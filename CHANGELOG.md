@@ -65,3 +65,7 @@ See "Deliberate deviations from Laravel" in `docs/protocol.md`:
 - A deferred `Scroll` prop reports its merge path (`posts.data`) like a resolved one.
 - `Back()` uses the `Referer` header with a fallback instead of a stored previous URL.
 - Flash data, errors and history flags use a Data Protection encrypted cookie by default, not the session.
+- Validation errors survive chained redirects like flash data.
+- A typed object given directly as a prop keeps partial-reload filtering for its members.
+- Lazy values at top-level dot keys stay lazy; any prop can be once, rescued, merged or deferred; list headers are trimmed.
+- An SSR response with an empty body falls back to client rendering; the Vite hot file is only read in Development.

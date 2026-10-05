@@ -15,7 +15,7 @@ When this document and the Laravel adapter disagree, Laravel wins. The exception
 | `props` | object | always. Always contains `errors` (defaults to `{}`) |
 | `url` | string | always. Path + query relative to host, keeping PathBase and the trailing slash |
 | `version` | string | always. `""` when no version is set |
-| `sharedProps` | string[] | top-level keys of the shared props, only when non-empty (option `ExposeSharedPropKeys`, default on) |
+| `sharedProps` | string[] | top-level keys of the shared props, only when non-empty (option `ExposeSharedPropKeys`, default on). `errors` is always shared, so with the option on it is always emitted and lists at least `"errors"` (as in Laravel, whose middleware shares `errors`) |
 | `mergeProps` | string[] | dot paths, only when non-empty |
 | `prependProps` | string[] | only when non-empty |
 | `deepMergeProps` | string[] | only when non-empty |
@@ -62,9 +62,11 @@ The middleware runs in this order:
 1. **Inertia GET with a version mismatch.** If `X-Inertia-Version` (absent = `""`) differs from the current version, respond `409` with `X-Inertia-Location: <absolute request URL>` and `X-Inertia-Version: <current>`, and keep the flash/state. This check runs **before** the handler (deliberate deviation 1). Non-GET requests never get the version 409.
 2. Run the handler.
 3. If the request is not an Inertia request, return the response unchanged.
-4. If the status is 200 and the body is empty, redirect back (Referer, falling back to `/`).
+4. If the status is 200 and the body is empty, redirect back (same-host Referer, falling back to the app root `PathBase/`).
 5. If the status is 302 and the method is PUT, PATCH or DELETE, change it to 303.
 6. If the response is a redirect, its `Location` contains `#`, and the request is not a prefetch, replace it with `409` and `X-Inertia-Redirect: <Location>` (empty body).
+
+"Redirect" means status 301, 302, 303, 307 or 308 (Symfony's `isRedirect()`, without 201). When the response is a redirect, or a `409` carrying `X-Inertia-Location`/`X-Inertia-Redirect`, the flash/errors/history flags (set during this request **or** restored and not rendered yet) are saved to the state store; any other response consumes the loaded state (§7).
 
 `Inertia.Location(url)` returns, for an Inertia request, `409` with `X-Inertia-Location: url` and an empty body. For any other request it returns `302 Location: url`.
 
@@ -197,7 +199,7 @@ isIncludedInPartialMetadata(p) = (only == null or matchesOnly(p)) and (except ==
 
 ## 7. Flash, clearHistory, preserveFragment
 
-All three are stored in the state store and survive a redirect.
+All three (and validation errors) are stored in the state store when a response redirects, and are carried through any number of further redirects until a response that is not a redirect consumes them (Laravel re-flashes its flash data on every redirect and keeps the history flags in the session until a page renders).
 
 | Item | How it is set | When it is emitted |
 |---|---|---|
@@ -235,5 +237,11 @@ The React refresh preamble is:
 
 1. **The version 409 check runs before the handler**, so no work is wasted rendering a page that will be discarded.
 2. **Scroll props:** `configureMergeIntent` runs before metadata is collected for a deferred Scroll prop, so a deferred scroll reports `"posts.data"` rather than root `"posts"`. Laravel 3.x has a quirk here.
-3. **Redirect back** uses the `Referer` header with a fallback, not a session-stored previous URL.
+3. **Redirect back** uses the `Referer` header only when it has the request's own host and port (no open redirect), falling back to `~/` (the app root, `PathBase` included) or the given fallback. Laravel uses any `Referer`, then the session's previous URL.
 4. **Flash, errors and history flags** go through a Data-Protection-encrypted cookie by default (AOT-safe; no Session/TempData requirement).
+5. **Validation errors survive chained redirects** like flash data does. Laravel re-flashes only its Inertia flash data, so its `errors` are lost when the redirect target redirects again.
+6. **Typed objects given directly are literal objects.** A POCO with `InertiaProp` members passed as a prop (not returned by a loader) keeps partial-reload filtering for its members, like an `InertiaProps` dictionary. Laravel resolves `JsonSerializable`/`Arrayable` objects first, so their children bypass the filter. The client deep-merges nested partial responses, so the result on the page is the same.
+7. **Lazy values at dot keys stay lazy.** `"auth.user" = Prop(...)` is unpacked as a prop and only resolved when included; Laravel calls closures at dot keys while unpacking. Intermediate plain lazy props are resolved, as in Laravel's `ensurePathIsTraversable`.
+8. **Supersets of Laravel's prop flags.** Any prop can be `Once()`, `Rescue()`d, merged or deferred (Laravel limits e.g. rescue to `DeferProp`), and list headers are trimmed (`"a, b"` works; Laravel does not trim).
+9. **SSR returning an empty body falls back to client rendering.** Laravel echoes the empty body.
+10. **The Vite hot file is only read in Development** (or use `Vite.DevServerUrl`), so a stale `hot` file deployed to production cannot point pages at a dev server. Laravel reads it in any environment.
