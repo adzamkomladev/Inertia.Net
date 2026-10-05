@@ -45,11 +45,13 @@ jobs:
       fail-fast: false
       matrix:
         # TODO: add vue (Mvc.Vue) and svelte (FastEndpoints.Svelte) once those samples exist.
-        sample: [react]
+        sample: [react, vue]
         include:
           - sample: react
             dir: MinimalApi.React
             ssr: "1" # also builds the SSR bundle, starts the SSR server and runs the SSR spec
+          - sample: vue
+            dir: Mvc.Vue
     env:
       SAMPLE: ${{ matrix.sample }}
       INERTIA_SSR: ${{ matrix.ssr }}

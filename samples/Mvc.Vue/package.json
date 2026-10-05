@@ -1,0 +1,21 @@
+{
+  "name": "mvc-vue",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@inertiajs/vite": "^3.8.0",
+    "@inertiajs/vue3": "^3.8.0",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.2",
+    "vue-tsc": "^3.3.12"
+  }
+}
