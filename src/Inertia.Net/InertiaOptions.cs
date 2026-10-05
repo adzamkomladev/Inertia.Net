@@ -13,7 +13,10 @@ public sealed class InertiaOptions
     /// <summary>The id of the root element and the <c>data-page</c> script. Default <c>app</c>.</summary>
     public string RootElementId { get; set; } = "app";
 
-    /// <summary>The asset version. Null means <c>""</c> unless <see cref="VersionResolver"/> returns one.</summary>
+    /// <summary>
+    /// The asset version. Null means a hash of the Vite manifest (<c>""</c> when there is none),
+    /// unless <see cref="VersionResolver"/> returns one.
+    /// </summary>
     public string? Version { get; set; }
 
     /// <summary>Resolves the asset version per request; wins over <see cref="Version"/> when it returns non-null.</summary>
@@ -36,6 +39,9 @@ public sealed class InertiaOptions
 
     /// <summary>Server-side rendering settings.</summary>
     public SsrOptions Ssr { get; } = new();
+
+    /// <summary>Where flash data, errors and history flags are kept across redirects.</summary>
+    public InertiaStateOptions State { get; } = new();
 
     /// <summary>Shares a prop with every page. Page props with the same key win.</summary>
     public InertiaOptions Share(string key, object? value)
@@ -100,4 +106,23 @@ public sealed class SsrOptions
 
     /// <summary>Request paths (<c>Request.Path</c>, without PathBase) that are never server-side rendered. Exact match, or a trailing <c>*</c> for a prefix match, e.g. <c>/admin/*</c>.</summary>
     public IList<string> ExcludePaths { get; } = [];
+}
+
+/// <summary>Settings for the store that carries flash data, errors and history flags across redirects.</summary>
+public sealed class InertiaStateOptions
+{
+    /// <summary>The cookie name (cookie store) or session key (session store). Default <c>.Inertia.State</c>.</summary>
+    public string CookieName { get; set; } = ".Inertia.State";
+
+    internal bool UsesSession { get; private set; }
+
+    /// <summary>
+    /// Keeps the state in <c>ISession</c> instead of the default encrypted cookie. Needs <c>services.AddSession()</c> and
+    /// <c>app.UseSession()</c> before <c>app.UseInertia()</c>.
+    /// </summary>
+    public InertiaStateOptions UseSession()
+    {
+        UsesSession = true;
+        return this;
+    }
 }

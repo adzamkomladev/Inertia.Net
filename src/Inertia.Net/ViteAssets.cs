@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -23,6 +24,8 @@ public sealed class ViteAssets
     private readonly bool _development;
     private readonly FileCache<ManifestState> _manifests;
     private readonly FileCache<string> _hotFiles;
+    private readonly FileCache<string> _manifestHashes;
+    private readonly string[] _manifestCandidates;
 
     /// <summary>Creates the service; registered as a singleton by <c>AddInertia</c>.</summary>
     public ViteAssets(IOptions<InertiaOptions> options, IHostEnvironment environment, TimeProvider timeProvider)
@@ -35,6 +38,11 @@ public sealed class ViteAssets
         _development = environment.IsDevelopment();
         _manifests = new FileCache<ManifestState>(ManifestState.Load, _development, timeProvider);
         _hotFiles = new FileCache<string>(ReadHotFile, _development, timeProvider);
+        _manifestHashes = new FileCache<string>(HashFile, _development, timeProvider);
+        var buildRoot = Path.Combine(_contentRoot, _options.PublicDirectory, _options.BuildDirectory);
+        _manifestCandidates = _options.ManifestPath is { } custom
+            ? [Path.Combine(_contentRoot, custom)]
+            : [Path.Combine(buildRoot, ".vite", "manifest.json"), Path.Combine(buildRoot, "manifest.json")];
     }
 
     /// <summary>True while the Vite dev server is considered running: <see cref="ViteOptions.DevServerUrl"/> is set, or (in Development only) the hot file exists.</summary>
@@ -166,13 +174,31 @@ public sealed class ViteAssets
             ? $"<link rel=\"stylesheet\" href=\"{url}\">\n"
             : $"<script type=\"module\" src=\"{url}\"></script>\n");
 
+    /// <summary>The asset version derived from the manifest: the first 16 bytes (hex) of its SHA-256, or <c>""</c> when there is no manifest.</summary>
+    internal string ManifestHash()
+    {
+        foreach (var path in _manifestCandidates)
+        {
+            if (_manifestHashes.Get(path) is { } hash)
+            {
+                return hash;
+            }
+        }
+
+        return "";
+    }
+
+    private static string HashFile(string path)
+    {
+        using var stream = File.OpenRead(path);
+        Span<byte> hash = stackalloc byte[SHA256.HashSizeInBytes];
+        SHA256.HashData(stream, hash);
+        return Convert.ToHexStringLower(hash[..16]);
+    }
+
     private ManifestState LoadManifest()
     {
-        var buildRoot = Path.Combine(_contentRoot, _options.PublicDirectory, _options.BuildDirectory);
-        string[] candidates = _options.ManifestPath is { } custom
-            ? [Path.Combine(_contentRoot, custom)]
-            : [Path.Combine(buildRoot, ".vite", "manifest.json"), Path.Combine(buildRoot, "manifest.json")];
-        foreach (var path in candidates)
+        foreach (var path in _manifestCandidates)
         {
             if (_manifests.Get(path) is { } manifest)
             {
@@ -180,7 +206,7 @@ public sealed class ViteAssets
             }
         }
 
-        throw new InvalidOperationException($"Vite manifest not found. Looked in: {string.Join(", ", candidates)}. Run the Vite build (e.g. 'npm run build'), start the dev server so the hot file exists, or set InertiaOptions.Vite.ManifestPath.");
+        throw new InvalidOperationException($"Vite manifest not found. Looked in: {string.Join(", ", _manifestCandidates)}. Run the Vite build (e.g. 'npm run build'), start the dev server so the hot file exists, or set InertiaOptions.Vite.ManifestPath.");
     }
 
     private string? DevOrigin()

@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Lets apps write Render(...), Defer(...), Back() unqualified. The namespace and the static class are both named Inertia
+    (Inertia.Net / Inertia.Net.Inertia), so "Inertia.Render" does not bind outside the Inertia.Net namespace.
+    Opt out with <InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>.
+  -->
+  <ItemGroup Condition="'$(ImplicitUsings)' == 'enable' and '$(InertiaNetImplicitUsings)' != 'false'">
+    <Using Include="Inertia.Net" />
+    <Using Include="Inertia.Net.Inertia" Static="true" />
+  </ItemGroup>
+</Project>
