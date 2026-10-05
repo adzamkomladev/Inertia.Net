@@ -21,6 +21,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - uses: actions/setup-node@v4 # the SsrNodeProcess tests run a JS fixture under Node
+        with:
+          node-version: 24
       - run: dotnet build Inertia.Net.slnx -c Release -warnaserror
       - run: dotnet test Inertia.Net.slnx -c Release --no-build
       - name: Pack
@@ -48,7 +51,7 @@ jobs:
         include:
           - sample: react
             dir: MinimalApi.React
-            ssr: "1" # also builds the SSR bundle, starts the SSR server and runs the SSR spec
+            ssr: "1" # also builds the SSR bundle (the sample starts the SSR server itself) and runs the SSR spec
           - sample: vue
             dir: Mvc.Vue
           - sample: svelte

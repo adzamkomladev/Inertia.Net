@@ -81,10 +81,10 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 - [x] Precognition (live validation)
 - [x] Flash data (`flash`)
 - [x] `encryptHistory`, `clearHistory`, `preserveFragment`, `preserveBigIntegers`
-- [x] Server-side rendering (production Node server, Vite dev server, health check)
+- [x] Server-side rendering (production Node server, optionally started and supervised by the app, Vite dev server, health check)
 - [x] Vite manifest and dev-server tags, CDN asset base URL
 
-Not in 1.0: spawning and managing the Node SSR process (run it with Docker or a process manager), v2 protocol compatibility, a TempData state store.
+Not in 1.0: v2 protocol compatibility, a TempData state store.
 
 ---
 
@@ -1128,7 +1128,7 @@ Build both bundles. The SSR build writes a Node script; run it with Node:
 node ssr/ssr.js        # listens on http://127.0.0.1:13714
 ```
 
-The SSR build leaves `node_modules` imports external, so run the server where `node_modules` is installed (a Docker image with `npm ci --omit=dev` is the usual way). Inertia.Net does not start or supervise this process. Run it with a process manager (systemd, pm2) or as a sidecar container (`docker compose` service) and point `o.Ssr.Url` at it.
+The SSR build leaves `node_modules` imports external, so run the server where `node_modules` is installed (a Docker image with `npm ci --omit=dev` is the usual way). Either let the app start it (`o.Ssr.UseNodeProcess()`, below), or run it yourself with a process manager (systemd, pm2) or as a sidecar container (`docker compose` service) and point `o.Ssr.Url` at it.
 
 ### 2. Enable it
 
@@ -1143,6 +1143,27 @@ builder.Services.AddInertia(o =>
     o.Ssr.ThrowOnError = false;                      // default: log and fall back to client-side rendering
 });
 ```
+
+#### Let the app run the Node server
+
+```csharp
+o.Ssr.UseNodeProcess();          // also sets Enabled = true
+o.Ssr.UseNodeProcess(n =>
+{
+    n.BundlePath = "ssr/ssr.js";                 // default: Ssr.BundlePath, else the first of ssr/ssr.{js,mjs}, bootstrap/ssr/ssr.{js,mjs}, dist/ssr.{js,mjs}
+    n.Executable = "node";                       // default, looked up on PATH
+    n.Arguments.Add("--enable-source-maps");     // Node options, passed before the bundle path
+    n.Environment["NODE_OPTIONS"] = "--max-old-space-size=512";
+    n.WorkingDirectory = null;                   // default: the content root
+    n.StartupTimeout = TimeSpan.FromSeconds(10); // default
+    n.RestartOnExit = true;                      // default
+});
+```
+
+A hosted service runs `node {bundle}` (no shell) when the app starts, logs its stdout (Information) and stderr (Warning) under the `Inertia.Net.Ssr` category, and waits up to `StartupTimeout` for `GET {Url}/health`. A missing bundle, a missing `node` or a startup timeout is logged and pages render on the client; with `ThrowOnError = true` app startup fails with `InertiaSsrException` (`Type = "startup"`). If the process exits, it is restarted after 1 s, doubling up to 30 s. On shutdown the app calls `{Url}/shutdown` (the v3 server exits on it) and kills the process tree if it is still running after 5 s. Nothing is spawned while the Vite dev server runs.
+
+- **Port.** The v3 server (`createServer` in `@inertiajs/core`) takes its port and host only from its options, which `@inertiajs/vite` bakes into the bundle at build time: `inertia({ ssr: { port, host } })`, default `13714` on `0.0.0.0`. There is no CLI flag or environment variable. Keep the build port and `o.Ssr.Url` in sync (`host: '127.0.0.1'` keeps it off the network). The process also gets `INERTIA_SSR_PORT` (the port of `Ssr.Url`) and `NODE_ENV=production` (unless set), so a hand-written entry can follow the app: `createServer(render, { port: Number(process.env.INERTIA_SSR_PORT) })`.
+- **Orphans.** A graceful shutdown (Ctrl+C, SIGTERM, `docker stop`, IIS recycle) stops Node. If the .NET process is killed outright or crashes hard, the OS does not take Node with it; the next start then finds the port taken and keeps restarting Node with warnings until the old process is gone. Use a process manager or container for hard-crash cleanup.
 
 - The server posts the page JSON to `{Url}/render` and reads `{ "head": [...], "body": "..." }`. `@inertiaHead` outputs the head tags joined with `\n`, and `@inertia` outputs the body verbatim.
 - On a structured `500` from the SSR server, a timeout, a connection error or an empty response, Inertia.Net logs a warning (with the server's `hint` and source location when it sends them) and **falls back to client-side rendering**. With `ThrowOnError = true` it throws `InertiaSsrException` (`Type` is the server's error type or `connection`, `timeout`, `http`, `response`; `Hint` carries the fix suggestion).
@@ -1411,6 +1432,19 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `ThrowOnError` | `false` | Throw `InertiaSsrException` instead of falling back to client rendering. |
 | `BundlePath` | `null` | Skip SSR while this file is missing, unless the Vite dev server runs. |
 | `ExcludePaths` | empty | Request paths never rendered on the server: exact, or a trailing `*` for a prefix. |
+| `UseNodeProcess(configure?)` | off | Start and supervise the Node SSR server with the app (sets `Enabled`). Options below. |
+
+### `o.Ssr.UseNodeProcess(n => ...)`: `SsrNodeProcessOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `BundlePath` | `Ssr.BundlePath`, else probed | Bundle to run, relative to the content root. Probes `ssr/ssr.{js,mjs}`, `bootstrap/ssr/ssr.{js,mjs}`, `dist/ssr.{js,mjs}`. |
+| `Executable` | `"node"` | Node executable (path, or name on `PATH`). |
+| `Arguments` | empty | Node options, passed before the bundle path. |
+| `Environment` | empty | Extra environment variables (the app's environment is inherited; `INERTIA_SSR_PORT` and `NODE_ENV=production` are added). |
+| `WorkingDirectory` | content root | Process working directory. |
+| `StartupTimeout` | `10 s` | How long startup waits for `/health`; then a warning (or `InertiaSsrException` with `ThrowOnError`). |
+| `RestartOnExit` | `true` | Restart after an unexpected exit, 1 s doubling to 30 s. |
 
 ### `o.State`: `InertiaStateOptions`
 
@@ -1513,7 +1547,7 @@ An `InertiaProp` ended up somewhere Inertia.Net does not walk: a `Flash(...)` va
 Add the type to your `JsonSerializerContext` and chain it with `ConfigureHttpJsonOptions` (see [Native AOT](#native-aot)). Setting `JsonSerializerIsReflectionEnabledByDefault=false` in regular builds finds these early.
 
 **SSR does not run and there is no error.**
-SSR falls back to client rendering on any failure: look for the warning `Inertia SSR failed (...)` in the logs, which includes the server's hint. Check `o.Ssr.Enabled`, `Url`, that the Node server is running (`GET /health`), that `BundlePath` points at the built file, and that the path is not in `ExcludePaths`. Set `ThrowOnError = true` in Development to surface the failure.
+SSR falls back to client rendering on any failure: look for the warning `Inertia SSR failed (...)` in the logs, which includes the server's hint. Check `o.Ssr.Enabled`, `Url`, that the Node server is running (`GET /health`; with `UseNodeProcess()` look for `Inertia.Net.Ssr` log lines), that `BundlePath` points at the built file, and that the path is not in `ExcludePaths`. Set `ThrowOnError = true` in Development to surface the failure.
 
 **The SSR output is not hydrated, or I see a hydration warning.**
 Use the hydrating client entry shown in [Server-side rendering](#server-side-rendering) and build both bundles from the same sources. The SSR body is marked `data-server-rendered="true"`.

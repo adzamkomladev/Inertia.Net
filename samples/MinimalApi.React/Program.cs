@@ -16,8 +16,11 @@ builder.Services.AddInertia(o =>
 {
     o.Share("appName", "Inertia.Net Sample");
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
-    o.Ssr.Enabled = ssr;
     o.Ssr.BundlePath = "ssr/ssr.js";
+    if (ssr)
+    {
+        o.Ssr.UseNodeProcess(); // the app starts and supervises `node ssr/ssr.js` (port 13714, the default Ssr.Url)
+    }
 });
 
 var app = builder.Build();
