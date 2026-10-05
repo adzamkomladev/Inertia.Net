@@ -492,3 +492,5 @@ artifacts/
 
 # Claude Code local worktrees
 .claude/worktrees/
+samples/*/ssr/
+samples/*/wwwroot/hot

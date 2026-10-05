@@ -1,0 +1,60 @@
+{
+  "ClientApp/app.tsx": {
+    "file": "assets/app-_yUgHOev.js",
+    "name": "app",
+    "src": "ClientApp/app.tsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "ClientApp/pages/Contacts/Create.tsx",
+      "ClientApp/pages/Feed/Index.tsx",
+      "ClientApp/pages/Home.tsx",
+      "ClientApp/pages/Users/Index.tsx"
+    ]
+  },
+  "ClientApp/pages/Contacts/Create.tsx": {
+    "file": "assets/Create-BydcCQ-N.js",
+    "name": "Create",
+    "src": "ClientApp/pages/Contacts/Create.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "ClientApp/app.tsx",
+      "_Layout-CtjCU0CK.js"
+    ]
+  },
+  "ClientApp/pages/Feed/Index.tsx": {
+    "file": "assets/Index-CIte5Uge.js",
+    "name": "Index",
+    "src": "ClientApp/pages/Feed/Index.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "ClientApp/app.tsx",
+      "_Layout-CtjCU0CK.js"
+    ]
+  },
+  "ClientApp/pages/Home.tsx": {
+    "file": "assets/Home-CG8KAJw7.js",
+    "name": "Home",
+    "src": "ClientApp/pages/Home.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_Layout-CtjCU0CK.js"
+    ]
+  },
+  "ClientApp/pages/Users/Index.tsx": {
+    "file": "assets/Index-B0g3EXKA.js",
+    "name": "Index",
+    "src": "ClientApp/pages/Users/Index.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "ClientApp/app.tsx",
+      "_Layout-CtjCU0CK.js"
+    ]
+  },
+  "_Layout-CtjCU0CK.js": {
+    "file": "assets/Layout-CtjCU0CK.js",
+    "name": "Layout",
+    "imports": [
+      "ClientApp/app.tsx"
+    ]
+  }
+}
