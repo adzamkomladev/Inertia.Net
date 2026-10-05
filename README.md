@@ -961,7 +961,10 @@ Read it on the client with `usePage().flash` (or the `onFlash` visit callback).
 
 - **Default: an encrypted cookie** (`.Inertia.State`). It is protected with ASP.NET Core Data Protection, HttpOnly, SameSite=Lax, and works without sessions and under Native AOT. Tampered or undecryptable cookies are ignored and deleted. It logs a warning above about 4 KB: browsers drop larger cookies.
 - **Session store (opt in):** `o.State.UseSession()`, with `services.AddSession()` and `app.UseSession()` before `app.UseInertia()`.
+- **TempData store (MVC package):** `AddInertiaMvc(o => o.UseTempDataStateStore())` keeps the state in MVC TempData, so it follows your TempData provider: the default cookie provider, or `AddSessionStateTempDataProvider()` with `AddSession()` and `app.UseSession()` before `app.UseInertia()`. It works for Minimal API endpoints too (the store saves TempData itself). Not Native AOT compatible.
 - **Your own store:** implement `IInertiaStateStore` (`LoadAsync`, `SaveAsync`, `ClearAsync`, all moving opaque bytes) and register it before `AddInertia`.
+
+**Which one?** Use the default cookie unless you have a reason not to (stateless, AOT safe, ~4 KB limit). Choose the session store when flash data can be large or must not reach the browser, and you already run sessions. Choose the TempData store when the app already standardizes on MVC TempData (for example one provider shared with `TempData["..."]` in views), or you want to switch between cookie and session TempData by changing only the provider.
 
 In a multi-instance deployment, configure Data Protection with a shared key ring, or the cookie written by one instance cannot be read by another.
 
@@ -1418,6 +1421,7 @@ Most per-request allocation in a real handler is the props you build, not the re
 |---|---|---|
 | `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. |
+| `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData (cookie or session provider) instead of the encrypted cookie. Inertia.Net.Mvc package. |
 
 ### Middleware, endpoint and result API
 
