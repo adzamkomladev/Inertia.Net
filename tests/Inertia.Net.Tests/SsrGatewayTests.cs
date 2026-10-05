@@ -147,6 +147,16 @@ public sealed class SsrGatewayTests
     }
 
     [Fact]
+    public async Task Misconfigured_url_falls_back_instead_of_failing_the_page()
+    {
+        // What HttpClient throws for e.g. Ssr.Url = "localhost:13714" (no scheme).
+        var harness = Create(new FakeHandler((_, _) => throw new NotSupportedException("The 'localhost' scheme is not supported.")));
+        AssertClientRendered(await GetAsync(harness));
+
+        Assert.Contains("(unknown)", Assert.Single(harness.Logs.Entries, e => e.Level == LogLevel.Warning).Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Aborted_request_is_not_treated_as_a_timeout()
     {
         var handler = new FakeHandler(async (_, ct) =>

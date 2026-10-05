@@ -100,6 +100,11 @@ internal sealed partial class SsrGateway(
         {
             return Fail(ssr, "connection", $"Could not reach the SSR server at {url}: {ex.Message}", null, ex);
         }
+        catch (Exception ex) when (ex is not InertiaSsrException)
+        {
+            // e.g. a malformed Ssr.Url; like Laravel, SSR problems never take the page down unless ThrowOnError is set.
+            return Fail(ssr, "unknown", $"SSR request to {url} failed: {ex.Message}", null, ex);
+        }
     }
 
     /// <summary>Matches the request path against exact entries and entries ending in <c>*</c> (prefix match).</summary>
