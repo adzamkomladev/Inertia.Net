@@ -8,6 +8,10 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Global usings for consumers (Inertia.Net + using static Inertia.Net.Inertia); see the file for the opt-out. -->
+    <None Include="buildTransitive\Inertia.Net.props" Pack="true" PackagePath="buildTransitive\" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="Inertia.Net.Tests" />
     <InternalsVisibleTo Include="Inertia.Net.IntegrationTests" />
     <InternalsVisibleTo Include="Inertia.Net.Benchmarks" />

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
@@ -22,6 +23,11 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<InertiaPageWriter>();
         services.AddHttpClient(SsrGateway.HttpClientName);
         services.TryAddSingleton<IInertiaSsrRenderer, SsrGateway>();
+        services.TryAddSingleton<VersionProvider>();
+        services.AddDataProtection();
+        services.TryAddSingleton<IInertiaStateStore>(sp => sp.GetRequiredService<IOptions<InertiaOptions>>().Value.State.UsesSession
+            ? ActivatorUtilities.CreateInstance<SessionInertiaStateStore>(sp)
+            : ActivatorUtilities.CreateInstance<CookieInertiaStateStore>(sp));
         return services;
     }
 }

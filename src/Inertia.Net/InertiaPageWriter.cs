@@ -20,11 +20,14 @@ internal sealed class InertiaPageWriter
     private readonly JsonWriterOptions _jsonWriterOptions;
     private readonly JsonWriterOptions _htmlWriterOptions;
 
-    public InertiaPageWriter(IOptions<InertiaOptions> options, IOptions<HttpJsonOptions> jsonOptions, TimeProvider timeProvider, ILogger<InertiaPageWriter> logger)
+    private readonly VersionProvider _versionProvider;
+
+    public InertiaPageWriter(IOptions<InertiaOptions> options, IOptions<HttpJsonOptions> jsonOptions, TimeProvider timeProvider, ILogger<InertiaPageWriter> logger, VersionProvider versionProvider)
     {
         Options = options.Value;
         TimeProvider = timeProvider;
         Logger = logger;
+        _versionProvider = versionProvider;
 
         var source = jsonOptions.Value.SerializerOptions;
         var serializerOptions = new JsonSerializerOptions(source)
@@ -73,7 +76,7 @@ internal sealed class InertiaPageWriter
             writer.WritePropertyName("props");
             await propsWriter.WritePropsAsync(entries);
             writer.WriteString("url", GetUrl(httpContext.Request));
-            writer.WriteString("version", GetVersion(httpContext));
+            writer.WriteString("version", _versionProvider.GetVersion(httpContext));
             propsWriter.WriteMetadata(sharedPropKeys);
 
             if (Options.PreserveBigIntegers)
@@ -147,10 +150,6 @@ internal sealed class InertiaPageWriter
         var url = string.Concat(request.PathBase.ToUriComponent(), request.Path.ToUriComponent(), request.QueryString.ToUriComponent());
         return url.Length == 0 ? "/" : url;
     }
-
-    // ponytail: Phase 2a replaces this with the precomputed VersionProvider.
-    private string GetVersion(HttpContext httpContext) =>
-        Options.VersionResolver?.Invoke(httpContext) ?? Options.Version ?? "";
 
     // errors (always), then option shares, then request shares, then page props; later keys override earlier ones in place.
     private async ValueTask<List<PropEntry>> BuildPropsAsync(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<string>? sharedPropKeys)
