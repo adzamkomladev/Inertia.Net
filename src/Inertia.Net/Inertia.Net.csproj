@@ -15,5 +15,6 @@
     <InternalsVisibleTo Include="Inertia.Net.Tests" />
     <InternalsVisibleTo Include="Inertia.Net.IntegrationTests" />
     <InternalsVisibleTo Include="Inertia.Net.Benchmarks" />
+    <InternalsVisibleTo Include="Inertia.Net.FastEndpoints" />
   </ItemGroup>
 </Project>
