@@ -27,16 +27,16 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack Inertia.Net.slnx -c Release --no-build -o artifacts
 
-  # TODO(phase 5): publish tests/Inertia.Net.AotSmoke with -r linux-x64 -p:PublishAot=true
-  # (warnings as errors), start the binary and run the scripted request assertions.
-  # aot-smoke:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-dotnet@v4
-  #       with:
-  #         global-json-file: global.json
-  #     - run: dotnet publish tests/Inertia.Net.AotSmoke -c Release -r linux-x64 -p:PublishAot=true -warnaserror
+  # Native AOT publish of tests/Inertia.Net.AotSmoke (any IL2xxx/IL3xxx warning fails), then protocol smoke checks on the binary.
+  aot-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - run: bash eng/aot-smoke.sh
 
   # TODO(phase 6): Node 22, npm ci, build the sample frontends, run Playwright (tests/e2e).
   # e2e:
