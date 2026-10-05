@@ -1,4 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- What a package consumer gets from buildTransitive/: global usings for Inertia.Net and its static Inertia class. -->
+  <Import Project="..\..\src\Inertia.Net\buildTransitive\Inertia.Net.props" />
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>Inertia.Net.Benchmarks</RootNamespace>
@@ -8,6 +10,7 @@
     <PackageReference Include="BenchmarkDotNet" />
   </ItemGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
   </ItemGroup>
 </Project>

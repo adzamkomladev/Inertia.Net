@@ -1,0 +1,15 @@
+{
+  "src/app.tsx": {
+    "file": "assets/app-4f2a91c3.js",
+    "name": "app",
+    "src": "src/app.tsx",
+    "isEntry": true,
+    "imports": ["_vendor-8d1e0b7a.js"],
+    "css": ["assets/app-1c9b6e2d.css"]
+  },
+  "_vendor-8d1e0b7a.js": {
+    "file": "assets/vendor-8d1e0b7a.js",
+    "name": "vendor",
+    "css": ["assets/vendor-55aa01ff.css"]
+  }
+}

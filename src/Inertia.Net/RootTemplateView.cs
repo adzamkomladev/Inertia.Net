@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -25,6 +26,7 @@ internal sealed class RootTemplateView : IInertiaRootView
     private readonly ViteAssets _vite;
     private readonly IInertiaSsrRenderer? _ssr;
     private readonly FileCache<RootTemplate> _templates;
+    private readonly ConcurrentDictionary<string, string> _paths = new(StringComparer.Ordinal); // root view name -> full path
 
     public RootTemplateView(IHostEnvironment environment, ViteAssets vite, TimeProvider timeProvider, IInertiaSsrRenderer? ssr = null)
     {
@@ -36,7 +38,7 @@ internal sealed class RootTemplateView : IInertiaRootView
 
     public async ValueTask RenderAsync(InertiaRootViewContext context)
     {
-        var path = Path.Combine(_contentRoot, context.RootView);
+        var path = _paths.GetOrAdd(context.RootView, static (view, root) => Path.Combine(root, view), _contentRoot);
         var template = _templates.Get(path)
             ?? throw new FileNotFoundException($"The Inertia root template '{path}' was not found. Create it (it must contain @inertia), or set InertiaOptions.RootView / InertiaResult.WithRootView.", path);
 

@@ -205,6 +205,9 @@ internal sealed class PropsWriter : IDisposable
             case JsonElement element:
                 element.WriteTo(_writer);
                 return;
+            case Dictionary<string, object?> dictionary: // InertiaProps: struct enumerator, no boxing
+                await WriteObjectAsync(dictionary, parentWasResolved);
+                return;
             case IReadOnlyDictionary<string, object?> dictionary:
                 await WriteObjectAsync(dictionary, parentWasResolved);
                 return;
@@ -244,11 +247,24 @@ internal sealed class PropsWriter : IDisposable
         _writer.WriteEndObject();
     }
 
+    private async ValueTask WriteObjectAsync(Dictionary<string, object?> entries, bool parentWasResolved)
+    {
+        _writer.WriteStartObject();
+        foreach (var (key, value) in entries)
+        {
+            await WriteEntryAsync(key, -1, value, typeof(object), parentWasResolved);
+        }
+
+        _writer.WriteEndObject();
+    }
+
     private async ValueTask WriteObjectAsync(object value, JsonTypeInfo info, bool parentWasResolved)
     {
         _writer.WriteStartObject();
-        foreach (var property in info.Properties)
+        var properties = info.Properties;
+        for (var i = 0; i < properties.Count; i++) // indexed: foreach over the IList boxes an enumerator
         {
+            var property = properties[i];
             if (_owner.TryGetPropertyValue(property, value, out var propertyValue))
             {
                 await WriteEntryAsync(property.Name, -1, propertyValue, property.PropertyType, parentWasResolved);
@@ -383,20 +399,24 @@ internal sealed class PropsWriter : IDisposable
         }
         else
         {
-            foreach (var appendPath in appendPaths ?? [])
-            {
-                (_mergeProps ??= []).Add($"{path}.{appendPath}");
-            }
-
-            foreach (var prependPath in prependPaths ?? [])
-            {
-                (_prependProps ??= []).Add($"{path}.{prependPath}");
-            }
+            AddPaths(ref _mergeProps, path, appendPaths);
+            AddPaths(ref _prependProps, path, prependPaths);
         }
 
-        foreach (var key in prop.MatchOnKeys ?? [])
+        AddPaths(ref _matchPropsOn, path, prop.MatchOnKeys);
+    }
+
+    // Adds "{path}.{suffix}" for each suffix. (A `suffixes ?? []` fallback would allocate an empty list per call.)
+    private static void AddPaths(ref List<string>? target, string path, List<string>? suffixes)
+    {
+        if (suffixes is null)
         {
-            (_matchPropsOn ??= []).Add($"{path}.{key}");
+            return;
+        }
+
+        foreach (var suffix in suffixes)
+        {
+            (target ??= []).Add($"{path}.{suffix}");
         }
     }
 
@@ -433,7 +453,7 @@ internal sealed class PropsWriter : IDisposable
     }
 
     // path == filter, or path is a descendant of filter.
-    private static bool MatchesAny(string[] filters, ReadOnlySpan<char> path)
+    internal static bool MatchesAny(string[] filters, ReadOnlySpan<char> path)
     {
         foreach (var filter in filters)
         {
@@ -447,7 +467,7 @@ internal sealed class PropsWriter : IDisposable
     }
 
     // path is an ancestor of filter.
-    private static bool LeadsToAny(string[] filters, ReadOnlySpan<char> path)
+    internal static bool LeadsToAny(string[] filters, ReadOnlySpan<char> path)
     {
         foreach (var filter in filters)
         {
