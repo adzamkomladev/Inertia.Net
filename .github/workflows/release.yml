@@ -1,0 +1,67 @@
+name: release
+
+# Push a tag such as v1.0.0 (or v1.1.0-rc.1 for a prerelease) to build, test, pack and publish to NuGet.
+on:
+  push:
+    tags: ['v*']
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+permissions:
+  contents: write # create the GitHub Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Resolve the version from the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '$GITHUB_REF_NAME' is not a semantic version (expected vMAJOR.MINOR.PATCH[-prerelease])."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      # The same -p:Version for build and pack, so the assemblies and the packages agree.
+      - run: dotnet build Inertia.Net.slnx -c Release -warnaserror -p:Version=$VERSION
+      - run: dotnet test Inertia.Net.slnx -c Release --no-build
+
+      # Only the four src projects are packable: Inertia.Net, .Mvc, .FastEndpoints and .Testing. They are packed one by one,
+      # because packing the solution also warns about every non-packable test project.
+      # SourceLink and the snupkg symbol packages come from src/Directory.Build.props.
+      - name: Pack
+        run: |
+          for project in src/*/*.csproj; do
+            dotnet pack "$project" -c Release --no-build -p:Version=$VERSION -o artifacts
+          done
+
+      - name: Check the package set
+        run: |
+          ls -l artifacts
+          for id in Inertia.Net Inertia.Net.Mvc Inertia.Net.FastEndpoints Inertia.Net.Testing; do
+            test -f "artifacts/$id.$VERSION.nupkg" || { echo "Missing artifacts/$id.$VERSION.nupkg"; exit 1; }
+          done
+
+      # A .snupkg next to a .nupkg is pushed to the symbol server automatically.
+      - name: Push to NuGet
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+      - name: Create the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
