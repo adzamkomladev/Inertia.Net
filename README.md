@@ -1479,6 +1479,9 @@ Behavior differences to check when you migrate:
 **`Inertia.Render(...)` does not compile / "'Inertia' is a namespace".**
 Call `Render(...)` unqualified. The namespace `Inertia.Net` shadows the class name outside the `Inertia.Net` namespace. The global usings come from the package's `buildTransitive` props and need `<ImplicitUsings>enable</ImplicitUsings>`. Without implicit usings (or with `InertiaNetImplicitUsings` set to `false`) add `using static Inertia.Net.Inertia;` to the file. See the [callout](#installation). A class library that references `Inertia.Net` gets the same global usings.
 
+**Generated code fails with "'Inertia' is a type" (e.g. FastEndpoints' source generator).**
+Inside a namespace that starts with `Inertia.Net.`, the name `Inertia` binds to the `Inertia.Net.Inertia` class. Source generators that emit non-`global::` names starting with `Inertia` then break. Don't put your app's code under an `Inertia.Net.*` namespace.
+
 **`Vite manifest not found. Looked in: ...`**
 Run `npm run build`, or start the dev server so the hot file exists (in Development), or set `o.Vite.ManifestPath` / `o.Vite.BuildDirectory`. Check that Vite writes `.vite/manifest.json` (`build.manifest: true`, Vite 5 and later) to `wwwroot/build`, and that the build output is part of what you deploy.
 
