@@ -34,7 +34,22 @@ public static class InertiaValidationEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.DisableValidation();
-        builder.AddEndpointFilterFactory(InertiaValidationFilter.Create);
+        builder.AddEndpointFilterFactory((context, next) => InertiaValidationFilter.Create(context, next, precognition: false));
+        return builder;
+    }
+
+    /// <summary>
+    /// <see cref="WithInertiaValidation{TBuilder}"/> plus Precognition (<c>Precognition: true</c> live validation requests): the
+    /// request is validated and answered without running the handler or any endpoint filter added after this one, with
+    /// <c>204</c> (<c>Precognition-Success: true</c>) when valid, otherwise <c>422</c> with <c>{ "message", "errors": { field: [messages] } }</c>,
+    /// limited to the fields named by <c>Precognition-Validate-Only</c>. Use it instead of <c>WithInertiaValidation()</c>, not in addition.
+    /// </summary>
+    public static TBuilder WithInertiaPrecognition<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.DisableValidation();
+        builder.AddEndpointFilterFactory((context, next) => InertiaValidationFilter.Create(context, next, precognition: true));
         return builder;
     }
 }
@@ -42,13 +57,26 @@ public static class InertiaValidationEndpointExtensions
 /// <summary>The endpoint filter behind <see cref="InertiaValidationEndpointExtensions.WithInertiaValidation"/>.</summary>
 internal static class InertiaValidationFilter
 {
-    public static EndpointFilterDelegate Create(EndpointFilterFactoryContext context, EndpointFilterDelegate next)
+    public static JsonNamingPolicy? NamingPolicy(IServiceProvider services) =>
+        services.GetService<InertiaPageWriter>()?.SerializerOptions.PropertyNamingPolicy;
+
+    public static EndpointFilterDelegate Create(EndpointFilterFactoryContext context, EndpointFilterDelegate next, bool precognition)
     {
         var validatable = FindValidatableParameters(context);
-        var naming = context.ApplicationServices.GetService<InertiaPageWriter>()?.SerializerOptions.PropertyNamingPolicy;
+        var naming = NamingPolicy(context.ApplicationServices);
         return async invocation =>
         {
             var httpContext = invocation.HttpContext;
+            if (precognition)
+            {
+                if (InertiaPrecognition.IsPrecognitive(httpContext.Request))
+                {
+                    return InertiaPrecognition.Result(httpContext, validatable is null ? null : await ValidateAsync(invocation, validatable.Value), naming);
+                }
+
+                InertiaPrecognition.AppendVary(httpContext.Response.Headers);
+            }
+
             if (validatable is not null && await ValidateAsync(invocation, validatable.Value) is { } errors)
             {
                 return IsInertiaMutation(httpContext) ? Back(httpContext, ToClientKeys(errors, naming)) : TypedResults.ValidationProblem(errors);
