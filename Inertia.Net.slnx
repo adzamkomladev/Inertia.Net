@@ -5,6 +5,9 @@
     <Project Path="src/Inertia.Net.Testing/Inertia.Net.Testing.csproj" />
     <Project Path="src/Inertia.Net/Inertia.Net.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/MinimalApi.React/MinimalApi.React.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Inertia.Net.AotSmoke/Inertia.Net.AotSmoke.csproj" />
     <Project Path="tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj" />

@@ -1,0 +1,1 @@
+import{n as e,t}from"./Layout-CtjCU0CK.js";var n=e();function r(){return(0,n.jsx)(t,{children:(0,n.jsx)(`h1`,{"data-testid":`home-title`,children:`Home`})})}export{r as default};
