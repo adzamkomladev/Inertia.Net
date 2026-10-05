@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- What a package consumer gets from buildTransitive/: global usings for Inertia.Net and its static Inertia class. -->
+  <Import Project="..\..\src\Inertia.Net\buildTransitive\Inertia.Net.props" />
+  <PropertyGroup>
+    <RootNamespace>FastEndpoints.Svelte</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Inertia.Net.FastEndpoints\Inertia.Net.FastEndpoints.csproj" />
+    <!-- Source-generated endpoint discovery (DiscoveredTypes.All), the Native AOT friendly way to register endpoints. -->
+    <PackageReference Include="FastEndpoints.Generator" PrivateAssets="all" />
+  </ItemGroup>
+  <!-- The frontend is built separately (npm run build); dotnet build never needs Node. -->
+  <ItemGroup>
+    <Content Remove="node_modules\**;ClientApp\**;package*.json;tsconfig*.json" />
+    <None Remove="node_modules\**;ClientApp\**" />
+    <Content Update="app.html" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
