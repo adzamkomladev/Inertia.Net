@@ -120,9 +120,24 @@ public readonly struct InertiaRequest
         return string.IsNullOrEmpty(value) ? null : value;
     }
 
+    // Two passes (count, then copy) so the result is allocated once at its exact size.
     private static string[]? ParseList(StringValues values)
     {
-        List<string>? list = null;
+        var count = ParseList(values, null);
+        if (count == 0)
+        {
+            return null;
+        }
+
+        var list = new string[count];
+        ParseList(values, list);
+        return list;
+    }
+
+    // Counts the non-empty trimmed entries, copying them into target when given.
+    private static int ParseList(StringValues values, string[]? target)
+    {
+        var count = 0;
         foreach (var value in values)
         {
             var span = value.AsSpan();
@@ -131,11 +146,16 @@ public readonly struct InertiaRequest
                 var part = span[range].Trim();
                 if (!part.IsEmpty)
                 {
-                    (list ??= []).Add(part.ToString());
+                    if (target is not null)
+                    {
+                        target[count] = part.ToString();
+                    }
+
+                    count++;
                 }
             }
         }
 
-        return list?.ToArray();
+        return count;
     }
 }

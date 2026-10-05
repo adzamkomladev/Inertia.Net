@@ -158,32 +158,34 @@ internal enum PropLoad
 internal sealed class InertiaProp<T> : InertiaProp
 {
     private readonly T? _value;
+    private readonly Func<T>? _syncLoader; // kept as-is: wrapping it in an async loader would allocate a closure per prop
     private readonly Func<CancellationToken, ValueTask<T>>? _loader;
 
-    private InertiaProp(T? value, Func<CancellationToken, ValueTask<T>>? loader)
+    private InertiaProp(T? value, Func<T>? syncLoader, Func<CancellationToken, ValueTask<T>>? loader)
     {
         _value = value;
+        _syncLoader = syncLoader;
         _loader = loader;
     }
 
-    internal static InertiaProp<T> FromValue(T value) => new(value, null);
+    internal static InertiaProp<T> FromValue(T value) => new(value, null, null);
 
     internal static InertiaProp<T> FromLoader(Func<CancellationToken, ValueTask<T>> loader)
     {
         ArgumentNullException.ThrowIfNull(loader);
-        return new(default, loader);
+        return new(default, null, loader);
     }
 
     internal static InertiaProp<T> FromLoader(Func<T> loader)
     {
         ArgumentNullException.ThrowIfNull(loader);
-        return new(default, _ => new ValueTask<T>(loader()));
+        return new(default, loader, null);
     }
 
     internal override Type ValueType => typeof(T);
 
     internal override async ValueTask<object?> ResolveAsync(CancellationToken cancellationToken) =>
-        _loader is null ? _value : await _loader(cancellationToken);
+        _loader is not null ? await _loader(cancellationToken) : _syncLoader is not null ? _syncLoader() : _value;
 }
 
 /// <summary>

@@ -1,20 +1,38 @@
 # Inertia.Net.Mvc
 
-Part of Inertia.Net, a .NET 10 server adapter for the Inertia.js v3 protocol.
-See the repository README for documentation.
+MVC integration for [Inertia.Net](https://github.com/OWNER/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
 
-Controllers return the core results (`return Render("Users/Index", props);`, `Back()`, `Location(url)`). This package adds:
+```sh
+dotnet add package Inertia.Net
+dotnet add package Inertia.Net.Mvc
+```
 
 ```csharp
 builder.Services.AddInertia();
 builder.Services.AddControllersWithViews().AddInertiaMvc(o => o.UseRazorRootView("App")); // UseRazorRootView is optional
+
+var app = builder.Build();
+app.UseStaticFiles();
+app.UseInertia();
+app.MapControllers();
 ```
 
-- `InertiaModelStateFilter` (global): an Inertia non-GET request with invalid `ModelState` is redirected back with the errors in the
-  `X-Inertia-Error-Bag` bag (default `default`). Keys are model paths with each segment through the MVC JSON naming policy
-  (`Address.Street` becomes `address.street`). `[ApiController]` controllers work too: their automatic 400 is replaced by the same redirect for Inertia requests.
-- Razor root view: `UseRazorRootView("App")` renders `Views/Shared/App.cshtml` (or a `~/Views/...` path) with an `InertiaRootViewContext` model.
-  In the view, after `@addTagHelper *, Inertia.Net.Mvc`: `<inertia />`, `<inertia-head />` (SSR head), `<vite entry="src/app.ts, src/x.css" />`, `<vite-react-refresh />`.
-  SSR runs at most once per request.
+```csharp
+public sealed class UsersController : Controller
+{
+    [HttpGet("/users")]
+    public IResult Index() => Render("Users/Index", new InertiaProps { ["users"] = users });   // also Back(), Location(url)
 
-Not Native AOT compatible (MVC is not).
+    [HttpPost("/users")]
+    public IActionResult Store([FromBody] CreateUserInput input) => Redirect("/users");
+}
+```
+
+- **Validation:** a global filter redirects an Inertia non-GET request with an invalid `ModelState` back with the errors, in the bag named by `X-Inertia-Error-Bag` (default `default`). Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). `[ApiController]` controllers are covered too.
+- **Razor root view (optional):** `UseRazorRootView("App")` renders `Views/Shared/App.cshtml` with an `InertiaRootViewContext` model. After `@addTagHelper *, Inertia.Net.Mvc` the view can use `<inertia />`, `<inertia-head />`, `<vite entry="resources/js/app.tsx" />` and `<vite-react-refresh />`.
+- Not Native AOT compatible (MVC is not).
+
+Documentation:
+- [Quick start (MVC)](https://github.com/OWNER/Inertia.Net#mvc)
+- [Root template and Razor](https://github.com/OWNER/Inertia.Net#the-root-template)
+- [Validation and error bags](https://github.com/OWNER/Inertia.Net#validation-and-error-bags)
