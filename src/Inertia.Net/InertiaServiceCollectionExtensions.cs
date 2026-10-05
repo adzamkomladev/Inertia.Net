@@ -20,6 +20,8 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<ViteAssets>();
         services.TryAddSingleton<IInertiaRootView, RootTemplateView>();
         services.TryAddSingleton<InertiaPageWriter>();
+        services.AddHttpClient(SsrGateway.HttpClientName);
+        services.TryAddSingleton<IInertiaSsrRenderer, SsrGateway>();
         return services;
     }
 }
