@@ -7,15 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- `Inertia.Net.Mvc`: `AddInertiaMvc(o => o.UseTempDataStateStore())` keeps the redirect state in MVC TempData (cookie or session provider), also for Minimal API endpoints.
-
-## [1.0.0] - TBD
+## [1.0.0] - 2026-10-05
 
 First release: a .NET 10 server adapter for the Inertia.js v3 protocol (v3 only, no v2 compatibility mode).
 
 ### Added
+
+- `Inertia.Net.Mvc`: `AddInertiaMvc(o => o.UseTempDataStateStore())` keeps the redirect state in MVC TempData (cookie or session provider), also for Minimal API endpoints.
+- `o.Ssr.UseNodeProcess()`: the app starts `node {bundle}`, logs its output under `Inertia.Net.Ssr`, waits for `/health`, restarts it on exit (1 s to 30 s backoff) and stops it on shutdown (`/shutdown`, then a process-tree kill). Not started while the Vite dev server runs. The React sample uses it.
 
 #### Packages
 

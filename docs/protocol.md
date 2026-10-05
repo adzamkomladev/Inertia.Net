@@ -216,6 +216,8 @@ The state is kept (not consumed) when the response is a version-mismatch 409.
 - **Development** (Vite hot file present): `POST {viteDevUrl}/__inertia_ssr` with the same body.
 - **Failure:** the response is `500 {error, type, hint, browserApi?, stack?, sourceLocation?}`. On this, or on a timeout or connection error: log it and fall back to client-side rendering, unless `ThrowOnError` is set.
 - **Health:** `GET {ssrUrl}/health` returns 2xx when healthy.
+- **Shutdown:** any request to `{ssrUrl}/shutdown` makes the v3 server call `process.exit()` (no response is sent).
+- **Port:** the v3 server reads its port and host only from `createServer` options, baked into the bundle by `@inertiajs/vite` (`ssr: { port, host }`, default `13714` / `0.0.0.0`); no CLI argument or environment variable.
 
 ## 9. Vite
 
