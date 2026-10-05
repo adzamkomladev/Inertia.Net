@@ -1,6 +1,6 @@
 # Inertia.Net.Mvc
 
-MVC integration for [Inertia.Net](https://github.com/OWNER/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
+MVC integration for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
 
 ```sh
 dotnet add package Inertia.Net
@@ -33,6 +33,6 @@ public sealed class UsersController : Controller
 - Not Native AOT compatible (MVC is not).
 
 Documentation:
-- [Quick start (MVC)](https://github.com/OWNER/Inertia.Net#mvc)
-- [Root template and Razor](https://github.com/OWNER/Inertia.Net#the-root-template)
-- [Validation and error bags](https://github.com/OWNER/Inertia.Net#validation-and-error-bags)
+- [Quick start (MVC)](https://github.com/adzamkomladev/Inertia.Net#mvc)
+- [Root template and Razor](https://github.com/adzamkomladev/Inertia.Net#the-root-template)
+- [Validation and error bags](https://github.com/adzamkomladev/Inertia.Net#validation-and-error-bags)

@@ -5,9 +5,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Authors>Inertia.Net contributors</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <!-- TODO: replace OWNER with the real GitHub owner/org before first release. -->
-    <PackageProjectUrl>https://github.com/OWNER/Inertia.Net</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/OWNER/Inertia.Net</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/adzamkomladev/Inertia.Net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/adzamkomladev/Inertia.Net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>inertia inertiajs aspnetcore react vue svelte spa minimal-api fastendpoints</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

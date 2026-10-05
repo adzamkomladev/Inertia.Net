@@ -37,8 +37,8 @@ app.Run();
 
 What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll), partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR with a health check, validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), the antiforgery cookie, and an encrypted-cookie state store.
 
-Documentation: <https://github.com/OWNER/Inertia.Net#readme>
-- [Quick start](https://github.com/OWNER/Inertia.Net#quick-start) and [client setup](https://github.com/OWNER/Inertia.Net#client-setup)
-- [Props reference](https://github.com/OWNER/Inertia.Net#props-reference)
-- [Native AOT](https://github.com/OWNER/Inertia.Net#native-aot)
-- [Configuration reference](https://github.com/OWNER/Inertia.Net#configuration-reference)
+Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
+- [Quick start](https://github.com/adzamkomladev/Inertia.Net#quick-start) and [client setup](https://github.com/adzamkomladev/Inertia.Net#client-setup)
+- [Props reference](https://github.com/adzamkomladev/Inertia.Net#props-reference)
+- [Native AOT](https://github.com/adzamkomladev/Inertia.Net#native-aot)
+- [Configuration reference](https://github.com/adzamkomladev/Inertia.Net#configuration-reference)

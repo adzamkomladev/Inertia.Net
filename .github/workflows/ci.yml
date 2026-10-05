@@ -22,7 +22,7 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build Inertia.Net.slnx -c Release -warnaserror
-      - run: dotnet test Inertia.Net.slnx -c Release --no-build
+      - run: dotnet test --solution Inertia.Net.slnx -c Release --no-build
       - name: Pack
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack Inertia.Net.slnx -c Release --no-build -warnaserror -o artifacts
