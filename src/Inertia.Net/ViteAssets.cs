@@ -40,6 +40,8 @@ public sealed class ViteAssets
     /// <summary>True while the Vite dev server is considered running: <see cref="ViteOptions.DevServerUrl"/> is set, or (in Development only) the hot file exists.</summary>
     public bool IsDevServerRunning => DevOrigin() is not null;
 
+    internal string? DevServerOrigin => DevOrigin();
+
     /// <summary>Renders the tags for the entry points, e.g. <c>"src/app.tsx"</c> (the manifest key, relative to the Vite root).</summary>
     /// <exception cref="InvalidOperationException">An entry is not in the manifest, or there is no manifest and no dev server.</exception>
     public string RenderTags(HttpContext context, params string[] entries) => Encoding.UTF8.GetString(RenderTagsUtf8(context, entries));

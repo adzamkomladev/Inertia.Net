@@ -92,6 +92,12 @@ public sealed class SsrOptions
     /// <summary>Throws instead of falling back to client-side rendering when SSR fails.</summary>
     public bool ThrowOnError { get; set; }
 
-    /// <summary>Request paths that are never server-side rendered.</summary>
+    /// <summary>
+    /// If set (relative to the content root, or absolute), SSR is skipped while this file does not exist, unless the Vite dev server is running.
+    /// Point it at the built SSR bundle, e.g. <c>bootstrap/ssr/ssr.mjs</c>.
+    /// </summary>
+    public string? BundlePath { get; set; }
+
+    /// <summary>Request paths (<c>Request.Path</c>, without PathBase) that are never server-side rendered. Exact match, or a trailing <c>*</c> for a prefix match, e.g. <c>/admin/*</c>.</summary>
     public IList<string> ExcludePaths { get; } = [];
 }
