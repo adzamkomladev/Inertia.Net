@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>Inertia.Net.Testing.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
@@ -12,7 +13,6 @@
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
     <ProjectReference Include="..\..\src\Inertia.Net.Testing\Inertia.Net.Testing.csproj" />
   </ItemGroup>
 </Project>
