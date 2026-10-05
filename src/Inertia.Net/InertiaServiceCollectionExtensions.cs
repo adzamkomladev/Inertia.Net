@@ -23,6 +23,7 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<InertiaPageWriter>();
         services.AddHttpClient(SsrGateway.HttpClientName);
         services.TryAddSingleton<IInertiaSsrRenderer, SsrGateway>();
+        services.AddHostedService<SsrNodeProcess>(); // no-op unless o.Ssr.UseNodeProcess()
         services.TryAddSingleton<VersionProvider>();
         services.AddDataProtection();
         services.TryAddSingleton<IInertiaStateStore>(sp => sp.GetRequiredService<IOptions<InertiaOptions>>().Value.State.UsesSession

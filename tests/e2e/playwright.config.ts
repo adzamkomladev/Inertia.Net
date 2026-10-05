@@ -13,7 +13,6 @@ if (!sample) throw new Error(`Unknown SAMPLE '${name}'. Use react, vue or svelte
 
 const baseURL = `http://localhost:${sample.port}`
 const sampleDir = path.resolve(import.meta.dirname, '../../samples', sample.dir)
-const ssr = name === 'react' && process.env.INERTIA_SSR === '1'
 
 // The frontend must already be built (npm run build in the sample; INERTIA_SSR=1 also builds the SSR bundle).
 export default defineConfig({
@@ -26,21 +25,12 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: [
     {
+      // With INERTIA_SSR=1 the react sample starts the Node SSR server itself (o.Ssr.UseNodeProcess()).
       command: `dotnet run --project "${sampleDir}" -c Release --no-launch-profile --urls ${baseURL}`,
       url: baseURL,
       env: { ...process.env, E2E: '1' } as Record<string, string>,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
-    ...(ssr
-      ? [
-          {
-            command: 'node ssr/ssr.js',
-            cwd: sampleDir,
-            url: 'http://127.0.0.1:13714/health',
-            reuseExistingServer: !process.env.CI,
-          },
-        ]
-      : []),
   ],
 })

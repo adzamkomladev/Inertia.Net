@@ -106,6 +106,49 @@ public sealed class SsrOptions
 
     /// <summary>Request paths (<c>Request.Path</c>, without PathBase) that are never server-side rendered. Exact match, or a trailing <c>*</c> for a prefix match, e.g. <c>/admin/*</c>.</summary>
     public IList<string> ExcludePaths { get; } = [];
+
+    /// <summary>The managed Node SSR process settings; null (the default) when the SSR server runs on its own. Set by <see cref="UseNodeProcess"/>.</summary>
+    public SsrNodeProcessOptions? NodeProcess { get; private set; }
+
+    /// <summary>
+    /// Enables SSR and has the app start and supervise <c>node {bundle}</c> itself (restarted on crash, stopped with the app).
+    /// Nothing is spawned while the Vite dev server runs: SSR then goes through the dev server.
+    /// </summary>
+    public SsrOptions UseNodeProcess(Action<SsrNodeProcessOptions>? configure = null)
+    {
+        Enabled = true;
+        NodeProcess ??= new();
+        configure?.Invoke(NodeProcess);
+        return this;
+    }
+}
+
+/// <summary>Settings for the Node SSR process that the app starts and supervises (<see cref="SsrOptions.UseNodeProcess"/>).</summary>
+public sealed class SsrNodeProcessOptions
+{
+    /// <summary>
+    /// The SSR bundle, relative to the content root (or absolute). Default: <see cref="SsrOptions.BundlePath"/>, else the first that exists of
+    /// <c>ssr/ssr.js</c>, <c>ssr/ssr.mjs</c>, <c>bootstrap/ssr/ssr.js</c>, <c>bootstrap/ssr/ssr.mjs</c>, <c>dist/ssr.js</c>, <c>dist/ssr.mjs</c>.
+    /// </summary>
+    public string? BundlePath { get; set; }
+
+    /// <summary>The Node executable, a path or a name looked up on <c>PATH</c>. Default <c>node</c>.</summary>
+    public string Executable { get; set; } = "node";
+
+    /// <summary>Arguments passed before the bundle path, e.g. <c>--enable-source-maps</c>.</summary>
+    public IList<string> Arguments { get; } = [];
+
+    /// <summary>Extra environment variables for the process (it inherits the app's environment).</summary>
+    public IDictionary<string, string?> Environment { get; } = new Dictionary<string, string?>();
+
+    /// <summary>The working directory. Default: the content root.</summary>
+    public string? WorkingDirectory { get; set; }
+
+    /// <summary>How long app startup waits for <c>GET {Url}/health</c> to answer. Default 10 seconds.</summary>
+    public TimeSpan StartupTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>Restarts the process when it exits unexpectedly, after 1 s, doubling up to 30 s. Default true.</summary>
+    public bool RestartOnExit { get; set; } = true;
 }
 
 /// <summary>Settings for the store that carries flash data, errors and history flags across redirects.</summary>
