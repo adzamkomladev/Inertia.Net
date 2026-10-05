@@ -166,6 +166,28 @@ req GET /external
 status_is 302
 header_is Location https://example.com/landing
 
+# 14. FastEndpoints (generator-discovered endpoints): page render, validation failure redirects back, flash after success.
+inertia GET /fe/page
+status_is 200
+header_is X-Inertia true
+has '"component":"Fe/Page"'
+has '"framework":"FastEndpoints"'
+has '"deferredProps":{"default":["lazy"]}'
+inertia GET /fe/page -H 'X-Inertia-Partial-Component: Fe/Page' -H 'X-Inertia-Partial-Data: lazy'
+has '"lazy":7'
+inertia POST /fe/contacts -H 'Content-Type: application/json' -H "Referer: $BASE/fe/page" --data '{"name":""}'
+status_is 302
+header_is Location "$BASE/fe/page"
+inertia GET /fe/page
+has '"errors":{"name":"Name is required."}'
+req POST /fe/contacts -H 'Content-Type: application/json' --data '{"name":""}'
+status_is 400
+inertia POST /fe/contacts -H 'Content-Type: application/json' --data '{"name":"Ada"}'
+status_is 302
+header_is Location /fe/page
+inertia GET /fe/page
+has '"flash":{"toast":"Contact Ada"}'
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES smoke check(s) failed. App log:"
   cat "$T/app.log"
