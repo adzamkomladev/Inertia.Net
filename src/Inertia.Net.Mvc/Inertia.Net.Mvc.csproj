@@ -8,6 +8,9 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Inertia.Net.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Inertia.Net\Inertia.Net.csproj" />
   </ItemGroup>
 </Project>
