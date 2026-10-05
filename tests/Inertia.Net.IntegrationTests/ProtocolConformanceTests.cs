@@ -263,7 +263,10 @@ public abstract class ProtocolConformanceTests<THost>
 
         var response = await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
         Assert.Equal("/page", response.Headers.Location?.OriginalString);
-        Assert.Contains(".Inertia.State=", response.Header("Set-Cookie"), StringComparison.Ordinal);
+        if (THost.StateInCookie)
+        {
+            Assert.Contains(".Inertia.State=", response.Header("Set-Cookie"), StringComparison.Ordinal);
+        }
 
         var page = await (await client.InertiaGetAsync("/page")).PageAsync();
         JsonAssert.Equal("""{"success":"Saved Ann"}""", page["flash"]);
@@ -295,7 +298,10 @@ public abstract class ProtocolConformanceTests<THost>
         await client.GetAsync("/clear-history", TestContext.Current.CancellationToken);
 
         var other = await client.GetAsync("/external", TestContext.Current.CancellationToken); // a redirect that sets nothing new
-        Assert.DoesNotContain("expires=", other.Header("Set-Cookie") ?? "", StringComparison.OrdinalIgnoreCase);
+        if (THost.StateInCookie)
+        {
+            Assert.DoesNotContain("expires=", other.Header("Set-Cookie") ?? "", StringComparison.OrdinalIgnoreCase);
+        }
 
         var page = await (await client.InertiaGetAsync("/page")).PageAsync();
         JsonAssert.Equal("""{"success":"Saved Ann"}""", page["flash"]);
@@ -314,7 +320,10 @@ public abstract class ProtocolConformanceTests<THost>
         await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
 
         var other = await client.GetAsync("/empty", TestContext.Current.CancellationToken);
-        Assert.Contains("expires=", other.Header("Set-Cookie"), StringComparison.OrdinalIgnoreCase);
+        if (THost.StateInCookie)
+        {
+            Assert.Contains("expires=", other.Header("Set-Cookie"), StringComparison.OrdinalIgnoreCase);
+        }
 
         JsonAssert.Missing(await (await client.InertiaGetAsync("/page")).PageAsync(), "flash");
     }
@@ -434,6 +443,11 @@ public abstract class ProtocolConformanceTests<THost>
     [Fact]
     public async Task A_tampered_state_cookie_is_ignored_and_deleted()
     {
+        if (!THost.StateInCookie)
+        {
+            return; // the TempData store has its own unreadable-state test
+        }
+
         await using var app = await StartAsync();
         var client = app.Server.CreateClient(); // no cookie container: the Cookie header is set by hand
         var request = new HttpRequestMessage(HttpMethod.Get, "/page");

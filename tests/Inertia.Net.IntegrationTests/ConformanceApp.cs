@@ -22,6 +22,12 @@ public interface IConformanceHost
 
     /// <summary>Maps the route contract. Called after <c>UseInertia()</c>.</summary>
     static abstract void MapRoutes(WebApplication app);
+
+    /// <summary>True when the host needs <c>app.UseSession()</c> before <c>UseInertia()</c> (it registers the session services itself).</summary>
+    static virtual bool UsesSession => false;
+
+    /// <summary>False for hosts whose state store is not the <c>.Inertia.State</c> cookie (the suite then skips the cookie-specific assertions).</summary>
+    static virtual bool StateInCookie => true;
 }
 
 /// <summary>Counts handler invocations, so tests can prove a handler did not run.</summary>
@@ -86,7 +92,7 @@ public sealed class ConformanceApp : IAsyncDisposable
             app.UsePathBase(pathBase);
         }
 
-        if (setup.UseSession)
+        if (setup.UseSession || THost.UsesSession)
         {
             app.UseSession();
         }
