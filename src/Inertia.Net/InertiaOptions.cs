@@ -64,11 +64,17 @@ public sealed class ViteOptions
     /// <summary>The Vite build output directory, relative to <see cref="PublicDirectory"/>. Default <c>build</c>.</summary>
     public string BuildDirectory { get; set; } = "build";
 
-    /// <summary>The manifest path. Null means <c>{PublicDirectory}/{BuildDirectory}/.vite/manifest.json</c>.</summary>
+    /// <summary>The manifest path, relative to the content root. Null means <c>{PublicDirectory}/{BuildDirectory}/.vite/manifest.json</c>.</summary>
     public string? ManifestPath { get; set; }
 
-    /// <summary>The file the Vite dev server writes its URL to. Null means <c>{PublicDirectory}/hot</c>.</summary>
+    /// <summary>The file the Vite dev server writes its URL to, relative to the content root. Null means <c>{PublicDirectory}/hot</c>.</summary>
     public string? HotFilePath { get; set; }
+
+    /// <summary>The Vite dev server origin, e.g. <c>http://localhost:5173</c>. When set, the dev server tags are always rendered and the hot file is not consulted.</summary>
+    public string? DevServerUrl { get; set; }
+
+    /// <summary>Replaces <c>{PathBase}/{BuildDirectory}</c> as the URL prefix of built assets, e.g. <c>https://cdn.example.com/build</c>.</summary>
+    public string? AssetBaseUrl { get; set; }
 }
 
 /// <summary>Server-side rendering settings.</summary>

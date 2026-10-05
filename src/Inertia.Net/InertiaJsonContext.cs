@@ -30,4 +30,5 @@ namespace Inertia.Net;
 [JsonSerializable(typeof(InertiaProps[]))]
 [JsonSerializable(typeof(List<InertiaProps>))]
 [JsonSerializable(typeof(Dictionary<string, object>))]
+[JsonSerializable(typeof(Dictionary<string, ViteManifestChunk>))]
 internal sealed partial class InertiaJsonContext : JsonSerializerContext;
