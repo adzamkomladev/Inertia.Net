@@ -489,3 +489,6 @@ playwright-report/
 artifacts/
 *.nupkg
 *.snupkg
+
+# Claude Code local worktrees
+.claude/worktrees/
