@@ -1,12 +1,23 @@
 # Inertia.Net.FastEndpoints
 
-Part of Inertia.Net, a .NET 10 server adapter for the Inertia.js v3 protocol.
-See the repository README for documentation.
+FastEndpoints integration for [Inertia.Net](https://github.com/OWNER/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
+
+```sh
+dotnet add package Inertia.Net
+dotnet add package Inertia.Net.FastEndpoints
+```
 
 ```csharp
-app.UseInertia();
-app.UseFastEndpoints(c => c.UseInertia(ep => ep.AllowAnonymous())); // validation redirect + Precognition
+builder.Services.AddInertia();
+builder.Services.AddFastEndpoints();
 
+var app = builder.Build();
+app.UseStaticFiles();
+app.UseInertia();
+app.UseFastEndpoints(c => c.UseInertia(ep => ep.AllowAnonymous()));   // validation redirect + Precognition
+```
+
+```csharp
 public sealed class UsersEndpoint : EndpointWithoutRequest
 {
     public override void Configure() => Get("/users");
@@ -15,7 +26,12 @@ public sealed class UsersEndpoint : EndpointWithoutRequest
 }
 ```
 
-- An endpoint implementing `ExecuteAsync` can return `Render(...)`, `Back()` or `Location(...)` directly (`Endpoint<TReq, InertiaResult>`); FastEndpoints sends any `IResult`.
-- `c.UseInertia()` turns FastEndpoints validation failures of Inertia requests (not GET) into a redirect back with the errors (first message per field, JSON names, `X-Inertia-Error-Bag` honoured). Requests without `X-Inertia` keep the normal 400. It sets `c.Endpoints.Configurator`: pass your own configuration as the argument.
-- It also answers Precognition requests (`Precognition: true`): 204, or 422 with `{ message, errors }` limited to `Precognition-Validate-Only`, without running the handler.
+- An endpoint that implements `ExecuteAsync` can return `Render(...)`, `Back()` or `Location(...)` directly (`Endpoint<TReq, InertiaResult>`): FastEndpoints sends any `IResult`.
+- `c.UseInertia()` turns validation failures of Inertia requests (not GET) into a redirect back with the errors (JSON names, `X-Inertia-Error-Bag` honoured). Other requests keep the normal 400. It sets `c.Endpoints.Configurator`: pass your own configuration as the argument.
+- It also answers Precognition requests (`Precognition: true`) with 204 or 422 `{ message, errors }`, without running the handler.
 - Native AOT: register endpoints with the FastEndpoints source generator, `AddFastEndpoints(o => o.SourceGeneratorDiscoveredTypes.AddRange(DiscoveredTypes.All))`.
+
+Documentation:
+- [Quick start (FastEndpoints)](https://github.com/OWNER/Inertia.Net#fastendpoints)
+- [Validation and Precognition](https://github.com/OWNER/Inertia.Net#validation-and-error-bags)
+- [Native AOT](https://github.com/OWNER/Inertia.Net#native-aot)
