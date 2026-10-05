@@ -1,6 +1,6 @@
 # Inertia.Net.Testing
 
-Test helpers for [Inertia.Net](https://github.com/OWNER/Inertia.Net): Laravel-style fluent assertions over Inertia responses, for any test framework. It parses JSON responses and the first-visit HTML `<script data-page>`, and throws `InertiaAssertionException` when an assertion fails.
+Test helpers for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net): Laravel-style fluent assertions over Inertia responses, for any test framework. It parses JSON responses and the first-visit HTML `<script data-page>`, and throws `InertiaAssertionException` when an assertion fails.
 
 ```sh
 dotnet add package Inertia.Net.Testing
@@ -25,4 +25,4 @@ var only = await page.ReloadOnlyAsync(client, "users");
 
 Nested scopes fail on properties you did not assert unless you call `Etc()`. Call `Interacted()` to enforce the same at the root.
 
-Documentation: <https://github.com/OWNER/Inertia.Net#testing>
+Documentation: <https://github.com/adzamkomladev/Inertia.Net#testing>

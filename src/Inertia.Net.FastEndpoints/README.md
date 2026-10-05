@@ -1,6 +1,6 @@
 # Inertia.Net.FastEndpoints
 
-FastEndpoints integration for [Inertia.Net](https://github.com/OWNER/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
+FastEndpoints integration for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
 
 ```sh
 dotnet add package Inertia.Net
@@ -32,6 +32,6 @@ public sealed class UsersEndpoint : EndpointWithoutRequest
 - Native AOT: register endpoints with the FastEndpoints source generator, `AddFastEndpoints(DiscoveredTypes.All)`.
 
 Documentation:
-- [Quick start (FastEndpoints)](https://github.com/OWNER/Inertia.Net#fastendpoints)
-- [Validation and Precognition](https://github.com/OWNER/Inertia.Net#validation-and-error-bags)
-- [Native AOT](https://github.com/OWNER/Inertia.Net#native-aot)
+- [Quick start (FastEndpoints)](https://github.com/adzamkomladev/Inertia.Net#fastendpoints)
+- [Validation and Precognition](https://github.com/adzamkomladev/Inertia.Net#validation-and-error-bags)
+- [Native AOT](https://github.com/adzamkomladev/Inertia.Net#native-aot)

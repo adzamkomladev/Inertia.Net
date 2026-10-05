@@ -11,6 +11,7 @@ env:
 
 permissions:
   contents: write # create the GitHub Release
+  id-token: write # NuGet Trusted Publishing (OIDC): no long-lived API key
 
 jobs:
   release:
@@ -21,6 +22,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+
+      - uses: actions/setup-node@v4 # the managed SSR process tests run real node
+        with:
+          node-version: 22
 
       - name: Resolve the version from the tag
         run: |
@@ -33,7 +38,7 @@ jobs:
 
       # The same -p:Version for build and pack, so the assemblies and the packages agree.
       - run: dotnet build Inertia.Net.slnx -c Release -warnaserror -p:Version=$VERSION
-      - run: dotnet test Inertia.Net.slnx -c Release --no-build
+      - run: dotnet test --solution Inertia.Net.slnx -c Release --no-build
 
       # Only the four src projects are packable: Inertia.Net, .Mvc, .FastEndpoints and .Testing. They are packed one by one,
       # because packing the solution also warns about every non-packable test project.
@@ -51,11 +56,20 @@ jobs:
             test -f "artifacts/$id.$VERSION.nupkg" || { echo "Missing artifacts/$id.$VERSION.nupkg"; exit 1; }
           done
 
+      # Trusted Publishing: exchanges the workflow's OIDC token for a short-lived NuGet API key.
+      # One-time setup on nuget.org (Account > Trusted Publishing): owner adzamkomladev, repository Inertia.Net,
+      # workflow file release.yml. NUGET_USER is the nuget.org profile name (repository secret).
+      - name: NuGet login (Trusted Publishing)
+        id: nuget
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       # A .snupkg next to a .nupkg is pushed to the symbol server automatically.
       - name: Push to NuGet
         run: >
           dotnet nuget push "artifacts/*.nupkg"
-          --api-key ${{ secrets.NUGET_API_KEY }}
+          --api-key ${{ steps.nuget.outputs.NUGET_API_KEY }}
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
