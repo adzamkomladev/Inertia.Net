@@ -26,8 +26,9 @@ function hotFile(): Plugin {
   }
 }
 
-export default defineConfig({
-  base: '/build/',
+export default defineConfig(({ command }) => ({
+  // Dev: assets come from the Vite origin; build: from the app's /build/ path.
+  base: command === 'build' ? '/build/' : '/',
   publicDir: false,
   plugins: [vue(), inertia(), hotFile()],
   server: { port: 5174, strictPort: true },
@@ -37,4 +38,4 @@ export default defineConfig({
     manifest: true,
     rolldownOptions: { input: 'ClientApp/app.ts' },
   },
-})
+}))

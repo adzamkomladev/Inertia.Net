@@ -26,8 +26,9 @@ function hotFile(): Plugin {
   }
 }
 
-export default defineConfig(({ isSsrBuild }) => ({
-  base: '/build/',
+export default defineConfig(({ command, isSsrBuild }) => ({
+  // Dev: assets come from the Vite origin; build: from the app's /build/ path.
+  base: command === 'build' ? '/build/' : '/',
   publicDir: false,
   plugins: [react(), inertia({ ssr: { entry: 'ClientApp/ssr.tsx', sourcemap: false } }), hotFile()],
   server: { port: 5173, strictPort: true },
