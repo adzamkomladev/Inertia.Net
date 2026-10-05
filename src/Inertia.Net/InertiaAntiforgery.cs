@@ -20,7 +20,8 @@ public static class InertiaAntiforgeryApplicationBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(app);
         ArgumentException.ThrowIfNullOrEmpty(cookieName);
-        var antiforgery = app.ApplicationServices.GetRequiredService<IAntiforgery>();
+        var antiforgery = app.ApplicationServices.GetService<IAntiforgery>()
+            ?? throw new InvalidOperationException("UseInertiaAntiforgeryCookie() needs the antiforgery services. Call services.AddAntiforgery(o => o.HeaderName = \"X-XSRF-TOKEN\") at startup.");
         return app.Use((httpContext, next) =>
         {
             var request = httpContext.Request;

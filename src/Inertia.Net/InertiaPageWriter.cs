@@ -377,14 +377,17 @@ internal sealed class InertiaPageWriter
 
     private bool ComputeContainsProps(Type type, HashSet<Type> visiting)
     {
-        if (typeof(InertiaProp).IsAssignableFrom(type)
+        // object: the slot may hold a prop at runtime (object[], List<object>, an object property), so it is walked and
+        // each value is then handled by its runtime type.
+        if (type == typeof(object)
+            || typeof(InertiaProp).IsAssignableFrom(type)
             || typeof(IReadOnlyDictionary<string, object?>).IsAssignableFrom(type)
             || typeof(IDictionary<string, object?>).IsAssignableFrom(type))
         {
             return true;
         }
 
-        if (type == typeof(object) || type == typeof(string) || type.IsPrimitive || !visiting.Add(type))
+        if (type == typeof(string) || type.IsPrimitive || !visiting.Add(type))
         {
             return false;
         }

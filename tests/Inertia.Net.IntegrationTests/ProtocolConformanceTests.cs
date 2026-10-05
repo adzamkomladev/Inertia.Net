@@ -284,14 +284,36 @@ public abstract class ProtocolConformanceTests<THost>
         Assert.Equal("Saved Bob", (string?)page["flash"]!["success"]);
     }
 
+    // Laravel re-flashes on every redirect (Middleware::reflash) and keeps clearHistory/preserveFragment in the session until a
+    // page renders, so e.g. Back() to a URL that itself redirects still shows the flash.
     [Fact]
-    public async Task State_that_is_never_rendered_is_dropped()
+    public async Task State_survives_chained_redirects_until_a_page_renders()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
+        await client.GetAsync("/clear-history", TestContext.Current.CancellationToken);
+
+        var other = await client.GetAsync("/external", TestContext.Current.CancellationToken); // a redirect that sets nothing new
+        Assert.DoesNotContain("expires=", other.Header("Set-Cookie") ?? "", StringComparison.OrdinalIgnoreCase);
+
+        var page = await (await client.InertiaGetAsync("/page")).PageAsync();
+        JsonAssert.Equal("""{"success":"Saved Ann"}""", page["flash"]);
+        Assert.True((bool?)page["clearHistory"]);
+
+        var next = await (await client.InertiaGetAsync("/page")).PageAsync();
+        JsonAssert.Missing(next, "flash");
+        JsonAssert.Missing(next, "clearHistory");
+    }
+
+    [Fact]
+    public async Task State_is_consumed_by_the_next_response_that_is_not_a_redirect()
     {
         await using var app = await StartAsync();
         var client = app.CreateClient();
         await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
 
-        var other = await client.GetAsync("/external", TestContext.Current.CancellationToken); // a redirect that sets nothing new
+        var other = await client.GetAsync("/empty", TestContext.Current.CancellationToken);
         Assert.Contains("expires=", other.Header("Set-Cookie"), StringComparison.OrdinalIgnoreCase);
 
         JsonAssert.Missing(await (await client.InertiaGetAsync("/page")).PageAsync(), "flash");

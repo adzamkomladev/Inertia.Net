@@ -171,6 +171,8 @@ public sealed record PagedUsers(List<User> Data, int Page, bool HasMore) : IProv
 
 public sealed record Row(string Name, InertiaProp? Extra);
 
+public sealed record Boxed(string Name, object? Value);
+
 public sealed record IgnoredMembers(
     string Name,
     [property: JsonIgnore] string Secret,
@@ -185,6 +187,8 @@ public sealed record BigNumbers(long Long, ulong ULong, Int128 Int128, UInt128 U
 [JsonSerializable(typeof(DashboardPage))]
 [JsonSerializable(typeof(PagedUsers))]
 [JsonSerializable(typeof(List<Row>))]
+[JsonSerializable(typeof(Boxed))]
+[JsonSerializable(typeof(Dictionary<int, object>))]
 [JsonSerializable(typeof(BigNumbers))]
 [JsonSerializable(typeof(IgnoredMembers))]
 internal sealed partial class TestJsonContext : JsonSerializerContext;

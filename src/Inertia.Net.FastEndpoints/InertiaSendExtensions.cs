@@ -27,10 +27,10 @@ public static class InertiaSendExtensions
         send.ResultAsync(Inertia.Location(url));
 
     /// <summary>
-    /// Redirects back to the same-origin <c>Referer</c>, or to <paramref name="fallback"/>. For errors or flash data send
+    /// Redirects back to the same-origin <c>Referer</c>, or to <paramref name="fallback"/> (<c>~/</c> is the app root). For errors or flash data send
     /// <c>Back().WithErrors(...).WithFlash(...)</c> with <c>Send.ResultAsync</c>.
     /// </summary>
-    public static Task<Void> InertiaBackAsync<TRequest, TResponse>(this ResponseSender<TRequest, TResponse> send, string fallback = "/")
+    public static Task<Void> InertiaBackAsync<TRequest, TResponse>(this ResponseSender<TRequest, TResponse> send, string fallback = "~/")
         where TRequest : notnull =>
         send.ResultAsync(Inertia.Back(fallback));
 }

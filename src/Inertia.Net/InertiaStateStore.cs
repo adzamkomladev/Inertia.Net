@@ -140,7 +140,7 @@ internal static class InertiaStateSerializer
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            if (feature.PendingErrors is { Count: > 0 } bags)
+            if (feature.Errors is { Count: > 0 } bags)
             {
                 writer.WriteStartObject("errors");
                 foreach (var (bag, errors) in bags)
@@ -163,7 +163,7 @@ internal static class InertiaStateSerializer
                 writer.WriteEndObject();
             }
 
-            if (feature.PendingFlash is { Count: > 0 } flash)
+            if (feature.FlashData is { Count: > 0 } flash)
             {
                 writer.WriteStartObject("flash");
                 foreach (var (key, value) in flash)
@@ -186,12 +186,12 @@ internal static class InertiaStateSerializer
                 writer.WriteEndObject();
             }
 
-            if (feature.PendingClearHistory)
+            if (feature.HistoryCleared)
             {
                 writer.WriteBoolean("clearHistory", true);
             }
 
-            if (feature.PendingPreserveFragment)
+            if (feature.FragmentPreserved)
             {
                 writer.WriteBoolean("preserveFragment", true);
             }

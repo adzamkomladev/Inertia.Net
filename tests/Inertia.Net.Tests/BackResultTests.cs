@@ -47,9 +47,9 @@ public class BackResultTests
 
         var feature = context.Inertia();
         Assert.Equal("/", context.Response.Headers.Location);
-        Assert.Equal(["Required"], feature.PendingErrors!["default"]["name"]);
-        Assert.Equal(["Taken"], feature.PendingErrors!["login"]["email"]);
-        Assert.Equal("Nope", feature.PendingFlash!["toast"]);
+        Assert.Equal(["Required"], feature.Errors!["default"]["name"]);
+        Assert.Equal(["Taken"], feature.Errors!["login"]["email"]);
+        Assert.Equal("Nope", feature.FlashData!["toast"]);
     }
 
     [Fact]
