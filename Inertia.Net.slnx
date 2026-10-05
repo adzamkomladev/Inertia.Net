@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Inertia.Net.FastEndpoints/Inertia.Net.FastEndpoints.csproj" />
+    <Project Path="src/Inertia.Net.Mvc/Inertia.Net.Mvc.csproj" />
+    <Project Path="src/Inertia.Net.Testing/Inertia.Net.Testing.csproj" />
+    <Project Path="src/Inertia.Net/Inertia.Net.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Inertia.Net.AotSmoke/Inertia.Net.AotSmoke.csproj" />
+    <Project Path="tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj" />
+    <Project Path="tests/Inertia.Net.IntegrationTests/Inertia.Net.IntegrationTests.csproj" />
+    <Project Path="tests/Inertia.Net.Testing.Tests/Inertia.Net.Testing.Tests.csproj" />
+    <Project Path="tests/Inertia.Net.Tests/Inertia.Net.Tests.csproj" />
+  </Folder>
+</Solution>

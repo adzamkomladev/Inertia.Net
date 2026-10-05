@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <Description>Core Inertia.js v3 server adapter for ASP.NET Core (Native AOT compatible).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Inertia.Net.Tests" />
+    <InternalsVisibleTo Include="Inertia.Net.IntegrationTests" />
+    <InternalsVisibleTo Include="Inertia.Net.Benchmarks" />
+  </ItemGroup>
+</Project>

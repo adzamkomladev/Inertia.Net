@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net.FastEndpoints</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <Description>FastEndpoints integration for Inertia.Net.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FastEndpoints" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Inertia.Net\Inertia.Net.csproj" />
+  </ItemGroup>
+</Project>

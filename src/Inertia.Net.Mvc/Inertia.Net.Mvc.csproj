@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net.Mvc</RootNamespace>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <Description>MVC integration for Inertia.Net: ModelState errors filter, Razor root view and tag helpers (not Native AOT compatible).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Inertia.Net\Inertia.Net.csproj" />
+  </ItemGroup>
+</Project>

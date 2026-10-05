@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build Inertia.Net.slnx -c Release -warnaserror
+      - run: dotnet test Inertia.Net.slnx -c Release --no-build
+      - name: Pack
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet pack Inertia.Net.slnx -c Release --no-build -o artifacts
+
+  # TODO(phase 5): publish tests/Inertia.Net.AotSmoke with -r linux-x64 -p:PublishAot=true
+  # (warnings as errors), start the binary and run the scripted request assertions.
+  # aot-smoke:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-dotnet@v4
+  #       with:
+  #         global-json-file: global.json
+  #     - run: dotnet publish tests/Inertia.Net.AotSmoke -c Release -r linux-x64 -p:PublishAot=true -warnaserror
+
+  # TODO(phase 6): Node 22, npm ci, build the sample frontends, run Playwright (tests/e2e).
+  # e2e:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-dotnet@v4
+  #       with:
+  #         global-json-file: global.json
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #     - run: npm ci
+  #     - run: npx playwright install --with-deps
+  #     - run: npx playwright test
