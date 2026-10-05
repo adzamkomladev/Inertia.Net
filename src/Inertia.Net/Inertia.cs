@@ -199,10 +199,11 @@ public static class Inertia
     public static InertiaLocationResult Location(string url) => new(url);
 
     /// <summary>
-    /// Redirects back to the same-origin <c>Referer</c>, or to <paramref name="fallback"/> when there is none.
+    /// Redirects back to the same-origin <c>Referer</c>, or to <paramref name="fallback"/> when there is none (a leading <c>~/</c> is
+    /// the app root, i.e. it includes <c>PathBase</c>).
     /// Chain <see cref="InertiaBackResult.WithErrors(IDictionary{string, string[]}, string)"/> and <see cref="InertiaBackResult.WithFlash"/>.
     /// </summary>
-    public static InertiaBackResult Back(string fallback = "/") => new(fallback);
+    public static InertiaBackResult Back(string fallback = "~/") => new(fallback);
 
     private static Func<CancellationToken, ValueTask<T>> Wrap<T>(Func<CancellationToken, Task<T>> loader)
     {

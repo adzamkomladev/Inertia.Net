@@ -155,6 +155,8 @@ internal enum PropLoad
     Deferred,
 }
 
+// System.Text.Json reads [JsonConverter] without inheritance, so the runtime type needs it too (a prop in a slot Inertia.Net does not walk).
+[JsonConverter(typeof(InertiaPropJsonConverter))]
 internal sealed class InertiaProp<T> : InertiaProp
 {
     private readonly T? _value;
@@ -194,6 +196,9 @@ internal sealed class InertiaProp<T> : InertiaProp
 /// </summary>
 public sealed class InertiaPropJsonConverter : JsonConverter<InertiaProp>
 {
+    /// <inheritdoc />
+    public override bool CanConvert(Type typeToConvert) => typeof(InertiaProp).IsAssignableFrom(typeToConvert);
+
     /// <inheritdoc />
     public override InertiaProp Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         throw new InvalidOperationException("InertiaProp values can only be serialized by Inertia.Net");

@@ -109,6 +109,14 @@ public class ResultTests
     }
 
     [Fact]
+    public void Antiforgery_cookie_without_add_antiforgery_gives_a_helpful_error()
+    {
+        var app = new Microsoft.AspNetCore.Builder.ApplicationBuilder(new ServiceCollection().BuildServiceProvider());
+        var ex = Assert.Throws<InvalidOperationException>(() => app.UseInertiaAntiforgeryCookie());
+        Assert.Contains("services.AddAntiforgery(o => o.HeaderName = \"X-XSRF-TOKEN\")", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Location_is_a_409_for_inertia_requests_and_a_302_otherwise()
     {
         var inertia = _harness.Context().AsInertia();

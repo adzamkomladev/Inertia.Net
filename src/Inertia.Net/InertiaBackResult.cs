@@ -18,7 +18,7 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
         Fallback = fallback;
     }
 
-    /// <summary>Where to go when there is no usable <c>Referer</c>.</summary>
+    /// <summary>Where to go when there is no usable <c>Referer</c>. A leading <c>~/</c> is the app root (<c>PathBase</c>).</summary>
     public string Fallback { get; }
 
     /// <summary>Always 302.</summary>
@@ -71,7 +71,10 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
         return Task.CompletedTask;
     }
 
-    /// <summary>The <c>Referer</c> (absolute, so a <c>//host</c> path cannot turn it into a protocol-relative redirect) when it is an http(s) URL with the request's host and port, otherwise <paramref name="fallback"/>.</summary>
+    /// <summary>
+    /// The <c>Referer</c> (absolute, so a <c>//host</c> path cannot turn it into a protocol-relative redirect) when it is an http(s) URL
+    /// with the request's host and port, otherwise <paramref name="fallback"/>, where a leading <c>~/</c> is replaced by <c>PathBase/</c>.
+    /// </summary>
     internal static string GetBackUrl(HttpRequest request, string fallback)
     {
         // The scheme is not compared, so this keeps working behind a TLS-terminating proxy.
@@ -83,6 +86,6 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
             return referer.AbsoluteUri;
         }
 
-        return fallback;
+        return fallback.StartsWith("~/", StringComparison.Ordinal) ? request.PathBase.ToUriComponent() + fallback[1..] : fallback;
     }
 }

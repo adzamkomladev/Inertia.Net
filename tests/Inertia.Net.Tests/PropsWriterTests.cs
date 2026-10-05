@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.Tests;
 
@@ -321,6 +322,34 @@ public class PropsWriterTests
 
         JsonAssert.Equal("""[{"name":"a"},{"name":"b","extra":null}]""", page["props"]!["rows"]);
         JsonAssert.Equal("""{"default":["rows.0.extra"]}""", page["deferredProps"]);
+    }
+
+    // Laravel walks every array; here a prop held in an object-typed slot (object[], List<object>, an object property) used to be
+    // handed to System.Text.Json, which silently wrote "{}".
+    [Fact]
+    public async Task Props_in_object_typed_lists_and_properties_are_walked()
+    {
+        InertiaProps Props() => new()
+        {
+            ["array"] = new object[] { new InertiaProps { ["name"] = "a", ["bar"] = Inertia.Optional(() => 1) } },
+            ["list"] = new List<object?> { 1, new InertiaProps { ["bar"] = Inertia.Defer(() => 2) } },
+            ["boxed"] = new Boxed("b", Inertia.Defer(() => 3)),
+        };
+
+        var initial = await Page(Props());
+        JsonAssert.Equal("""{"errors":{},"array":[{"name":"a"}],"list":[1,{}],"boxed":{"name":"b"}}""", initial["props"]);
+        JsonAssert.Equal("""{"default":["list.1.bar","boxed.value"]}""", initial["deferredProps"]);
+
+        var partial = await Page(Props(), c => c.AsPartial("array,list,boxed"));
+        JsonAssert.Equal("""{"errors":{},"array":[{"name":"a","bar":1}],"list":[1,{"bar":2}],"boxed":{"name":"b","value":3}}""", partial["props"]);
+    }
+
+    [Fact]
+    public void Serializing_a_prop_through_an_object_slot_throws_instead_of_writing_an_empty_object()
+    {
+        var value = new Dictionary<int, object> { [1] = Inertia.Prop(() => 1) };
+        var ex = Assert.Throws<InvalidOperationException>(() => System.Text.Json.JsonSerializer.Serialize(value, _harness.Services.GetRequiredService<InertiaPageWriter>().SerializerOptions));
+        Assert.Equal("InertiaProp values can only be serialized by Inertia.Net", ex.Message);
     }
 
     [Fact]

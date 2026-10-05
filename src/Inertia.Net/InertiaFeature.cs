@@ -5,17 +5,18 @@ namespace Inertia.Net;
 /// <summary>
 /// Per-request Inertia state (shared props, flash, errors, history flags). Get it with <see cref="InertiaHttpContextExtensions.Inertia"/>.
 /// Flash, errors, <see cref="ClearHistory"/> and <see cref="PreserveFragment"/> set during a request that ends in a redirect are
-/// carried to the next request by the <see cref="IInertiaStateStore"/> (see <c>app.UseInertia()</c>).
+/// carried by the <see cref="IInertiaStateStore"/> (see <c>app.UseInertia()</c>) through any further redirects to the next response
+/// that is not a redirect, which renders (consumes) them.
 /// </summary>
 public sealed class InertiaFeature
 {
-    // Set during this request: persisted when the response is a redirect.
+    // Set during this request.
     private Dictionary<string, object?>? _flash;
     private Dictionary<string, Dictionary<string, string[]>>? _errors;
     private bool _clearHistory;
     private bool _preserveFragment;
 
-    // Restored from the previous request: rendered on this one, never carried further (consumed).
+    // Restored from the previous request: rendered on this one (consumed), or carried on by another redirect.
     private Dictionary<string, object?>? _restoredFlash;
     private Dictionary<string, Dictionary<string, string[]>>? _restoredErrors;
     private bool _restoredClearHistory;
@@ -41,15 +42,11 @@ public sealed class InertiaFeature
     /// <summary>The middleware has already saved or cleared the stored state for this request.</summary>
     internal bool StateFinished { get; set; }
 
-    internal Dictionary<string, object?>? PendingFlash => _flash;
-
-    internal Dictionary<string, Dictionary<string, string[]>>? PendingErrors => _errors;
-
-    internal bool PendingClearHistory => _clearHistory;
-
-    internal bool PendingPreserveFragment => _preserveFragment;
-
-    internal bool HasPendingState => _flash is { Count: > 0 } || _errors is { Count: > 0 } || _clearHistory || _preserveFragment;
+    /// <summary>
+    /// State to carry across a redirect: set during this request, or restored and not rendered yet (like Laravel, which re-flashes
+    /// on every redirect and keeps the history flags until a page renders).
+    /// </summary>
+    internal bool HasState => FlashData is { Count: > 0 } || Errors is { Count: > 0 } || HistoryCleared || FragmentPreserved;
 
     /// <summary>Shares a prop with the page rendered for this request. Page props with the same key win.</summary>
     public InertiaFeature Share(string key, object? value)

@@ -12,8 +12,8 @@ namespace Inertia.Net;
 /// <item>The stored flash/errors/history flags are loaded into <see cref="InertiaFeature"/> (and consumed).</item>
 /// <item>After the handler, an Inertia request answered with an empty 200 is redirected back.</item>
 /// <item>When the response starts: <c>Vary: X-Inertia</c>; for Inertia requests a 302 becomes a 303 for PUT/PATCH/DELETE and a
-/// redirect to a URL with a fragment becomes a 409 with <c>X-Inertia-Redirect</c> (except prefetches); state set during a request
-/// that ends in a redirect is saved, otherwise loaded state is cleared.</item>
+/// redirect to a URL with a fragment becomes a 409 with <c>X-Inertia-Redirect</c> (except prefetches); when the response is a redirect,
+/// the state set during the request plus the loaded state not rendered yet is saved, otherwise the loaded state is cleared (consumed).</item>
 /// </list>
 /// </summary>
 internal sealed class InertiaMiddleware
@@ -65,7 +65,7 @@ internal sealed class InertiaMiddleware
             && response.ContentLength is null or 0)
         {
             response.StatusCode = IsPutPatchDelete(request.Method) ? StatusCodes.Status303SeeOther : StatusCodes.Status302Found;
-            response.Headers.Location = InertiaBackResult.GetBackUrl(request, "/");
+            response.Headers.Location = InertiaBackResult.GetBackUrl(request, "~/");
         }
 
         // Most redirects write no body, so the headers would only be sent after the whole pipeline has unwound, when an
@@ -80,7 +80,8 @@ internal sealed class InertiaMiddleware
 
     private static bool IsPutPatchDelete(string method) => HttpMethods.IsPut(method) || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method);
 
-    private static bool IsRedirect(int statusCode) => statusCode is >= 300 and < 400;
+    // Symfony's Response::isRedirect() codes (minus 201): a 304 or 300 is not a redirect.
+    private static bool IsRedirect(int statusCode) => statusCode is 301 or 302 or 303 or 307 or 308;
 
     // Idempotent: runs after the handler when the response has not started, and again (or only) when it starts.
     private async Task FinishAsync(HttpContext httpContext)
@@ -113,11 +114,11 @@ internal sealed class InertiaMiddleware
 
         feature.StateFinished = true;
 
-        // A redirect, or a 409 the client turns into a visit (Location()/fragment redirect), carries this request's state forward.
+        // A redirect, or a 409 the client turns into a visit (Location()/fragment redirect), carries the state forward.
         var redirects = IsRedirect(response.StatusCode)
             || (response.StatusCode == StatusCodes.Status409Conflict
                 && (headers.ContainsKey(InertiaHeaders.Location) || headers.ContainsKey(InertiaHeaders.Redirect)));
-        if (redirects && feature.HasPendingState)
+        if (redirects && feature.HasState)
         {
             await _store.SaveAsync(httpContext, InertiaStateSerializer.Serialize(feature, _pageWriter.SerializerOptions));
         }

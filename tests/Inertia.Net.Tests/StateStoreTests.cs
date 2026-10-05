@@ -109,16 +109,15 @@ public class StateStoreTests
     }
 
     [Fact]
-    public void Restored_state_is_rendered_but_never_persisted_again()
+    public void Restored_state_is_carried_on_with_new_state_when_persisted_again()
     {
         var feature = new InertiaFeature();
         Assert.True(InertiaStateSerializer.TryRestore(feature, """{"flash":{"a":1},"errors":{"default":{"f":["m"]}},"clearHistory":true}"""u8.ToArray()));
-        Assert.False(feature.HasPendingState);
+        Assert.True(feature.HasState);
         Assert.True(feature.HistoryCleared);
-        Assert.Equal("{}", Encoding.UTF8.GetString(InertiaStateSerializer.Serialize(feature, PageOptions())));
 
         feature.Flash("b", 2);
-        Assert.Equal("""{"flash":{"b":2}}""", Encoding.UTF8.GetString(InertiaStateSerializer.Serialize(feature, PageOptions())));
+        Assert.Equal("""{"errors":{"default":{"f":["m"]}},"flash":{"a":1,"b":2},"clearHistory":true}""", Encoding.UTF8.GetString(InertiaStateSerializer.Serialize(feature, PageOptions())));
         Assert.Equal(["a", "b"], feature.FlashData!.Keys);
     }
 
