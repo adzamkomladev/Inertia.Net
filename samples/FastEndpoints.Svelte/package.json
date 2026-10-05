@@ -1,0 +1,21 @@
+{
+  "name": "fastendpoints-svelte",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@inertiajs/svelte": "^3.8.0",
+    "@inertiajs/vite": "^3.8.0",
+    "svelte": "^5.57.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^26.6.4",
+    "svelte-check": "^4.7.6",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.2"
+  }
+}
