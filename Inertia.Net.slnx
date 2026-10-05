@@ -8,6 +8,7 @@
   <Folder Name="/samples/">
     <Project Path="samples/MinimalApi.React/MinimalApi.React.csproj" />
     <Project Path="samples/Mvc.Vue/Mvc.Vue.csproj" />
+    <Project Path="samples/FastEndpoints.Svelte/FastEndpoints.Svelte.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Inertia.Net.AotSmoke/Inertia.Net.AotSmoke.csproj" />

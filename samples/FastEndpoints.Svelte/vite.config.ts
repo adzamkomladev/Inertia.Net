@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import inertia from '@inertiajs/vite'
-import react from '@vitejs/plugin-react'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { defineConfig, type Plugin } from 'vite'
 
 // Inertia.Net finds the dev server through a "hot file" (wwwroot/hot) holding its origin, like laravel-vite-plugin does.
@@ -15,7 +15,7 @@ function hotFile(): Plugin {
     configureServer(server) {
       server.httpServer?.once('listening', () => {
         fs.mkdirSync(path.dirname(file), { recursive: true })
-        fs.writeFileSync(file, server.resolvedUrls?.local[0] ?? 'http://localhost:5173')
+        fs.writeFileSync(file, server.resolvedUrls?.local[0] ?? 'http://localhost:5175')
       })
       server.httpServer?.once('close', remove)
       for (const signal of ['SIGINT', 'SIGTERM'] as const) {
@@ -26,18 +26,16 @@ function hotFile(): Plugin {
   }
 }
 
-export default defineConfig(({ command, isSsrBuild }) => ({
+export default defineConfig(({ command }) => ({
   // Dev: assets come from the Vite origin; build: from the app's /build/ path.
   base: command === 'build' ? '/build/' : '/',
   publicDir: false,
-  plugins: [react(), inertia({ ssr: { entry: 'ClientApp/ssr.tsx', sourcemap: false } }), hotFile()],
-  server: { port: 5173, strictPort: true },
-  build: isSsrBuild
-    ? { outDir: 'ssr', emptyOutDir: true }
-    : {
-        outDir: 'wwwroot/build',
-        emptyOutDir: true,
-        manifest: true,
-        rolldownOptions: { input: 'ClientApp/app.tsx' },
-      },
+  plugins: [svelte(), inertia(), hotFile()],
+  server: { port: 5175, strictPort: true },
+  build: {
+    outDir: 'wwwroot/build',
+    emptyOutDir: true,
+    manifest: true,
+    rolldownOptions: { input: 'ClientApp/app.ts' },
+  },
 }))
