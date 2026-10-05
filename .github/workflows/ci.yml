@@ -25,7 +25,7 @@ jobs:
       - run: dotnet test Inertia.Net.slnx -c Release --no-build
       - name: Pack
         if: matrix.os == 'ubuntu-latest'
-        run: dotnet pack Inertia.Net.slnx -c Release --no-build -o artifacts
+        run: dotnet pack Inertia.Net.slnx -c Release --no-build -warnaserror -o artifacts
 
   # Native AOT publish of tests/Inertia.Net.AotSmoke (any IL2xxx/IL3xxx warning fails), then protocol smoke checks on the binary.
   aot-smoke:
