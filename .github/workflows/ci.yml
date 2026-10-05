@@ -38,17 +38,47 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
       - run: bash eng/aot-smoke.sh
 
-  # TODO(phase 6): Node 22, npm ci, build the sample frontends, run Playwright (tests/e2e).
-  # e2e:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-dotnet@v4
-  #       with:
-  #         global-json-file: global.json
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 22
-  #     - run: npm ci
-  #     - run: npx playwright install --with-deps
-  #     - run: npx playwright test
+  # Playwright E2E: the same spec suite runs against every sample (tests/e2e, contract in samples/README.md).
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # TODO: add vue (Mvc.Vue) and svelte (FastEndpoints.Svelte) once those samples exist.
+        sample: [react]
+        include:
+          - sample: react
+            dir: MinimalApi.React
+            ssr: "1" # also builds the SSR bundle, starts the SSR server and runs the SSR spec
+    env:
+      SAMPLE: ${{ matrix.sample }}
+      INERTIA_SSR: ${{ matrix.ssr }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the sample frontend
+        working-directory: samples/${{ matrix.dir }}
+        run: |
+          npm ci
+          npm run build
+      - name: Install Playwright
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run the E2E suite
+        working-directory: tests/e2e
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.sample }}
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+          retention-days: 7

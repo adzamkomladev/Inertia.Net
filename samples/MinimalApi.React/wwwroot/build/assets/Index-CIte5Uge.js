@@ -1,1 +1,0 @@
-import{n as e}from"./app-_yUgHOev.js";import{n as t,t as n}from"./Layout-CtjCU0CK.js";var r=t();function i({posts:t}){return(0,r.jsxs)(n,{children:[(0,r.jsx)(`h1`,{children:`Feed`}),(0,r.jsx)(e,{data:`posts`,children:t.data.map(e=>(0,r.jsx)(`article`,{"data-testid":`post`,style:{height:160,borderBottom:`1px solid #ccc`},children:e.title},e.id))})]})}export{i as default};

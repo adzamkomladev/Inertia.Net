@@ -494,3 +494,4 @@ artifacts/
 .claude/worktrees/
 samples/*/ssr/
 samples/*/wwwroot/hot
+samples/*/wwwroot/build/
