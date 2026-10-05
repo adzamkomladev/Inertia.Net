@@ -16,6 +16,9 @@ internal sealed class InertiaPageWriter
 {
     private static readonly JavaScriptEncoder HtmlSafeEncoder = CreateHtmlSafeEncoder();
 
+    // The errors prop when there are none (the common case). Never mutated: the props walk only reads it.
+    private static readonly InertiaProp NoErrors = Inertia.Always(new InertiaProps());
+
     private readonly ConcurrentDictionary<Type, bool> _containsProps = new();
     private readonly JsonWriterOptions _jsonWriterOptions;
     private readonly JsonWriterOptions _htmlWriterOptions;
@@ -65,7 +68,7 @@ internal sealed class InertiaPageWriter
         try
         {
             var feature = httpContext.Features.Get<InertiaFeature>();
-            var sharedPropKeys = Options.ExposeSharedPropKeys ? new List<string>() : null;
+            var sharedPropKeys = Options.ExposeSharedPropKeys ? new List<string>(Options.SharedProps.Count + 1 + (feature?.SharedProps?.Count ?? 0)) : null;
             var entries = await BuildPropsAsync(httpContext, feature, props, request, sharedPropKeys);
 
             using var writer = new Utf8JsonWriter(buffer, htmlSafe ? _htmlWriterOptions : _jsonWriterOptions);
@@ -154,20 +157,43 @@ internal sealed class InertiaPageWriter
     // errors (always), then option shares, then request shares, then page props; later keys override earlier ones in place.
     private async ValueTask<List<PropEntry>> BuildPropsAsync(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<string>? sharedPropKeys)
     {
-        var entries = new List<PropEntry>();
-        var positions = new Dictionary<string, int>(StringComparer.Ordinal);
+        // Sized up front: one allocation instead of a grow-and-copy chain.
+        var entries = new List<PropEntry>(1 + Options.SharedProps.Count + (feature?.SharedProps?.Count ?? 0) + props switch
+        {
+            ICollection<KeyValuePair<string, object?>> collection => collection.Count,
+            IReadOnlyCollection<KeyValuePair<string, object?>> collection => collection.Count,
+            _ => 16,
+        });
+
+        // Page props come from one dictionary or object, so their keys are unique: a key can only collide with an earlier
+        // errors/shared entry. Those come first, so a linear scan of that prefix replaces a key-to-position dictionary.
+        // ponytail: O(shared x props) string compares; a dictionary pays off only with dozens of shared props.
+        var sharedCount = 0;
         var hasDotKey = false;
 
         void Set(string key, object? value, Type type, bool shared)
         {
-            if (positions.TryGetValue(key, out var position))
+            var position = -1;
+            for (var i = 0; i < sharedCount; i++)
+            {
+                if (string.Equals(entries[i].Key, key, StringComparison.Ordinal))
+                {
+                    position = i;
+                    break;
+                }
+            }
+
+            if (position >= 0)
             {
                 entries[position] = new PropEntry(key, value, type);
             }
             else
             {
-                positions[key] = entries.Count;
                 entries.Add(new PropEntry(key, value, type));
+                if (shared)
+                {
+                    sharedCount++;
+                }
             }
 
             var dot = key.IndexOf('.', StringComparison.Ordinal);
@@ -182,21 +208,32 @@ internal sealed class InertiaPageWriter
             }
         }
 
-        Set("errors", Inertia.Always(ErrorsResolver.Resolve(feature?.Errors, Options.WithAllErrors, request.ErrorBag)), typeof(object), shared: true);
+        var errors = feature?.Errors is { Count: > 0 } bags ? Inertia.Always(ErrorsResolver.Resolve(bags, Options.WithAllErrors, request.ErrorBag)) : NoErrors;
+        Set("errors", errors, typeof(object), shared: true);
 
         foreach (var (key, value) in Options.SharedProps)
         {
             Set(key, value is Func<HttpContext, object?> factory ? factory(httpContext) : value, typeof(object), shared: true);
         }
 
-        foreach (var (key, value) in feature?.SharedProps ?? [])
+        if (feature?.SharedProps is { } requestShared)
         {
-            Set(key, value, typeof(object), shared: true);
+            foreach (var (key, value) in requestShared)
+            {
+                Set(key, value, typeof(object), shared: true);
+            }
         }
 
         switch (props)
         {
             case null:
+                break;
+            case Dictionary<string, object?> dictionary: // InertiaProps: struct enumerator, no boxing
+                foreach (var (key, value) in dictionary)
+                {
+                    Set(key, value, typeof(object), shared: false);
+                }
+
                 break;
             case IReadOnlyDictionary<string, object?> dictionary:
                 foreach (var (key, value) in dictionary)
@@ -219,8 +256,10 @@ internal sealed class InertiaPageWriter
                     throw new InvalidOperationException($"Page props must be a dictionary or an object with properties, not '{info.Type}'.");
                 }
 
-                foreach (var property in info.Properties)
+                var properties = info.Properties;
+                for (var i = 0; i < properties.Count; i++) // indexed: foreach over the IList boxes an enumerator
                 {
+                    var property = properties[i];
                     if (TryGetPropertyValue(property, props, out var value))
                     {
                         Set(property.Name, value, property.PropertyType, shared: false);
