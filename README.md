@@ -938,7 +938,7 @@ const form = useForm({ name: '', email: '' }).withPrecognition('post', '/users')
 
 ## Flash data
 
-Flash data is carried across one redirect and then consumed. It appears as `page.flash`, only when there is some.
+Flash data is carried across the redirect (and any further redirects) and consumed by the next response that is not a redirect. It appears as `page.flash`, only when there is some.
 
 ```csharp
 app.MapPost("/users", (CreateUserInput input, HttpContext context) =>
@@ -957,7 +957,7 @@ return Back().WithFlash("toast", "Saved");
 
 Read it on the client with `usePage().flash` (or the `onFlash` visit callback).
 
-**Where state is kept.** Flash data, errors, `clearHistory` and `preserveFragment` set during a request that ends in a redirect (or a `Location()`/fragment `409`) are saved in an `IInertiaStateStore`, loaded at the start of the next request and then consumed. The state is kept, not consumed, when the response is the version-mismatch `409`.
+**Where state is kept.** Flash data, errors, `clearHistory` and `preserveFragment` set during a request that ends in a redirect (or a `Location()`/fragment `409`) are saved in an `IInertiaStateStore` and loaded at the start of the next request. If that request redirects again, the state is carried on (so `Back()` to a URL that itself redirects still shows the flash); otherwise its response consumes it. The state is also kept when the response is the version-mismatch `409`.
 
 - **Default: an encrypted cookie** (`.Inertia.State`). It is protected with ASP.NET Core Data Protection, HttpOnly, SameSite=Lax, and works without sessions and under Native AOT. Tampered or undecryptable cookies are ignored and deleted. It logs a warning above about 4 KB: browsers drop larger cookies.
 - **Session store (opt in):** `o.State.UseSession()`, with `services.AddSession()` and `app.UseSession()` before `app.UseInertia()`.
@@ -971,7 +971,7 @@ In a multi-instance deployment, configure Data Protection with a shared key ring
 
 ```csharp
 return Results.Redirect("/users");                 // standard redirect: works with Inertia
-return Back();                                     // to the Referer, else "/"
+return Back();                                     // to the Referer, else "~/" (the app root, PathBase included)
 return Back("/users");                             // to the Referer, else "/users"
 return Location("https://billing.example.com");    // leave the SPA
 ```
@@ -983,8 +983,8 @@ What `UseInertia()` does for Inertia requests:
 | 302 for PUT, PATCH or DELETE | changed to **303 See Other**, so the browser follows with a GET |
 | Redirect whose `Location` contains `#`, and the request is not a prefetch | `409` with `X-Inertia-Redirect: <url>` (the client performs a full visit that keeps the fragment) |
 | `Location(url)` | `409` with `X-Inertia-Location: <url>` for Inertia requests, a plain `302` otherwise |
-| An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE) |
-| `Back()` | `302` to the `Referer` when it is an http(s) URL with the request's own host and port, otherwise to the fallback |
+| An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE), falling back to the app root (`PathBase/`) |
+| `Back()` | `302` to the `Referer` when it is an http(s) URL with the request's own host and port, otherwise to the fallback (default `~/`, the app root including `PathBase`) |
 
 The same-origin rule on `Referer` exists so `Back()` cannot become an open redirect. The scheme is not compared, so it keeps working behind a TLS-terminating proxy.
 
@@ -1003,7 +1003,7 @@ context.Inertia().ClearHistory();                            // clear the histor
 context.Inertia().PreserveFragment();                        // keep the URL fragment across the next redirect
 ```
 
-`encryptHistory` is written as `true` only when set and is not carried across redirects. `clearHistory` and `preserveFragment` go through the state store and apply to the next rendered page, then they are consumed.
+`encryptHistory` is written as `true` only when set and is not carried across redirects. `clearHistory` and `preserveFragment` go through the state store and apply to the next page that is rendered after the redirect(s), then they are consumed.
 
 ```csharp
 app.MapPost("/logout", (HttpContext context) =>
@@ -1366,7 +1366,7 @@ Design notes:
 - **Pooled buffers.** The page is written to a pooled `IBufferWriter<byte>`, and the path tracker is a pooled `char[]`. A path becomes a string only when metadata needs it. The buffer also means a failing loader never produces a half-written 200.
 - **Version check before the handler.** A stale client costs one header comparison and a 409.
 - **No per-request mutable singletons.** Per-request state lives in an `InertiaFeature` on `HttpContext.Features`, so concurrent requests cannot leak history or flash settings into one another.
-- **Plain DTOs take the fast path.** A POCO is walked only when its type contains `InertiaProp` members (cached per type). Everything else is one `Serialize` call.
+- **Plain DTOs take the fast path.** A POCO or list is walked only when its type can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements; cached per type). Everything else is one `Serialize` call.
 - **Cached assets.** The Vite manifest is parsed once, the root template is parsed once into pre-encoded UTF-8 segments, and the production tags are pre-rendered per entry set and path base. The version is a precomputed string compared ordinally.
 - **Sync loaders stay sync.** `Func<T>` loaders are not wrapped in closures.
 
@@ -1433,9 +1433,9 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `config.UseInertia(configure?)` | FastEndpoints: validation redirect and Precognition (`app.UseFastEndpoints(c => ...)`). |
 | `Render(component, props?)` | `InertiaResult`: `.WithStatusCode(int)`, `.WithRootView(string)`, `.WithViewData(key, value)`. |
 | `Location(url)` | `InertiaLocationResult`. |
-| `Back(fallback = "/")` | `InertiaBackResult`: `.WithErrors(errors, bag = "default")`, `.WithFlash(key, value)`. |
+| `Back(fallback = "~/")` | `InertiaBackResult`: `.WithErrors(errors, bag = "default")`, `.WithFlash(key, value)`. |
 | `httpContext.Inertia()` | `InertiaFeature`: `Share`, `Flash`, `WithErrors`, `ClearHistory`, `EncryptHistory(bool = true)`, `PreserveFragment`. |
-| `Send.InertiaAsync(component, props?)`, `Send.InertiaLocationAsync(url)`, `Send.InertiaBackAsync(fallback = "/")` | FastEndpoints `Send` extensions. |
+| `Send.InertiaAsync(component, props?)`, `Send.InertiaLocationAsync(url)`, `Send.InertiaBackAsync(fallback = "~/")` | FastEndpoints `Send` extensions. |
 
 Extension points: `IInertiaRootView`, `IInertiaStateStore`, `ViteAssets`, `InertiaRequest` (the parsed headers), `InertiaHeaders` (header name constants), `InertiaSsrException`.
 
@@ -1504,7 +1504,7 @@ Use `.WithInertiaValidation()` on the endpoint. Without it, the built-in `AddVal
 Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). In MVC the policy is the one in the MVC `JsonOptions`. The page itself is written with the HTTP `JsonOptions`: keep both policies aligned.
 
 **`InvalidOperationException: InertiaProp values can only be serialized by Inertia.Net`.**
-An `InertiaProp` ended up somewhere Inertia.Net does not walk: a member declared as `object`, a `List<object>`, or a `Flash(...)` value. Whether a type holds props is decided from its declared member types. Put props directly in `InertiaProps`, or declare the member as `InertiaProp` on the typed page object.
+An `InertiaProp` ended up somewhere Inertia.Net does not walk: a `Flash(...)` value, a dictionary with non-string keys or non-`object` values (`Dictionary<string, InertiaProp>`), or a type with a custom converter. Lists, `object` members and `IDictionary<string, object?>` are walked. Put props in `InertiaProps`, or declare the member as `InertiaProp` (or `object`) on the typed page object.
 
 **Serialization fails under Native AOT: "JsonTypeInfo metadata ... was not provided".**
 Add the type to your `JsonSerializerContext` and chain it with `ConfigureHttpJsonOptions` (see [Native AOT](#native-aot)). Setting `JsonSerializerIsReflectionEnabledByDefault=false` in regular builds finds these early.
