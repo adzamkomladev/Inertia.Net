@@ -59,12 +59,12 @@ internal static class InertiaValidationFilter
         };
     }
 
-    private static bool IsInertiaMutation(HttpContext httpContext) =>
+    internal static bool IsInertiaMutation(HttpContext httpContext) =>
         !HttpMethods.IsGet(httpContext.Request.Method) && !string.IsNullOrEmpty(httpContext.Request.Headers[InertiaHeaders.Inertia]);
 
     // Microsoft.Extensions.Validation reports CLR member paths ("Address.Street"); the client knows the JSON names, so each
     // segment goes through the JSON naming policy ("address.street"). [JsonPropertyName] overrides are not applied.
-    private static Dictionary<string, string[]> ToClientKeys(Dictionary<string, string[]> errors, JsonNamingPolicy? naming)
+    internal static Dictionary<string, string[]> ToClientKeys(Dictionary<string, string[]> errors, JsonNamingPolicy? naming)
     {
         if (naming is null)
         {
@@ -80,7 +80,7 @@ internal static class InertiaValidationFilter
         return result;
     }
 
-    private static InertiaBackResult Back(HttpContext httpContext, IDictionary<string, string[]> errors)
+    internal static InertiaBackResult Back(HttpContext httpContext, IDictionary<string, string[]> errors)
     {
         var bag = httpContext.Request.Headers[InertiaHeaders.ErrorBag].ToString();
         return Inertia.Back().WithErrors(errors, bag.Length == 0 ? "default" : bag);

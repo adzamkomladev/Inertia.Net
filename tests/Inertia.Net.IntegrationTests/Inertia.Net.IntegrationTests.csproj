@@ -1,8 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
   <!-- What a package consumer gets from buildTransitive/: global usings for Inertia.Net and its static Inertia class. -->
   <Import Project="..\..\src\Inertia.Net\buildTransitive\Inertia.Net.props" />
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
     <RootNamespace>Inertia.Net.IntegrationTests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
