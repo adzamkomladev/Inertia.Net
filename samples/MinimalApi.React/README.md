@@ -29,10 +29,10 @@ dotnet run -c Release --no-launch-profile --urls http://localhost:5101
 
 ```bash
 INERTIA_SSR=1 npm run build   # also builds ssr/ssr.js
-npm run ssr                   # Node SSR server on :13714
 INERTIA_SSR=1 dotnet run -c Release --no-launch-profile --urls http://localhost:5101
 ```
 
+With `INERTIA_SSR=1` the app starts `node ssr/ssr.js` itself (`o.Ssr.UseNodeProcess()`, port 13714) and stops it on exit.
 If the SSR server is down the backend logs it and falls back to client rendering.
 
 ## E2E
