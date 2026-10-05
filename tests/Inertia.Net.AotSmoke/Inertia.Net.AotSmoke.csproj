@@ -1,13 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- What a package consumer gets from buildTransitive/: global usings for Inertia.Net and its static Inertia class. -->
+  <Import Project="..\..\src\Inertia.Net\buildTransitive\Inertia.Net.props" />
   <PropertyGroup>
     <RootNamespace>Inertia.Net.AotSmoke</RootNamespace>
     <PublishAot>true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
     <IsPackable>false</IsPackable>
+    <!-- Every trim/AOT warning fails the publish (IL2xxx/IL3xxx), including the ones only ILC reports. -->
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
-    <ProjectReference Include="..\..\src\Inertia.Net.FastEndpoints\Inertia.Net.FastEndpoints.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="wwwroot\build\.vite\manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Remove="wwwroot\build\.vite\manifest.json" />
   </ItemGroup>
 </Project>
