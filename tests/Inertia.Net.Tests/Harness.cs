@@ -5,6 +5,9 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Inertia.Net.Tests;
@@ -12,10 +15,11 @@ namespace Inertia.Net.Tests;
 /// <summary>Builds a service provider with Inertia registered and runs results against a <see cref="DefaultHttpContext"/>.</summary>
 internal sealed class Harness
 {
-    public Harness(Action<InertiaOptions>? configure = null, TimeProvider? timeProvider = null, Action<IServiceCollection>? configureServices = null)
+    public Harness(Action<InertiaOptions>? configure = null, TimeProvider? timeProvider = null, Action<IServiceCollection>? configureServices = null, string? contentRoot = null, string environment = "Production")
     {
         var services = new ServiceCollection();
         configureServices?.Invoke(services);
+        services.TryAddSingleton<IHostEnvironment>(new TestHostEnvironment(contentRoot ?? DefaultContentRoot, environment));
         services.AddLogging(b => b.AddProvider(Logs));
         // App-style JSON setup: a source-generated context first, reflection as the fallback.
         services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, TestJsonContext.Default));
@@ -28,7 +32,18 @@ internal sealed class Harness
         Services = services.BuildServiceProvider();
     }
 
+    /// <summary>A content root holding the default <c>app.html</c> template.</summary>
+    public static string DefaultContentRoot { get; } = CreateDefaultContentRoot();
+
     public IServiceProvider Services { get; }
+
+    private static string CreateDefaultContentRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "inertia-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "app.html"), "<!DOCTYPE html><html><head><meta charset=\"utf-8\">@inertiaHead</head><body>@inertia</body></html>");
+        return root;
+    }
 
     public CapturingLoggerProvider Logs { get; } = new();
 
@@ -73,6 +88,17 @@ internal sealed class Harness
         var end = html.IndexOf("</script>", start, StringComparison.Ordinal);
         return html[start..end];
     }
+}
+
+internal sealed class TestHostEnvironment(string contentRoot, string environment = "Production") : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = environment;
+
+    public string ApplicationName { get; set; } = "Tests";
+
+    public string ContentRootPath { get; set; } = contentRoot;
+
+    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
 
 internal static class RequestExtensions

@@ -73,16 +73,3 @@ public sealed class InertiaRootViewContext
         writer.Advance(Encoding.UTF8.GetBytes(text, span));
     }
 }
-
-/// <summary>Fallback root view: a bare HTML document around the page. Replaced by the template root view.</summary>
-internal sealed class MinimalRootView : IInertiaRootView
-{
-    public async ValueTask RenderAsync(InertiaRootViewContext context)
-    {
-        var writer = context.HttpContext.Response.BodyWriter;
-        writer.Write("<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>"u8);
-        context.WriteBody(writer);
-        writer.Write("</body></html>"u8);
-        await writer.FlushAsync(context.HttpContext.RequestAborted);
-    }
-}

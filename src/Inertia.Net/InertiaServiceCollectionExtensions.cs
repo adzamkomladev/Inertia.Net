@@ -17,7 +17,8 @@ public static class InertiaServiceCollectionExtensions
         }
 
         services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<IInertiaRootView, MinimalRootView>();
+        services.TryAddSingleton<ViteAssets>();
+        services.TryAddSingleton<IInertiaRootView, RootTemplateView>();
         services.TryAddSingleton<InertiaPageWriter>();
         return services;
     }
