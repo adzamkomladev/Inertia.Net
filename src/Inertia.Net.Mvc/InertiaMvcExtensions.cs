@@ -9,6 +9,8 @@ public sealed class InertiaMvcOptions
 {
     internal string? RazorView { get; private set; }
 
+    internal bool TempDataStore { get; private set; }
+
     /// <summary>
     /// Renders the first-visit HTML with a Razor view instead of the <c>app.html</c> template. The view gets an
     /// <see cref="InertiaRootViewContext"/> as its model and the <c>&lt;inertia /&gt;</c>, <c>&lt;inertia-head /&gt;</c>, <c>&lt;vite /&gt;</c> and
@@ -20,6 +22,17 @@ public sealed class InertiaMvcOptions
     {
         ArgumentException.ThrowIfNullOrEmpty(view);
         RazorView = view;
+        return this;
+    }
+
+    /// <summary>
+    /// Keeps the redirect state (flash, errors, history flags) in MVC TempData instead of the encrypted cookie, so it follows the app's
+    /// TempData provider: the default cookie provider, or <c>AddSessionStateTempDataProvider()</c> with <c>AddSession()</c> and
+    /// <c>app.UseSession()</c> before <c>app.UseInertia()</c>. Replaces the <see cref="IInertiaStateStore"/> registration.
+    /// </summary>
+    public InertiaMvcOptions UseTempDataStateStore()
+    {
+        TempDataStore = true;
         return this;
     }
 }
@@ -53,6 +66,11 @@ public static class InertiaMvcExtensions
         {
             builder.Services.Configure<InertiaOptions>(o => o.RootView = view);
             builder.Services.Replace(ServiceDescriptor.Singleton<IInertiaRootView, RazorInertiaRootView>());
+        }
+
+        if (options.TempDataStore)
+        {
+            builder.Services.Replace(ServiceDescriptor.Singleton<IInertiaStateStore, TempDataInertiaStateStore>());
         }
 
         return builder;
