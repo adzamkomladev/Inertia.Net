@@ -30,6 +30,7 @@ internal sealed partial class SsrNodeProcess(
     private Task _supervisor = Task.CompletedTask;
     private Process? _process;
     private volatile bool _running;
+    private bool _disposed;
 
     /// <summary>The id of the running Node process; null when none runs.</summary>
     internal int? ProcessId { get; private set; }
@@ -110,6 +111,11 @@ internal sealed partial class SsrNodeProcess(
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         await _stopping.CancelAsync();
         await _supervisor;
         if (_process is not { HasExited: false } process)
@@ -135,6 +141,12 @@ internal sealed partial class SsrNodeProcess(
     /// <summary>Kills the process tree if it still runs (e.g. the host was disposed without being stopped).</summary>
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _stopping.Cancel();
         Kill();
         _process?.Dispose();

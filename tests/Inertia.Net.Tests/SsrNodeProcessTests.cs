@@ -145,6 +145,36 @@ public sealed class SsrNodeProcessTests
         }
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Repeated_stop_is_safe_even_after_disposal(bool writeBundle, bool disposeBetweenStops)
+    {
+        Assert.SkipUnless(!writeBundle || NodeAvailable, "node is not on PATH");
+        var (_, ssr, _) = Create(writeBundle);
+        using (ssr)
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            var pid = ssr.ProcessId;
+            Assert.Equal(writeBundle, pid.HasValue);
+
+            await ssr.StopAsync(CancellationToken.None);
+            if (pid is { } processId)
+            {
+                Assert.False(IsAlive(processId));
+            }
+
+            if (disposeBetweenStops)
+            {
+                ssr.Dispose();
+            }
+
+            await ssr.StopAsync(CancellationToken.None);
+        }
+    }
+
     [Fact]
     public async Task Missing_bundle_logs_an_error_and_falls_back_to_client_rendering()
     {
