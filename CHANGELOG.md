@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-06
+
+### Fixed
+
+- Managed Node SSR health checks and shutdown tolerate socket disconnections, including unwrapped socket errors on Linux.
+
 ## [1.0.2] - 2026-10-06
 
 ### Fixed

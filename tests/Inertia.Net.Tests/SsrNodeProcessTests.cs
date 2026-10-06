@@ -46,7 +46,7 @@ public sealed class SsrNodeProcessTests
         }
     }
 
-    private static (Harness Harness, SsrNodeProcess Process, string Url) Create(bool writeBundle = true, Action<InertiaOptions>? configure = null)
+    private static (Harness Harness, SsrNodeProcess Process, string Url) Create(bool writeBundle = true, Action<InertiaOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "inertia-ssr-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "ssr"));
@@ -68,7 +68,8 @@ public sealed class SsrNodeProcessTests
                 o.Ssr.UseNodeProcess(n => n.StartupTimeout = TimeSpan.FromSeconds(15));
                 configure?.Invoke(o);
             },
-            contentRoot: root);
+            contentRoot: root,
+            configureServices: configureServices);
         return (harness, harness.Services.GetServices<IHostedService>().OfType<SsrNodeProcess>().Single(), url);
     }
 
@@ -121,6 +122,43 @@ public sealed class SsrNodeProcessTests
 
         Assert.False(IsAlive(pid));
         Assert.Contains(harness.Logs.Entries, e => e.Message == "The Node SSR process stopped.");
+    }
+
+    [Fact]
+    public async Task Stops_when_shutdown_throws_a_socket_exception()
+    {
+        Assert.SkipUnless(NodeAvailable, "node is not on PATH");
+        var (_, ssr, _) = Create(configureServices: services => services.AddHttpClient(SsrGateway.HttpClientName)
+            .AddHttpMessageHandler(() => new ShutdownSocketHandler()));
+        using (ssr)
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            var pid = Assert.NotNull(ssr.ProcessId);
+            await ssr.StopAsync(TestContext.Current.CancellationToken);
+            Assert.False(IsAlive(pid));
+        }
+    }
+
+    private sealed class ShutdownSocketHandler : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath != "/shutdown")
+            {
+                return await base.SendAsync(request, cancellationToken);
+            }
+
+            try
+            {
+                using var response = await base.SendAsync(request, cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                // The fixture exits without responding to shutdown.
+            }
+
+            throw new SocketException((int)SocketError.NotConnected);
+        }
     }
 
     [Fact]

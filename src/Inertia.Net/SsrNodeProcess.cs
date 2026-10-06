@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net.Sockets;
 using System.Text;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -254,7 +255,7 @@ internal sealed partial class SsrNodeProcess(
             using var response = await httpClients.CreateClient(SsrGateway.HttpClientName).GetAsync($"{options.Value.Ssr.Url.TrimEnd('/')}{path}", cts.Token);
             return response.IsSuccessStatusCode;
         }
-        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or InvalidOperationException or FormatException)
+        catch (Exception ex) when (ex is HttpRequestException or SocketException or OperationCanceledException or InvalidOperationException or FormatException)
         {
             return false;
         }
