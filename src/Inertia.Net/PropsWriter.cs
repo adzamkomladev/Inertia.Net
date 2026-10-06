@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Logging;
 
@@ -197,6 +198,9 @@ internal sealed class PropsWriter : IDisposable
     {
         switch (value)
         {
+            case InertiaPageWriter.PropertyValue member:
+                JsonSerializer.Serialize(_writer, member.Value, _owner.PropertyTypeInfo(member.Property));
+                return;
             case null:
                 _writer.WriteNullValue();
                 return;
@@ -204,6 +208,9 @@ internal sealed class PropsWriter : IDisposable
                 throw new InvalidOperationException($"The prop at '{new string(Path)}' resolved to an InertiaProp more than once.");
             case JsonElement element:
                 element.WriteTo(_writer);
+                return;
+            case JsonNode node:
+                node.WriteTo(_writer, _options);
                 return;
             case Dictionary<string, object?> dictionary: // InertiaProps: struct enumerator, no boxing
                 await WriteObjectAsync(dictionary, parentWasResolved);
@@ -261,14 +268,9 @@ internal sealed class PropsWriter : IDisposable
     private async ValueTask WriteObjectAsync(object value, JsonTypeInfo info, bool parentWasResolved)
     {
         _writer.WriteStartObject();
-        var properties = info.Properties;
-        for (var i = 0; i < properties.Count; i++) // indexed: foreach over the IList boxes an enumerator
+        foreach (var entry in _owner.ObjectEntries(value, info))
         {
-            var property = properties[i];
-            if (_owner.TryGetPropertyValue(property, value, out var propertyValue))
-            {
-                await WriteEntryAsync(property.Name, -1, propertyValue, property.PropertyType, parentWasResolved);
-            }
+            await WriteEntryAsync(entry.Key, -1, entry.Value, entry.Type, parentWasResolved);
         }
 
         _writer.WriteEndObject();

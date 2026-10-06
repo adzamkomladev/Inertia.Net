@@ -490,8 +490,10 @@ artifacts/
 *.nupkg
 *.snupkg
 
-# Claude Code local worktrees
+# Agent local worktrees and personal settings
 .claude/worktrees/
+.codex/worktrees/
+.claude/settings.local.json
 samples/*/ssr/
 samples/*/wwwroot/hot
 samples/*/wwwroot/build/

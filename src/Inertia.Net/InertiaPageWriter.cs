@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.Unicode;
@@ -20,6 +21,7 @@ internal sealed class InertiaPageWriter
     private static readonly InertiaProp NoErrors = Inertia.Always(new InertiaProps());
 
     private readonly ConcurrentDictionary<Type, bool> _containsProps = new();
+    private readonly ConcurrentDictionary<JsonPropertyInfo, JsonTypeInfo> _propertySerializers = new();
     private readonly JsonWriterOptions _jsonWriterOptions;
     private readonly JsonWriterOptions _htmlWriterOptions;
 
@@ -133,19 +135,76 @@ internal sealed class InertiaPageWriter
     public bool TryGetPropertyValue(JsonPropertyInfo property, object target, out object? value)
     {
         value = null;
-        if (property.Get is null || property.IsExtensionData)
+        if (property.Get is null)
         {
             return false;
         }
 
         value = property.Get(target);
-        if (property.ShouldSerialize is { } shouldSerialize && !shouldSerialize(target, value))
+        if (property.ShouldSerialize is { } shouldSerialize)
         {
-            return false;
+            return shouldSerialize(target, value);
         }
 
-        return value is not null
+        return property.IsExtensionData || value is not null
             || SerializerOptions.DefaultIgnoreCondition is not (JsonIgnoreCondition.WhenWritingNull or JsonIgnoreCondition.WhenWritingDefault);
+    }
+
+    // Keep the member's converter/number handling using the application's existing type resolver.
+    internal readonly record struct PropertyValue(JsonPropertyInfo Property, object? Value);
+
+    public JsonTypeInfo PropertyTypeInfo(JsonPropertyInfo property) =>
+        _propertySerializers.GetOrAdd(property, member =>
+        {
+            var options = new JsonSerializerOptions(SerializerOptions)
+            {
+                NumberHandling = member.NumberHandling ?? SerializerOptions.NumberHandling,
+            };
+            if (member.CustomConverter is { } converter)
+            {
+                options.Converters.Insert(0, converter);
+            }
+            options.MakeReadOnly();
+            return options.GetTypeInfo(member.PropertyType);
+        });
+
+    public IEnumerable<PropEntry> ObjectEntries(object target, JsonTypeInfo info)
+    {
+        for (var i = 0; i < info.Properties.Count; i++)
+        {
+            var property = info.Properties[i];
+            if (!TryGetPropertyValue(property, target, out var value))
+            {
+                continue;
+            }
+            if (property.IsExtensionData)
+            {
+                if (value is null)
+                {
+                    continue;
+                }
+                // Extension keys are literal JSON names: DictionaryKeyPolicy must not rename them.
+                if (value is IEnumerable<KeyValuePair<string, object?>> objects)
+                {
+                    foreach (var entry in objects) yield return new(entry.Key, entry.Value, typeof(object));
+                }
+                else if (value is IEnumerable<KeyValuePair<string, JsonElement>> elements)
+                {
+                    foreach (var entry in elements) yield return new(entry.Key, entry.Value, typeof(JsonElement));
+                }
+                else if (value is JsonObject nodes)
+                {
+                    foreach (var entry in nodes) yield return new(entry.Key, entry.Value, typeof(JsonNode));
+                }
+            }
+            else
+            {
+                yield return new(property.Name,
+                    value is not InertiaProp && (property.CustomConverter is not null || property.NumberHandling is not null)
+                        ? new PropertyValue(property, value) : value,
+                    property.PropertyType);
+            }
+        }
     }
 
     private static string GetUrl(HttpRequest request)
@@ -256,14 +315,9 @@ internal sealed class InertiaPageWriter
                     throw new InvalidOperationException($"Page props must be a dictionary or an object with properties, not '{info.Type}'.");
                 }
 
-                var properties = info.Properties;
-                for (var i = 0; i < properties.Count; i++) // indexed: foreach over the IList boxes an enumerator
+                foreach (var entry in ObjectEntries(props, info))
                 {
-                    var property = properties[i];
-                    if (TryGetPropertyValue(property, props, out var value))
-                    {
-                        Set(property.Name, value, property.PropertyType, shared: false);
-                    }
+                    Set(entry.Key, entry.Value, entry.Type, shared: false);
                 }
 
                 break;

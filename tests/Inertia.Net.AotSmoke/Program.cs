@@ -1,5 +1,6 @@
 // A Native AOT Minimal API app exercising the Inertia.Net surface; tests/Inertia.Net.AotSmoke/smoke.sh drives the published binary.
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using FastEndpoints;
 using Inertia.Net.AotSmoke; // FastEndpoints.Generator output (DiscoveredTypes, ReflectionCache.AddFromInertiaNetAotSmoke)
@@ -8,7 +9,11 @@ using Inertia.Net.FastEndpoints;
 
 var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
 
-builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default);
+    o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
 builder.Services.AddValidation();
 builder.Services.AddFastEndpoints(DiscoveredTypes.All);
 // Registers the ProblemDetails JSON metadata: without it (reflection off) the 400 for non-Inertia clients cannot be serialized.
@@ -86,6 +91,15 @@ app.Run();
 
 internal sealed class HomePage
 {
+    [JsonConverter(typeof(SmokeMaskConverter))]
+    public string Token { get; init; } = "private-value";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public string? KeepNull { get; init; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> Extra { get; set; } = new() { ["DynamicValue"] = JsonSerializer.SerializeToElement(42, AppJsonContext.Default.Int32) };
+
     public required string Title { get; init; }
 
     public long Big { get; init; }
@@ -97,9 +111,15 @@ internal sealed class HomePage
     public required InertiaProp Feed { get; init; }
 }
 
+internal sealed class SmokeMaskConverter : JsonConverter<string>
+{
+    public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetString()!;
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options) => writer.WriteStringValue("masked");
+}
+
 internal sealed record Stat(string Name, int Value);
 
-internal sealed record AuthInfo(string? User);
+internal sealed record AuthInfo([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? User);
 
 internal sealed record FeedPage(Stat[] Data, int Page, bool HasMore) : IProvidesScrollMetadata
 {

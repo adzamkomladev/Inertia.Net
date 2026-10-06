@@ -11,7 +11,6 @@ env:
 
 permissions:
   contents: write # create the GitHub Release
-  id-token: write # NuGet Trusted Publishing (OIDC): no long-lived API key
 
 jobs:
   release:
@@ -56,20 +55,11 @@ jobs:
             test -f "artifacts/$id.$VERSION.nupkg" || { echo "Missing artifacts/$id.$VERSION.nupkg"; exit 1; }
           done
 
-      # Trusted Publishing: exchanges the workflow's OIDC token for a short-lived NuGet API key.
-      # One-time setup on nuget.org (Account > Trusted Publishing): owner adzamkomladev, repository Inertia.Net,
-      # workflow file release.yml. NUGET_USER is the nuget.org profile name (repository secret).
-      - name: NuGet login (Trusted Publishing)
-        id: nuget
-        uses: NuGet/login@v1
-        with:
-          user: ${{ secrets.NUGET_USER }}
-
       # A .snupkg next to a .nupkg is pushed to the symbol server automatically.
       - name: Push to NuGet
         run: >
           dotnet nuget push "artifacts/*.nupkg"
-          --api-key ${{ steps.nuget.outputs.NUGET_API_KEY }}
+          --api-key ${{ secrets.NUGET_API_KEY }}
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
