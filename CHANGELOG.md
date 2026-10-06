@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-06
+
+### Fixed
+
+- Typed page props and nested objects now honor property-level JSON converters and number handling.
+- JSON extension data is included in props, preserving literal keys, null values, and partial-reload filtering.
+- Explicit property ignore rules, including `JsonIgnoreCondition.Never`, take precedence over global null omission.
+
 ## [1.0.0] - 2026-10-05
 
 First release: a .NET 10 server adapter for the Inertia.js v3 protocol (v3 only, no v2 compatibility mode).

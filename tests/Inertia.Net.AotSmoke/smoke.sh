@@ -59,6 +59,10 @@ header_is X-Inertia true
 header_is Vary X-Inertia
 header_is Content-Type 'application/json; charset=utf-8'
 has '"component":"Home"'
+has '"token":"masked"'
+has '"keepNull":null'
+has '"DynamicValue":42'
+lacks 'private-value'
 has '"big":{"$bigint":"9007199254740993"}'
 has '"plans":["free","pro"]'
 has '"feed":[{"name":"item","value":1}]'
