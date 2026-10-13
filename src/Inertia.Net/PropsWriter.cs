@@ -25,6 +25,7 @@ internal sealed class PropsWriter : IDisposable
     private readonly CancellationToken _cancellationToken;
     private char[] _path = ArrayPool<char>.Shared.Rent(128);
     private int _pathLength;
+    private int _arrayPathLength;
 
     private List<string>? _mergeProps;
     private List<string>? _prependProps;
@@ -134,8 +135,10 @@ internal sealed class PropsWriter : IDisposable
     private async ValueTask WriteEntryAsync(string? key, int index, object? prop, Type declaredType, bool parentWasResolved)
     {
         var mark = key is null ? Push(index) : Push(key);
+        var arrayMark = _arrayPathLength;
         try
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             var p = prop as InertiaProp;
 
             // Always props and the children of resolved values bypass partial filtering.
@@ -144,8 +147,15 @@ internal sealed class PropsWriter : IDisposable
                 return;
             }
 
+            if (_isPartial && !parentWasResolved && p is not { IsAlways: true }
+                && _request.Except is { } excluded && LeadsToAny(excluded, Path) && IsArray(prop, declaredType))
+            {
+                return;
+            }
+
             if (p is not null && !_isPartial && ExcludeFromInitialResponse(p))
             {
+                if (key is null) _writer.WriteNullValue();
                 return;
             }
 
@@ -157,6 +167,7 @@ internal sealed class PropsWriter : IDisposable
                 (resolved, value) = await ResolveAsync(p);
                 if (!resolved)
                 {
+                    if (key is null) _writer.WriteNullValue();
                     return;
                 }
 
@@ -166,17 +177,22 @@ internal sealed class PropsWriter : IDisposable
                     p = inner;
                     if (!_isPartial && ExcludeFromInitialResponse(p))
                     {
+                        if (key is null) _writer.WriteNullValue();
                         return;
                     }
 
                     (resolved, value) = await ResolveAsync(p);
                     if (!resolved)
                     {
+                        if (key is null) _writer.WriteNullValue();
                         return;
                     }
                 }
 
                 type = p.ValueType;
+                if (_isPartial && !parentWasResolved && !p.IsAlways && _request.Except is { } except
+                    && LeadsToAny(except, Path) && IsArray(value, type)) return;
+                if (_isPartial && _arrayPathLength == 0 && IsArray(value, type)) _arrayPathLength = _pathLength;
                 CollectMetadata(p, value);
             }
 
@@ -191,6 +207,7 @@ internal sealed class PropsWriter : IDisposable
         finally
         {
             _pathLength = mark;
+            _arrayPathLength = arrayMark;
         }
     }
 
@@ -199,7 +216,7 @@ internal sealed class PropsWriter : IDisposable
         switch (value)
         {
             case InertiaPageWriter.PropertyValue member:
-                JsonSerializer.Serialize(_writer, member.Value, _owner.PropertyTypeInfo(member.Property));
+                JsonSerializer.Serialize(_writer, member.Value, member.TypeInfo);
                 return;
             case null:
                 _writer.WriteNullValue();
@@ -207,10 +224,10 @@ internal sealed class PropsWriter : IDisposable
             case InertiaProp:
                 throw new InvalidOperationException($"The prop at '{new string(Path)}' resolved to an InertiaProp more than once.");
             case JsonElement element:
-                element.WriteTo(_writer);
+                _owner.WriteElement(_writer, element);
                 return;
             case JsonNode node:
-                node.WriteTo(_writer, _options);
+                _owner.WriteNode(_writer, node);
                 return;
             case Dictionary<string, object?> dictionary: // InertiaProps: struct enumerator, no boxing
                 await WriteObjectAsync(dictionary, parentWasResolved);
@@ -229,7 +246,8 @@ internal sealed class PropsWriter : IDisposable
         {
             if (info.Kind == JsonTypeInfoKind.Object)
             {
-                await WriteObjectAsync(value, info, parentWasResolved);
+                var contract = _owner.ObjectContract(value, info);
+                await WriteObjectAsync(value, contract.Info, parentWasResolved, contract.Discriminator, contract.DiscriminatorName);
                 return;
             }
 
@@ -265,31 +283,44 @@ internal sealed class PropsWriter : IDisposable
         _writer.WriteEndObject();
     }
 
-    private async ValueTask WriteObjectAsync(object value, JsonTypeInfo info, bool parentWasResolved)
+    private async ValueTask WriteObjectAsync(object value, JsonTypeInfo info, bool parentWasResolved, object? discriminator, string? discriminatorName)
     {
+        info.OnSerializing?.Invoke(value);
         _writer.WriteStartObject();
+        if (discriminator is string text) _writer.WriteString(discriminatorName!, text);
+        else if (discriminator is int number) _writer.WriteNumber(discriminatorName!, number);
         foreach (var entry in _owner.ObjectEntries(value, info))
         {
             await WriteEntryAsync(entry.Key, -1, entry.Value, entry.Type, parentWasResolved);
         }
 
         _writer.WriteEndObject();
+        info.OnSerialized?.Invoke(value);
     }
 
     private async ValueTask WriteArrayAsync(IEnumerable items, Type elementType, bool parentWasResolved)
     {
-        _writer.WriteStartArray();
-        var index = 0;
-        foreach (var item in items)
+        var previous = _arrayPathLength;
+        if (_isPartial && _arrayPathLength == 0) _arrayPathLength = _pathLength;
+        try
         {
-            await WriteEntryAsync(null, index++, item, elementType, parentWasResolved);
+            _writer.WriteStartArray();
+            var index = 0;
+            foreach (var item in items)
+            {
+                await WriteEntryAsync(null, index++, item, elementType, parentWasResolved || _isPartial);
+            }
+            _writer.WriteEndArray();
         }
-
-        _writer.WriteEndArray();
+        finally
+        {
+            _arrayPathLength = previous;
+        }
     }
 
     private async ValueTask<(bool Resolved, object? Value)> ResolveAsync(InertiaProp prop)
     {
+        _cancellationToken.ThrowIfCancellationRequested();
         try
         {
             return (true, await prop.ResolveAsync(_cancellationToken));
@@ -449,9 +480,21 @@ internal sealed class PropsWriter : IDisposable
 
     private bool IsIncludedInPartialMetadata()
     {
+        if (_arrayPathLength > 0) return true;
         var path = Path;
         return (_request.Only is not { } only || MatchesAny(only, path))
             && (_request.Except is not { } except || !MatchesAny(except, path));
+    }
+
+    private bool IsArray(object? value, Type declaredType)
+    {
+        if (value is null or string) return false;
+        if (value is JsonElement element) return element.ValueKind == JsonValueKind.Array;
+        if (value is JsonNode node) return node is JsonArray;
+        if (value is InertiaProp prop) return prop.ValueType != typeof(object) && _options.GetTypeInfo(prop.ValueType).Kind == JsonTypeInfoKind.Enumerable;
+        if (value is InertiaPageWriter.PropertyValue member)
+            return member.TypeInfo.Kind == JsonTypeInfoKind.Enumerable;
+        return value is IEnumerable && _options.GetTypeInfo(declaredType == typeof(object) ? value.GetType() : declaredType).Kind == JsonTypeInfoKind.Enumerable;
     }
 
     // path == filter, or path is a descendant of filter.

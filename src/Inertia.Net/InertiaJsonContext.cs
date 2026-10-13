@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace Inertia.Net;
@@ -21,6 +22,10 @@ namespace Inertia.Net;
 [JsonSerializable(typeof(TimeOnly))]
 [JsonSerializable(typeof(TimeSpan))]
 [JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(JsonNode))]
+[JsonSerializable(typeof(JsonObject))]
+[JsonSerializable(typeof(JsonArray))]
+[JsonSerializable(typeof(JsonValue))]
 [JsonSerializable(typeof(string[]))]
 [JsonSerializable(typeof(int[]))]
 [JsonSerializable(typeof(List<string>))]

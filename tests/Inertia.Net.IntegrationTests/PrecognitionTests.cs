@@ -136,6 +136,15 @@ public sealed class PrecognitionTests
         public List<string> Names { get; } = [];
     }
 
+    [Fact]
+    public async Task Collection_validate_only_keeps_the_invalid_indexed_field()
+    {
+        await using var app = await StartAsync();
+        var response = await PostAsync(app.CreateClient(), "/precog-collection", new { items = new[] { new { email = "" } } }, "items.0.email");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["items.0.email"], (await ErrorsAsync(response)).Select(e => e.Key));
+    }
+
     public sealed class Host : IConformanceHost
     {
         public static void ConfigureServices(IServiceCollection services)
@@ -160,6 +169,7 @@ public sealed class PrecognitionTests
                 });
             app.MapPost("/precog-nested", ([FromBody] NestedInput input) => Results.Ok()).WithInertiaPrecognition();
             app.MapPost("/precog-none", () => Results.Ok()).WithInertiaPrecognition();
+            app.MapPost("/precog-collection", ([FromBody] CollectionInput input) => Results.Ok()).WithInertiaPrecognition();
         }
     }
 
@@ -182,5 +192,14 @@ public sealed class PrecognitionTests
     {
         [Required]
         public string? Street { get; set; }
+    }
+
+    public sealed class CollectionInput
+    {
+        public List<CollectionItem> Items { get; set; } = [];
+    }
+    public sealed class CollectionItem
+    {
+        [Required] public string? Email { get; set; }
     }
 }

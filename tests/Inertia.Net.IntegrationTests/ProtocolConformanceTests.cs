@@ -39,6 +39,19 @@ public abstract class ProtocolConformanceTests<THost>
     protected static Task<ConformanceApp> StartAsync(ConformanceSetup? setup = null) => ConformanceApp.StartAsync<THost>(setup);
 
     [Fact]
+    public async Task Deferred_array_index_reload_preserves_both_rows_and_their_siblings()
+    {
+        await using var app = await StartAsync();
+        var response = await app.CreateClient().InertiaGetAsync("/array", r =>
+        {
+            r.WithHeader(InertiaHeaders.PartialComponent, "Array");
+            r.WithHeader(InertiaHeaders.PartialData, "rows.1.extra");
+        });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        JsonAssert.Equal("""[{"name":"first","extra":10},{"name":"second","extra":20}]""", (await response.PageAsync())["props"]!["rows"]);
+    }
+
+    [Fact]
     public async Task Plain_get_returns_html_with_the_embedded_page()
     {
         await using var app = await StartAsync();

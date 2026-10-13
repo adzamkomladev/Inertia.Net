@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using static Inertia.Net.Inertia;
 
 namespace Inertia.Net.Tests;
@@ -125,7 +126,7 @@ public sealed class SsrNodeProcessTests
     }
 
     [Fact]
-    public async Task Stops_when_shutdown_throws_a_socket_exception()
+    public async Task Stops_the_owned_process_without_sending_a_shutdown_request()
     {
         Assert.SkipUnless(NodeAvailable, "node is not on PATH");
         var (_, ssr, _) = Create(configureServices: services => services.AddHttpClient(SsrGateway.HttpClientName)
@@ -148,16 +149,7 @@ public sealed class SsrNodeProcessTests
                 return await base.SendAsync(request, cancellationToken);
             }
 
-            try
-            {
-                using var response = await base.SendAsync(request, cancellationToken);
-            }
-            catch (HttpRequestException)
-            {
-                // The fixture exits without responding to shutdown.
-            }
-
-            throw new SocketException((int)SocketError.NotConnected);
+            throw new InvalidOperationException("Shutdown must target the owned process, not a URL.");
         }
     }
 
@@ -244,5 +236,121 @@ public sealed class SsrNodeProcessTests
         var plain = new Harness(o => o.Ssr.Enabled = true).Services.GetServices<IHostedService>().OfType<SsrNodeProcess>().Single();
         await plain.StartAsync(TestContext.Current.CancellationToken);
         Assert.Null(plain.ProcessId);
+    }
+
+    [Fact]
+    public async Task Occupied_endpoint_is_not_used_for_health_render_or_shutdown()
+    {
+        var (harness, ssr, url) = Create();
+        using var listener = new TcpListener(IPAddress.Loopback, new Uri(url).Port);
+        listener.Start();
+        using (ssr)
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            Assert.False(listener.Pending());
+            Assert.Null(ssr.ProcessId);
+            Assert.False(ssr.IsReady);
+            Assert.DoesNotContain("data-server-rendered", await RenderAsync(harness), StringComparison.Ordinal);
+            await ssr.StopAsync(TestContext.Current.CancellationToken);
+            Assert.False(listener.Pending());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Managed_render_does_not_follow_a_changed_url_to_another_server(bool throwOnError)
+    {
+        Assert.SkipUnless(NodeAvailable, "node is not on PATH");
+        var (harness, ssr, _) = Create(configure: o => o.Ssr.ThrowOnError = throwOnError);
+        using var other = new TcpListener(IPAddress.Loopback, 0);
+        other.Start();
+        using (ssr)
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            var pid = Assert.NotNull(ssr.ProcessId);
+            harness.Services.GetRequiredService<IOptionsMonitor<InertiaOptions>>().CurrentValue.Ssr.Url =
+                $"http://127.0.0.1:{((IPEndPoint)other.LocalEndpoint).Port}";
+            if (throwOnError)
+            {
+                var error = await Assert.ThrowsAsync<InertiaSsrException>(() => RenderAsync(harness));
+                Assert.Equal("startup", error.Type);
+            }
+            else Assert.DoesNotContain("data-server-rendered", await RenderAsync(harness), StringComparison.Ordinal);
+            Assert.False(other.Pending());
+            Assert.Equal(pid, ssr.ProcessId);
+            Assert.True(ssr.IsReady);
+        }
+    }
+
+    [Fact]
+    public async Task Managed_ssr_rejects_external_urls_and_can_throw_on_an_occupied_endpoint()
+    {
+        var (_, remote, _) = Create(configure: o => { o.Ssr.Url = "https://ssr.example.com"; o.Ssr.ThrowOnError = true; });
+        using (remote)
+        {
+            var error = await Assert.ThrowsAsync<InertiaSsrException>(() => remote.StartAsync(TestContext.Current.CancellationToken));
+            Assert.Equal("startup", error.Type);
+            Assert.Null(remote.ProcessId);
+        }
+        var (_, occupied, url) = Create(configure: o => o.Ssr.ThrowOnError = true);
+        using var listener = new TcpListener(IPAddress.Loopback, new Uri(url).Port);
+        listener.Start();
+        using (occupied)
+            await Assert.ThrowsAsync<InertiaSsrException>(() => occupied.StartAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Disposal_during_a_queued_restart_joins_the_supervisor_and_prevents_a_new_child()
+    {
+        Assert.SkipUnless(NodeAvailable, "node is not on PATH");
+        using var barrier = new RestartBarrier();
+        var (_, ssr, url) = Create(configureServices: s => s.AddLogging(b => b.AddProvider(barrier)));
+        Task? disposal = null;
+        try
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            var pid = Assert.NotNull(ssr.ProcessId);
+            using var client = new HttpClient();
+            await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync($"{url}/crash", TestContext.Current.CancellationToken));
+            Assert.True(barrier.RestartEntered.Wait(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken));
+            disposal = Task.Run(ssr.Dispose, TestContext.Current.CancellationToken);
+            Assert.True(barrier.StopEntered.Wait(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken));
+            barrier.ReleaseRestart.Set();
+            await disposal.WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
+            Assert.Null(ssr.ProcessId);
+            Assert.False(ssr.IsReady);
+            Assert.False(IsAlive(pid));
+            Assert.Equal(1, barrier.Spawns);
+        }
+        finally
+        {
+            barrier.ReleaseRestart.Set();
+            if (disposal is not null) await disposal;
+            ssr.Dispose();
+        }
+    }
+
+    private sealed class RestartBarrier : ILoggerProvider, ILogger
+    {
+        internal ManualResetEventSlim RestartEntered { get; } = new();
+        internal ManualResetEventSlim StopEntered { get; } = new();
+        internal ManualResetEventSlim ReleaseRestart { get; } = new();
+        internal int Spawns;
+        public ILogger CreateLogger(string categoryName) => this;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> formatter)
+        {
+            var message = formatter(state, error);
+            if (message.StartsWith("Started the Node SSR process", StringComparison.Ordinal)) Interlocked.Increment(ref Spawns);
+            if (message.StartsWith("Stopping the owned", StringComparison.Ordinal)) StopEntered.Set();
+            if (message.StartsWith("Restarting the Node", StringComparison.Ordinal))
+            {
+                RestartEntered.Set();
+                if (!ReleaseRestart.Wait(TimeSpan.FromSeconds(15))) throw new TimeoutException("Restart barrier was not released.");
+            }
+        }
+        public void Dispose() { RestartEntered.Dispose(); StopEntered.Dispose(); ReleaseRestart.Dispose(); }
     }
 }

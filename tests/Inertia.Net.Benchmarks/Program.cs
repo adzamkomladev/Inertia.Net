@@ -2,6 +2,32 @@ using System.Text;
 using BenchmarkDotNet.Running;
 using Inertia.Net.Benchmarks;
 
+if (args is ["--load-server"]) { await LoadProbe.ServerAsync(); return; }
+if (args is ["--render-probe"]) { await RenderProbe.RunAsync(); return; }
+if (args is ["--load", var output]) { await LoadProbe.RunAsync(output); return; }
+if (args is ["--ssr-probe"])
+{
+    var benchmark = new SsrBufferingBenchmarks { PayloadBytes = 1048576 };
+    benchmark.Setup();
+    for (var repetition = 1; repetition <= 3; repetition++)
+    {
+        foreach (var (name, run) in new (string, Func<Task<string?>>)[] { ("buffered", () => benchmark.BufferedReference()), ("gateway", () => benchmark.Streaming().AsTask()) })
+        {
+            var cold = System.Diagnostics.Stopwatch.GetTimestamp();
+            await run();
+            var coldMs = System.Diagnostics.Stopwatch.GetElapsedTime(cold).TotalMilliseconds;
+            for (var i = 0; i < 20; i++) await run();
+            var before = GC.GetTotalAllocatedBytes(true);
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
+            for (var i = 0; i < 100; i++)
+                if ((await run())?.Length != 1048576) throw new InvalidOperationException("SSR probe returned the wrong body.");
+            Console.WriteLine($"run={repetition} {name}: {(GC.GetTotalAllocatedBytes(true) - before) / 100} B/request, {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds / 100:F3} ms/request; first-call={coldMs:F3} ms");
+        }
+    }
+    benchmark.Cleanup();
+    return;
+}
+
 // `dotnet run -c Release -- --check` prints what each render benchmark produces, to verify the setup before measuring.
 if (args is ["--check"])
 {

@@ -72,6 +72,20 @@ has '"preserveBigIntegers":true'
 lacks '"stats":'
 
 # 3. InertiaProps page: deferred groups, scroll, once with TTL, always, optional, nested dictionaries, shared props.
+inertia GET /serialization
+status_is 200
+has '"number":"42"'
+has '"strict":42'
+has '"value":"normalized"'
+has '"item":{"$type":"derived","name":"visible"}'
+has '"data":{"id":{"$bigint":"9007199254740993"}}'
+lacks '"count":'
+lacks '"enabled":'
+lacks '"zero":'
+inertia GET /serialization -H 'X-Inertia-Partial-Component: Serialization' -H 'X-Inertia-Partial-Data: rows.1.extra'
+status_is 200
+has '"rows":[{"name":"first","extra":10},{"name":"second","extra":20}]'
+
 inertia GET /dashboard
 status_is 200
 has '"component":"Dashboard"'

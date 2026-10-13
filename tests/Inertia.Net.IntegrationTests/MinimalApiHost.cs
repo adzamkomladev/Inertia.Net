@@ -25,6 +25,7 @@ public sealed class MinimalApiHost : IConformanceHost
         });
 
         app.MapGet("/café", () => Render("Page"));
+        app.MapGet("/array", () => Render("Array", ArrayProps()));
 
         app.MapGet("/partial", () => Render("Partial", new InertiaProps
         {
@@ -92,6 +93,12 @@ public sealed class MinimalApiHost : IConformanceHost
 
         app.MapGet("/error-page", () => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404));
     }
+
+    internal static InertiaProps ArrayProps() => new() { ["rows"] = new object[]
+    {
+        new InertiaProps { ["name"] = "first", ["extra"] = Defer(() => 10, "a") },
+        new InertiaProps { ["name"] = "second", ["extra"] = Defer(() => 20, "b") },
+    } };
 }
 
 /// <summary>The <c>/form</c> body: <c>name</c> is required.</summary>

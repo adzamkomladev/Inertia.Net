@@ -18,7 +18,7 @@ public sealed class InertiaSsrException : Exception
         Hint = hint;
     }
 
-    /// <summary>The failure kind: the SSR server's error <c>type</c>, or <c>connection</c>, <c>timeout</c>, <c>http</c> or <c>response</c>.</summary>
+    /// <summary>The failure kind: the SSR server's error <c>type</c>, or <c>startup</c>, <c>connection</c>, <c>timeout</c>, <c>http</c>, <c>response</c>, <c>response-too-large</c> or <c>unknown</c>.</summary>
     public string? Type { get; }
 
     /// <summary>The SSR server's hint on how to fix the error, when it sent one.</summary>
@@ -42,6 +42,7 @@ internal sealed partial class SsrGateway(
     ViteAssets vite,
     IHttpClientFactory httpClients,
     IHostEnvironment environment,
+    SsrNodeProcess nodeProcess,
     ILogger<SsrGateway> logger) : IInertiaSsrRenderer
 {
     internal const string HttpClientName = "Inertia.Net.Ssr";
@@ -56,6 +57,9 @@ internal sealed partial class SsrGateway(
         }
 
         var devOrigin = vite.DevServerOrigin;
+        http.RequestAborted.ThrowIfCancellationRequested();
+        if (devOrigin is null && ssr.NodeProcess is not null && !nodeProcess.IsReadyFor(ssr.Url))
+            return Fail(ssr, "startup", "The managed SSR process is not ready for the configured endpoint.", null, null);
         if (devOrigin is null && ssr.BundlePath is { Length: > 0 } bundle && !File.Exists(Path.Combine(environment.ContentRootPath, bundle)))
         {
             return null;
@@ -68,20 +72,22 @@ internal sealed partial class SsrGateway(
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new ReadOnlyMemoryContent(context.PageJson) };
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
-            using var response = await httpClients.CreateClient(HttpClientName).SendAsync(request, timeout.Token);
-            var bytes = await response.Content.ReadAsByteArrayAsync(timeout.Token);
+            using var response = await httpClients.CreateClient(HttpClientName).SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            if (ssr.MaxResponseBytes is { } max && response.Content.Headers.ContentLength > max) throw new SsrResponseTooLargeException(max);
+            using var stream = new SsrResponseStream(await response.Content.ReadAsStreamAsync(timeout.Token), ssr.MaxResponseBytes);
             if (!response.IsSuccessStatusCode)
             {
-                return FailedResponse(ssr, (int)response.StatusCode, bytes);
+                return await FailedResponseAsync(ssr, (int)response.StatusCode, stream, timeout.Token);
             }
 
             SsrResponse? page = null;
             try
             {
-                page = JsonSerializer.Deserialize(bytes, InertiaJsonContext.Default.SsrResponse);
+                page = await JsonSerializer.DeserializeAsync(stream, InertiaJsonContext.Default.SsrResponse, timeout.Token);
             }
             catch (JsonException)
             {
+                if (ssr.MaxResponseBytes is not null) await stream.CopyToAsync(Stream.Null, timeout.Token);
             }
 
             return page is { Body.Length: > 0 }
@@ -91,6 +97,10 @@ internal sealed partial class SsrGateway(
         catch (OperationCanceledException) when (http.RequestAborted.IsCancellationRequested)
         {
             throw;
+        }
+        catch (SsrResponseTooLargeException ex)
+        {
+            return Fail(ssr, "response-too-large", ex.Message, null, ex);
         }
         catch (OperationCanceledException ex)
         {
@@ -122,15 +132,16 @@ internal sealed partial class SsrGateway(
         return false;
     }
 
-    private SsrRender? FailedResponse(SsrOptions ssr, int status, byte[] body)
+    private async ValueTask<SsrRender?> FailedResponseAsync(SsrOptions ssr, int status, Stream body, CancellationToken cancellationToken)
     {
         SsrError? error = null;
         try
         {
-            error = JsonSerializer.Deserialize(body, InertiaJsonContext.Default.SsrError);
+            error = await JsonSerializer.DeserializeAsync(body, InertiaJsonContext.Default.SsrError, cancellationToken);
         }
         catch (JsonException)
         {
+            if (ssr.MaxResponseBytes is not null) await body.CopyToAsync(Stream.Null, cancellationToken);
         }
 
         return error is null

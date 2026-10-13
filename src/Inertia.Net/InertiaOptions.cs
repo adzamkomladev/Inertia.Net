@@ -92,8 +92,11 @@ public sealed class SsrOptions
     /// <summary>The SSR server base URL. Default <c>http://127.0.0.1:13714</c>.</summary>
     public string Url { get; set; } = "http://127.0.0.1:13714";
 
-    /// <summary>How long to wait for the SSR server. Default 5 seconds.</summary>
+    /// <summary>The sole render deadline. Default 5 seconds; <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> disables it.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Maximum SSR response body size in bytes, including error responses. Default 16 MiB; null disables the limit. Nonpositive values are invalid.</summary>
+    public long? MaxResponseBytes { get; set; } = 16 * 1024 * 1024;
 
     /// <summary>Throws instead of falling back to client-side rendering when SSR fails.</summary>
     public bool ThrowOnError { get; set; }
@@ -113,6 +116,7 @@ public sealed class SsrOptions
     /// <summary>
     /// Enables SSR and has the app start and supervise <c>node {bundle}</c> itself (restarted on crash, stopped with the app).
     /// Nothing is spawned while the Vite dev server runs: SSR then goes through the dev server.
+    /// Requires a dedicated loopback URL; occupied endpoints prevent startup. Shutdown stops the owned process tree.
     /// </summary>
     public SsrOptions UseNodeProcess(Action<SsrNodeProcessOptions>? configure = null)
     {

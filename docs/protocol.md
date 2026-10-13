@@ -173,6 +173,9 @@ isIncludedInPartialMetadata(p) = (only == null or matchesOnly(p)) and (except ==
 - `deferredProps` is only produced on non-partial renders.
 - Nested filtering only applies inside **literal** objects (`InertiaProps`/dictionaries). The children of a value produced by a loader are not filtered.
 - `errors` is shared as an Always prop.
+- **Whole-array reloads (deviation 11):** selecting any array descendant selects the entire array, all sibling data and nested loaders. A descendant `except` excludes the array unless `Always` wins. Merge/once metadata uses the same effective selection. Omitted or rescued direct elements write `null` placeholders.
+- Manual typed traversal preserves registered System.Text.Json polymorphism, discriminator and unknown-derived-type rules, ignore/default rules, number handling and serialization callbacks. Each traversed object's callbacks run once. Ordinary DTOs retain the serializer fast path and source-generated metadata.
+- With big-integer preservation enabled, DOM integer text is parsed exactly and unsafe integers use `$bigint` markers, including flash and restored state.
 
 ## 5. Initial HTML (v3)
 
@@ -189,6 +192,7 @@ isIncludedInPartialMetadata(p) = (only == null or matchesOnly(p)) and (except ==
 ## 6. Validation errors
 
 - `props.errors` is always present.
+- Numeric collection indices use dotted client paths (`Items[0].Email` → `items.0.email`); dictionary keys retain their spelling. Naming policies apply to member segments, using each adapter's binding serializer. Duplicate normalized keys combine messages. Precognition validate-only matching uses the same index normalization. `[JsonPropertyName]` validation overrides remain unsupported.
 - Within each bag, a field maps to its first message, or to all messages when `WithAllErrors` is on.
 - `errors` is chosen as follows:
   - no errors stored → `{}`;
@@ -216,6 +220,8 @@ The state is kept (not consumed) when the response is a version-mismatch 409.
 - **Development** (Vite hot file present): `POST {viteDevUrl}/__inertia_ssr` with the same body.
 - **Failure:** the response is `500 {error, type, hint, browserApi?, stack?, sourceLocation?}`. On this, or on a timeout or connection error: log it and fall back to client-side rendering, unless `ThrowOnError` is set.
 - **Health:** `GET {ssrUrl}/health` returns 2xx when healthy.
+- **Limits:** the linked token makes `Ssr.Timeout` the sole render deadline; request cancellation propagates. Streaming responses are limited to `Ssr.MaxResponseBytes` (16 MiB by default, `null` disables), including errors and unknown lengths. Oversize failures have type `response-too-large` and use normal fallback/throw behavior.
+- **Managed process:** require a dedicated loopback endpoint, reject occupied ports, and accept readiness only while the owned child lives at its startup endpoint. Gate render requests on that readiness; URL changes require restarting the host. Cancel supervision and kill the owned process tree on shutdown. No URL-based shutdown request is sent.
 - **Shutdown:** any request to `{ssrUrl}/shutdown` makes the v3 server call `process.exit()` (no response is sent).
 - **Port:** the v3 server reads its port and host only from `createServer` options, baked into the bundle by `@inertiajs/vite` (`ssr: { port, host }`, default `13714` / `0.0.0.0`); no CLI argument or environment variable.
 
@@ -247,3 +253,4 @@ The React refresh preamble is:
 8. **Supersets of Laravel's prop flags.** Any prop can be `Once()`, `Rescue()`d, merged or deferred (Laravel limits e.g. rescue to `DeferProp`), and list headers are trimmed (`"a, b"` works; Laravel does not trim).
 9. **SSR returning an empty body falls back to client rendering.** Laravel echoes the empty body.
 10. **The Vite hot file is only read in Development** (or use `Vite.DevServerUrl`), so a stale `hot` file deployed to production cannot point pages at a dev server. Laravel reads it in any environment.
+11. **Array descendant reloads return complete arrays.** The client replaces arrays on ordinary partial merges, so fragments can lose sibling fields or move an element to another index. Selecting a descendant loads the whole array; excluding a descendant excludes the whole array, preserving `Always` precedence. Use keyed objects for independent updates.

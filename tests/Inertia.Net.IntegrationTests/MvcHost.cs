@@ -27,6 +27,9 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     [HttpGet("/café")]
     public IResult Cafe() => Render("Page");
 
+    [HttpGet("/array")]
+    public IResult Array() => Render("Array", MinimalApiHost.ArrayProps());
+
     [HttpGet("/partial")]
     public IResult Partial() => Render("Partial", new InertiaProps
     {
@@ -119,6 +122,9 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     // MVC-specific routes, used by MvcTests.
     [HttpPost("/mvc/nested")]
     public IActionResult Nested([FromBody] MvcNestedInput input) => Ok();
+
+    [HttpPost("/mvc/collection")]
+    public IActionResult Collection([FromBody] PrecognitionTests.CollectionInput input) => Ok();
 
     [HttpPost("/mvc/back")]
     public IResult BackWithErrors() => Back("/fallback").WithErrors(new Dictionary<string, string> { ["name"] = "Nope" }).WithFlash("toast", "Check the form");

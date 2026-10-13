@@ -10,31 +10,25 @@ namespace Inertia.Net;
 /// </summary>
 public sealed class InertiaFeature
 {
-    // Set during this request.
+    // Effective state: pending writes override restored entries.
     private Dictionary<string, object?>? _flash;
     private Dictionary<string, Dictionary<string, string[]>>? _errors;
     private bool _clearHistory;
     private bool _preserveFragment;
 
-    // Restored from the previous request: rendered on this one (consumed), or carried on by another redirect.
-    private Dictionary<string, object?>? _restoredFlash;
-    private Dictionary<string, Dictionary<string, string[]>>? _restoredErrors;
-    private bool _restoredClearHistory;
-    private bool _restoredPreserveFragment;
-
     internal Dictionary<string, object?>? SharedProps { get; private set; }
 
     /// <summary>Restored and pending flash data, as rendered on the page.</summary>
-    internal Dictionary<string, object?>? FlashData => Merge(_restoredFlash, _flash);
+    internal Dictionary<string, object?>? FlashData => _flash;
 
     /// <summary>Restored and pending error bags, as rendered on the page.</summary>
-    internal Dictionary<string, Dictionary<string, string[]>>? Errors => Merge(_restoredErrors, _errors);
+    internal Dictionary<string, Dictionary<string, string[]>>? Errors => _errors;
 
-    internal bool HistoryCleared => _clearHistory || _restoredClearHistory;
+    internal bool HistoryCleared => _clearHistory;
 
     internal bool? HistoryEncrypted { get; private set; }
 
-    internal bool FragmentPreserved => _preserveFragment || _restoredPreserveFragment;
+    internal bool FragmentPreserved => _preserveFragment;
 
     /// <summary>The state store had data for this request; the middleware clears it unless it persists new state.</summary>
     internal bool StateLoaded { get; set; }
@@ -113,15 +107,15 @@ public sealed class InertiaFeature
         return this;
     }
 
-    internal void RestoreFlash(string key, object? value) => (_restoredFlash ??= new(StringComparer.Ordinal))[key] = value;
+    internal void RestoreFlash(string key, object? value) => (_flash ??= new(StringComparer.Ordinal)).TryAdd(key, value);
 
     internal void RestoreError(string bag, string field, string[] messages) =>
-        GetBag(_restoredErrors ??= new(StringComparer.Ordinal), bag)[field] = messages;
+        GetBag(_errors ??= new(StringComparer.Ordinal), bag).TryAdd(field, messages);
 
     internal void RestoreFlags(bool clearHistory, bool preserveFragment)
     {
-        _restoredClearHistory = clearHistory;
-        _restoredPreserveFragment = preserveFragment;
+        _clearHistory |= clearHistory;
+        _preserveFragment |= preserveFragment;
     }
 
     private static Dictionary<string, string[]> GetBag(Dictionary<string, Dictionary<string, string[]>> bags, string bag)
@@ -132,46 +126,6 @@ public sealed class InertiaFeature
         }
 
         return target;
-    }
-
-    // Pending entries override restored ones (per key; per field within a bag). Allocates only when both exist.
-    private static Dictionary<string, object?>? Merge(Dictionary<string, object?>? restored, Dictionary<string, object?>? pending)
-    {
-        if (restored is null || pending is null)
-        {
-            return pending ?? restored;
-        }
-
-        var merged = new Dictionary<string, object?>(restored, StringComparer.Ordinal);
-        foreach (var (key, value) in pending)
-        {
-            merged[key] = value;
-        }
-
-        return merged;
-    }
-
-    private static Dictionary<string, Dictionary<string, string[]>>? Merge(Dictionary<string, Dictionary<string, string[]>>? restored, Dictionary<string, Dictionary<string, string[]>>? pending)
-    {
-        if (restored is null || pending is null)
-        {
-            return pending ?? restored;
-        }
-
-        var merged = new Dictionary<string, Dictionary<string, string[]>>(StringComparer.Ordinal);
-        foreach (var source in (ReadOnlySpan<Dictionary<string, Dictionary<string, string[]>>>)[restored, pending])
-        {
-            foreach (var (bag, errors) in source)
-            {
-                var target = GetBag(merged, bag);
-                foreach (var (field, messages) in errors)
-                {
-                    target[field] = messages;
-                }
-            }
-        }
-
-        return merged;
     }
 }
 

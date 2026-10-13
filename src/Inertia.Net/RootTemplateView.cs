@@ -91,8 +91,7 @@ internal sealed class RootTemplateView : IInertiaRootView
 
     private static void WriteString(IBufferWriter<byte> writer, string text)
     {
-        var span = writer.GetSpan(Encoding.UTF8.GetMaxByteCount(text.Length));
-        writer.Advance(Encoding.UTF8.GetBytes(text, span));
+        Utf8Output.Write(writer, text);
     }
 }
 

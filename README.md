@@ -2,6 +2,8 @@
 
 A .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs, MVC controllers and FastEndpoints, with the React, Vue and Svelte clients, and it is **Native AOT and trim compatible**.
 
+For the 1.1 release, review [migration guidance](docs/migrating-to-1.1.md), especially indexed array reloads, corrected JSON contracts and managed SSR configuration.
+
 ```csharp
 app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 {
@@ -13,7 +15,7 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 
 - **v3 only.** No v2 compatibility mode. The wire format is documented in [docs/protocol.md](docs/protocol.md).
 - **AOT first.** No reflection over your props, one source-generated JSON context for the library's own types. See [Native AOT](#native-aot).
-- **Fast.** A 20-prop page renders in about 14 µs and allocates about 2.7 KB. The middleware allocates nothing. See [Performance](#performance).
+- **Measured.** Benchmarks cover page rendering, SSR and state storage; Inertia requests track response writes without another body buffer. See [Performance](#performance).
 - **Tested.** Unit tests ported from inertia-laravel 3.x, a protocol conformance suite that runs against all three backends, an AOT smoke test and Playwright end-to-end tests.
 
 ## Contents
@@ -84,7 +86,7 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 - [x] Server-side rendering (production Node server, optionally started and supervised by the app, Vite dev server, health check)
 - [x] Vite manifest and dev-server tags, CDN asset base URL
 
-Not in 1.0: v2 protocol compatibility, a TempData state store.
+No v2 protocol compatibility. MVC TempData storage is available through `AddInertiaMvc(o => o.UseTempDataStateStore())`.
 
 ---
 
@@ -447,7 +449,7 @@ In production run `npm run build`, then deploy `wwwroot/build` with the app. Sam
 
 ## The root template
 
-The default root view parses an HTML file at startup (and re-reads it on change in Development) into literal chunks plus tokens. It throws at startup when `@inertia` is missing. The path is `InertiaOptions.RootView` (default `app.html`) relative to the content root.
+The default root view parses an HTML file on its first render (and re-reads it on change in Development) into literal chunks plus tokens. It throws on that render when `@inertia` is missing. The path is `InertiaOptions.RootView` (default `app.html`) relative to the content root.
 
 | Token | Output |
 |---|---|
@@ -722,6 +724,7 @@ The client sends `X-Inertia-Partial-Component`, and `X-Inertia-Partial-Data` (`o
 - `except` beats `only`. `Always(...)` ignores both.
 - The children of a value produced by a loader are not filtered. Nested literal `InertiaProps` are.
 - Loaders of excluded props never run.
+- Selecting an array descendant (`rows.1.extra`) reloads the complete array, including sibling fields and nested loaders. A descendant `except` excludes the entire array; `Always` still wins. Use objects keyed by ID for independent updates. Omitted or rescued direct array elements retain their positions as `null`.
 - A missing or empty list header means "no filter", which differs from an empty list.
 
 ```tsx
@@ -1058,6 +1061,7 @@ createServer((page) =>
     },
     setup: ({ App, props }) => <App {...props} />,
   }),
+  { host: '127.0.0.1', port: 13714 },
 )
 ```
 
@@ -1094,6 +1098,7 @@ createServer((page) =>
       return createSSRApp({ render: () => h(App, props) }).use(plugin)
     },
   }),
+  { host: '127.0.0.1', port: 13714 },
 )
 // client entry: use createSSRApp(...).use(plugin).mount(el) instead of createApp
 ```
@@ -1115,6 +1120,7 @@ createServer((page) =>
       return render(App, { props })
     },
   }),
+  { host: '127.0.0.1', port: 13714 },
 )
 // client entry: if (el.dataset.serverRendered === 'true') hydrate(App, { target: el, props }) else mount(App, { target: el, props })
 ```
@@ -1140,7 +1146,8 @@ builder.Services.AddInertia(o =>
 {
     o.Ssr.Enabled = true;
     o.Ssr.Url = "http://127.0.0.1:13714";           // default
-    o.Ssr.Timeout = TimeSpan.FromSeconds(5);         // default
+    o.Ssr.Timeout = TimeSpan.FromSeconds(5);         // sole deadline; Timeout.InfiniteTimeSpan disables it
+    o.Ssr.MaxResponseBytes = 16L * 1024 * 1024;     // default for success and error responses; null disables the limit
     o.Ssr.BundlePath = "ssr/ssr.js";                 // skip SSR while this file does not exist (relative to the content root)
     o.Ssr.ExcludePaths.Add("/admin/*");              // never SSR these (exact match, or a trailing * for a prefix), Request.Path without PathBase
     o.Ssr.ThrowOnError = false;                      // default: log and fall back to client-side rendering
@@ -1163,10 +1170,10 @@ o.Ssr.UseNodeProcess(n =>
 });
 ```
 
-A hosted service runs `node {bundle}` (no shell) when the app starts, logs its stdout (Information) and stderr (Warning) under the `Inertia.Net.Ssr` category, and waits up to `StartupTimeout` for `GET {Url}/health`. A missing bundle, a missing `node` or a startup timeout is logged and pages render on the client; with `ThrowOnError = true` app startup fails with `InertiaSsrException` (`Type = "startup"`). If the process exits, it is restarted after 1 s, doubling up to 30 s. On shutdown the app calls `{Url}/shutdown` (the v3 server exits on it) and kills the process tree if it is still running after 5 s. Nothing is spawned while the Vite dev server runs.
+A hosted service runs `node {bundle}` (no shell) when the app starts, logs its stdout (Information) and stderr (Warning) under the `Inertia.Net.Ssr` category, and waits up to `StartupTimeout` for `GET {Url}/health`. Managed mode requires a dedicated loopback URL and rejects occupied endpoints before spawning. Rendering requires readiness from a live owned child. A missing bundle, a missing `node` or a startup timeout is logged and pages render on the client; with `ThrowOnError = true` app startup fails with `InertiaSsrException` (`Type = "startup"`). If the process exits, it is restarted after 1 s, doubling up to 30 s. Shutdown cancels supervision and stops the owned process tree without requesting `/shutdown`. Nothing is spawned while the Vite dev server runs. For external or remote servers, enable SSR without `UseNodeProcess()` and configure the Node listener host explicitly.
 
-- **Port.** The v3 server (`createServer` in `@inertiajs/core`) takes its port and host only from its options, which `@inertiajs/vite` bakes into the bundle at build time: `inertia({ ssr: { port, host } })`, default `13714` on `0.0.0.0`. There is no CLI flag or environment variable. Keep the build port and `o.Ssr.Url` in sync (`host: '127.0.0.1'` keeps it off the network). The process also gets `INERTIA_SSR_PORT` (the port of `Ssr.Url`) and `NODE_ENV=production` (unless set), so a hand-written entry can follow the app: `createServer(render, { port: Number(process.env.INERTIA_SSR_PORT) })`.
-- **Orphans.** A graceful shutdown (Ctrl+C, SIGTERM, `docker stop`, IIS recycle) stops Node. If the .NET process is killed outright or crashes hard, the OS does not take Node with it; the next start then finds the port taken and keeps restarting Node with warnings until the old process is gone. Use a process manager or container for hard-crash cleanup.
+- **Port.** The v3 server (`createServer` in `@inertiajs/core`) takes its port and host only from its options, which `@inertiajs/vite` bakes into the bundle at build time: `inertia({ ssr: { port, host } })`, default `13714` on `0.0.0.0`. There is no CLI flag or environment variable. Keep the build port and `o.Ssr.Url` in sync (`host: '127.0.0.1'` keeps it off the network). The process also gets `INERTIA_SSR_PORT` (the port of `Ssr.Url`) and `NODE_ENV=production` (unless set), so a hand-written entry can follow the app: `createServer(render, { host: '127.0.0.1', port: Number(process.env.INERTIA_SSR_PORT) })`.
+- **Orphans.** A graceful shutdown (Ctrl+C, SIGTERM, `docker stop`, IIS recycle) stops Node. If the .NET process is killed outright or crashes hard, the OS does not take Node with it; the next start rejects the occupied port. Use a process manager or container for hard-crash cleanup.
 
 - The server posts the page JSON to `{Url}/render` and reads `{ "head": [...], "body": "..." }`. `@inertiaHead` outputs the head tags joined with `\n`, and `@inertia` outputs the body verbatim.
 - On a structured `500` from the SSR server, a timeout, a connection error or an empty response, Inertia.Net logs a warning (with the server's `hint` and source location when it sends them) and **falls back to client-side rendering**. With `ThrowOnError = true` it throws `InertiaSsrException` (`Type` is the server's error type or `connection`, `timeout`, `http`, `response`; `Hint` carries the fix suggestion).
@@ -1179,7 +1186,7 @@ With the Vite hot file present (Development only), or `o.Vite.DevServerUrl` set,
 ```ts
 // vite.config.ts, add to plugins
 import inertia from '@inertiajs/vite'
-inertia({ ssr: { entry: 'resources/js/ssr.tsx' } })
+inertia({ ssr: { entry: 'resources/js/ssr.tsx', host: '127.0.0.1', port: 13714 } })
 ```
 
 `BundlePath` is ignored while the dev server runs.
@@ -1367,22 +1374,21 @@ Flash and errors travel in a cookie across the redirect, so use a client that ke
 
 ## Performance
 
-Measured with BenchmarkDotNet on a laptop (i5-8265U, .NET 10.0.12). Each render benchmark runs the result against a reused `DefaultHttpContext` with a null body: header parsing, shared props, the prop walk, the pooled buffer and the copy to the response. Timings are noisy (about ±10%); allocation numbers are exact.
+Measured in Release on a laptop (i5-8265U, .NET 10.0.12). Warm render probes reuse a `DefaultHttpContext` with a null body and cover header parsing, shared props, the prop walk, the pooled buffer and response copying. Values below summarize three measurement processes; they are not production throughput estimates.
 
-| Benchmark | Mean | Allocated |
+| Workload | Warm time | Allocated/request |
 |---|---:|---:|
-| JSON, 20 mixed props | 13.7 µs | 2,744 B |
-| JSON, typed POCO props | 9.5 µs | 2,464 B |
-| Partial reload, 2 of 20 props | 6.1 µs | 1,576 B |
-| Deferred group load (2 props) | 4.7 µs | 1,584 B |
-| HTML + Vite tags, 20 props (template view) | 14.7 µs | 2,784 B |
-| *Reference: `JsonSerializer.Serialize` of the same page as plain data* | 9.3 µs | 312 B |
-| Middleware: endpoint only (baseline) | 40 ns | 0 B |
-| Middleware: `UseInertia`, non-Inertia request | 193 ns | 0 B |
-| Middleware: `UseInertia`, Inertia request (version check) | 345 ns | 0 B |
-| Parse partial-reload headers | 460 ns | 272 B |
+| JSON, 20 mixed props | 13.43 µs | 2,752 B |
+| Partial reload, 2 of 20 props | 6.15 µs | 1,584 B |
+| HTML + Vite tags, 20 props | 14.62 µs | 2,792 B |
+| 1 MiB SSR, buffered reference | 0.79 ms | 4,101 KiB |
+| 1 MiB SSR, streaming gateway | 0.94 ms | 2,053 KiB |
+| Middleware: non-Inertia, empty endpoint | 0.23–0.26 µs | 0 B |
+| Middleware: Inertia, empty endpoint | 0.80–1.51 µs | 48 B |
 
-Full results and the allocation-tuning history are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --filter '*'` in `tests/Inertia.Net.Benchmarks`.
+Warm SSR allocation fell about 50%, with a timing tradeoff and sensitivity to pool reuse. A measured 2,000-prop page with 32 shared props rendered about 20% faster after indexing shared keys, at a cost of about 1.1 KiB more allocation. MemoryPack was evaluated in benchmarks; production transport and redirect state remain JSON.
+
+Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
 
 Design notes:
 
@@ -1432,6 +1438,7 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `Enabled` | `false` | Render first visits on the SSR server. |
 | `Url` | `"http://127.0.0.1:13714"` | SSR server base URL (`/render`, `/health`). |
 | `Timeout` | `5 s` | Wait for the SSR server (also the health check timeout). |
+| `MaxResponseBytes` | `16 MiB` | Limit actual response bytes, including errors and chunked responses. Positive `long`, or `null` for unlimited. Oversized responses fall back, or throw with type `response-too-large`. |
 | `ThrowOnError` | `false` | Throw `InertiaSsrException` instead of falling back to client rendering. |
 | `BundlePath` | `null` | Skip SSR while this file is missing, unless the Vite dev server runs. |
 | `ExcludePaths` | empty | Request paths never rendered on the server: exact, or a trailing `*` for a prefix. |
@@ -1577,6 +1584,6 @@ bash eng/aot-smoke.sh                    # Native AOT publish + protocol smoke t
 
 - Warnings are errors; the code is nullable-annotated and the public API is documented.
 - Every protocol rule should be backed by a test in `tests/Inertia.Net.Tests` or a conformance case in `tests/Inertia.Net.IntegrationTests` (which runs against Minimal API, MVC and FastEndpoints hosts). The protocol itself is in [docs/protocol.md](docs/protocol.md), including the deliberate deviations from inertia-laravel.
-- Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet through [Trusted Publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing) (no stored API key).
+- Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet using the repository's `NUGET_API_KEY` secret.
 
 Licensed under the [MIT license](LICENSE).

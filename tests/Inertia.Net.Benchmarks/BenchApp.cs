@@ -12,7 +12,7 @@ internal static class BenchApp
 {
     public const string Component = "Users/Index";
 
-    public static IServiceProvider CreateServices()
+    public static IServiceProvider CreateServices(Action<InertiaOptions>? configure = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IHostEnvironment>(new BenchHostEnvironment(CreateContentRoot()));
@@ -22,6 +22,7 @@ internal static class BenchApp
         {
             o.Share("appName", "Bench");
             o.Share("auth", ctx => new AuthInfo(ctx.Request.Headers["X-User"].ToString() is { Length: > 0 } user ? user : null));
+            configure?.Invoke(o);
         });
         return services.BuildServiceProvider();
     }
@@ -121,7 +122,7 @@ internal static class BenchApp
         Feed = Merge(Users),
     };
 
-    private static string CreateContentRoot()
+    internal static string CreateContentRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "inertia-bench-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "wwwroot", "build", ".vite"));
@@ -181,6 +182,7 @@ public sealed class UsersPage
 [JsonSerializable(typeof(Filters))]
 [JsonSerializable(typeof(AuthInfo))]
 [JsonSerializable(typeof(UsersPage))]
+[JsonSerializable(typeof(BenchRow[]))]
 internal sealed partial class BenchJsonContext : JsonSerializerContext;
 
 internal sealed class BenchHostEnvironment(string contentRoot) : IHostEnvironment

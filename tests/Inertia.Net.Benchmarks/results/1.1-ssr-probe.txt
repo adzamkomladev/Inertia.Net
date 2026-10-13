@@ -1,0 +1,6 @@
+run=1 buffered: 4198230 B/request, 1.279 ms/request; first-call=41.959 ms
+run=1 gateway: 2100608 B/request, 1.180 ms/request; first-call=12.976 ms
+run=2 buffered: 4198538 B/request, 1.300 ms/request; first-call=1.031 ms
+run=2 gateway: 2101280 B/request, 1.284 ms/request; first-call=2.027 ms
+run=3 buffered: 4198935 B/request, 1.200 ms/request; first-call=1.286 ms
+run=3 gateway: 2101201 B/request, 1.167 ms/request; first-call=2.045 ms

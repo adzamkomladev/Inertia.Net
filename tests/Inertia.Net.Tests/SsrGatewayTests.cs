@@ -58,6 +58,76 @@ public sealed class SsrGatewayTests
         Assert.DoesNotContain("data-server-rendered", html, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Response_limit_covers_declared_and_streamed_success_and_error_bodies(bool streamed, bool error)
+    {
+        const string body = """{"head":[],"body":"SSR","error":"detail","type":"http"}""";
+        var length = Encoding.UTF8.GetByteCount(body);
+        var handler = new FakeHandler((_, _) =>
+        {
+            HttpContent content = streamed ? new StreamContent(new NonSeekableStream(Encoding.UTF8.GetBytes(body))) : new StringContent(body);
+            // A misleading short length must not bypass the stream limit.
+            if (streamed) content.Headers.ContentLength = 1;
+            return Task.FromResult(new HttpResponseMessage(error ? HttpStatusCode.InternalServerError : HttpStatusCode.OK) { Content = content });
+        });
+        var harness = Create(handler, s => s.MaxResponseBytes = length - 1);
+        AssertClientRendered(await GetAsync(harness));
+        Assert.Contains(harness.Logs.Entries, e => e.Message.Contains("response-too-large", StringComparison.Ordinal));
+        var throwing = Create(handler, s => { s.MaxResponseBytes = length - 1; s.ThrowOnError = true; });
+        var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(throwing));
+        Assert.Equal("response-too-large", exception.Type);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(null)]
+    public async Task Response_at_or_below_the_limit_or_with_limit_disabled_renders(int? extra)
+    {
+        const string body = """{"head":[],"body":"SSR"}""";
+        var handler = new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StreamContent(new NonSeekableStream(Encoding.UTF8.GetBytes(body))),
+        }));
+        var html = await GetAsync(Create(handler, s => s.MaxResponseBytes = extra is { } bytes ? Encoding.UTF8.GetByteCount(body) + bytes : null));
+        Assert.Contains("SSR", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-page", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Ssr_options_have_one_authoritative_timeout_and_validate_limits()
+    {
+        var harness = new Harness(o => o.Ssr.Timeout = TimeSpan.FromSeconds(180));
+        Assert.Equal(Timeout.InfiniteTimeSpan, harness.Services.GetRequiredService<IHttpClientFactory>().CreateClient(SsrGateway.HttpClientName).Timeout);
+        var invalid = new Harness(o => o.Ssr.MaxResponseBytes = 0);
+        Assert.Throws<Microsoft.Extensions.Options.OptionsValidationException>(() => invalid.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<InertiaOptions>>().Value);
+        var infinite = new Harness(o => o.Ssr.Timeout = Timeout.InfiniteTimeSpan);
+        Assert.Equal(Timeout.InfiniteTimeSpan, infinite.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<InertiaOptions>>().Value.Ssr.Timeout);
+    }
+
+    private sealed class NonSeekableStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public override bool CanSeek => false;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Invalid_json_does_not_bypass_the_actual_response_limit(bool error)
+    {
+        var handler = new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(error ? HttpStatusCode.InternalServerError : HttpStatusCode.OK)
+        {
+            Content = new StreamContent(new NonSeekableStream(Encoding.UTF8.GetBytes("!" + new string('x', 40000)))),
+        }));
+        var throwing = Create(handler, s => { s.MaxResponseBytes = 20000; s.ThrowOnError = true; });
+        var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(throwing));
+        Assert.Equal("response-too-large", exception.Type);
+    }
+
     [Fact]
     public async Task Success_joins_head_and_echoes_the_body_verbatim()
     {

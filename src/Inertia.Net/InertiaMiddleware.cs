@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net;
@@ -57,22 +58,33 @@ internal sealed class InertiaMiddleware
 
         response.OnStarting(_onStarting, httpContext);
 
-        await _next(httpContext);
-
-        if (isInertia
-            && response.StatusCode == StatusCodes.Status200OK
-            && !response.HasStarted
-            && response.ContentLength is null or 0)
+        var originalBody = httpContext.Features.Get<IHttpResponseBodyFeature>();
+        var tracker = isInertia && originalBody is not null ? new ResponseWriteTracker(originalBody) : null;
+        if (tracker is not null) httpContext.Features.Set<IHttpResponseBodyFeature>(tracker);
+        try
         {
-            response.StatusCode = IsPutPatchDelete(request.Method) ? StatusCodes.Status303SeeOther : StatusCodes.Status302Found;
-            response.Headers.Location = InertiaBackResult.GetBackUrl(request, "~/");
+            await _next(httpContext);
+
+            if (isInertia
+                && response.StatusCode == StatusCodes.Status200OK
+                && !response.HasStarted
+                && tracker?.HasWritten != true
+                && response.ContentLength is null or 0)
+            {
+                response.StatusCode = IsPutPatchDelete(request.Method) ? StatusCodes.Status303SeeOther : StatusCodes.Status302Found;
+                response.Headers.Location = InertiaBackResult.GetBackUrl(request, "~/");
+            }
+
+            // Finish while outer middleware such as UseSession is still active.
+            if (!response.HasStarted)
+            {
+                await FinishAsync(httpContext);
+            }
         }
-
-        // Most redirects write no body, so the headers would only be sent after the whole pipeline has unwound, when an
-        // outer middleware (UseSession) has already committed and detached. Finish here while it is still active.
-        if (!response.HasStarted)
+        finally
         {
-            await FinishAsync(httpContext);
+            if (tracker is not null && ReferenceEquals(httpContext.Features.Get<IHttpResponseBodyFeature>(), tracker))
+                httpContext.Features.Set(originalBody);
         }
     }
 

@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -46,6 +47,40 @@ public sealed class MiddlewareCompositionTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("true", response.Header(InertiaHeaders.Inertia));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Buffered_responses_redirect_only_when_no_bytes_were_written(bool pipe, bool empty)
+    {
+        await using var app = await StartAsync(a =>
+        {
+            a.Use(async (context, next) =>
+            {
+                var original = context.Response.Body;
+                await using var buffer = new MemoryStream();
+                context.Response.Body = buffer;
+                var feature = context.Features.Get<IHttpResponseBodyFeature>();
+                await next(context);
+                Assert.Same(feature, context.Features.Get<IHttpResponseBodyFeature>());
+                context.Response.Body = original;
+                buffer.Position = 0;
+                await buffer.CopyToAsync(original, context.RequestAborted);
+            });
+            a.UseInertia();
+            a.MapGet("/buffered", async (HttpContext context) =>
+            {
+                var bytes = empty ? ReadOnlyMemory<byte>.Empty : "nonempty"u8.ToArray();
+                if (pipe) await context.Response.BodyWriter.WriteAsync(bytes, context.RequestAborted);
+                else await context.Response.Body.WriteAsync(bytes, context.RequestAborted);
+            });
+        });
+        var response = await app.GetTestClient().InertiaGetAsync("/buffered");
+        Assert.Equal(empty ? HttpStatusCode.Found : HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(empty ? "" : "nonempty", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]

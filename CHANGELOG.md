@@ -3,9 +3,35 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are documented with migration guidance.
 
 ## [Unreleased]
+
+## [1.1.0] - 2026-10-13
+
+See [migration guidance](docs/migrating-to-1.1.md) for observable behavior changes. This minor release includes behavior corrections that may require application changes, despite retaining public APIs and redirect-state formats. Update all four packages together.
+
+### Changed
+
+- Array descendant partial reloads return complete arrays; descendant exclusions omit the whole array, with `Always` precedence. Omitted/rescued slots preserve their indices.
+- Managed SSR requires a dedicated loopback endpoint, rejects occupied ports, gates rendering on owned-child readiness, and stops its owned process tree without URL-based shutdown. Disposal and restart share a lifecycle gate.
+- SSR responses stream through a 16 MiB default byte limit (`Ssr.MaxResponseBytes`; `null` disables), including error responses. Oversized responses use failure type `response-too-large`.
+- Validation collection keys use dotted indices and FastEndpoints uses its binding serializer naming policy.
+
+### Fixed
+
+- Manual typed serialization preserves registered polymorphism, discriminators, default omission, type/member number handling and callbacks, with reflection and source-generated metadata.
+- DOM unsafe integers honor `$bigint` preservation in props, flash and restored redirect state.
+- Buffered nonempty Inertia responses retain their status, including stream and pipe writes.
+- Flash and history first created during share factories or prop resolution reach the rendered page; cancellation prevents subsequent loaders.
+- The configured SSR timeout is authoritative, including infinite deadlines.
+
+### Performance
+
+- Removed duplicate HTTP response buffering in SSR and bounded UTF-8 encoding reservations for large HTML strings.
+- Restored and pending state share effective dictionaries, preserving pending precedence without repeated merge copies.
+- Large pages with dozens of shared props index shared keys instead of repeatedly scanning them; smaller pages retain the allocation-light scan.
+- Added payload, SSR, state-codec and separate-process Kestrel benchmarks. MemoryPack is evaluated only in the benchmark project; production state remains JSON.
 
 ## [1.0.3] - 2026-10-06
 

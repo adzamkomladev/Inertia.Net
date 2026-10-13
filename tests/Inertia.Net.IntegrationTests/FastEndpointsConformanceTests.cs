@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FastEndpoints;
 using FluentValidation;
 using Inertia.Net.FastEndpoints;
@@ -18,6 +19,73 @@ public sealed class FastEndpointsConformanceTests : ProtocolConformanceTests<Fas
 public sealed class FastEndpointsTests
 {
     private static Task<ConformanceApp> StartAsync() => ConformanceApp.StartAsync<FastEndpointsHost>();
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Binding_serializer_policy_controls_error_keys_and_validate_only(bool prefix)
+    {
+        // FastEndpoints configures serialization once per process; this app needs an isolated configuration.
+        using var serializerReset = new SerializerReset();
+        PolicyHost.Prefix = prefix;
+        await using var app = await ConformanceApp.StartAsync<PolicyHost>();
+        var field = prefix ? "x_FirstName" : "first_name";
+        var body = new Dictionary<string, string> { [field] = "" };
+        var invalid = await app.CreateClient().SendAsync(Json(HttpMethod.Post, "/fe/policy", body, r => r.WithHeader("Precognition", "true")), TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+        Assert.Equal([field], System.Text.Json.Nodes.JsonNode.Parse(await invalid.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["errors"]!.AsObject().Select(p => p.Key));
+        var request = Json(HttpMethod.Post, "/fe/policy", body, r =>
+        {
+            r.WithHeader("Precognition", "true");
+            r.WithHeader("Precognition-Validate-Only", field);
+        });
+        var response = await app.CreateClient().SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal([field], System.Text.Json.Nodes.JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["errors"]!.AsObject().Select(p => p.Key));
+    }
+
+    private sealed class SerializerReset : IDisposable
+    {
+        private static readonly System.Reflection.FieldInfo Configured = typeof(MainExtensions).GetField("SerializerConfigured", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        public SerializerReset() => Configured.SetValue(null, false);
+        public void Dispose() => Configured.SetValue(null, false);
+    }
+
+    [Fact]
+    public async Task Collection_validate_only_keeps_indexed_errors()
+    {
+        await using var app = await StartAsync();
+        var request = Json(HttpMethod.Post, "/fe/nested", new { address = new { street = "valid" }, items = new[] { new { sku = "" } } }, r =>
+        {
+            r.WithHeader("Precognition", "true");
+            r.WithHeader("Precognition-Validate-Only", "items.0.sku");
+        });
+        var response = await app.CreateClient().SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["items.0.sku"], System.Text.Json.Nodes.JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["errors"]!.AsObject().Select(p => p.Key));
+    }
+
+    public sealed class PolicyHost : IConformanceHost
+    {
+        public static bool Prefix { get; set; }
+        public static void ConfigureServices(IServiceCollection services) => FastEndpointsHost.ConfigureServices(services);
+        public static void MapRoutes(WebApplication app) => app.UseFastEndpoints(c =>
+        {
+            c.UseInertia(ep => ep.AllowAnonymous());
+            c.Serializer.Options.PropertyNamingPolicy = Prefix ? new PrefixPolicy() : JsonNamingPolicy.SnakeCaseLower;
+        });
+    }
+    private sealed class PrefixPolicy : JsonNamingPolicy { public override string ConvertName(string name) => "x_" + name; }
+    public sealed class PolicyRequest { public string? FirstName { get; set; } }
+    public sealed class PolicyValidator : Validator<PolicyRequest>
+    {
+        public PolicyValidator() => RuleFor(x => x.FirstName).NotEmpty();
+    }
+    public sealed class PolicyEndpoint : Endpoint<PolicyRequest>
+    {
+        public override void Configure() => Post("/fe/policy");
+        public override Task HandleAsync(PolicyRequest req, CancellationToken ct) => Send.OkAsync(ct);
+    }
 
     [Fact]
     public async Task Send_extensions_render_redirect_and_go_back()
@@ -81,7 +149,7 @@ public sealed class FastEndpointsTests
         var response = await client.InertiaAsync(HttpMethod.Post, "/fe/nested", new { address = new { street = "" }, items = new[] { new { sku = "" } } });
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
         var errors = (await (await client.InertiaGetAsync("/page")).PageAsync())["props"]!["errors"]!.AsObject();
-        Assert.Equal(["address.street", "items[0].sku"], errors.Select(e => e.Key).Order());
+        Assert.Equal(["address.street", "items.0.sku"], errors.Select(e => e.Key).Order());
         Assert.False(errors["address.street"] is System.Text.Json.Nodes.JsonArray); // first message only
     }
 

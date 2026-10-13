@@ -5,8 +5,6 @@ namespace Inertia.Net.FastEndpoints;
 /// <summary>Configures FastEndpoints for Inertia forms.</summary>
 public static class InertiaFastEndpointsConfig
 {
-    private static readonly InertiaPreProcessor Processor = new();
-
     /// <summary>
     /// For every endpoint, answers request validation failures of Inertia requests (other than GET) with a redirect back carrying
     /// the errors (first message per field, keyed by the JSON name, in the bag named by <c>X-Inertia-Error-Bag</c>) instead of
@@ -23,17 +21,18 @@ public static class InertiaFastEndpointsConfig
     public static Config UseInertia(this Config config, Action<EndpointDefinition>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(config);
+        var processor = new InertiaPreProcessor(config);
         config.Endpoints.Configurator = ep =>
         {
             // After the endpoint's own pre-processors, so one that already answered (e.g. 403) wins.
-            ep.PreProcessors(Order.After, Processor);
+            ep.PreProcessors(Order.After, processor);
             configure?.Invoke(ep);
         };
         return config;
     }
 }
 
-internal sealed class InertiaPreProcessor : IGlobalPreProcessor
+internal sealed class InertiaPreProcessor(Config config) : IGlobalPreProcessor
 {
     public Task PreProcessAsync(IPreProcessorContext context, CancellationToken ct)
     {
@@ -55,9 +54,12 @@ internal sealed class InertiaPreProcessor : IGlobalPreProcessor
             errors[failures.Key] = [.. failures.Select(f => f.ErrorMessage)];
         }
 
-        var naming = InertiaValidationFilter.NamingPolicy(httpContext.RequestServices);
+        var naming = config.Serializer.Options.PropertyNamingPolicy;
+        errors = InertiaValidationFilter.ToClientKeys(errors, naming,
+            context.Request is { } request
+                ? InertiaValidationFilter.GetSchema(config.Serializer.Options, request.GetType()) : null);
         return httpContext.Response.SendResultAsync(precognitive
-            ? InertiaPrecognition.Result(httpContext, errors, naming)
-            : InertiaValidationFilter.Back(httpContext, InertiaValidationFilter.ToClientKeys(errors, naming)));
+            ? InertiaPrecognition.Result(httpContext, errors, null)
+            : InertiaValidationFilter.Back(httpContext, errors));
     }
 }

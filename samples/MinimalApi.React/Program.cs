@@ -19,7 +19,8 @@ builder.Services.AddInertia(o =>
     o.Ssr.BundlePath = "ssr/ssr.js";
     if (ssr)
     {
-        o.Ssr.UseNodeProcess(); // the app starts and supervises `node ssr/ssr.js` (port 13714, the default Ssr.Url)
+        o.Ssr.Url = $"http://127.0.0.1:{Environment.GetEnvironmentVariable("INERTIA_SSR_PORT") ?? "13714"}";
+        o.Ssr.UseNodeProcess(); // Match the port used when building the SSR bundle.
     }
 });
 
@@ -75,6 +76,14 @@ if (e2e)
 {
     app.MapPost("/__e2e/bump-version", () => AppState.Version = Guid.NewGuid().ToString("N"));
     app.MapPost("/__e2e/reset", AppState.Reset);
+    app.MapGet("/__e2e/array", () => Render("ArrayRegression", new InertiaProps
+    {
+        ["rows"] = new List<DeferredRow>
+        {
+            new("first", Defer(() => 10, "a")),
+            new("second", Defer(() => 20, "b")),
+        },
+    }));
 }
 
 app.Run();
@@ -92,6 +101,8 @@ namespace MinimalApi.React
     public sealed record Post(int Id, string Title);
 
     public sealed record PostPage(List<Post> Data);
+
+    public sealed record DeferredRow(string Name, InertiaProp Extra);
 
     public sealed class ContactForm
     {
@@ -115,6 +126,7 @@ namespace MinimalApi.React
     [JsonSerializable(typeof(PostPage))]
     [JsonSerializable(typeof(ContactForm))]
     [JsonSerializable(typeof(NewsletterForm))]
+    [JsonSerializable(typeof(List<DeferredRow>))]
     internal sealed partial class AppJsonContext : JsonSerializerContext;
 
     /// <summary>In-memory demo state shared by all requests (a sample, not a database).</summary>

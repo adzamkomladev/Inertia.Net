@@ -33,7 +33,8 @@ internal static class InertiaPrecognition
         var only = httpContext.Request.Headers[ValidateOnlyHeader].ToString();
         if (only.Length > 0)
         {
-            var fields = only.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var fields = only.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(f => InertiaValidationFilter.ToClientPath(f, null)).ToArray();
             // A field matches itself and, when it names an object or array, everything below it.
             errors = errors
                 .Where(e => fields.Any(f => e.Key == f || e.Key.StartsWith(f + ".", StringComparison.Ordinal) || e.Key.StartsWith(f + "[", StringComparison.Ordinal)))

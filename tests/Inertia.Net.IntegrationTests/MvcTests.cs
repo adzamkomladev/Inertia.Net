@@ -16,6 +16,17 @@ public sealed class MvcModelStateTests
     private static Task<ConformanceApp> StartAsync() => ConformanceApp.StartAsync<MvcHost>();
 
     [Fact]
+    public async Task Indexed_model_state_keys_use_the_clients_dotted_paths()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        var response = await client.InertiaAsync(HttpMethod.Post, "/mvc/collection", new { items = new[] { new { email = "" } } });
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        var page = await (await client.InertiaGetAsync("/page")).PageAsync();
+        Assert.Equal(["items.0.email"], page["props"]!["errors"]!.AsObject().Select(p => p.Key));
+    }
+
+    [Fact]
     public async Task Nested_model_paths_use_json_names_and_all_failures_are_reported()
     {
         await using var app = await StartAsync();

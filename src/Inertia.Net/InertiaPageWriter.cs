@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -21,7 +23,8 @@ internal sealed class InertiaPageWriter
     private static readonly InertiaProp NoErrors = Inertia.Always(new InertiaProps());
 
     private readonly ConcurrentDictionary<Type, bool> _containsProps = new();
-    private readonly ConcurrentDictionary<JsonPropertyInfo, JsonTypeInfo> _propertySerializers = new();
+    private readonly ConcurrentDictionary<(JsonPropertyInfo Property, JsonNumberHandling? Handling), JsonTypeInfo> _propertySerializers = new();
+    private readonly ConcurrentDictionary<Type, object> _defaultValues = new();
     private readonly JsonWriterOptions _jsonWriterOptions;
     private readonly JsonWriterOptions _htmlWriterOptions;
 
@@ -69,6 +72,9 @@ internal sealed class InertiaPageWriter
         var buffer = new PooledBufferWriter();
         try
         {
+            httpContext.RequestAborted.ThrowIfCancellationRequested();
+            var rootInfo = props is not null and not IEnumerable<KeyValuePair<string, object?>>
+                ? SerializerOptions.GetTypeInfo(props.GetType()) : null;
             var feature = httpContext.Features.Get<InertiaFeature>();
             var sharedPropKeys = Options.ExposeSharedPropKeys ? new List<string>(Options.SharedProps.Count + 1 + (feature?.SharedProps?.Count ?? 0)) : null;
             var entries = await BuildPropsAsync(httpContext, feature, props, request, sharedPropKeys);
@@ -80,6 +86,8 @@ internal sealed class InertiaPageWriter
             writer.WriteString("component", component);
             writer.WritePropertyName("props");
             await propsWriter.WritePropsAsync(entries);
+            rootInfo?.OnSerialized?.Invoke(props!);
+            feature = httpContext.Features.Get<InertiaFeature>();
             writer.WriteString("url", GetUrl(httpContext.Request));
             writer.WriteString("version", _versionProvider.GetVersion(httpContext));
             propsWriter.WriteMetadata(sharedPropKeys);
@@ -146,19 +154,29 @@ internal sealed class InertiaPageWriter
             return shouldSerialize(target, value);
         }
 
-        return property.IsExtensionData || value is not null
-            || SerializerOptions.DefaultIgnoreCondition is not (JsonIgnoreCondition.WhenWritingNull or JsonIgnoreCondition.WhenWritingDefault);
+        if (property.IsExtensionData) return true;
+        return SerializerOptions.DefaultIgnoreCondition switch
+        {
+            JsonIgnoreCondition.WhenWritingNull => value is not null,
+            JsonIgnoreCondition.WhenWritingDefault => value is not null && (!property.PropertyType.IsValueType || Nullable.GetUnderlyingType(property.PropertyType) is not null
+                || !value.Equals(_defaultValues.GetOrAdd(property.PropertyType, CreateDefaultValue))),
+            _ => true,
+        };
     }
 
-    // Keep the member's converter/number handling using the application's existing type resolver.
-    internal readonly record struct PropertyValue(JsonPropertyInfo Property, object? Value);
+    [UnconditionalSuppressMessage("Trimming", "IL2067", Justification = "Only boxed value types already present in registered JSON metadata are used; creating their zero value does not call a constructor.")]
+    private static object CreateDefaultValue(Type type) => RuntimeHelpers.GetUninitializedObject(type);
 
-    public JsonTypeInfo PropertyTypeInfo(JsonPropertyInfo property) =>
-        _propertySerializers.GetOrAdd(property, member =>
+    // Keep the member's converter/number handling using the application's existing type resolver.
+    internal readonly record struct PropertyValue(JsonTypeInfo TypeInfo, object? Value);
+
+    private JsonTypeInfo PropertyTypeInfo(JsonPropertyInfo property, JsonNumberHandling? handling) =>
+        _propertySerializers.GetOrAdd((property, handling), key =>
         {
+            var member = key.Property;
             var options = new JsonSerializerOptions(SerializerOptions)
             {
-                NumberHandling = member.NumberHandling ?? SerializerOptions.NumberHandling,
+                NumberHandling = key.Handling ?? SerializerOptions.NumberHandling,
             };
             if (member.CustomConverter is { } converter)
             {
@@ -199,9 +217,10 @@ internal sealed class InertiaPageWriter
             }
             else
             {
+                var handling = property.NumberHandling ?? info.NumberHandling;
                 yield return new(property.Name,
-                    value is not InertiaProp && (property.CustomConverter is not null || property.NumberHandling is not null)
-                        ? new PropertyValue(property, value) : value,
+                    value is not InertiaProp && (property.CustomConverter is not null || (handling is not null && !ContainsProps(property.PropertyType)))
+                        ? new PropertyValue(PropertyTypeInfo(property, handling), value) : value,
                     property.PropertyType);
             }
         }
@@ -216,29 +235,37 @@ internal sealed class InertiaPageWriter
     // errors (always), then option shares, then request shares, then page props; later keys override earlier ones in place.
     private async ValueTask<List<PropEntry>> BuildPropsAsync(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<string>? sharedPropKeys)
     {
-        // Sized up front: one allocation instead of a grow-and-copy chain.
-        var entries = new List<PropEntry>(1 + Options.SharedProps.Count + (feature?.SharedProps?.Count ?? 0) + props switch
+        var propCount = props switch
         {
             ICollection<KeyValuePair<string, object?>> collection => collection.Count,
             IReadOnlyCollection<KeyValuePair<string, object?>> collection => collection.Count,
             _ => 16,
-        });
+        };
+        var sharedCapacity = 1 + Options.SharedProps.Count + (feature?.SharedProps?.Count ?? 0);
+        var entries = new List<PropEntry>(sharedCapacity + propCount);
 
         // Page props come from one dictionary or object, so their keys are unique: a key can only collide with an earlier
-        // errors/shared entry. Those come first, so a linear scan of that prefix replaces a key-to-position dictionary.
-        // ponytail: O(shared x props) string compares; a dictionary pays off only with dozens of shared props.
+        // errors/shared entry. Measurements favor indexing only for large pages with dozens of shared keys.
+        Dictionary<string, int>? sharedPositions = sharedCapacity >= 32 && propCount >= 200 ? new(sharedCapacity, StringComparer.Ordinal) : null;
         var sharedCount = 0;
         var hasDotKey = false;
 
         void Set(string key, object? value, Type type, bool shared)
         {
             var position = -1;
-            for (var i = 0; i < sharedCount; i++)
+            if (sharedPositions is not null)
             {
-                if (string.Equals(entries[i].Key, key, StringComparison.Ordinal))
+                if (!sharedPositions.TryGetValue(key, out position)) position = -1;
+            }
+            else
+            {
+                for (var i = 0; i < sharedCount; i++)
                 {
-                    position = i;
-                    break;
+                    if (string.Equals(entries[i].Key, key, StringComparison.Ordinal))
+                    {
+                        position = i;
+                        break;
+                    }
                 }
             }
 
@@ -251,6 +278,7 @@ internal sealed class InertiaPageWriter
                 entries.Add(new PropEntry(key, value, type));
                 if (shared)
                 {
+                    sharedPositions?.Add(key, entries.Count - 1);
                     sharedCount++;
                 }
             }
@@ -267,14 +295,17 @@ internal sealed class InertiaPageWriter
             }
         }
 
-        var errors = feature?.Errors is { Count: > 0 } bags ? Inertia.Always(ErrorsResolver.Resolve(bags, Options.WithAllErrors, request.ErrorBag)) : NoErrors;
-        Set("errors", errors, typeof(object), shared: true);
+        Set("errors", NoErrors, typeof(object), shared: true);
 
         foreach (var (key, value) in Options.SharedProps)
         {
+            httpContext.RequestAborted.ThrowIfCancellationRequested();
             Set(key, value is Func<HttpContext, object?> factory ? factory(httpContext) : value, typeof(object), shared: true);
         }
 
+        feature = httpContext.Features.Get<InertiaFeature>();
+        if (ReferenceEquals(entries[0].Value, NoErrors) && feature?.Errors is { Count: > 0 } bags)
+            Set("errors", Inertia.Always(ErrorsResolver.Resolve(bags, Options.WithAllErrors, request.ErrorBag)), typeof(object), shared: true);
         if (feature?.SharedProps is { } requestShared)
         {
             foreach (var (key, value) in requestShared)
@@ -315,6 +346,7 @@ internal sealed class InertiaPageWriter
                     throw new InvalidOperationException($"Page props must be a dictionary or an object with properties, not '{info.Type}'.");
                 }
 
+                info.OnSerializing?.Invoke(props);
                 foreach (var entry in ObjectEntries(props, info))
                 {
                     Set(entry.Key, entry.Value, entry.Type, shared: false);
@@ -387,6 +419,7 @@ internal sealed class InertiaPageWriter
 
         if (value is InertiaProp { Load: PropLoad.Eager, IsAlways: false, IsOnce: false, IsMerge: false, ShouldRescue: false } plain)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             value = await plain.ResolveAsync(cancellationToken);
         }
 
@@ -413,7 +446,7 @@ internal sealed class InertiaPageWriter
         return copy;
     }
 
-    private void WritePlainValue(Utf8JsonWriter writer, object? value)
+    internal void WritePlainValue(Utf8JsonWriter writer, object? value)
     {
         switch (value)
         {
@@ -421,12 +454,57 @@ internal sealed class InertiaPageWriter
                 writer.WriteNullValue();
                 break;
             case JsonElement element:
-                element.WriteTo(writer);
+                WriteElement(writer, element);
+                break;
+            case JsonNode node:
+                WriteNode(writer, node);
                 break;
             default:
                 JsonSerializer.Serialize(writer, value, SerializerOptions.GetTypeInfo(value.GetType()));
                 break;
         }
+    }
+
+    internal void WriteElement(Utf8JsonWriter writer, JsonElement element)
+    {
+        if (Options.PreserveBigIntegers) BigIntegerConverters.WriteElement(writer, element);
+        else element.WriteTo(writer);
+    }
+
+    internal void WriteNode(Utf8JsonWriter writer, JsonNode node)
+    {
+        if (Options.PreserveBigIntegers) BigIntegerConverters.WriteNode(writer, node, SerializerOptions);
+        else node.WriteTo(writer, SerializerOptions);
+    }
+
+    internal (JsonTypeInfo Info, object? Discriminator, string? DiscriminatorName) ObjectContract(object value, JsonTypeInfo info)
+    {
+        var runtime = value.GetType();
+        if (runtime == info.Type || info.PolymorphismOptions is not { } polymorphism) return (info, null, null);
+        JsonDerivedType? selected = null;
+        foreach (var derived in polymorphism.DerivedTypes)
+        {
+            if (derived.DerivedType == runtime)
+                return (SerializerOptions.GetTypeInfo(runtime), derived.TypeDiscriminator, polymorphism.TypeDiscriminatorPropertyName);
+        }
+        switch (polymorphism.UnknownDerivedTypeHandling)
+        {
+            case JsonUnknownDerivedTypeHandling.FailSerialization:
+                throw new NotSupportedException($"Runtime type '{runtime}' is not registered for polymorphic type '{info.Type}'.");
+            case JsonUnknownDerivedTypeHandling.FallBackToNearestAncestor:
+                foreach (var candidate in polymorphism.DerivedTypes)
+                {
+                    if (!candidate.DerivedType.IsAssignableFrom(runtime)) continue;
+                    if (polymorphism.DerivedTypes.Any(other => other.DerivedType != candidate.DerivedType
+                        && candidate.DerivedType.IsAssignableFrom(other.DerivedType) && other.DerivedType.IsAssignableFrom(runtime))) continue;
+                    if (selected is not null) throw new NotSupportedException($"Runtime type '{runtime}' has ambiguous registered polymorphic ancestors.");
+                    selected = candidate;
+                }
+                break;
+        }
+        return selected is { } ancestor
+            ? (SerializerOptions.GetTypeInfo(ancestor.DerivedType), ancestor.TypeDiscriminator, polymorphism.TypeDiscriminatorPropertyName)
+            : (info, null, null);
     }
 
     private bool ComputeContainsProps(Type type, HashSet<Type> visiting)
@@ -458,7 +536,8 @@ internal sealed class InertiaPageWriter
 
         return info.Kind switch
         {
-            JsonTypeInfoKind.Object => info.Properties.Any(p => ComputeContainsProps(p.PropertyType, visiting)),
+            JsonTypeInfoKind.Object => info.Properties.Any(p => ComputeContainsProps(p.PropertyType, visiting))
+                || (info.PolymorphismOptions?.DerivedTypes.Any(d => ComputeContainsProps(d.DerivedType, visiting)) ?? false),
             JsonTypeInfoKind.Enumerable => info.ElementType is { } elementType && ComputeContainsProps(elementType, visiting),
             _ => false,
         };

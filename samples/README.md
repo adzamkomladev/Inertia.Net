@@ -45,5 +45,7 @@ Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
 
 Enabled with the environment variable `INERTIA_SSR=1`:
 - `npm run build` also builds the SSR bundle (`ssr/ssr.js`);
-- the Node SSR server runs on port 13714 (`npm run ssr`), the backend renders through it (`InertiaOptions.Ssr.Enabled`), and falls back to client rendering if it is down;
+- the backend starts and supervises its Node SSR child on `127.0.0.1:13714`, and falls back to client rendering while it is unavailable;
+- set `INERTIA_SSR_PORT` to the same free port during both the frontend build and backend run to avoid collisions; managed mode rejects an occupied endpoint and does not shut down another server;
+- the Vite configuration explicitly binds SSR to `127.0.0.1`. For intentional remote SSR, configure the listener host explicitly and use unmanaged mode in .NET;
 - the server-rendered HTML contains `data-server-rendered="true"`.

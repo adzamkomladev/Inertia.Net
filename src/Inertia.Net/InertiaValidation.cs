@@ -4,7 +4,9 @@
 
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -92,9 +94,9 @@ internal static class InertiaValidationFilter
 
     // Microsoft.Extensions.Validation reports CLR member paths ("Address.Street"); the client knows the JSON names, so each
     // segment goes through the JSON naming policy ("address.street"). [JsonPropertyName] overrides are not applied.
-    internal static Dictionary<string, string[]> ToClientKeys(Dictionary<string, string[]> errors, JsonNamingPolicy? naming)
+    internal static Dictionary<string, string[]> ToClientKeys(Dictionary<string, string[]> errors, JsonNamingPolicy? naming, JsonTypeInfo? schema = null)
     {
-        if (naming is null)
+        if (naming is null && !errors.Keys.Any(k => k.Contains('[', StringComparison.Ordinal)))
         {
             return errors;
         }
@@ -102,10 +104,57 @@ internal static class InertiaValidationFilter
         var result = new Dictionary<string, string[]>(errors.Count, StringComparer.Ordinal);
         foreach (var (key, messages) in errors)
         {
-            result[string.Join('.', key.Split('.').Select(naming.ConvertName))] = messages;
+            var path = ToClientPath(key, naming, schema);
+            result[path] = result.TryGetValue(path, out var existing) ? [.. existing, .. messages] : messages;
         }
 
         return result;
+    }
+
+    internal static string ToClientPath(string path, JsonNamingPolicy? naming, JsonTypeInfo? schema = null)
+    {
+        var result = new StringBuilder(path.Length);
+        for (var i = 0; i < path.Length;)
+        {
+            if (path[i] == '.') { result.Append('.'); i++; continue; }
+            if (path[i] == '[')
+            {
+                var close = path.IndexOf(']', i + 1);
+                if (close < 0) { result.Append(path.AsSpan(i)); break; }
+                var index = path.AsSpan(i + 1, close - i - 1);
+                if (!index.IsEmpty && index.IndexOfAnyExceptInRange('0', '9') < 0)
+                    result.Append('.').Append(index);
+                else result.Append(path.AsSpan(i, close - i + 1));
+                schema = ElementSchema(schema);
+                i = close + 1;
+                continue;
+            }
+            var start = i;
+            while (i < path.Length && path[i] is not ('.' or '[')) i++;
+            var member = path[start..i];
+            if (schema?.Kind == JsonTypeInfoKind.Dictionary || member.AsSpan().IndexOfAnyExceptInRange('0', '9') < 0)
+            {
+                result.Append(member);
+                schema = ElementSchema(schema);
+                continue;
+            }
+            var converted = naming?.ConvertName(member) ?? member;
+            // FastEndpoints may already have named part of a validation path through its global resolver.
+            var property = schema?.Kind == JsonTypeInfoKind.Object
+                ? schema.Properties.FirstOrDefault(p => p.Name == member) ?? schema.Properties.FirstOrDefault(p => p.Name == converted)
+                : null;
+            result.Append(property?.Name ?? converted);
+            schema = property is null ? null : GetSchema(schema!.Options, property.PropertyType);
+        }
+        return result.ToString();
+    }
+
+    private static JsonTypeInfo? ElementSchema(JsonTypeInfo? schema) => schema?.ElementType is { } type
+        ? GetSchema(schema.Options, type) : null;
+    internal static JsonTypeInfo? GetSchema(JsonSerializerOptions options, Type type)
+    {
+        try { return options.GetTypeInfo(type); }
+        catch (NotSupportedException) { return null; }
     }
 
     internal static InertiaBackResult Back(HttpContext httpContext, IDictionary<string, string[]> errors)

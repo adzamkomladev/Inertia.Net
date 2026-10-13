@@ -17,13 +17,19 @@ public static class InertiaServiceCollectionExtensions
             options.Configure(configure);
         }
 
+        options.Validate(o => o.Ssr.MaxResponseBytes is null or > 0, "Ssr.MaxResponseBytes must be positive or null.")
+            .Validate(o => o.Ssr.Timeout == Timeout.InfiniteTimeSpan || (o.Ssr.Timeout >= TimeSpan.Zero && o.Ssr.Timeout.TotalMilliseconds <= uint.MaxValue - 1),
+                "Ssr.Timeout must be nonnegative and supported by CancellationTokenSource, or Timeout.InfiniteTimeSpan.")
+            .ValidateOnStart();
+
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<ViteAssets>();
         services.TryAddSingleton<IInertiaRootView, RootTemplateView>();
         services.TryAddSingleton<InertiaPageWriter>();
-        services.AddHttpClient(SsrGateway.HttpClientName);
+        services.AddHttpClient(SsrGateway.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
         services.TryAddSingleton<IInertiaSsrRenderer, SsrGateway>();
-        services.AddHostedService<SsrNodeProcess>(); // no-op unless o.Ssr.UseNodeProcess()
+        services.TryAddSingleton<SsrNodeProcess>();
+        services.AddHostedService(sp => sp.GetRequiredService<SsrNodeProcess>()); // no-op unless o.Ssr.UseNodeProcess()
         services.TryAddSingleton<VersionProvider>();
         services.AddDataProtection();
         services.TryAddSingleton<IInertiaStateStore>(sp => sp.GetRequiredService<IOptions<InertiaOptions>>().Value.State.UsesSession

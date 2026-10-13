@@ -175,7 +175,7 @@ internal static class InertiaStateSerializer
                             writer.WriteNullValue();
                             break;
                         case JsonElement element:
-                            element.WriteTo(writer);
+                            JsonSerializer.Serialize(writer, element, serializerOptions.GetTypeInfo(typeof(JsonElement)));
                             break;
                         default:
                             JsonSerializer.Serialize(writer, value, serializerOptions.GetTypeInfo(value.GetType()));

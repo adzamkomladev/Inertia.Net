@@ -32,6 +32,12 @@ public static class FastEndpointsRoutes
 {
     private static readonly Http[] Mutations = [Http.POST, Http.PUT, Http.PATCH, Http.DELETE];
 
+    public sealed class ArrayEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Get("/array");
+        public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Array", MinimalApiHost.ArrayProps());
+    }
+
     public sealed class PageEndpoint(ConformanceCounters counters) : EndpointWithoutRequest
     {
         public override void Configure() => Get("/page");

@@ -12,7 +12,7 @@ var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args 
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
     o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default);
-    o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
 });
 builder.Services.AddValidation();
 builder.Services.AddFastEndpoints(DiscoveredTypes.All);
@@ -35,6 +35,7 @@ app.UseFastEndpoints(c =>
 });
 
 app.MapGet("/healthz", () => "ok");
+app.MapGet("/serialization", () => Render("Serialization", new SerializationPage()));
 
 // Typed page props: plain members are serialized through AppJsonContext; InertiaProp members are resolved by Inertia.Net.
 app.MapGet("/", () => Render("Home", new HomePage
@@ -145,4 +146,36 @@ public sealed class UserInput
 [JsonSerializable(typeof(FeedPage))]
 [JsonSerializable(typeof(UserInput))]
 [JsonSerializable(typeof(ContactRequest))]
+[JsonSerializable(typeof(SerializationPage))]
 internal sealed partial class AppJsonContext : JsonSerializerContext;
+
+[JsonNumberHandling(JsonNumberHandling.WriteAsString)]
+internal sealed class SerializationPage : IJsonOnSerializing
+{
+    public int Count { get; init; }
+    public bool Enabled { get; init; }
+    public ZeroValue Zero { get; init; }
+    public int Number { get; init; } = 42;
+    [JsonNumberHandling(JsonNumberHandling.Strict)] public int Strict { get; init; } = 42;
+    public string Value { get; set; } = "raw";
+    public InertiaProp Lazy { get; init; } = Defer(() => 1);
+    public PolymorphicBase Item { get; init; } = new PolymorphicDerived();
+    public JsonElement Data { get; init; } = JsonDocument.Parse("{\"id\":9007199254740993}").RootElement.Clone();
+    public SerializationRow[] Rows { get; init; } = [new("first", Defer(() => 10, "a")), new("second", Defer(() => 20, "b"))];
+    public void OnSerializing() => Value = "normalized";
+}
+
+internal struct ZeroValue
+{
+    public ZeroValue() => Value = 7;
+    public int Value { get; set; }
+}
+
+[JsonPolymorphic]
+[JsonDerivedType(typeof(PolymorphicDerived), "derived")]
+internal class PolymorphicBase
+{
+    public InertiaProp Extra { get; init; } = Defer(() => 8);
+}
+internal sealed class PolymorphicDerived : PolymorphicBase { public string Name { get; init; } = "visible"; }
+internal sealed record SerializationRow(string Name, InertiaProp Extra);
