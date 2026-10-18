@@ -7,6 +7,44 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+See [migration guidance](docs/migrating-to-1.2.md) for observable behavior changes. Adds public API (`UseInertiaAntiforgery`,
+`InertiaAntiforgeryOptions`, `InertiaStateOptions.CookieSecurePolicy`), so the next release is a minor version. Update all four packages together.
+The findings behind these changes are in [the security and performance review](docs/reviews/2026-10-18-security-performance-review.md).
+
+### Added
+
+- `app.UseInertiaAntiforgery(configure?)`: issues the `XSRF-TOKEN` cookie and validates every unsafe request (JSON and form bodies),
+  answering `419` (or `OnRejected`, e.g. `Back().WithFlash(...)`). Endpoints opt out with `DisableAntiforgery()`, areas with `ShouldValidate`.
+  It also satisfies form-binding endpoints, so `UseAntiforgery()` is not needed. The samples use it.
+- `InertiaAntiforgeryOptions.SecurePolicy` and `InertiaStateOptions.CookieSecurePolicy` for TLS-terminating proxies that do not forward the scheme.
+- Managed SSR logs a warning when the Node server also answers on a non-loopback address.
+- README sections: "Deploying behind a proxy", the SSR trust model, payload size guidance, and CSRF in every quick start.
+- Repository: `SECURITY.md`, Dependabot (NuGet, npm, Actions), CodeQL, SHA-pinned actions, a read-only CI token, a `release` environment
+  for publishing, and NuGet audit of transitive packages at every severity.
+
+### Fixed
+
+- Typed dictionaries (`Dictionary<TKey, TValue>`) whose values hold `InertiaProp` members are walked instead of throwing
+  `InertiaProp values can only be serialized by Inertia.Net`; keys follow System.Text.Json (key policy, non-string keys).
+- With a custom app encoder such as `UnsafeRelaxedJsonEscaping`, a declared property name containing `</script>` could close the page
+  `<script>` element in the initial HTML. Property names now use the HTML-safe encoder in that case.
+
+### Security
+
+- The `XSRF-TOKEN` cookie is essential, so a cookie-consent policy no longer withholds it.
+- `Back()` upgrades an `http` Referer to `https` on HTTPS requests.
+- Root views that resolve outside the content root are refused; the template, manifest and path caches are bounded.
+
+### Performance
+
+- SSR responses are parsed from a pooled buffer into UTF-8 head/body bytes written as-is: about half the allocation of 1.1 and faster.
+- The MVC `<inertia />`, `<vite />` and `<vite-react-refresh />` tag helpers stream pre-encoded UTF-8 (a 1 MiB page: about 3 MiB to 80 B).
+- The session and TempData state stores skip loading when the request has no session or TempData cookie.
+- The SSR bundle check and render URL are cached; `Location()` reads one header; typed objects no longer allocate an enumerator;
+  members that differ only by number handling share serializer options; the page buffer starts at the component's recent size.
+- `@vite(...)` tags are resolved before the template is written, so a manifest error is a clean exception, not half a page.
+- A Vite manifest, template or SSR bundle missing at startup is re-checked once per second in production instead of never.
+
 ## [1.1.0] - 2026-10-13
 
 See [migration guidance](docs/migrating-to-1.1.md) for observable behavior changes. This minor release includes behavior corrections that may require application changes, despite retaining public APIs and redirect-state formats. Update all four packages together.

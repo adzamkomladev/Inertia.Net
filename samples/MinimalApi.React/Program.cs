@@ -12,6 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 // The app's source-generated JSON context: Inertia.Net serializes prop values through these options (Native AOT friendly).
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 builder.Services.AddValidation();
+// CSRF: the Inertia client sends the XSRF-TOKEN cookie back as X-XSRF-TOKEN; UseInertiaAntiforgery() issues and validates it.
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddInertia(o =>
 {
     o.Share("appName", "Inertia.Net Sample");
@@ -28,6 +30,7 @@ var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseInertia();
+app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
 
 app.MapGet("/", () => Render("Home"));
 
@@ -74,8 +77,9 @@ app.MapGet("/feed", (int page = 1) =>
 
 if (e2e)
 {
-    app.MapPost("/__e2e/bump-version", () => AppState.Version = Guid.NewGuid().ToString("N"));
-    app.MapPost("/__e2e/reset", AppState.Reset);
+    // Test hooks called by the E2E runner, not by a browser page: exempt from CSRF validation.
+    app.MapPost("/__e2e/bump-version", () => AppState.Version = Guid.NewGuid().ToString("N")).DisableAntiforgery();
+    app.MapPost("/__e2e/reset", AppState.Reset).DisableAntiforgery();
     app.MapGet("/__e2e/array", () => Render("ArrayRegression", new InertiaProps
     {
         ["rows"] = new List<DeferredRow>

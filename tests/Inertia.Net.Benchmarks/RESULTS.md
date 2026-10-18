@@ -1,5 +1,53 @@
 # Inertia.Net benchmark results
 
+## Security and performance review follow-up — 2026-10-18
+
+Measured in a cloud Linux container (Intel Xeon @ 2.10 GHz, 4 vCPUs, SDK 10.0.402, .NET 10.0.13), a different and noisier host than
+the 1.1 laptop runs below, so compare rows within this section only. Each probe runs three repetitions in one process; "before" is
+commit `2b99400` (1.1.0) or, for the large-page probe, the commit before the change, built from a separate worktree with the same
+probe source. Allocation is exact; timings vary by tens of percent between runs, so ranges are given.
+
+| Workload (probe) | Before | After |
+|---|---:|---:|
+| 1 MiB SSR response, gateway (`--ssr-probe`) | 2,100,575 B; 1.36–1.57 ms | 1,051,738 B; 0.48–0.57 ms |
+| 1 MiB SSR response, 1.0 buffered reference (`--ssr-probe`) | 4,198,038 B; 2.05–2.45 ms | unchanged (reference) |
+| MVC `<inertia />` body, 1 MiB page (`--mvc-probe`) | 3,146,347 B; 1.33–1.37 ms | 80 B; 0.12–0.19 ms |
+| MVC `<inertia />` body, 2 KiB page (`--mvc-probe`) | 6,576 B; 1.9–7.8 µs | 80 B; 0.5–0.8 µs |
+| HTML render, one 1 MiB prop (`--payload-probe`) | 785–1,107 µs | 581–886 µs |
+| JSON render, one 1 MiB prop (`--payload-probe`) | 298–672 µs | 434–568 µs (no clear change) |
+| Typed POCO page (`--render-probe`) | 2,592 B; 8.1–10.3 µs | 2,472 B; 6.5–7.9 µs |
+| JSON, 20 mixed props (`--render-probe`) | 2,752 B; 11.0–27.5 µs | 2,752 B; 11.3–18.1 µs |
+| Partial reload, 2 of 20 (`--render-probe`) | 1,584 B; 5.7–6.8 µs | 1,584 B; 4.7–5.7 µs |
+| HTML + Vite tags, 20 props (`--render-probe`) | 2,792 B; 13.5–14.4 µs | 2,792 B; 10.8–14.7 µs |
+
+What changed:
+
+- **SSR.** The response is read into a pooled buffer and `head`/`body` are unescaped once into UTF-8 arrays that the root view writes
+  as-is. The 1.1 gateway materialized UTF-16 strings (twice the bytes) and re-encoded them on output; the output re-encoding is not
+  part of this probe, so the end-to-end saving is larger than the table shows. `MaxResponseBytes` still bounds the read.
+- **MVC.** The `<inertia />`, `<vite />` and `<vite-react-refresh />` tag helpers write pre-encoded UTF-8 through `IHtmlContent` in
+  pooled 4 KiB chunks instead of building strings. The probe writes both forms to a `StreamWriter` the way Razor's response writer
+  encodes them. The 80 B left is the content object and the decoder.
+- **Large pages.** The page buffer starts at each component's recent page size (plus 1/8, at least 4 KiB, at most 8 MiB; it shrinks
+  back gradually), so a large page skips the doubling copies from 4 KiB. The HTML render improved; the JSON measurement did not separate
+  from noise. Pooled buffers mean this shows in time, not allocation. The probe's HTML allocation (about 546 KiB) comes from the test
+  `StreamPipeWriter` over `Stream.Null`; Kestrel's response pipe pools large writes (see the 1.1 Kestrel table).
+- **Typed objects.** Members are collected into a pooled array instead of a `yield` iterator: one enumerator less per typed object.
+- **Small pages** are otherwise unchanged in allocation; their timings stayed within run-to-run noise.
+
+Not measured with a probe: the session and TempData stores skip loading without their cookie (one distributed-cache read or TempData
+decrypt less per request through `UseInertia()`), the SSR bundle check is cached (one `stat` less per server-rendered page), and
+`Location()` reads one header instead of parsing nine.
+
+Reproduce:
+
+```sh
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --render-probe
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --ssr-probe
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --mvc-probe
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --payload-probe
+```
+
 ## 1.1 correctness and resource measurements — 2026-10-13
 
 These are local Release measurements, not a production capacity guarantee. The environment was Windows 11

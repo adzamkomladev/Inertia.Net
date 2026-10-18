@@ -1,0 +1,32 @@
+version: 2
+
+# Minor and patch updates are grouped per ecosystem to keep the PR count low; major updates arrive one by one.
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      nuget-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directories:
+      - /samples/MinimalApi.React
+      - /samples/Mvc.Vue
+      - /samples/FastEndpoints.Svelte
+      - /tests/e2e
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  # Workflow actions are pinned to commit SHAs with the version in a comment; Dependabot updates both.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: [minor, patch]

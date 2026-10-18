@@ -15,14 +15,18 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Publishing needs approval: add required reviewers to the "release" environment (Settings > Environments) and store
+    # NUGET_API_KEY as an environment secret there, so a pushed tag alone cannot publish.
+    environment: release
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
 
-      - uses: actions/setup-node@v7 # the managed SSR process tests run real node
+      # The managed SSR process tests run real node.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
 
@@ -64,7 +68,7 @@ jobs:
           --skip-duplicate
 
       - name: Create the GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: artifacts/*
           generate_release_notes: true

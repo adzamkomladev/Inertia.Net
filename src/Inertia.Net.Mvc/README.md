@@ -12,10 +12,12 @@ dotnet add package Inertia.Net.Mvc
 ```csharp
 builder.Services.AddInertia();
 builder.Services.AddControllersWithViews().AddInertiaMvc(o => o.UseRazorRootView("App")); // UseRazorRootView is optional
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 
 var app = builder.Build();
 app.UseStaticFiles();
 app.UseInertia();
+app.UseInertiaAntiforgery();   // CSRF: XSRF-TOKEN cookie, 419 for mutations without a valid token
 app.MapControllers();
 ```
 

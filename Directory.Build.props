@@ -6,6 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
+    <!-- Known vulnerabilities in any package, direct or transitive, fail the (warnings-as-errors) build. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
     <IsPackable>false</IsPackable>
     <!-- The Web SDK warns when a non-packable web project is packed; solution-level pack packs only src/ (IsPackable=true there). -->
     <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>

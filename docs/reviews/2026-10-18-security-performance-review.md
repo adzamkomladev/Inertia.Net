@@ -39,6 +39,43 @@ dangerous surfaces (script embedding, redirect targets, cookie integrity, proces
 The Medium security and performance items are about defaults and deployment realities rather than bugs in what exists; the
 one reproduced bug (C1) is a serialization gap, not a security issue.
 
+## Implementation status
+
+Every finding and plan item below was implemented on the same branch after this review; see the [changelog](../../CHANGELOG.md)
+and [migration guidance](../migrating-to-1.2.md). Two findings changed while being fixed:
+
+- **S8 was a real bug.** The regression test the review asked for failed: with `UnsafeRelaxedJsonEscaping`, a declared property name
+  containing `</script>` closed the page script four times in one page. Property names now use the HTML-safe encoder whenever the
+  app sets a custom encoder.
+- **P7 is narrower than proposed.** Converter instances can carry per-property configuration (custom `JsonConverterAttribute`
+  subclasses), so options are shared per converter *instance* and number handling, not per converter type. Members that differ only by
+  number handling share one options instance.
+
+| Finding | Resolution | Verified by |
+|---|---|---|
+| S1 | `UseInertiaAntiforgery()`: issue and validate (JSON and form), `419`, `DisableAntiforgery()` opt-out, `ShouldValidate`, `OnRejected`; samples and all quick starts use it | `InertiaAntiforgeryTests` (Minimal API, MVC, FastEndpoints hosts); Playwright token-less mutation spec on all three samples |
+| S2 | `SecurePolicy` / `CookieSecurePolicy` options; README "Deploying behind a proxy" | `StateStoreTests`, `InertiaAntiforgeryTests` |
+| S3 | XSRF cookie `IsEssential` | consent-policy integration test |
+| S4 | `http` Referer upgraded to `https` on HTTPS requests | `BackResultTests` |
+| S5 | Non-loopback exposure probe and warning; README trust model | `SsrNodeProcessTests` with a fixture on `0.0.0.0` and on `127.0.0.1` |
+| S6 | Root views outside the content root refused; path and file caches bounded | `RootTemplateTests` |
+| S7 | Dependabot, CodeQL, SHA-pinned actions, read-only CI token, `release` environment, NuGet audit `all`/`low`, `SECURITY.md` | restore and build with the stricter audit; YAML parsed |
+| S8 | HTML-safe encoder for property names under a custom app encoder | `PageWriterTests` |
+| P1 | Bundle presence through the file cache; cached render URL; URL string compared before parsing | `SsrGatewayTests` |
+| P2 | Streaming `IHtmlContent` for the MVC tag helpers; cached entry split | `MvcRazorTests` (60,000-character multi-byte page); `--mvc-probe` |
+| P3 | Pooled UTF-8 SSR parsing, kept after measuring | `SsrGatewayTests` parser cases; `--ssr-probe`; React SSR Playwright spec |
+| P4 | Session and TempData loads skipped without their cookie | `StateStoreTests`, `TempDataStateStoreTests` and the TempData conformance suites |
+| P5 | Misses re-checked once per second in production | `RootTemplateTests`, `SsrGatewayTests` |
+| P6 | One header read in `InertiaLocationResult` | conformance suites |
+| P7 | Options shared per converter instance and number handling | `SerializationRegressionTests` |
+| P8 | Pooled member arrays instead of an iterator; synchronous prop building | `--render-probe` (typed page 2,592 to 2,472 B) |
+| P9 | `@vite` tags resolved before the first byte | `RootTemplateTests` |
+| P10 | Per-component initial page buffer size; README payload guidance | `PageWriterTests`; `--payload-probe` |
+| P11 | No change (as planned) | n/a |
+| C1 | Typed dictionaries walked, keys as System.Text.Json writes them | `SerializationRegressionTests` |
+
+Measurements are in the first section of `tests/Inertia.Net.Benchmarks/RESULTS.md`.
+
 ## Security review
 
 ### S1. CSRF protection is opt-in, partial, and absent from the samples (Medium)
