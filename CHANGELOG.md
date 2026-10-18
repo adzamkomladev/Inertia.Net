@@ -7,6 +7,8 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-18
+
 Adds public API (`UseInertiaAntiforgery`, `InertiaAntiforgeryOptions`, `InertiaStateOptions.CookieSecurePolicy`), so the next release is a
 minor version. Public signatures, the Inertia v3 JSON protocol and the cookie, session and TempData formats are unchanged. Update all four
 packages together.

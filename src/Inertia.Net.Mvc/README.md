@@ -1,6 +1,6 @@
 # Inertia.Net.Mvc
 
-Use the 1.1 packages together. Collection validation keys now use dotted indices (`items.0.email`). See [migration guidance](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.1.md); TempData state formats remain unchanged.
+Use the 1.2 packages together. Collection validation keys use dotted indices (`items.0.email`); TempData state formats are unchanged. See the [upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md).
 
 MVC integration for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
 
