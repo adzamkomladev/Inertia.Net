@@ -89,8 +89,8 @@ public sealed class TempDataStateStoreTests
     public async Task Save_load_and_clear_round_trip_through_the_request_tempdata()
     {
         await using var provider = new ServiceCollection().AddControllersWithViews().Services.BuildServiceProvider();
-        var store = new TempDataInertiaStateStore(provider.GetRequiredService<ITempDataDictionaryFactory>());
-        var context = new DefaultHttpContext { RequestServices = provider };
+        var store = ActivatorUtilities.CreateInstance<TempDataInertiaStateStore>(provider);
+        var context = WithTempDataCookie(new DefaultHttpContext { RequestServices = provider });
         Assert.Null(await store.LoadAsync(context));
 
         await store.SaveAsync(context, Encoding.UTF8.GetBytes("""{"flash":{"a":1}}"""));
@@ -105,9 +105,72 @@ public sealed class TempDataStateStoreTests
     {
         await using var provider = new ServiceCollection().AddControllersWithViews().Services.BuildServiceProvider();
         var factory = provider.GetRequiredService<ITempDataDictionaryFactory>();
-        var context = new DefaultHttpContext { RequestServices = provider };
+        var context = WithTempDataCookie(new DefaultHttpContext { RequestServices = provider });
         factory.GetTempData(context)[TempDataInertiaStateStore.Key] = "%%not base64%%";
-        Assert.Empty((await new TempDataInertiaStateStore(factory).LoadAsync(context))!);
+        Assert.Empty((await ActivatorUtilities.CreateInstance<TempDataInertiaStateStore>(provider).LoadAsync(context))!);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Load_skips_tempdata_without_the_provider_cookie(bool session)
+    {
+        var services = new ServiceCollection().AddControllersWithViews();
+        if (session)
+        {
+            services.AddSessionStateTempDataProvider();
+        }
+
+        await using var provider = services.Services.BuildServiceProvider();
+        var factory = new CountingFactory(provider.GetRequiredService<ITempDataDictionaryFactory>());
+        var store = ActivatorUtilities.CreateInstance<TempDataInertiaStateStore>(provider, factory);
+        Assert.Null(await store.LoadAsync(new DefaultHttpContext { RequestServices = provider }));
+        Assert.Equal(0, factory.Calls);
+
+        var context = new DefaultHttpContext { RequestServices = provider };
+        context.Request.Headers.Cookie = session ? ".AspNetCore.Session=abc" : ".AspNetCore.Mvc.CookieTempDataProvider=abc";
+        if (session)
+        {
+            context.Features.Set<Microsoft.AspNetCore.Http.Features.ISessionFeature>(new SessionFeature());
+        }
+
+        Assert.Null(await store.LoadAsync(context));
+        Assert.Equal(1, factory.Calls);
+    }
+
+    private static DefaultHttpContext WithTempDataCookie(DefaultHttpContext context)
+    {
+        context.Request.Headers.Cookie = ".AspNetCore.Mvc.CookieTempDataProvider=unreadable";
+        return context;
+    }
+
+    private sealed class CountingFactory(ITempDataDictionaryFactory inner) : ITempDataDictionaryFactory
+    {
+        public int Calls { get; private set; }
+
+        public ITempDataDictionary GetTempData(HttpContext context)
+        {
+            Calls++;
+            return inner.GetTempData(context);
+        }
+    }
+
+    private sealed class SessionFeature : Microsoft.AspNetCore.Http.Features.ISessionFeature
+    {
+        public ISession Session { get; set; } = new EmptySession();
+    }
+
+    private sealed class EmptySession : ISession
+    {
+        public bool IsAvailable => true;
+        public string Id => "id";
+        public IEnumerable<string> Keys => [];
+        public void Clear() { }
+        public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public void Remove(string key) { }
+        public void Set(string key, byte[] value) { }
+        public bool TryGetValue(string key, out byte[] value) { value = []; return false; }
     }
 
     [Fact]

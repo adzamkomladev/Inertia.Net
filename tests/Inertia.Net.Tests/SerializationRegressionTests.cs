@@ -84,6 +84,18 @@ public class SerializationRegressionTests
             JsonSerializer.Serialize(new Dictionary<RowKind, Row> { [RowKind.SecondKind] = new("second", null) }, options.GetTypeInfo(typeof(Dictionary<RowKind, Row>))));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Members_with_the_same_number_handling_share_serializer_options(bool generated)
+    {
+        var harness = Create(generated);
+        var page = await harness.PageAsync(new ContractPage());
+        Assert.Equal("42", (string?)page["props"]!["number"]);
+        Assert.Equal("0", (string?)page["props"]!["count"]);
+        Assert.Equal(1, harness.Services.GetRequiredService<InertiaPageWriter>().MemberOptionsCount);
+    }
+
     [Fact]
     public async Task Typed_page_members_of_dictionary_type_are_walked()
     {

@@ -9,8 +9,14 @@ using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
-/// <summary>The server-side-rendered head and body of a page. Supplied by the SSR phase; null means render on the client.</summary>
-internal readonly record struct SsrRender(string Head, string Body);
+/// <summary>The server-side-rendered head and body of a page, as UTF-8 HTML. Supplied by the SSR phase; null means render on the client.</summary>
+internal readonly record struct SsrRender(ReadOnlyMemory<byte> Head, ReadOnlyMemory<byte> Body)
+{
+    public SsrRender(string head, string body)
+        : this(Encoding.UTF8.GetBytes(head), Encoding.UTF8.GetBytes(body))
+    {
+    }
+}
 
 /// <summary>Seam for SSR: when registered, <see cref="RootTemplateView"/> renders <c>@inertiaHead</c> and <c>@inertia</c> from the result.</summary>
 internal interface IInertiaSsrRenderer
@@ -91,14 +97,14 @@ internal sealed class RootTemplateView : IInertiaRootView
                 case RootTemplate.Kind.Head:
                     if (ssr is { } head)
                     {
-                        WriteString(writer, head.Head);
+                        writer.Write(head.Head.Span);
                     }
 
                     break;
                 case RootTemplate.Kind.Body:
                     if (ssr is { } body)
                     {
-                        WriteString(writer, body.Body);
+                        writer.Write(body.Body.Span);
                     }
                     else
                     {

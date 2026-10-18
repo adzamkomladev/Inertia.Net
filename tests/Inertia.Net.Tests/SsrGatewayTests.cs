@@ -331,6 +331,31 @@ public sealed class SsrGatewayTests
         Assert.Equal("http://127.0.0.1:13714/render", handler.Requests[0].Uri.ToString());
     }
 
+    [Theory]
+    [InlineData("""{"head":["<title>a</title>","<meta>"],"body":"<div>x</div>"}""", "<title>a</title>\n<meta>", "<div>x</div>")]
+    [InlineData("""{"body":"\u003Cp class=\"a\"\u003E\ud83d\ude00 \u00e9\/\n</p>","head":[]}""", "", "<p class=\"a\">😀 é/\n</p>")]
+    [InlineData("""{"extra":{"deep":[1,{"x":2}]},"head":[1,null,"<a>",{"x":1},"<b>"],"body":"y"}""", "<a>\n<b>", "y")]
+    [InlineData("""{"head":null,"body":"first","body":"last"}""", "", "last")]
+    public void Ssr_responses_parse_into_utf8_html(string json, string head, string body)
+    {
+        var render = Assert.NotNull(SsrGateway.ParseRender(Encoding.UTF8.GetBytes(json)));
+        Assert.Equal(head, Encoding.UTF8.GetString(render.Head.Span));
+        Assert.Equal(body, Encoding.UTF8.GetString(render.Body.Span));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("[]")]
+    [InlineData("\"body\"")]
+    [InlineData("""{"body":"unterminated""")]
+    [InlineData("""{"body":"\ud800"}""")]
+    public void Malformed_ssr_responses_parse_as_null(string json) =>
+        Assert.Null(SsrGateway.ParseRender(Encoding.UTF8.GetBytes(json)));
+
+    [Fact]
+    public void Invalid_utf8_in_an_ssr_response_parses_as_null() =>
+        Assert.Null(SsrGateway.ParseRender([.. "{\"body\":\""u8, 0xC3, 0x28, .. "\"}"u8]));
+
     [Fact]
     public async Task Inertia_json_requests_never_call_ssr()
     {

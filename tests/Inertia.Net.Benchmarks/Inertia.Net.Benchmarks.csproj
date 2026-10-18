@@ -13,5 +13,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
+    <ProjectReference Include="..\..\src\Inertia.Net.Mvc\Inertia.Net.Mvc.csproj" />
   </ItemGroup>
 </Project>

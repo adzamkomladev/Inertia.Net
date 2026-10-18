@@ -292,6 +292,25 @@ public class PageWriterTests
     }
 
     [Fact]
+    public async Task The_page_buffer_starts_at_the_recent_size_of_the_component()
+    {
+        var harness = new Harness();
+        var writer = harness.Services.GetRequiredService<InertiaPageWriter>();
+        Assert.Equal(4096, writer.InitialCapacity("Big"));
+
+        await harness.PageAsync(new InertiaProps { ["text"] = new string('x', 100_000) }, component: "Big");
+        var grown = writer.InitialCapacity("Big");
+        Assert.InRange(grown, 100_000 + 12_500, 100_000 + 12_700);
+
+        // Smaller renders shrink the hint gradually; other components are unaffected.
+        await harness.PageAsync(new InertiaProps { ["text"] = "small" }, component: "Big");
+        Assert.InRange(writer.InitialCapacity("Big"), 4096, grown - 1);
+        Assert.True(writer.InitialCapacity("Big") > grown / 2);
+        await harness.PageAsync(null, component: "Small");
+        Assert.Equal(4096, writer.InitialCapacity("Small"));
+    }
+
+    [Fact]
     public async Task Json_responses_keep_the_app_encoder()
     {
         var page = await new Harness().PageAsync(new InertiaProps { ["path"] = "a/b" }, c => c.AsInertia());

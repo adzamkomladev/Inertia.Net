@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Inertia.Net.IntegrationTests" />
+    <InternalsVisibleTo Include="Inertia.Net.Benchmarks" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Inertia.Net\Inertia.Net.csproj" />

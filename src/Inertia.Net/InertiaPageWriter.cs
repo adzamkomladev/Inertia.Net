@@ -26,7 +26,10 @@ internal sealed class InertiaPageWriter
 
     private readonly ConcurrentDictionary<Type, bool> _containsProps = new();
     private readonly ConcurrentDictionary<(JsonPropertyInfo Property, JsonNumberHandling? Handling), JsonTypeInfo> _propertySerializers = new();
+    private readonly ConcurrentDictionary<(JsonConverter? Converter, JsonNumberHandling? Handling), JsonSerializerOptions> _memberOptions = new();
     private readonly ConcurrentDictionary<Type, object> _defaultValues = new();
+    private const int MinPageCapacity = 4096, MaxPageCapacityHint = 8 * 1024 * 1024, MaxSizeHints = 1024;
+    private readonly ConcurrentDictionary<string, int> _sizeHints = new(StringComparer.Ordinal);
     private readonly JsonWriterOptions _jsonWriterOptions;
     private readonly JsonWriterOptions _htmlWriterOptions;
 
@@ -79,7 +82,7 @@ internal sealed class InertiaPageWriter
     /// </summary>
     public async ValueTask<PooledBufferWriter> WritePageAsync(HttpContext httpContext, string component, object? props, InertiaRequest request, bool htmlSafe)
     {
-        var buffer = new PooledBufferWriter();
+        var buffer = new PooledBufferWriter(InitialCapacity(component));
         try
         {
             httpContext.RequestAborted.ThrowIfCancellationRequested();
@@ -140,12 +143,36 @@ internal sealed class InertiaPageWriter
 
             writer.WriteEndObject();
             writer.Flush();
+            RecordSize(component, buffer.WrittenMemory.Length);
             return buffer;
         }
         catch
         {
             buffer.Dispose();
             throw;
+        }
+    }
+
+    /// <summary>The initial page buffer size for <paramref name="component"/>: the recent page size plus headroom, at least 4 KiB.</summary>
+    internal int InitialCapacity(string component) => _sizeHints.TryGetValue(component, out var hint) ? hint : MinPageCapacity;
+
+    // Grows to a larger page at once (so a large page is not copied through every doubling of a 4 KiB buffer on each render) and
+    // shrinks back gradually, so one unusually large render does not pin a large buffer for the component. Bounded per component
+    // count and size; components are developer-chosen names.
+    private void RecordSize(string component, int written)
+    {
+        var target = (int)Math.Clamp(written + (long)written / 8, MinPageCapacity, MaxPageCapacityHint);
+        if (_sizeHints.TryGetValue(component, out var hint))
+        {
+            var next = target >= hint ? target : hint - (hint - target) / 4;
+            if (next != hint)
+            {
+                _sizeHints[component] = next;
+            }
+        }
+        else if (_sizeHints.Count < MaxSizeHints)
+        {
+            _sizeHints.TryAdd(component, target);
         }
     }
 
@@ -185,20 +212,30 @@ internal sealed class InertiaPageWriter
     internal readonly record struct PropertyValue(JsonTypeInfo TypeInfo, object? Value);
 
     private JsonTypeInfo PropertyTypeInfo(JsonPropertyInfo property, JsonNumberHandling? handling) =>
-        _propertySerializers.GetOrAdd((property, handling), key =>
+        _propertySerializers.GetOrAdd((property, handling),
+            static (key, self) => self.MemberOptions(key.Property.CustomConverter, key.Handling).GetTypeInfo(key.Property.PropertyType), this);
+
+    // One options instance (with its own metadata cache) per converter instance and number handling, not per member: every member
+    // that only differs by [JsonNumberHandling] shares one. Converters are compared by instance, since two instances of one converter
+    // type can be configured differently (custom JsonConverterAttribute subclasses).
+    private JsonSerializerOptions MemberOptions(JsonConverter? converter, JsonNumberHandling? handling) =>
+        _memberOptions.GetOrAdd((converter, handling), static (key, self) =>
         {
-            var member = key.Property;
-            var options = new JsonSerializerOptions(SerializerOptions)
+            var options = new JsonSerializerOptions(self.SerializerOptions)
             {
-                NumberHandling = key.Handling ?? SerializerOptions.NumberHandling,
+                NumberHandling = key.Handling ?? self.SerializerOptions.NumberHandling,
             };
-            if (member.CustomConverter is { } converter)
+            if (key.Converter is { } converter)
             {
                 options.Converters.Insert(0, converter);
             }
+
             options.MakeReadOnly();
-            return options.GetTypeInfo(member.PropertyType);
-        });
+            return options;
+        }, this);
+
+    /// <summary>The number of member serializer options created (for tests).</summary>
+    internal int MemberOptionsCount => _memberOptions.Count;
 
     /// <summary>
     /// The members of a typed object as System.Text.Json would write them, in a pooled array (no enumerator per object).
