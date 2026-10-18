@@ -7,15 +7,15 @@
     "build": "node scripts/build.mjs"
   },
   "dependencies": {
-    "@inertiajs/svelte": "^3.8.0",
-    "@inertiajs/vite": "^3.8.0",
-    "svelte": "^5.57.1"
+    "@inertiajs/svelte": "^3.9.1",
+    "@inertiajs/vite": "^3.9.1",
+    "svelte": "^5.57.2"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "svelte-check": "^4.7.6",
     "typescript": "^6.0.3",
-    "vite": "^8.3.2"
+    "vite": "^8.3.4"
   }
 }
