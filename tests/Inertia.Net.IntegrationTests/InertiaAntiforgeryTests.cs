@@ -94,14 +94,15 @@ public sealed class InertiaAntiforgeryTests
         await using var app = await ConformanceApp.StartAsync<Host>();
         var client = app.CreateClient();
         var token = await TokenAsync(client);
-        var request = new HttpRequestMessage(HttpMethod.Post, "/form-body") { Content = new FormUrlEncodedContent([new("name", "Ann")]) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/form-body") { Content = new FormUrlEncodedContent([new("name", "Ann")]) };
         request.WithHeader(InertiaHeaders.XsrfToken, token);
-        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Ann", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
 
         // A plain HTML form post without the token (classic cross-site CSRF) is rejected too.
-        var forged = await app.CreateClient().SendAsync(new HttpRequestMessage(HttpMethod.Post, "/form-body") { Content = new FormUrlEncodedContent([new("name", "Eve")]) }, TestContext.Current.CancellationToken);
+        using var forgedRequest = new HttpRequestMessage(HttpMethod.Post, "/form-body") { Content = new FormUrlEncodedContent([new("name", "Eve")]) };
+        using var forged = await app.CreateClient().SendAsync(forgedRequest, TestContext.Current.CancellationToken);
         Assert.Equal(419, (int)forged.StatusCode);
     }
 

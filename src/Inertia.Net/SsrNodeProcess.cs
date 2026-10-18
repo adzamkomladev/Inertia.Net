@@ -386,6 +386,8 @@ internal sealed partial class SsrNodeProcess(
             }
             catch (Exception ex) when (ex is SocketException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {
+                // Refused or timed out: the server is not reachable on this address; try the next one.
+                continue;
             }
         }
 

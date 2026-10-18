@@ -140,7 +140,8 @@ public sealed class MvcRazorTests
         await using var app = await StartAsync();
         var html = await HtmlAsync(app.CreateClient(), "/mvc/razor-large");
         Assert.Equal(1, html.Split("</script><div id=\"app\">").Length - 1);
-        var page = await new HttpResponseMessage { Content = new StringContent(html) }.PageAsync();
+        using var parsed = new HttpResponseMessage { Content = new StringContent(html) };
+        var page = await parsed.PageAsync();
         Assert.Equal(ConformanceController.LargeText, (string?)page["props"]!["text"]);
     }
 

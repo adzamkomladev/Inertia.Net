@@ -306,9 +306,9 @@ public sealed class SsrGatewayTests
     {
         var handler = Ok();
         var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
-        var root = Path.Combine(Path.GetTempPath(), "inertia-bundle-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Join(Path.GetTempPath(), "inertia-bundle-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        File.Copy(Path.Combine(Harness.DefaultContentRoot, "app.html"), Path.Combine(root, "app.html"));
+        File.Copy(Path.Join(Harness.DefaultContentRoot, "app.html"), Path.Join(root, "app.html"));
         var harness = new Harness(
             o =>
             {
@@ -320,8 +320,8 @@ public sealed class SsrGatewayTests
             configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
 
         AssertClientRendered(await GetAsync(harness));
-        Directory.CreateDirectory(Path.Combine(root, "ssr"));
-        File.WriteAllText(Path.Combine(root, "ssr", "ssr.mjs"), "");
+        Directory.CreateDirectory(Path.Join(root, "ssr"));
+        File.WriteAllText(Path.Join(root, "ssr", "ssr.mjs"), "");
         AssertClientRendered(await GetAsync(harness)); // the miss is re-checked at most once per second
         Assert.Empty(handler.Requests);
 

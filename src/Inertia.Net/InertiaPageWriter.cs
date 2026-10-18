@@ -631,11 +631,10 @@ internal sealed class InertiaPageWriter
 
             probe.Clear();
             probe.Add(entry.Key, defaultValue);
+            // The probe is {"key":value}: the second token is the key.
             var reader = new Utf8JsonReader(JsonSerializer.SerializeToUtf8Bytes(probe, info));
-            while (reader.Read() && reader.TokenType != JsonTokenType.PropertyName)
-            {
-            }
-
+            reader.Read();
+            reader.Read();
             keys[i++] = reader.GetString() ?? "";
         }
 
