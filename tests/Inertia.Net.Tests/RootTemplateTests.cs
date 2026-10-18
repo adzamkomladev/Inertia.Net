@@ -139,6 +139,16 @@ public sealed class RootTemplateTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failing_vite_token_writes_nothing()
+    {
+        Manifest();
+        var harness = Create("<!DOCTYPE html><html><head><title>T</title>@vite(\"src/app.tsx\")@vite(\"nope.ts\")</head><body>@inertia</body></html>");
+        var context = harness.Context();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Inertia.Render("Home").ExecuteAsync(context));
+        Assert.Equal("", Harness.Body(context));
+    }
+
+    [Fact]
     public async Task ViewData_is_html_encoded_and_missing_keys_render_empty()
     {
         var harness = Create("<title>@viewData(\"title\")</title><meta content='@viewData('other')'>@viewData(\"n\")|@viewData(\"none\")@inertia");
@@ -153,6 +163,33 @@ public sealed class RootTemplateTests : IDisposable
         _root.Write("Views/admin.html", "ADMIN @inertia");
         var html = await RenderAsync(Create("DEFAULT @inertia"), Render("Home", null).WithRootView("Views/admin.html"));
         Assert.StartsWith("ADMIN <script", html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("../outside.html")]
+    [InlineData("Views/../../outside.html")]
+    [InlineData("/etc/hosts")]
+    public async Task Root_views_outside_the_content_root_are_refused(string view)
+    {
+        var harness = Create("DEFAULT @inertia");
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => RenderAsync(harness, Render("Home", null).WithRootView(view)));
+        Assert.Contains("outside the content root", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Missing_template_and_manifest_are_picked_up_after_startup_in_production()
+    {
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var harness = new Harness(contentRoot: _root.Path, timeProvider: clock);
+        await Assert.ThrowsAsync<FileNotFoundException>(() => RenderAsync(harness));
+
+        _root.Write("app.html", "@vite(\"src/app.tsx\")@inertia");
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RenderAsync(harness)); // the template is there, the manifest is not yet
+
+        Manifest();
+        clock.Advance(TimeSpan.FromSeconds(2));
+        Assert.StartsWith("<link rel=\"stylesheet\" href=\"/build/assets/app-1.css\">", await RenderAsync(harness), StringComparison.Ordinal);
     }
 
     [Fact]

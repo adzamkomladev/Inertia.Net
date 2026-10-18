@@ -251,6 +251,12 @@ internal sealed class PropsWriter : IDisposable
                 return;
             }
 
+            if (info.Kind == JsonTypeInfoKind.Dictionary && value is IDictionary dictionary)
+            {
+                await WriteDictionaryAsync(dictionary, info, parentWasResolved);
+                return;
+            }
+
             if (info.Kind == JsonTypeInfoKind.Enumerable && value is IEnumerable items)
             {
                 await WriteArrayAsync(items, info.ElementType ?? typeof(object), parentWasResolved);
@@ -289,13 +295,36 @@ internal sealed class PropsWriter : IDisposable
         _writer.WriteStartObject();
         if (discriminator is string text) _writer.WriteString(discriminatorName!, text);
         else if (discriminator is int number) _writer.WriteNumber(discriminatorName!, number);
-        foreach (var entry in _owner.ObjectEntries(value, info))
+        var entries = _owner.RentObjectEntries(value, info, out var count);
+        try
         {
-            await WriteEntryAsync(entry.Key, -1, entry.Value, entry.Type, parentWasResolved);
+            for (var i = 0; i < count; i++)
+            {
+                await WriteEntryAsync(entries[i].Key, -1, entries[i].Value, entries[i].Type, parentWasResolved);
+            }
+        }
+        finally
+        {
+            InertiaPageWriter.ReturnObjectEntries(entries, count);
         }
 
         _writer.WriteEndObject();
         info.OnSerialized?.Invoke(value);
+    }
+
+    // A typed dictionary (Dictionary<TKey, TValue>) whose values can hold props: keyed like System.Text.Json, walked like an object.
+    private async ValueTask WriteDictionaryAsync(IDictionary dictionary, JsonTypeInfo info, bool parentWasResolved)
+    {
+        var keys = _owner.DictionaryKeys(dictionary, info);
+        var valueType = info.ElementType ?? typeof(object);
+        _writer.WriteStartObject();
+        var i = 0;
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            await WriteEntryAsync(keys[i++], -1, entry.Value, valueType, parentWasResolved);
+        }
+
+        _writer.WriteEndObject();
     }
 
     private async ValueTask WriteArrayAsync(IEnumerable items, Type elementType, bool parentWasResolved)

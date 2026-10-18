@@ -39,7 +39,10 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         return this;
     }
 
-    /// <summary>Overrides <see cref="InertiaOptions.RootView"/> for this response.</summary>
+    /// <summary>
+    /// Overrides <see cref="InertiaOptions.RootView"/> for this response. The template view only accepts paths inside the content
+    /// root; never pass a value taken from the request.
+    /// </summary>
     public InertiaResult WithRootView(string rootView)
     {
         ArgumentNullException.ThrowIfNull(rootView);
@@ -117,7 +120,7 @@ public sealed class InertiaLocationResult : IResult
         ArgumentNullException.ThrowIfNull(httpContext);
         var response = httpContext.Response;
         InertiaHeaders.AppendVary(response.Headers);
-        if (new InertiaRequest(httpContext.Request.Headers).IsInertia)
+        if (!string.IsNullOrEmpty(httpContext.Request.Headers[InertiaHeaders.Inertia]))
         {
             response.StatusCode = StatusCodes.Status409Conflict;
             response.Headers[InertiaHeaders.Location] = Url;

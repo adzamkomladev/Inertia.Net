@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -49,9 +51,17 @@ internal sealed class InertiaPageWriter
             BigIntegerConverters.AddTo(serializerOptions.Converters);
         }
 
+        // Declared property names (and enum names) are pre-encoded with the options encoder, not the writer's. The default encoder
+        // escapes '<', '>' and '&'; a custom one such as UnsafeRelaxedJsonEscaping does not, so a name could close the page
+        // <script>. The HTML-safe encoder replaces it; like the relaxed one, it leaves non-ASCII text unescaped.
+        if (source.Encoder is { } encoder && !ReferenceEquals(encoder, JavaScriptEncoder.Default))
+        {
+            serializerOptions.Encoder = HtmlSafeEncoder;
+        }
+
         serializerOptions.MakeReadOnly();
         SerializerOptions = serializerOptions;
-        _jsonWriterOptions = new JsonWriterOptions { Encoder = serializerOptions.Encoder, Indented = serializerOptions.WriteIndented };
+        _jsonWriterOptions = new JsonWriterOptions { Encoder = source.Encoder, Indented = serializerOptions.WriteIndented };
         _htmlWriterOptions = new JsonWriterOptions { Encoder = HtmlSafeEncoder };
     }
 
@@ -77,7 +87,11 @@ internal sealed class InertiaPageWriter
                 ? SerializerOptions.GetTypeInfo(props.GetType()) : null;
             var feature = httpContext.Features.Get<InertiaFeature>();
             var sharedPropKeys = Options.ExposeSharedPropKeys ? new List<string>(Options.SharedProps.Count + 1 + (feature?.SharedProps?.Count ?? 0)) : null;
-            var entries = await BuildPropsAsync(httpContext, feature, props, request, sharedPropKeys);
+            var entries = BuildProps(httpContext, feature, props, request, sharedPropKeys, out var hasDotKey);
+            if (hasDotKey)
+            {
+                entries = await UnpackDotPropsAsync(entries, httpContext.RequestAborted);
+            }
 
             using var writer = new Utf8JsonWriter(buffer, htmlSafe ? _htmlWriterOptions : _jsonWriterOptions);
             using var propsWriter = new PropsWriter(this, writer, request, component, httpContext.RequestAborted);
@@ -186,8 +200,14 @@ internal sealed class InertiaPageWriter
             return options.GetTypeInfo(member.PropertyType);
         });
 
-    public IEnumerable<PropEntry> ObjectEntries(object target, JsonTypeInfo info)
+    /// <summary>
+    /// The members of a typed object as System.Text.Json would write them, in a pooled array (no enumerator per object).
+    /// Hand the array back with <see cref="ReturnObjectEntries"/>.
+    /// </summary>
+    public PropEntry[] RentObjectEntries(object target, JsonTypeInfo info, out int count)
     {
+        var entries = ArrayPool<PropEntry>.Shared.Rent(Math.Max(info.Properties.Count, 1));
+        count = 0;
         for (var i = 0; i < info.Properties.Count; i++)
         {
             var property = info.Properties[i];
@@ -204,26 +224,48 @@ internal sealed class InertiaPageWriter
                 // Extension keys are literal JSON names: DictionaryKeyPolicy must not rename them.
                 if (value is IEnumerable<KeyValuePair<string, object?>> objects)
                 {
-                    foreach (var entry in objects) yield return new(entry.Key, entry.Value, typeof(object));
+                    foreach (var entry in objects) Add(ref entries, ref count, new(entry.Key, entry.Value, typeof(object)));
                 }
                 else if (value is IEnumerable<KeyValuePair<string, JsonElement>> elements)
                 {
-                    foreach (var entry in elements) yield return new(entry.Key, entry.Value, typeof(JsonElement));
+                    foreach (var entry in elements) Add(ref entries, ref count, new(entry.Key, entry.Value, typeof(JsonElement)));
                 }
                 else if (value is JsonObject nodes)
                 {
-                    foreach (var entry in nodes) yield return new(entry.Key, entry.Value, typeof(JsonNode));
+                    foreach (var entry in nodes) Add(ref entries, ref count, new(entry.Key, entry.Value, typeof(JsonNode)));
                 }
             }
             else
             {
                 var handling = property.NumberHandling ?? info.NumberHandling;
-                yield return new(property.Name,
+                Add(ref entries, ref count, new(property.Name,
                     value is not InertiaProp && (property.CustomConverter is not null || (handling is not null && !ContainsProps(property.PropertyType)))
                         ? new PropertyValue(PropertyTypeInfo(property, handling), value) : value,
-                    property.PropertyType);
+                    property.PropertyType));
             }
         }
+
+        return entries;
+
+        static void Add(ref PropEntry[] entries, ref int count, PropEntry entry)
+        {
+            if (count == entries.Length)
+            {
+                var bigger = ArrayPool<PropEntry>.Shared.Rent(entries.Length * 2);
+                entries.AsSpan(0, count).CopyTo(bigger);
+                ReturnObjectEntries(entries, count);
+                entries = bigger;
+            }
+
+            entries[count++] = entry;
+        }
+    }
+
+    /// <summary>Clears the references in an array from <see cref="RentObjectEntries"/> and returns it to the pool.</summary>
+    public static void ReturnObjectEntries(PropEntry[] entries, int count)
+    {
+        entries.AsSpan(0, count).Clear();
+        ArrayPool<PropEntry>.Shared.Return(entries);
     }
 
     private static string GetUrl(HttpRequest request)
@@ -233,7 +275,8 @@ internal sealed class InertiaPageWriter
     }
 
     // errors (always), then option shares, then request shares, then page props; later keys override earlier ones in place.
-    private async ValueTask<List<PropEntry>> BuildPropsAsync(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<string>? sharedPropKeys)
+    // Synchronous, so the Set local function captures its locals in a stack struct instead of a heap closure.
+    private List<PropEntry> BuildProps(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<string>? sharedPropKeys, out bool dotKeys)
     {
         var propCount = props switch
         {
@@ -347,15 +390,24 @@ internal sealed class InertiaPageWriter
                 }
 
                 info.OnSerializing?.Invoke(props);
-                foreach (var entry in ObjectEntries(props, info))
+                var members = RentObjectEntries(props, info, out var count);
+                try
                 {
-                    Set(entry.Key, entry.Value, entry.Type, shared: false);
+                    for (var i = 0; i < count; i++)
+                    {
+                        Set(members[i].Key, members[i].Value, members[i].Type, shared: false);
+                    }
+                }
+                finally
+                {
+                    ReturnObjectEntries(members, count);
                 }
 
                 break;
         }
 
-        return hasDotKey ? await UnpackDotPropsAsync(entries, httpContext.RequestAborted) : entries;
+        dotKeys = hasDotKey;
+        return entries;
     }
 
     // Top-level "a.b.c" keys become nested objects (Laravel unpackDotProps). Nested dictionaries are copied, never mutated.
@@ -507,6 +559,52 @@ internal sealed class InertiaPageWriter
             : (info, null, null);
     }
 
+    /// <summary>
+    /// The JSON property names of a typed dictionary's keys, in enumeration order, as System.Text.Json writes them: string keys
+    /// through <see cref="JsonSerializerOptions.DictionaryKeyPolicy"/>, other keys through their dictionary key converter.
+    /// </summary>
+    internal string[] DictionaryKeys(IDictionary dictionary, JsonTypeInfo info)
+    {
+        var keys = new string[dictionary.Count];
+        var i = 0;
+        if (info.KeyType == typeof(string))
+        {
+            var policy = SerializerOptions.DictionaryKeyPolicy;
+            foreach (DictionaryEntry entry in dictionary)
+            {
+                var key = (string)entry.Key;
+                keys[i++] = policy?.ConvertName(key) ?? key;
+            }
+
+            return keys;
+        }
+
+        // Non-string keys (numbers, enums, Guids, ...) are formatted by the serializer itself: each key is written through a
+        // one-entry dictionary of the same type, so converters, enum names and the key policy all match a plain serialization.
+        var probe = info.CreateObject?.Invoke() as IDictionary;
+        var defaultValue = info.ElementType is { IsValueType: true } valueType && Nullable.GetUnderlyingType(valueType) is null
+            ? _defaultValues.GetOrAdd(valueType, CreateDefaultValue) : null;
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            if (probe is null)
+            {
+                keys[i++] = Convert.ToString(entry.Key, System.Globalization.CultureInfo.InvariantCulture) ?? "";
+                continue;
+            }
+
+            probe.Clear();
+            probe.Add(entry.Key, defaultValue);
+            var reader = new Utf8JsonReader(JsonSerializer.SerializeToUtf8Bytes(probe, info));
+            while (reader.Read() && reader.TokenType != JsonTokenType.PropertyName)
+            {
+            }
+
+            keys[i++] = reader.GetString() ?? "";
+        }
+
+        return keys;
+    }
+
     private bool ComputeContainsProps(Type type, HashSet<Type> visiting)
     {
         // object: the slot may hold a prop at runtime (object[], List<object>, an object property), so it is walked and
@@ -538,7 +636,7 @@ internal sealed class InertiaPageWriter
         {
             JsonTypeInfoKind.Object => info.Properties.Any(p => ComputeContainsProps(p.PropertyType, visiting))
                 || (info.PolymorphismOptions?.DerivedTypes.Any(d => ComputeContainsProps(d.DerivedType, visiting)) ?? false),
-            JsonTypeInfoKind.Enumerable => info.ElementType is { } elementType && ComputeContainsProps(elementType, visiting),
+            JsonTypeInfoKind.Enumerable or JsonTypeInfoKind.Dictionary => info.ElementType is { } elementType && ComputeContainsProps(elementType, visiting),
             _ => false,
         };
     }

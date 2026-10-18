@@ -43,9 +43,15 @@ internal sealed partial class SsrGateway(
     IHttpClientFactory httpClients,
     IHostEnvironment environment,
     SsrNodeProcess nodeProcess,
+    TimeProvider timeProvider,
     ILogger<SsrGateway> logger) : IInertiaSsrRenderer
 {
     internal const string HttpClientName = "Inertia.Net.Ssr";
+
+    // Bundle presence is cached like the manifest: a present bundle is never stat-ed again in production, a missing one is re-checked
+    // at most once per second (every second in Development), instead of a File.Exists on every server-rendered page.
+    private readonly FileCache<string> _bundles = new(static path => path, environment.IsDevelopment(), timeProvider);
+    private RenderEndpoint? _renderUrl;
 
     public async ValueTask<SsrRender?> RenderAsync(InertiaRootViewContext context)
     {
@@ -60,12 +66,12 @@ internal sealed partial class SsrGateway(
         http.RequestAborted.ThrowIfCancellationRequested();
         if (devOrigin is null && ssr.NodeProcess is not null && !nodeProcess.IsReadyFor(ssr.Url))
             return Fail(ssr, "startup", "The managed SSR process is not ready for the configured endpoint.", null, null);
-        if (devOrigin is null && ssr.BundlePath is { Length: > 0 } bundle && !File.Exists(Path.Combine(environment.ContentRootPath, bundle)))
+        if (devOrigin is null && ssr.BundlePath is { Length: > 0 } bundle && _bundles.Get(Path.Combine(environment.ContentRootPath, bundle)) is null)
         {
             return null;
         }
 
-        var url = devOrigin is null ? $"{ssr.Url.TrimEnd('/')}/render" : $"{devOrigin}/__inertia_ssr";
+        var url = devOrigin is null ? RenderUrl(ssr.Url) : $"{devOrigin}/__inertia_ssr";
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
         timeout.CancelAfter(ssr.Timeout);
         try
@@ -116,6 +122,21 @@ internal sealed partial class SsrGateway(
             return Fail(ssr, "unknown", $"SSR request to {url} failed: {ex.Message}", null, ex);
         }
     }
+
+    // The render endpoint, rebuilt only when Ssr.Url changes (options can be reloaded).
+    private string RenderUrl(string baseUrl)
+    {
+        if (_renderUrl is { } cached && string.Equals(cached.Base, baseUrl, StringComparison.Ordinal))
+        {
+            return cached.Render;
+        }
+
+        var render = $"{baseUrl.TrimEnd('/')}/render";
+        _renderUrl = new RenderEndpoint(baseUrl, render);
+        return render;
+    }
+
+    private sealed record RenderEndpoint(string Base, string Render);
 
     /// <summary>Matches the request path against exact entries and entries ending in <c>*</c> (prefix match).</summary>
     internal static bool IsExcluded(IList<string> patterns, string? path)

@@ -37,12 +37,14 @@ internal sealed partial class CookieInertiaStateStore : IInertiaStateStore
 
     private readonly IDataProtector _protector;
     private readonly string _cookieName;
+    private readonly CookieSecurePolicy _securePolicy;
     private readonly ILogger _logger;
 
     public CookieInertiaStateStore(IDataProtectionProvider dataProtection, IOptions<InertiaOptions> options, ILogger<CookieInertiaStateStore> logger)
     {
         _protector = dataProtection.CreateProtector("Inertia.Net.State");
         _cookieName = options.Value.State.CookieName;
+        _securePolicy = options.Value.State.CookieSecurePolicy;
         _logger = logger;
     }
 
@@ -82,11 +84,11 @@ internal sealed partial class CookieInertiaStateStore : IInertiaStateStore
         return ValueTask.CompletedTask;
     }
 
-    private static CookieOptions CreateCookieOptions(HttpContext httpContext) => new()
+    private CookieOptions CreateCookieOptions(HttpContext httpContext) => new()
     {
         HttpOnly = true,
         SameSite = SameSiteMode.Lax,
-        Secure = httpContext.Request.IsHttps,
+        Secure = InertiaCookies.IsSecure(_securePolicy, httpContext.Request),
         Path = "/",
         IsEssential = true,
     };

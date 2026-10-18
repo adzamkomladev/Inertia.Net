@@ -61,6 +61,26 @@ public class StateStoreTests
     }
 
     [Theory]
+    [InlineData(CookieSecurePolicy.Always, "http", true)]
+    [InlineData(CookieSecurePolicy.None, "https", false)]
+    [InlineData(CookieSecurePolicy.SameAsRequest, "https", true)]
+    public async Task Cookie_secure_flag_follows_the_policy(CookieSecurePolicy policy, string scheme, bool secure)
+    {
+        var harness = new Harness(o => o.State.CookieSecurePolicy = policy,
+            configureServices: s => s.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider()));
+        var store = harness.Services.GetRequiredService<IInertiaStateStore>();
+        var context = harness.Context();
+        context.Request.Scheme = scheme;
+        await store.SaveAsync(context, [1]);
+        Assert.Equal(secure, context.Response.Headers.SetCookie.ToString().Contains("secure", StringComparison.OrdinalIgnoreCase));
+
+        var cleared = harness.Context();
+        cleared.Request.Scheme = scheme;
+        await store.ClearAsync(cleared);
+        Assert.Equal(secure, cleared.Response.Headers.SetCookie.ToString().Contains("secure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
     [InlineData("garbage")]
     [InlineData("not+base64!")]
     [InlineData("")]

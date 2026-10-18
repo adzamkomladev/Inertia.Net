@@ -302,6 +302,36 @@ public sealed class SsrGatewayTests
     }
 
     [Fact]
+    public async Task Bundle_presence_is_cached_and_a_late_bundle_is_picked_up()
+    {
+        var handler = Ok();
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var root = Path.Combine(Path.GetTempPath(), "inertia-bundle-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.Copy(Path.Combine(Harness.DefaultContentRoot, "app.html"), Path.Combine(root, "app.html"));
+        var harness = new Harness(
+            o =>
+            {
+                o.Ssr.Enabled = true;
+                o.Ssr.BundlePath = "ssr/ssr.mjs";
+            },
+            timeProvider: clock,
+            contentRoot: root,
+            configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
+
+        AssertClientRendered(await GetAsync(harness));
+        Directory.CreateDirectory(Path.Combine(root, "ssr"));
+        File.WriteAllText(Path.Combine(root, "ssr", "ssr.mjs"), "");
+        AssertClientRendered(await GetAsync(harness)); // the miss is re-checked at most once per second
+        Assert.Empty(handler.Requests);
+
+        clock.Advance(TimeSpan.FromSeconds(2));
+        Assert.Contains("data-server-rendered", await GetAsync(harness), StringComparison.Ordinal);
+        Assert.Single(handler.Requests);
+        Assert.Equal("http://127.0.0.1:13714/render", handler.Requests[0].Uri.ToString());
+    }
+
+    [Fact]
     public async Task Inertia_json_requests_never_call_ssr()
     {
         var handler = Ok();

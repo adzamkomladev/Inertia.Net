@@ -74,6 +74,7 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
     /// <summary>
     /// The <c>Referer</c> (absolute, so a <c>//host</c> path cannot turn it into a protocol-relative redirect) when it is an http(s) URL
     /// with the request's host and port, otherwise <paramref name="fallback"/>, where a leading <c>~/</c> is replaced by <c>PathBase/</c>.
+    /// An <c>http</c> Referer on an HTTPS request is upgraded to <c>https</c>, so going back never downgrades the connection.
     /// </summary>
     internal static string GetBackUrl(HttpRequest request, string fallback)
     {
@@ -83,6 +84,11 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
             && string.Equals(referer.Host, request.Host.Host, StringComparison.OrdinalIgnoreCase)
             && (request.Host.Port is { } port ? referer.Port == port : referer.IsDefaultPort))
         {
+            if (request.IsHttps && referer.Scheme == Uri.UriSchemeHttp)
+            {
+                return new UriBuilder(referer) { Scheme = Uri.UriSchemeHttps, Port = referer.IsDefaultPort ? -1 : referer.Port }.Uri.AbsoluteUri;
+            }
+
             return referer.AbsoluteUri;
         }
 

@@ -36,6 +36,22 @@ public class BackResultTests
         Assert.Equal(expected, context.Response.Headers.Location);
     }
 
+    [Theory]
+    [InlineData("example.com", "http://example.com/users?page=2", "https://example.com/users?page=2")]
+    [InlineData("example.com:8443", "http://example.com:8443/a", "https://example.com:8443/a")]
+    [InlineData("example.com", "https://example.com/a", "https://example.com/a")]
+    public async Task An_http_referer_is_upgraded_on_an_https_request(string host, string referer, string expected)
+    {
+        var context = _harness.Context("/form", "POST");
+        context.Request.Scheme = "https";
+        context.Request.Host = new HostString(host);
+        context.Request.Headers.Referer = referer;
+
+        await Harness.ExecuteAsync(context, Inertia.Back("/fallback"));
+
+        Assert.Equal(expected, context.Response.Headers.Location);
+    }
+
     [Fact]
     public async Task Errors_and_flash_go_to_the_feature()
     {
