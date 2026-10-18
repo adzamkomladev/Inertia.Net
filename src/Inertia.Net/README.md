@@ -1,6 +1,6 @@
 # Inertia.Net
 
-Version 1.1 retains the Inertia v3 JSON protocol and public signatures. Review [migration guidance](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.1.md) for whole-array partial reloads, corrected serialization and bounded managed SSR.
+Version 1.2 keeps the Inertia v3 JSON protocol and public signatures, and adds one-call CSRF protection (`UseInertiaAntiforgery()`). Review the [upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md) before updating; coming from 1.0, also read the [1.1 migration guidance](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.1.md).
 
 The core of Inertia.Net, a .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs (this package), MVC (`Inertia.Net.Mvc`) and FastEndpoints (`Inertia.Net.FastEndpoints`), with the React, Vue and Svelte clients, and is Native AOT and trim compatible.
 

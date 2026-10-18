@@ -2,7 +2,7 @@
 
 A .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs, MVC controllers and FastEndpoints, with the React, Vue and Svelte clients, and it is **Native AOT and trim compatible**.
 
-For the 1.1 release, review [migration guidance](docs/migrating-to-1.1.md), especially indexed array reloads, corrected JSON contracts and managed SSR configuration.
+For the 1.2 release, review the upgrade notes in the [changelog](CHANGELOG.md), especially CSRF protection with `UseInertiaAntiforgery()`. Coming from 1.0, also read the [1.1 migration guidance](docs/migrating-to-1.1.md).
 
 ```csharp
 app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
