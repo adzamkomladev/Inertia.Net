@@ -7,9 +7,24 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
-See [migration guidance](docs/migrating-to-1.2.md) for observable behavior changes. Adds public API (`UseInertiaAntiforgery`,
-`InertiaAntiforgeryOptions`, `InertiaStateOptions.CookieSecurePolicy`), so the next release is a minor version. Update all four packages together.
-The findings behind these changes are in [the security and performance review](docs/reviews/2026-10-18-security-performance-review.md).
+Adds public API (`UseInertiaAntiforgery`, `InertiaAntiforgeryOptions`, `InertiaStateOptions.CookieSecurePolicy`), so the next release is a
+minor version. Public signatures, the Inertia v3 JSON protocol and the cookie, session and TempData formats are unchanged. Update all four
+packages together.
+
+### Upgrade notes
+
+- **Turn on CSRF protection.** Replace `UseInertiaAntiforgeryCookie()` (and `UseAntiforgery()`) with
+  `services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken)` and `app.UseInertiaAntiforgery()` after `app.UseInertia()`.
+  Every POST, PUT, PATCH and DELETE then needs the token: exempt webhooks and token-authenticated APIs with `.DisableAntiforgery()` or
+  `ShouldValidate`. Rejected requests get `419`; return `Back().WithFlash(...)` from `OnRejected` to show a message instead.
+- **Root views** (`RootView`, `WithRootView(...)`) that resolve outside the content root now throw. Razor view names are unaffected.
+- **Relaxed app encoder.** With a custom encoder on the HTTP JSON options, declared property names are HTML-escaped (`<`, `>`, `&`, `/`, ...)
+  in page JSON. The parsed JSON is identical; only byte-exact snapshots of such names change.
+- **SSR bundle.** In production a present `Ssr.BundlePath` is not checked again, so deleting it at runtime no longer turns SSR off; set
+  `Ssr.Enabled = false` or restart. A missing bundle, manifest or template is re-checked once per second.
+- **SSR responses** with invalid UTF-8 or an unpaired `\uD800` escape are a `response` failure (fallback or throw) instead of being decoded
+  with replacement characters.
+- **Releases** run in a `release` GitHub environment: add required reviewers and store `NUGET_API_KEY` as an environment secret there.
 
 ### Added
 
@@ -19,7 +34,7 @@ The findings behind these changes are in [the security and performance review](d
 - `InertiaAntiforgeryOptions.SecurePolicy` and `InertiaStateOptions.CookieSecurePolicy` for TLS-terminating proxies that do not forward the scheme.
 - Managed SSR logs a warning when the Node server also answers on a non-loopback address.
 - README sections: "Deploying behind a proxy", the SSR trust model, payload size guidance, and CSRF in every quick start.
-- Repository: `SECURITY.md`, Dependabot (NuGet, npm, Actions), CodeQL, SHA-pinned actions, a read-only CI token, a `release` environment
+- Repository: Dependabot (NuGet, npm, Actions), CodeQL, SHA-pinned actions, a read-only CI token, a `release` environment
   for publishing, and NuGet audit of transitive packages at every severity.
 
 ### Fixed

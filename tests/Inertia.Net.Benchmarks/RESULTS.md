@@ -1,6 +1,6 @@
 # Inertia.Net benchmark results
 
-## Security and performance review follow-up — 2026-10-18
+## Antiforgery, SSR and MVC streaming changes — 2026-10-18
 
 Measured in a cloud Linux container (Intel Xeon @ 2.10 GHz, 4 vCPUs, SDK 10.0.402, .NET 10.0.13), a different and noisier host than
 the 1.1 laptop runs below, so compare rows within this section only. Each probe runs three repetitions in one process; "before" is
