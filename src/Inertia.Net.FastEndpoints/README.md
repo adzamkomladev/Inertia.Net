@@ -12,10 +12,12 @@ dotnet add package Inertia.Net.FastEndpoints
 ```csharp
 builder.Services.AddInertia();
 builder.Services.AddFastEndpoints();
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 
 var app = builder.Build();
 app.UseStaticFiles();
 app.UseInertia();
+app.UseInertiaAntiforgery();   // CSRF: XSRF-TOKEN cookie, 419 for mutations without a valid token
 app.UseFastEndpoints(c => c.UseInertia(ep => ep.AllowAnonymous()));   // validation redirect + Precognition
 ```
 

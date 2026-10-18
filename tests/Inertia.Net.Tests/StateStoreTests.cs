@@ -61,6 +61,64 @@ public class StateStoreTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Session_store_skips_the_session_load_without_a_session_cookie(bool cookie)
+    {
+        var harness = new Harness(o => o.State.UseSession());
+        var store = harness.Services.GetRequiredService<IInertiaStateStore>();
+        var session = new CountingSession();
+        var context = harness.Context();
+        context.Features.Set<Microsoft.AspNetCore.Http.Features.ISessionFeature>(new SessionFeature(session));
+        if (cookie)
+        {
+            context.Request.Headers.Cookie = ".AspNetCore.Session=abc";
+        }
+
+        Assert.Null(await store.LoadAsync(context));
+        Assert.Equal(cookie ? 1 : 0, session.Loads);
+    }
+
+    private sealed class SessionFeature(ISession session) : Microsoft.AspNetCore.Http.Features.ISessionFeature
+    {
+        public ISession Session { get; set; } = session;
+    }
+
+    private sealed class CountingSession : ISession
+    {
+        public int Loads { get; private set; }
+        public bool IsAvailable => true;
+        public string Id => "id";
+        public IEnumerable<string> Keys => [];
+        public void Clear() { }
+        public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task LoadAsync(CancellationToken cancellationToken = default) { Loads++; return Task.CompletedTask; }
+        public void Remove(string key) { }
+        public void Set(string key, byte[] value) { }
+        public bool TryGetValue(string key, out byte[] value) { value = []; return false; }
+    }
+
+    [Theory]
+    [InlineData(CookieSecurePolicy.Always, "http", true)]
+    [InlineData(CookieSecurePolicy.None, "https", false)]
+    [InlineData(CookieSecurePolicy.SameAsRequest, "https", true)]
+    public async Task Cookie_secure_flag_follows_the_policy(CookieSecurePolicy policy, string scheme, bool secure)
+    {
+        var harness = new Harness(o => o.State.CookieSecurePolicy = policy,
+            configureServices: s => s.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider()));
+        var store = harness.Services.GetRequiredService<IInertiaStateStore>();
+        var context = harness.Context();
+        context.Request.Scheme = scheme;
+        await store.SaveAsync(context, [1]);
+        Assert.Equal(secure, context.Response.Headers.SetCookie.ToString().Contains("secure", StringComparison.OrdinalIgnoreCase));
+
+        var cleared = harness.Context();
+        cleared.Request.Scheme = scheme;
+        await store.ClearAsync(cleared);
+        Assert.Equal(secure, cleared.Response.Headers.SetCookie.ToString().Contains("secure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
     [InlineData("garbage")]
     [InlineData("not+base64!")]
     [InlineData("")]

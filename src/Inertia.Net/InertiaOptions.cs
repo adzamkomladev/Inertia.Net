@@ -7,7 +7,7 @@ public sealed class InertiaOptions
 {
     internal Dictionary<string, object?> SharedProps { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>The root view rendered on the first (non-Inertia) visit. Default <c>app.html</c>.</summary>
+    /// <summary>The root view rendered on the first (non-Inertia) visit, relative to the content root. Default <c>app.html</c>.</summary>
     public string RootView { get; set; } = "app.html";
 
     /// <summary>The id of the root element and the <c>data-page</c> script. Default <c>app</c>.</summary>
@@ -160,6 +160,12 @@ public sealed class InertiaStateOptions
 {
     /// <summary>The cookie name (cookie store) or session key (session store). Default <c>.Inertia.State</c>.</summary>
     public string CookieName { get; set; } = ".Inertia.State";
+
+    /// <summary>
+    /// When the state cookie (cookie store) is marked <c>Secure</c>. Default <see cref="CookieSecurePolicy.SameAsRequest"/>; use
+    /// <see cref="CookieSecurePolicy.Always"/> behind a TLS-terminating proxy that does not forward the scheme.
+    /// </summary>
+    public CookieSecurePolicy CookieSecurePolicy { get; set; } = CookieSecurePolicy.SameAsRequest;
 
     internal bool UsesSession { get; private set; }
 

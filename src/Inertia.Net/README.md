@@ -11,10 +11,12 @@ dotnet add package Inertia.Net
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddInertia(o => o.Share("appName", "Demo"));
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 
 var app = builder.Build();
 app.UseStaticFiles();
 app.UseInertia();
+app.UseInertiaAntiforgery();   // XSRF-TOKEN cookie for the client; 419 for mutations without a valid token
 
 app.MapGet("/users", () => Render("Users/Index", new InertiaProps
 {
@@ -37,7 +39,7 @@ app.Run();
 
 `Render`, `Defer`, `Back()` and `Location(...)` are called unqualified: the package adds `global using Inertia.Net;` and `global using static Inertia.Net.Inertia;` when `ImplicitUsings` is enabled (`Inertia.Render` does not compile outside the `Inertia.Net` namespace). Opt out with `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>`.
 
-What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll), partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR with a health check, validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), the antiforgery cookie, and an encrypted-cookie state store.
+What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll), partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR with a health check, validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), CSRF protection (`UseInertiaAntiforgery()`), and an encrypted-cookie state store.
 
 Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
 - [Quick start](https://github.com/adzamkomladev/Inertia.Net#quick-start) and [client setup](https://github.com/adzamkomladev/Inertia.Net#client-setup)

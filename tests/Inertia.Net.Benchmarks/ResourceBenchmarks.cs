@@ -89,7 +89,7 @@ public class SsrBufferingBenchmarks
     }
 
     [Benchmark(Baseline = true)]
-    public async Task<string?> BufferedReference()
+    public async Task<int?> BufferedReference()
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_context.HttpContext.RequestAborted);
         timeout.CancelAfter(TimeSpan.FromSeconds(5));
@@ -97,12 +97,13 @@ public class SsrBufferingBenchmarks
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         using var response = await _clients.CreateClient(SsrGateway.HttpClientName).SendAsync(request, timeout.Token);
         var bytes = await response.Content.ReadAsByteArrayAsync(timeout.Token);
-        return JsonSerializer.Deserialize(bytes, InertiaJsonContext.Default.SsrResponse)?.Body;
+        return JsonSerializer.Deserialize(bytes, InertiaJsonContext.Default.SsrResponse)?.Body?.Length;
     }
 
-    [Benchmark] public async ValueTask<string?> Streaming() => (await _renderer.RenderAsync(_context))?.Body;
-    [Benchmark] public async ValueTask<string?> Oversized() => (await _oversizedRenderer.RenderAsync(_context))?.Body;
-    [Benchmark] public async ValueTask<string?> Timeout() => (await _timeoutRenderer.RenderAsync(_context))?.Body;
+    // Body lengths: the 1.1 gateway returned a string (1 char per ASCII byte); the gateway now returns UTF-8 bytes.
+    [Benchmark] public async ValueTask<int?> Streaming() => (await _renderer.RenderAsync(_context))?.Body.Length;
+    [Benchmark] public async ValueTask<int?> Oversized() => (await _oversizedRenderer.RenderAsync(_context))?.Body.Length;
+    [Benchmark] public async ValueTask<int?> Timeout() => (await _timeoutRenderer.RenderAsync(_context))?.Body.Length;
     [Benchmark]
     public async Task Cancellation()
     {

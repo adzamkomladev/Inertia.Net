@@ -132,6 +132,12 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     [HttpGet("/mvc/razor")]
     public IResult Razor() => Render("Razor", new InertiaProps { ["message"] = "hello" }).WithViewData("title", "<Razor> & co");
 
+    // Larger than one 4 KiB decode chunk, with multi-byte characters that straddle chunk boundaries.
+    internal static readonly string LargeText = string.Concat(Enumerable.Repeat("é😀a</script>", 5000));
+
+    [HttpGet("/mvc/razor-large")]
+    public IResult RazorLarge() => Render("Razor", new InertiaProps { ["text"] = LargeText });
+
     [HttpGet("/mvc/razor-other")]
     public IResult RazorOther() => Render("Razor").WithRootView("Other");
 }

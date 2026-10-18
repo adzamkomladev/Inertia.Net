@@ -9,8 +9,14 @@ using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
-/// <summary>The server-side-rendered head and body of a page. Supplied by the SSR phase; null means render on the client.</summary>
-internal readonly record struct SsrRender(string Head, string Body);
+/// <summary>The server-side-rendered head and body of a page, as UTF-8 HTML. Supplied by the SSR phase; null means render on the client.</summary>
+internal readonly record struct SsrRender(ReadOnlyMemory<byte> Head, ReadOnlyMemory<byte> Body)
+{
+    public SsrRender(string head, string body)
+        : this(Encoding.UTF8.GetBytes(head), Encoding.UTF8.GetBytes(body))
+    {
+    }
+}
 
 /// <summary>Seam for SSR: when registered, <see cref="RootTemplateView"/> renders <c>@inertiaHead</c> and <c>@inertia</c> from the result.</summary>
 internal interface IInertiaSsrRenderer
@@ -26,11 +32,14 @@ internal sealed class RootTemplateView : IInertiaRootView
     private readonly ViteAssets _vite;
     private readonly IInertiaSsrRenderer? _ssr;
     private readonly FileCache<RootTemplate> _templates;
+    private const int MaxCachedPaths = 256;
+    private readonly string _contentRootPrefix;
     private readonly ConcurrentDictionary<string, string> _paths = new(StringComparer.Ordinal); // root view name -> full path
 
     public RootTemplateView(IHostEnvironment environment, ViteAssets vite, TimeProvider timeProvider, IInertiaSsrRenderer? ssr = null)
     {
         _contentRoot = environment.ContentRootPath;
+        _contentRootPrefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_contentRoot)) + Path.DirectorySeparatorChar;
         _vite = vite;
         _ssr = ssr;
         _templates = new FileCache<RootTemplate>(path => RootTemplate.Parse(File.ReadAllText(path), path), environment.IsDevelopment(), timeProvider);
@@ -38,13 +47,46 @@ internal sealed class RootTemplateView : IInertiaRootView
 
     public async ValueTask RenderAsync(InertiaRootViewContext context)
     {
-        var path = _paths.GetOrAdd(context.RootView, static (view, root) => Path.Combine(root, view), _contentRoot);
+        var path = ResolvePath(context.RootView);
         var template = _templates.Get(path)
             ?? throw new FileNotFoundException($"The Inertia root template '{path}' was not found. Create it (it must contain @inertia), or set InertiaOptions.RootView / InertiaResult.WithRootView.", path);
 
         var http = context.HttpContext;
         var ssr = _ssr is null ? null : await _ssr.RenderAsync(context);
+
+        // The Vite tags can fail (no manifest, unknown entry): resolve them before the first byte goes out, so a failure surfaces
+        // as a clean exception instead of an error page appended to half a document.
+        var vite = template.ViteCount == 0 ? null : ArrayPool<byte[]>.Shared.Rent(template.ViteCount);
+        try
+        {
+            var v = 0;
+            foreach (var segment in template.Segments)
+            {
+                if (segment.Kind == RootTemplate.Kind.Vite)
+                {
+                    vite![v++] = _vite.RenderTagsUtf8(http, segment.Args!);
+                }
+            }
+
+            Write(context, template, ssr, vite);
+        }
+        finally
+        {
+            if (vite is not null)
+            {
+                Array.Clear(vite, 0, template.ViteCount);
+                ArrayPool<byte[]>.Shared.Return(vite);
+            }
+        }
+
+        await http.Response.BodyWriter.FlushAsync(http.RequestAborted);
+    }
+
+    private void Write(InertiaRootViewContext context, RootTemplate template, SsrRender? ssr, byte[][]? vite)
+    {
+        var http = context.HttpContext;
         var writer = http.Response.BodyWriter;
+        var v = 0;
         foreach (var segment in template.Segments)
         {
             switch (segment.Kind)
@@ -55,14 +97,14 @@ internal sealed class RootTemplateView : IInertiaRootView
                 case RootTemplate.Kind.Head:
                     if (ssr is { } head)
                     {
-                        WriteString(writer, head.Head);
+                        writer.Write(head.Head.Span);
                     }
 
                     break;
                 case RootTemplate.Kind.Body:
                     if (ssr is { } body)
                     {
-                        WriteString(writer, body.Body);
+                        writer.Write(body.Body.Span);
                     }
                     else
                     {
@@ -71,7 +113,7 @@ internal sealed class RootTemplateView : IInertiaRootView
 
                     break;
                 case RootTemplate.Kind.Vite:
-                    writer.Write(_vite.RenderTagsUtf8(http, segment.Args!));
+                    writer.Write(vite![v++]);
                     break;
                 case RootTemplate.Kind.ReactRefresh:
                     writer.Write(_vite.RenderReactRefreshUtf8(http));
@@ -85,8 +127,29 @@ internal sealed class RootTemplateView : IInertiaRootView
                     break;
             }
         }
+    }
 
-        await writer.FlushAsync(http.RequestAborted);
+    // Root views are app-relative paths chosen by the app; one that escapes the content root (an absolute path, "..") is refused,
+    // so a root view name that ever comes from request input cannot read arbitrary files. The name cache is bounded too.
+    private string ResolvePath(string view)
+    {
+        if (_paths.TryGetValue(view, out var path))
+        {
+            return path;
+        }
+
+        path = Path.GetFullPath(Path.Combine(_contentRoot, view));
+        if (!path.StartsWith(_contentRootPrefix, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"The Inertia root view '{view}' resolves outside the content root '{_contentRoot}'. Root views are paths relative to the content root and must not come from request input.");
+        }
+
+        if (_paths.Count < MaxCachedPaths)
+        {
+            _paths.TryAdd(view, path);
+        }
+
+        return path;
     }
 
     private static void WriteString(IBufferWriter<byte> writer, string text)
@@ -110,9 +173,16 @@ internal sealed class RootTemplate
 
     internal readonly record struct Segment(Kind Kind, byte[]? Bytes = null, string[]? Args = null);
 
-    private RootTemplate(Segment[] segments) => Segments = segments;
+    private RootTemplate(Segment[] segments)
+    {
+        Segments = segments;
+        ViteCount = segments.Count(s => s.Kind == Kind.Vite);
+    }
 
     public Segment[] Segments { get; }
+
+    /// <summary>The number of <c>@vite(...)</c> tokens.</summary>
+    public int ViteCount { get; }
 
     /// <summary>Parses the template text (a leading BOM is already stripped by <see cref="File.ReadAllText(string)"/>).</summary>
     public static RootTemplate Parse(string text, string path)

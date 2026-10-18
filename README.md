@@ -40,13 +40,14 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 18. [Server-side rendering](#server-side-rendering)
 19. [Vite integration](#vite-integration)
 20. [CSRF and antiforgery](#csrf-and-antiforgery)
-21. [Native AOT](#native-aot)
-22. [Testing](#testing)
-23. [Performance](#performance)
-24. [Configuration reference](#configuration-reference)
-25. [Migrating from other .NET adapters](#migrating-from-other-net-adapters)
-26. [Troubleshooting and FAQ](#troubleshooting-and-faq)
-27. [Contributing and license](#contributing-and-license)
+21. [Deploying behind a proxy](#deploying-behind-a-proxy)
+22. [Native AOT](#native-aot)
+23. [Testing](#testing)
+24. [Performance](#performance)
+25. [Configuration reference](#configuration-reference)
+26. [Migrating from other .NET adapters](#migrating-from-other-net-adapters)
+27. [Troubleshooting and FAQ](#troubleshooting-and-faq)
+28. [Contributing and license](#contributing-and-license)
 
 ---
 
@@ -119,6 +120,7 @@ Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`).
 ## Quick start
 
 Every backend needs the same four things: `AddInertia()`, `UseInertia()`, a root template, and a frontend (see [Client setup](#client-setup)).
+Add CSRF protection from the start: `AddAntiforgery(...)` and `UseInertiaAntiforgery()`, as below (see [CSRF and antiforgery](#csrf-and-antiforgery)).
 
 The root template is an HTML file in the content root. The default name is `app.html`:
 
@@ -157,6 +159,7 @@ Make sure `app.html` is copied to the output and publish directory:
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddValidation();                    // .NET 10 source-generated validation
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddInertia(o =>
 {
     o.Share("appName", "Demo");
@@ -166,6 +169,7 @@ var app = builder.Build();
 
 app.UseStaticFiles();                                // serves wwwroot/build (Vite output)
 app.UseInertia();                                    // before the endpoints
+app.UseInertiaAntiforgery();                         // XSRF-TOKEN cookie; 419 for mutations without a valid token
 
 app.MapGet("/", () => Render("Home", new InertiaProps
 {
@@ -195,11 +199,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInertia();
 builder.Services.AddControllersWithViews().AddInertiaMvc();   // add .UseRazorRootView() options here if you want Razor
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 
 var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseInertia();
+app.UseInertiaAntiforgery();
 app.MapControllers();
 app.Run();
 ```
@@ -241,11 +247,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInertia();
 builder.Services.AddFastEndpoints();
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 
 var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseInertia();
+app.UseInertiaAntiforgery();
 app.UseFastEndpoints(c => c.UseInertia());           // validation redirect + Precognition
 app.Run();
 ```
@@ -992,7 +1000,7 @@ What `UseInertia()` does for Inertia requests:
 | An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE), falling back to the app root (`PathBase/`) |
 | `Back()` | `302` to the `Referer` when it is an http(s) URL with the request's own host and port, otherwise to the fallback (default `~/`, the app root including `PathBase`) |
 
-The same-origin rule on `Referer` exists so `Back()` cannot become an open redirect. The scheme is not compared, so it keeps working behind a TLS-terminating proxy.
+The same-origin rule on `Referer` exists so `Back()` cannot become an open redirect. The scheme is not compared, so it keeps working behind a TLS-terminating proxy. On an HTTPS request an `http` Referer is upgraded to `https`, so going back never downgrades the connection.
 
 `Vary: X-Inertia` is added to every response that passes through the middleware.
 
@@ -1173,6 +1181,10 @@ o.Ssr.UseNodeProcess(n =>
 A hosted service runs `node {bundle}` (no shell) when the app starts, logs its stdout (Information) and stderr (Warning) under the `Inertia.Net.Ssr` category, and waits up to `StartupTimeout` for `GET {Url}/health`. Managed mode requires a dedicated loopback URL and rejects occupied endpoints before spawning. Rendering requires readiness from a live owned child. A missing bundle, a missing `node` or a startup timeout is logged and pages render on the client; with `ThrowOnError = true` app startup fails with `InertiaSsrException` (`Type = "startup"`). If the process exits, it is restarted after 1 s, doubling up to 30 s. Shutdown cancels supervision and stops the owned process tree without requesting `/shutdown`. Nothing is spawned while the Vite dev server runs. For external or remote servers, enable SSR without `UseNodeProcess()` and configure the Node listener host explicitly.
 
 - **Port.** The v3 server (`createServer` in `@inertiajs/core`) takes its port and host only from its options, which `@inertiajs/vite` bakes into the bundle at build time: `inertia({ ssr: { port, host } })`, default `13714` on `0.0.0.0`. There is no CLI flag or environment variable. Keep the build port and `o.Ssr.Url` in sync (`host: '127.0.0.1'` keeps it off the network). The process also gets `INERTIA_SSR_PORT` (the port of `Ssr.Url`) and `NODE_ENV=production` (unless set), so a hand-written entry can follow the app: `createServer(render, { host: '127.0.0.1', port: Number(process.env.INERTIA_SSR_PORT) })`.
+- **Keep it on loopback.** The SSR server has no authentication: anyone who can reach it can `POST /render` (CPU) or `POST /shutdown`,
+  and its `head` and `body` are written into your pages verbatim, so it must be trusted. Build it with `host: '127.0.0.1'`. Once the managed
+  process is healthy, Inertia.Net tries the machine's non-loopback addresses on the SSR port and logs a warning
+  (`The SSR server also accepts connections on ...`) when it answers there, which is the case with the upstream default `0.0.0.0`.
 - **Orphans.** A graceful shutdown (Ctrl+C, SIGTERM, `docker stop`, IIS recycle) stops Node. If the .NET process is killed outright or crashes hard, the OS does not take Node with it; the next start rejects the occupied port. Use a process manager or container for hard-crash cleanup.
 
 - The server posts the page JSON to `{Url}/render` and reads `{ "head": [...], "body": "..." }`. `@inertiaHead` outputs the head tags joined with `\n`, and `@inertia` outputs the body verbatim.
@@ -1238,20 +1250,74 @@ With `AssetBaseUrl` set, Vite's own `base` must match, so lazily imported chunks
 
 ## CSRF and antiforgery
 
-The Inertia client (axios) reads the `XSRF-TOKEN` cookie and sends its value as the `X-XSRF-TOKEN` header. Inertia.Net writes that cookie and you validate it with ASP.NET Core antiforgery:
+The Inertia client reads the `XSRF-TOKEN` cookie and sends its value as the `X-XSRF-TOKEN` header on every request.
+`UseInertiaAntiforgery()` issues that cookie and validates it, so one call protects every form:
 
 ```csharp
-builder.Services.AddAntiforgery(o => o.HeaderName = "X-XSRF-TOKEN");
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);   // "X-XSRF-TOKEN"
 
+app.UseAuthentication();                 // if the app signs users in: the token is bound to the signed-in user
 app.UseInertia();
-app.UseAuthentication();
-app.UseInertiaAntiforgeryCookie();      // after authentication, so the token is bound to the signed-in user
-app.UseAntiforgery();                   // validates form bodies; see below for JSON bodies
+app.UseInertiaAntiforgery();
 ```
 
-- `UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` writes the request token to a script-readable cookie (`HttpOnly` off, SameSite=Lax, Secure on HTTPS, Path=/) on page loads: GET/HEAD requests that are Inertia requests or accept `text/html`. API calls and POSTs do not get it.
-- `app.UseAntiforgery()` validates requests that have a form body (and endpoints with antiforgery metadata). For JSON endpoints, call `await antiforgery.ValidateRequestAsync(context)` (`IAntiforgery`) from a middleware or endpoint filter.
-- MVC: add `[AutoValidateAntiforgeryToken]` as a global filter.
+- **Issue.** Page loads (GET/HEAD requests that are Inertia requests or accept `text/html`) get the request token in a script-readable,
+  essential cookie (`HttpOnly` off, `SameSite=Lax`, `Path=/`, `Secure` per `SecurePolicy`). Essential means a cookie-consent policy
+  (`CheckConsentNeeded`) does not withhold it, which would otherwise make every form submission fail.
+- **Validate.** Every unsafe request (anything but GET, HEAD, OPTIONS and TRACE), with a JSON or a form body, Inertia or not, is checked
+  with `IAntiforgery.ValidateRequestAsync`. A plain cross-site HTML form post is rejected as well as a forged XHR. It also sets the
+  antiforgery feature, so form-binding endpoints work without `app.UseAntiforgery()`.
+- **Reject.** A missing or wrong token gets **`419`** (page expired, as in Laravel); the handler does not run.
+- **Opt out** per endpoint with `.DisableAntiforgery()` (webhooks, test hooks), or for whole areas with `ShouldValidate`.
+
+```csharp
+app.UseInertiaAntiforgery(o =>
+{
+    o.CookieName = "XSRF-TOKEN";                                  // default
+    o.SecurePolicy = CookieSecurePolicy.Always;                   // default SameAsRequest; see "Deploying behind a proxy"
+    o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/api");   // e.g. bearer-token APIs
+    // Instead of a bare 419, send the user back with a message (UseInertia() must run before this middleware):
+    o.OnRejected = (ctx, error) => Back().WithFlash("error", "The page expired, please try again.");
+});
+```
+
+A session that expires or a sign-in that changes the user invalidates the token in an open tab; the next page load issues a new one.
+Returning `Back()` from `OnRejected` gives that tab a fresh token and a message instead of the client's error dialog.
+
+MVC: `UseInertiaAntiforgery()` covers controllers too. `[AutoValidateAntiforgeryToken]` as a global filter still works, but is not needed.
+FastEndpoints: covered by the middleware; FastEndpoints' own `EnableAntiforgery()` is not needed for Inertia forms.
+
+**Issue only.** `UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` (the 1.0 API) only writes the cookie; you then validate with
+`app.UseAntiforgery()` (form bodies only) and your own check for JSON bodies (`await antiforgery.ValidateRequestAsync(context)`).
+Prefer `UseInertiaAntiforgery()`.
+
+---
+
+## Deploying behind a proxy
+
+Behind a load balancer or reverse proxy that terminates TLS, Kestrel sees plain HTTP unless the scheme is forwarded. Without it:
+the state and `XSRF-TOKEN` cookies are not marked `Secure`, and the version-mismatch `409` sends an `http://` `X-Inertia-Location`.
+
+```csharp
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // o.KnownProxies / o.KnownNetworks: list your proxy, or headers from anyone else are ignored
+});
+
+app.UseForwardedHeaders();               // first
+app.UseInertia();
+```
+
+When the scheme cannot be forwarded, force the cookies:
+
+```csharp
+builder.Services.AddInertia(o => o.State.CookieSecurePolicy = CookieSecurePolicy.Always);
+app.UseInertiaAntiforgery(o => o.SecurePolicy = CookieSecurePolicy.Always);
+```
+
+On several instances, share the Data Protection key ring (`AddDataProtection().PersistKeysTo...`): the state cookie and the antiforgery
+tokens are protected with it. Keep the SSR server on loopback on each instance (see [Server-side rendering](#server-side-rendering)).
 
 ---
 
@@ -1386,9 +1452,18 @@ Measured in Release on a laptop (i5-8265U, .NET 10.0.12). Warm render probes reu
 | Middleware: non-Inertia, empty endpoint | 0.23–0.26 µs | 0 B |
 | Middleware: Inertia, empty endpoint | 0.80–1.51 µs | 48 B |
 
+Since then, SSR responses stay UTF-8 end to end (about half the allocation again, and faster), and the MVC `<inertia />` tag helper
+streams the page instead of building a string: a 1 MiB page went from about 3 MiB allocated to 80 bytes. Those measurements, taken on a
+different host, are in the first section of RESULTS.md.
+
 Warm SSR allocation fell about 50%, with a timing tradeoff and sensitivity to pool reuse. A measured 2,000-prop page with 32 shared props rendered about 20% faster after indexing shared keys, at a cost of about 1.1 KiB more allocation. MemoryPack was evaluated in benchmarks; production transport and redirect state remain JSON.
 
-Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
+Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` (also `--ssr-probe`, `--mvc-probe`, `--payload-probe`) or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
+
+**Payload size.** The page JSON is fully buffered before the first byte is sent, so a failing loader never produces a half-written 200.
+Each concurrent request therefore holds its whole page in memory (pooled, and sized from the component's recent pages). Keep pages well
+under a megabyte: paginate (`Scroll`), defer (`Defer`) or load on demand (`Optional`) large data. `Ssr.MaxResponseBytes` bounds the SSR
+response, not the props.
 
 Design notes:
 
@@ -1396,8 +1471,9 @@ Design notes:
 - **Pooled buffers.** The page is written to a pooled `IBufferWriter<byte>`, and the path tracker is a pooled `char[]`. A path becomes a string only when metadata needs it. The buffer also means a failing loader never produces a half-written 200.
 - **Version check before the handler.** A stale client costs one header comparison and a 409.
 - **No per-request mutable singletons.** Per-request state lives in an `InertiaFeature` on `HttpContext.Features`, so concurrent requests cannot leak history or flash settings into one another.
-- **Plain DTOs take the fast path.** A POCO or list is walked only when its type can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements; cached per type). Everything else is one `Serialize` call.
-- **Cached assets.** The Vite manifest is parsed once, the root template is parsed once into pre-encoded UTF-8 segments, and the production tags are pre-rendered per entry set and path base. The version is a precomputed string compared ordinally.
+- **Plain DTOs take the fast path.** A POCO, list or typed dictionary is walked only when its type can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements; cached per type). Everything else is one `Serialize` call.
+- **UTF-8 throughout.** SSR output and the MVC tag helpers write UTF-8 bytes; nothing large is materialized as a .NET string.
+- **Cached assets.** The Vite manifest is parsed once, the root template is parsed once into pre-encoded UTF-8 segments, and the production tags are pre-rendered per entry set and path base. The version is a precomputed string compared ordinally. A manifest, template or SSR bundle that is missing at startup is re-checked at most once per second, so files deployed after the app starts are picked up without a restart.
 - **Sync loaders stay sync.** `Func<T>` loaders are not wrapped in closures.
 
 Most per-request allocation in a real handler is the props you build, not the render.
@@ -1410,7 +1486,7 @@ Most per-request allocation in a real handler is the props you build, not the re
 
 | Option | Default | Description |
 |---|---|---|
-| `RootView` | `"app.html"` | Root template, relative to the content root (a Razor view name with `UseRazorRootView`). |
+| `RootView` | `"app.html"` | Root template, relative to the content root (a Razor view name with `UseRazorRootView`). Paths outside the content root are refused; never take it from the request. |
 | `RootElementId` | `"app"` | Id of the root element and the `data-page` script. |
 | `Version` | `null` | Asset version. `null` = hash of the Vite manifest, or `""` without one. |
 | `VersionResolver` | `null` | `Func<HttpContext, string?>` per-request version; wins over `Version` when non-null. |
@@ -1440,7 +1516,7 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `Timeout` | `5 s` | Wait for the SSR server (also the health check timeout). |
 | `MaxResponseBytes` | `16 MiB` | Limit actual response bytes, including errors and chunked responses. Positive `long`, or `null` for unlimited. Oversized responses fall back, or throw with type `response-too-large`. |
 | `ThrowOnError` | `false` | Throw `InertiaSsrException` instead of falling back to client rendering. |
-| `BundlePath` | `null` | Skip SSR while this file is missing, unless the Vite dev server runs. |
+| `BundlePath` | `null` | Skip SSR while this file is missing, unless the Vite dev server runs. A missing bundle is re-checked at most once per second; in production a present one is not checked again. |
 | `ExcludePaths` | empty | Request paths never rendered on the server: exact, or a trailing `*` for a prefix. |
 | `UseNodeProcess(configure?)` | off | Start and supervise the Node SSR server with the app (sets `Enabled`). Options below. |
 
@@ -1461,7 +1537,8 @@ Most per-request allocation in a real handler is the props you build, not the re
 | Option | Default | Description |
 |---|---|---|
 | `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
-| `UseSession()` | off | Use `ISession` instead of the encrypted cookie. |
+| `CookieSecurePolicy` | `SameAsRequest` | When the state cookie is `Secure`. `Always` behind a TLS-terminating proxy that does not forward the scheme. |
+| `UseSession()` | off | Use `ISession` instead of the encrypted cookie. The session is only loaded when the request has a session cookie. |
 | `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData (cookie or session provider) instead of the encrypted cookie. Inertia.Net.Mvc package. |
 
 ### Middleware, endpoint and result API
@@ -1470,7 +1547,8 @@ Most per-request allocation in a real handler is the props you build, not the re
 |---|---|
 | `services.AddInertia(configure?)` | Registers services and options. |
 | `app.UseInertia()` | The protocol middleware. Before the endpoints, after `UseSession()` when the session store is used. |
-| `app.UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` | Writes the antiforgery request token to a script-readable cookie. |
+| `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates every unsafe request (`419` on failure). Options: `CookieName`, `SecurePolicy`, `ShouldValidate`, `OnRejected`. |
+| `app.UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` | Only writes the antiforgery request token to a script-readable cookie; validation is up to you. |
 | `endpoint.WithInertiaValidation()` | Minimal API: validation failures redirect back with errors. Endpoint or group. |
 | `endpoint.WithInertiaPrecognition()` | Minimal API: `WithInertiaValidation()` plus Precognition. |
 | `healthChecks.AddInertiaSsr(name = "inertia-ssr", failureStatus?, tags?, timeout?)` | SSR health check. |
@@ -1533,6 +1611,15 @@ Run `npm run build`, or start the dev server so the hot file exists (in Developm
 **`Vite entry 'resources/js/app.tsx' was not found in the manifest`**
 The `@vite("...")` argument must equal the manifest key, which is the path relative to the Vite root. The error lists the available entries.
 
+**Form submissions fail with `419`.**
+`UseInertiaAntiforgery()` rejected a request without a valid `X-XSRF-TOKEN`. Check that the page was loaded through the middleware (it sets
+the `XSRF-TOKEN` cookie), that the cookie reaches the browser (`Secure` on plain HTTP is dropped; see [Deploying behind a proxy](#deploying-behind-a-proxy)),
+that all instances share the Data Protection key ring, and that `UseAuthentication()` runs before it. A sign-in or sign-out changes the
+token: reload the page, or return `Back()` from `OnRejected`. Exempt webhooks and token-authenticated APIs with `.DisableAntiforgery()` or `ShouldValidate`.
+
+**`The Inertia root view '...' resolves outside the content root`.**
+`RootView` and `WithRootView(...)` take a path relative to the content root; absolute paths and `..` are refused. Never derive them from request data.
+
 **The page keeps reloading, or a request loops with `409`.**
 A 409 means the asset version differs between the client and the server. A loop means it never converges: usually the version changes on every request (a `VersionResolver` that returns a new value each time, or a manifest regenerated by a file watcher), or different instances behind a load balancer serve different builds. Use a stable version string. In Development the manifest hash changes after each `vite build`, which is expected once.
 
@@ -1543,7 +1630,7 @@ The hot file is read only when `ASPNETCORE_ENVIRONMENT=Development`. Check that 
 `RootView` is relative to the **content root**. Copy `app.html` to the output and publish directories (`CopyToOutputDirectory`, `CopyToPublishDirectory`). The template must contain `@inertia`.
 
 **Flash data or errors disappear, or a warning says the cookie is over 4 KB.**
-The state cookie is limited to about 4 KB by browsers. Flash less data, or use `o.State.UseSession()`. If the app runs on several instances, share Data Protection keys. If the cookie is never sent back, check the cookie `Secure` flag on HTTP behind a proxy that does not forward `X-Forwarded-Proto`.
+The state cookie is limited to about 4 KB by browsers. Flash less data, or use `o.State.UseSession()`. If the app runs on several instances, share Data Protection keys. If the cookie is never sent back, check the cookie `Secure` flag on HTTP behind a proxy that does not forward `X-Forwarded-Proto` (see [Deploying behind a proxy](#deploying-behind-a-proxy)).
 
 **Validation errors do not show up (Minimal API).**
 Use `.WithInertiaValidation()` on the endpoint. Without it, the built-in `AddValidation()` filter returns a `400` problem details that the Inertia client cannot use. Make sure the model types are `public` (see [Native AOT](#native-aot)). The request must be an Inertia request and not a GET.
@@ -1552,10 +1639,13 @@ Use `.WithInertiaValidation()` on the endpoint. Without it, the built-in `AddVal
 Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). In MVC the policy is the one in the MVC `JsonOptions`. The page itself is written with the HTTP `JsonOptions`: keep both policies aligned.
 
 **`InvalidOperationException: InertiaProp values can only be serialized by Inertia.Net`.**
-An `InertiaProp` ended up somewhere Inertia.Net does not walk: a `Flash(...)` value, a dictionary with non-string keys or non-`object` values (`Dictionary<string, InertiaProp>`), or a type with a custom converter. Lists, `object` members and `IDictionary<string, object?>` are walked. Put props in `InertiaProps`, or declare the member as `InertiaProp` (or `object`) on the typed page object.
+An `InertiaProp` ended up somewhere Inertia.Net does not walk: a `Flash(...)` value, a read-only dictionary type that does not implement `IDictionary`, or a type with a custom converter. Lists, typed dictionaries (`Dictionary<TKey, TValue>` with any key type; keys are written as System.Text.Json writes them), `object` members and `IDictionary<string, object?>` are walked. Put props in `InertiaProps`, or declare the member as `InertiaProp` (or `object`) on the typed page object.
 
 **Serialization fails under Native AOT: "JsonTypeInfo metadata ... was not provided".**
 Add the type to your `JsonSerializerContext` and chain it with `ConfigureHttpJsonOptions` (see [Native AOT](#native-aot)). Setting `JsonSerializerIsReflectionEnabledByDefault=false` in regular builds finds these early.
+
+**A warning says `The SSR server also accepts connections on ...`.**
+The managed Node SSR server listens beyond loopback (the `@inertiajs/vite` default host is `0.0.0.0`). Rebuild with `inertia({ ssr: { host: '127.0.0.1' } })`.
 
 **SSR does not run and there is no error.**
 SSR falls back to client rendering on any failure: look for the warning `Inertia SSR failed (...)` in the logs, which includes the server's hint. Check `o.Ssr.Enabled`, `Url`, that the Node server is running (`GET /health`; with `UseNodeProcess()` look for `Inertia.Net.Ssr` log lines), that `BundlePath` points at the built file, and that the path is not in `ExcludePaths`. Set `ThrowOnError = true` in Development to surface the failure.

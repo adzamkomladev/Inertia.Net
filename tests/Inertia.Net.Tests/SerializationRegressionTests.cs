@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 namespace Inertia.Net.Tests;
@@ -44,6 +45,63 @@ public class SerializationRegressionTests
         var always = await harness.PageAsync(new InertiaProps { ["rows"] = Inertia.Always(new List<Row> { new("keep", null) }) },
             c => c.AsPartial(except: "rows.0.name"));
         Assert.Equal("keep", always["props"]!["rows"]![0]!["name"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Typed_dictionaries_whose_values_hold_props_are_walked(bool generated)
+    {
+        var harness = new Harness(configureServices: services => services.PostConfigure<HttpJsonOptions>(o =>
+        {
+            o.SerializerOptions.TypeInfoResolver = generated ? RegressionJsonContext.Default : new DefaultJsonTypeInfoResolver();
+            o.SerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+        }));
+        var calls = 0;
+        var props = new InertiaProps
+        {
+            ["byName"] = new Dictionary<string, Row> { ["FirstRow"] = new("first", Inertia.Defer(() => ++calls, "rows")) },
+            ["byId"] = new Dictionary<int, Row> { [7] = new("seven", Inertia.Prop(() => 70)) },
+            ["byKind"] = new Dictionary<RowKind, Row> { [RowKind.SecondKind] = new("second", null) },
+        };
+
+        var initial = await harness.PageAsync(props);
+        JsonAssert.Equal("""{"firstRow":{"name":"first"}}""", initial["props"]!["byName"]);
+        JsonAssert.Equal("""{"7":{"name":"seven","extra":70}}""", initial["props"]!["byId"]);
+        JsonAssert.Equal("""{"secondKind":{"name":"second","extra":null}}""", initial["props"]!["byKind"]);
+        JsonAssert.Equal("""{"rows":["byName.firstRow.extra"]}""", initial["deferredProps"]);
+        Assert.Equal(0, calls);
+
+        // Dictionary keys are path segments, like object members.
+        var partial = await harness.PageAsync(props, c => c.AsPartial("byName.firstRow.extra"));
+        JsonAssert.Equal("""{"firstRow":{"extra":1}}""", partial["props"]!["byName"]);
+        JsonAssert.Missing(partial["props"], "byId");
+        Assert.Equal(1, calls);
+
+        // The keys match a plain serialization of the same dictionary type.
+        var options = harness.Services.GetRequiredService<IOptions<HttpJsonOptions>>().Value.SerializerOptions;
+        Assert.Equal("""{"secondKind":{"name":"second","extra":null}}""",
+            JsonSerializer.Serialize(new Dictionary<RowKind, Row> { [RowKind.SecondKind] = new("second", null) }, options.GetTypeInfo(typeof(Dictionary<RowKind, Row>))));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Members_with_the_same_number_handling_share_serializer_options(bool generated)
+    {
+        var harness = Create(generated);
+        var page = await harness.PageAsync(new ContractPage());
+        Assert.Equal("42", (string?)page["props"]!["number"]);
+        Assert.Equal("0", (string?)page["props"]!["count"]);
+        Assert.Equal(1, harness.Services.GetRequiredService<InertiaPageWriter>().MemberOptionsCount);
+    }
+
+    [Fact]
+    public async Task Typed_page_members_of_dictionary_type_are_walked()
+    {
+        var page = await Create(generated: true).PageAsync(new DictionaryPage());
+        JsonAssert.Equal("""{"a":{"name":"a"}}""", page["props"]!["rows"]);
+        JsonAssert.Equal("""{"default":["rows.a.extra"]}""", page["deferredProps"]);
     }
 
     [Theory]
@@ -219,6 +277,17 @@ public sealed class ContractPage : IJsonOnSerializing, IJsonOnSerialized
     public void OnSerialized() => AfterCalls++;
 }
 
+public enum RowKind
+{
+    FirstKind,
+    SecondKind,
+}
+
+public sealed class DictionaryPage
+{
+    public Dictionary<string, Row> Rows { get; init; } = new() { ["a"] = new("a", Inertia.Defer(() => 1)) };
+}
+
 public sealed class DomPage
 {
     public JsonElement Data { get; init; }
@@ -230,4 +299,8 @@ public sealed class DomPage
 [JsonSerializable(typeof(UnknownRegisteredPage))]
 [JsonSerializable(typeof(ContractPage))]
 [JsonSerializable(typeof(DomPage))]
+[JsonSerializable(typeof(DictionaryPage))]
+[JsonSerializable(typeof(Dictionary<string, Row>))]
+[JsonSerializable(typeof(Dictionary<int, Row>))]
+[JsonSerializable(typeof(Dictionary<RowKind, Row>))]
 internal sealed partial class RegressionJsonContext : JsonSerializerContext;

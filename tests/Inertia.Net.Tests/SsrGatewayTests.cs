@@ -302,6 +302,61 @@ public sealed class SsrGatewayTests
     }
 
     [Fact]
+    public async Task Bundle_presence_is_cached_and_a_late_bundle_is_picked_up()
+    {
+        var handler = Ok();
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var root = Path.Join(Path.GetTempPath(), "inertia-bundle-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.Copy(Path.Join(Harness.DefaultContentRoot, "app.html"), Path.Join(root, "app.html"));
+        var harness = new Harness(
+            o =>
+            {
+                o.Ssr.Enabled = true;
+                o.Ssr.BundlePath = "ssr/ssr.mjs";
+            },
+            timeProvider: clock,
+            contentRoot: root,
+            configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
+
+        AssertClientRendered(await GetAsync(harness));
+        Directory.CreateDirectory(Path.Join(root, "ssr"));
+        File.WriteAllText(Path.Join(root, "ssr", "ssr.mjs"), "");
+        AssertClientRendered(await GetAsync(harness)); // the miss is re-checked at most once per second
+        Assert.Empty(handler.Requests);
+
+        clock.Advance(TimeSpan.FromSeconds(2));
+        Assert.Contains("data-server-rendered", await GetAsync(harness), StringComparison.Ordinal);
+        Assert.Single(handler.Requests);
+        Assert.Equal("http://127.0.0.1:13714/render", handler.Requests[0].Uri.ToString());
+    }
+
+    [Theory]
+    [InlineData("""{"head":["<title>a</title>","<meta>"],"body":"<div>x</div>"}""", "<title>a</title>\n<meta>", "<div>x</div>")]
+    [InlineData("""{"body":"\u003Cp class=\"a\"\u003E\ud83d\ude00 \u00e9\/\n</p>","head":[]}""", "", "<p class=\"a\">😀 é/\n</p>")]
+    [InlineData("""{"extra":{"deep":[1,{"x":2}]},"head":[1,null,"<a>",{"x":1},"<b>"],"body":"y"}""", "<a>\n<b>", "y")]
+    [InlineData("""{"head":null,"body":"first","body":"last"}""", "", "last")]
+    public void Ssr_responses_parse_into_utf8_html(string json, string head, string body)
+    {
+        var render = Assert.NotNull(SsrGateway.ParseRender(Encoding.UTF8.GetBytes(json)));
+        Assert.Equal(head, Encoding.UTF8.GetString(render.Head.Span));
+        Assert.Equal(body, Encoding.UTF8.GetString(render.Body.Span));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("[]")]
+    [InlineData("\"body\"")]
+    [InlineData("""{"body":"unterminated""")]
+    [InlineData("""{"body":"\ud800"}""")]
+    public void Malformed_ssr_responses_parse_as_null(string json) =>
+        Assert.Null(SsrGateway.ParseRender(Encoding.UTF8.GetBytes(json)));
+
+    [Fact]
+    public void Invalid_utf8_in_an_ssr_response_parses_as_null() =>
+        Assert.Null(SsrGateway.ParseRender([.. "{\"body\":\""u8, 0xC3, 0x28, .. "\"}"u8]));
+
+    [Fact]
     public async Task Inertia_json_requests_never_call_ssr()
     {
         var handler = Ok();

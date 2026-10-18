@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -37,12 +38,14 @@ internal sealed partial class CookieInertiaStateStore : IInertiaStateStore
 
     private readonly IDataProtector _protector;
     private readonly string _cookieName;
+    private readonly CookieSecurePolicy _securePolicy;
     private readonly ILogger _logger;
 
     public CookieInertiaStateStore(IDataProtectionProvider dataProtection, IOptions<InertiaOptions> options, ILogger<CookieInertiaStateStore> logger)
     {
         _protector = dataProtection.CreateProtector("Inertia.Net.State");
         _cookieName = options.Value.State.CookieName;
+        _securePolicy = options.Value.State.CookieSecurePolicy;
         _logger = logger;
     }
 
@@ -82,11 +85,11 @@ internal sealed partial class CookieInertiaStateStore : IInertiaStateStore
         return ValueTask.CompletedTask;
     }
 
-    private static CookieOptions CreateCookieOptions(HttpContext httpContext) => new()
+    private CookieOptions CreateCookieOptions(HttpContext httpContext) => new()
     {
         HttpOnly = true,
         SameSite = SameSiteMode.Lax,
-        Secure = httpContext.Request.IsHttps,
+        Secure = InertiaCookies.IsSecure(_securePolicy, httpContext.Request),
         Path = "/",
         IsEssential = true,
     };
@@ -99,13 +102,22 @@ internal sealed partial class CookieInertiaStateStore : IInertiaStateStore
 }
 
 /// <summary>Opt-in store backed by <see cref="ISession"/>. Needs <c>AddSession()</c> and <c>app.UseSession()</c> before <c>app.UseInertia()</c>.</summary>
-internal sealed class SessionInertiaStateStore(IOptions<InertiaOptions> options) : IInertiaStateStore
+internal sealed class SessionInertiaStateStore(IOptions<InertiaOptions> options, IOptions<SessionOptions> sessionOptions) : IInertiaStateStore
 {
     private readonly string _key = options.Value.State.CookieName;
+    private readonly string? _sessionCookie = sessionOptions.Value.Cookie.Name;
 
     public async ValueTask<byte[]?> LoadAsync(HttpContext httpContext)
     {
         var session = GetSession(httpContext);
+
+        // Without the session cookie the session is new and holds no state: skip the store round trip (a distributed cache read),
+        // which UseInertia() would otherwise pay on every request, including API calls and first visits.
+        if (_sessionCookie is not null && !httpContext.Request.Cookies.ContainsKey(_sessionCookie))
+        {
+            return null;
+        }
+
         await session.LoadAsync(httpContext.RequestAborted);
         return session.TryGetValue(_key, out var state) ? state : null;
     }

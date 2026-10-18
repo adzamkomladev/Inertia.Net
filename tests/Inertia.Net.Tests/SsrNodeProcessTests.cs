@@ -28,7 +28,7 @@ public sealed class SsrNodeProcessTests
             return res.end(JSON.stringify({ head: ['<title>fixture</title>'], body: `<div data-server-rendered="true" id="app">${page.component}</div>` }))
           }
           res.end('{"status":"OK"}')
-        }).listen(Number(process.env.INERTIA_SSR_PORT), '127.0.0.1')
+        }).listen(Number(process.env.INERTIA_SSR_PORT), process.env.FIXTURE_HOST ?? '127.0.0.1')
         """;
 
     private static readonly bool NodeAvailable = CheckNode();
@@ -123,6 +123,38 @@ public sealed class SsrNodeProcessTests
 
         Assert.False(IsAlive(pid));
         Assert.Contains(harness.Logs.Entries, e => e.Message == "The Node SSR process stopped.");
+    }
+
+    [Theory]
+    [InlineData("0.0.0.0", true)]
+    [InlineData("127.0.0.1", false)]
+    public async Task Warns_when_the_ssr_server_is_reachable_beyond_loopback(string host, bool exposed)
+    {
+        Assert.SkipUnless(NodeAvailable, "node is not on PATH");
+        var nonLoopback = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+            .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+            .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+            .Any(a => a.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a.Address));
+        Assert.SkipUnless(nonLoopback, "no non-loopback IPv4 interface");
+        var (harness, ssr, _) = Create(configure: o => o.Ssr.NodeProcess!.Environment["FIXTURE_HOST"] = host);
+        try
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            await WaitUntilAsync(() => Task.FromResult(harness.Logs.Entries.Any(e => e.Message.StartsWith("The SSR server at", StringComparison.Ordinal))));
+            await Task.Delay(exposed ? 0 : 3000, TestContext.Current.CancellationToken); // the negative case: give the probe time to finish
+            if (exposed)
+            {
+                await WaitUntilAsync(() => Task.FromResult(harness.Logs.Entries.Any(e => e is { Level: LogLevel.Warning } && e.Message.Contains("also accepts connections", StringComparison.Ordinal))));
+            }
+            else
+            {
+                Assert.DoesNotContain(harness.Logs.Entries, e => e.Message.Contains("also accepts connections", StringComparison.Ordinal));
+            }
+        }
+        finally
+        {
+            await ssr.StopAsync(CancellationToken.None);
+        }
     }
 
     [Fact]

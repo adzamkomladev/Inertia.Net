@@ -70,6 +70,10 @@ The middleware runs in this order:
 
 `Inertia.Location(url)` returns, for an Inertia request, `409` with `X-Inertia-Location: url` and an empty body. For any other request it returns `302 Location: url`.
 
+**CSRF** is an adapter feature, not part of the protocol. The client sends the `XSRF-TOKEN` cookie back as `X-XSRF-TOKEN` on every request.
+`UseInertiaAntiforgery()` issues that cookie on page loads and validates every unsafe request (JSON or form body), answering a missing or
+invalid token with `419` like Laravel's `VerifyCsrfToken`; endpoints opt out with antiforgery metadata (`DisableAntiforgery()`).
+
 ## 4. Prop resolution: the PropsResolver algorithm (port of Laravel 3.x)
 
 ```
@@ -174,6 +178,7 @@ isIncludedInPartialMetadata(p) = (only == null or matchesOnly(p)) and (except ==
 - Nested filtering only applies inside **literal** objects (`InertiaProps`/dictionaries). The children of a value produced by a loader are not filtered.
 - `errors` is shared as an Always prop.
 - **Whole-array reloads (deviation 11):** selecting any array descendant selects the entire array, all sibling data and nested loaders. A descendant `except` excludes the array unless `Always` wins. Merge/once metadata uses the same effective selection. Omitted or rescued direct elements write `null` placeholders.
+- **Typed dictionaries** (`Dictionary<TKey, TValue>` and other `IDictionary` types) whose value type can hold props are walked like objects. Keys are written as System.Text.Json writes them (string keys through `DictionaryKeyPolicy`; other keys through the serializer's dictionary key converter) and are path segments for partial reloads (`rows.someKey.extra`).
 - Manual typed traversal preserves registered System.Text.Json polymorphism, discriminator and unknown-derived-type rules, ignore/default rules, number handling and serialization callbacks. Each traversed object's callbacks run once. Ordinary DTOs retain the serializer fast path and source-generated metadata.
 - With big-integer preservation enabled, DOM integer text is parsed exactly and unsafe integers use `$bigint` markers, including flash and restored state.
 
@@ -184,6 +189,7 @@ isIncludedInPartialMetadata(p) = (only == null or matchesOnly(p)) and (except ==
 ```
 
 - The JSON is **not** HTML-entity encoded.
+- The guarantee below also holds when the application configures a relaxed encoder (`UnsafeRelaxedJsonEscaping`): declared property names, which System.Text.Json pre-encodes with the options encoder, then use the HTML-safe encoder too.
 - `<`, `>`, `&` and `/` are escaped as `<`, `>`, `&` and `/` (or `\/`), so `</script>` cannot appear.
 - The root id `app` is configurable. The `data-page` value equals the id.
 
@@ -219,9 +225,10 @@ The state is kept (not consumed) when the response is a version-mismatch 409.
 - **Production:** `POST {ssrUrl}/render` (default `http://127.0.0.1:13714`) with the page JSON as a UTF-8 body. A 200 response is `{"head": string[], "body": string}`.
 - **Development** (Vite hot file present): `POST {viteDevUrl}/__inertia_ssr` with the same body.
 - **Failure:** the response is `500 {error, type, hint, browserApi?, stack?, sourceLocation?}`. On this, or on a timeout or connection error: log it and fall back to client-side rendering, unless `ThrowOnError` is set.
+- **Parsing:** the response is read (bounded, see Limits) into a pooled buffer; `head` strings and `body` are unescaped once into UTF-8 and written to the HTML as-is. Malformed JSON, an unpaired surrogate escape or invalid UTF-8 is a `response` failure.
 - **Health:** `GET {ssrUrl}/health` returns 2xx when healthy.
 - **Limits:** the linked token makes `Ssr.Timeout` the sole render deadline; request cancellation propagates. Streaming responses are limited to `Ssr.MaxResponseBytes` (16 MiB by default, `null` disables), including errors and unknown lengths. Oversize failures have type `response-too-large` and use normal fallback/throw behavior.
-- **Managed process:** require a dedicated loopback endpoint, reject occupied ports, and accept readiness only while the owned child lives at its startup endpoint. Gate render requests on that readiness; URL changes require restarting the host. Cancel supervision and kill the owned process tree on shutdown. No URL-based shutdown request is sent.
+- **Managed process:** require a dedicated loopback endpoint, reject occupied ports, and accept readiness only while the owned child lives at its startup endpoint. Once healthy, probe the machine's non-loopback addresses on the SSR port and warn when the server answers there (it serves unauthenticated `/render` and `/shutdown`). Gate render requests on that readiness; URL changes require restarting the host. Cancel supervision and kill the owned process tree on shutdown. No URL-based shutdown request is sent.
 - **Shutdown:** any request to `{ssrUrl}/shutdown` makes the v3 server call `process.exit()` (no response is sent).
 - **Port:** the v3 server reads its port and host only from `createServer` options, baked into the bundle by `@inertiajs/vite` (`ssr: { port, host }`, default `13714` / `0.0.0.0`); no CLI argument or environment variable.
 
@@ -245,7 +252,7 @@ The React refresh preamble is:
 
 1. **The version 409 check runs before the handler**, so no work is wasted rendering a page that will be discarded.
 2. **Scroll props:** `configureMergeIntent` runs before metadata is collected for a deferred Scroll prop, so a deferred scroll reports `"posts.data"` rather than root `"posts"`. Laravel 3.x has a quirk here.
-3. **Redirect back** uses the `Referer` header only when it has the request's own host and port (no open redirect), falling back to `~/` (the app root, `PathBase` included) or the given fallback. Laravel uses any `Referer`, then the session's previous URL.
+3. **Redirect back** uses the `Referer` header only when it has the request's own host and port (no open redirect), falling back to `~/` (the app root, `PathBase` included) or the given fallback. On an HTTPS request an `http` Referer is upgraded to `https`. Laravel uses any `Referer`, then the session's previous URL.
 4. **Flash, errors and history flags** go through a Data-Protection-encrypted cookie by default (AOT-safe; no Session/TempData requirement).
 5. **Validation errors survive chained redirects** like flash data does. Laravel re-flashes only its Inertia flash data, so its `errors` are lost when the redirect target redirects again.
 6. **Typed objects given directly are literal objects.** A POCO with `InertiaProp` members passed as a prop (not returned by a loader) keeps partial-reload filtering for its members, like an `InertiaProps` dictionary. Laravel resolves `JsonSerializable`/`Arrayable` objects first, so their children bypass the filter. The client deep-merges nested partial responses, so the result on the page is the same.

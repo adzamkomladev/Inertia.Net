@@ -123,3 +123,18 @@ test('a version bump forces a full page reload on the next visit', async ({ page
   await expect(page.getByTestId('user-row')).toHaveCount(3)
   expect(await marker(page)).toBeUndefined()
 })
+
+test('mutations without the antiforgery token are rejected with 419', async ({ request }) => {
+  // The request fixture never loaded a page, so it holds no XSRF-TOKEN cookie: like a cross-site form or script.
+  const inertia = await request.post('/contacts', {
+    headers: { 'X-Inertia': 'true' },
+    data: { name: 'Eve', email: 'eve@example.com' },
+  })
+  expect(inertia.status()).toBe(419)
+
+  const form = await request.post('/contacts', { form: { name: 'Eve', email: 'eve@example.com' } })
+  expect(form.status()).toBe(419)
+
+  const deleted = await request.delete('/users/1', { headers: { 'X-Inertia': 'true' } })
+  expect(deleted.status()).toBe(419)
+})

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using Microsoft.Extensions.Hosting;
@@ -34,6 +35,7 @@ internal sealed partial class SsrNodeProcess(
     private Task? _stopTask;
     private Process? _process;
     private Uri? _managedUrl;
+    private string? _managedUrlText;
     private bool _ready;
     private bool _stopRequested;
     private bool _disposed;
@@ -43,9 +45,14 @@ internal sealed partial class SsrNodeProcess(
 
     internal bool IsReady { get { lock (_gate) return !_disposed && !_stopRequested && _ready && _process is { HasExited: false }; } }
 
+    // Called on every server-rendered page: the configured URL string is compared first, so the Uri is only parsed after a change.
     internal bool IsReadyFor(string url)
     {
-        lock (_gate) return IsReady && Uri.TryCreate(url, UriKind.Absolute, out var endpoint) && endpoint.Equals(_managedUrl);
+        lock (_gate)
+        {
+            return IsReady && (string.Equals(url, _managedUrlText, StringComparison.Ordinal)
+                || (Uri.TryCreate(url, UriKind.Absolute, out var endpoint) && endpoint.Equals(_managedUrl)));
+        }
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -125,6 +132,7 @@ internal sealed partial class SsrNodeProcess(
                 return;
             }
             _managedUrl = url;
+            _managedUrlText = ssr.Url;
             _supervisor = SuperviseAsync(startInfo, url, node.RestartOnExit, _stopping.Token);
         }
         var started = Stopwatch.GetTimestamp();
@@ -231,7 +239,14 @@ internal sealed partial class SsrNodeProcess(
                             {
                                 if (!_disposed && !_stopRequested && !process.HasExited && ReferenceEquals(process, _process)) _ready = true;
                             }
-                            if (IsReady) LogHealthy(_logger, url.ToString());
+                            if (IsReady)
+                            {
+                                LogHealthy(_logger, url.ToString());
+                                if (await FindExposedAddressAsync(url.Port, stopping).ConfigureAwait(false) is { } exposed)
+                                {
+                                    LogExposed(_logger, exposed.ToString(), url.Port);
+                                }
+                            }
                         }
                         if (!IsReady) await Task.Delay(100, stopping).ConfigureAwait(false);
                     }
@@ -340,6 +355,45 @@ internal sealed partial class SsrNodeProcess(
         }
     }
 
+    // The v3 SSR server binds the host baked into the bundle (upstream default 0.0.0.0) and serves unauthenticated /render and
+    // /shutdown. Once healthy, a connection attempt to each local non-loopback address tells whether it is reachable from the network.
+    internal static async Task<IPAddress?> FindExposedAddressAsync(int port, CancellationToken cancellationToken)
+    {
+        IEnumerable<IPAddress> addresses;
+        try
+        {
+            addresses = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses.Select(a => a.Address))
+                .Where(a => !IPAddress.IsLoopback(a) && !a.IsIPv6LinkLocal && (a.AddressFamily == AddressFamily.InterNetwork || Socket.OSSupportsIPv6))
+                .Take(8)
+                .ToList();
+        }
+        catch (NetworkInformationException)
+        {
+            return null;
+        }
+
+        foreach (var address in addresses)
+        {
+            using var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromMilliseconds(250));
+            try
+            {
+                await socket.ConnectAsync(address, port, timeout.Token).ConfigureAwait(false);
+                return address;
+            }
+            catch (Exception ex) when (ex is SocketException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                // Refused or timed out: the server is not reachable on this address; try the next one.
+                continue;
+            }
+        }
+
+        return null;
+    }
+
     private static bool IsOccupied(Uri url, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -383,6 +437,9 @@ internal sealed partial class SsrNodeProcess(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The SSR server at {Url} is healthy.")]
     private static partial void LogHealthy(ILogger logger, string url);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The SSR server also accepts connections on {Address}:{Port}. It serves unauthenticated /render and /shutdown endpoints; bind it to loopback with inertia({{ ssr: {{ host: '127.0.0.1' }} }}) in the Vite config.")]
+    private static partial void LogExposed(ILogger logger, string address, int port);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The SSR server at {Url} did not become healthy within {Timeout}; pages render on the client until it does.")]
     private static partial void LogStartupTimeout(ILogger logger, string url, TimeSpan timeout);

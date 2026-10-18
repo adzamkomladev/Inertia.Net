@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
@@ -19,7 +20,14 @@ public sealed class InertiaTagHelper : TagHelper
         var http = ViewContext.HttpContext;
         var ssr = await RazorInertiaRootView.GetSsrAsync(http);
         output.TagName = null;
-        output.Content.SetHtmlContent(ssr is { } render ? render.Body : RazorInertiaRootView.GetContext(http).GetBodyHtml());
+        if (ssr is { } render)
+        {
+            output.Content.SetHtmlContent(new Utf8HtmlContent(render.Body));
+        }
+        else
+        {
+            output.Content.SetHtmlContent(new PageBodyHtmlContent(RazorInertiaRootView.GetContext(http)));
+        }
     }
 }
 
@@ -37,7 +45,7 @@ public sealed class InertiaHeadTagHelper : TagHelper
     {
         var ssr = await RazorInertiaRootView.GetSsrAsync(ViewContext.HttpContext);
         output.TagName = null;
-        output.Content.SetHtmlContent(ssr?.Head ?? "");
+        output.Content.SetHtmlContent(new Utf8HtmlContent(ssr?.Head ?? ReadOnlyMemory<byte>.Empty));
     }
 }
 
@@ -57,7 +65,27 @@ public sealed class ViteTagHelper(ViteAssets vite) : TagHelper
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
         output.TagName = null;
-        output.Content.SetHtmlContent(vite.RenderTags(ViewContext.HttpContext, Entry.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)));
+        output.Content.SetHtmlContent(new Utf8HtmlContent(vite.RenderTagsUtf8(ViewContext.HttpContext, SplitEntries(Entry))));
+    }
+
+    private const int MaxCachedEntryLists = 256;
+    private static readonly ConcurrentDictionary<string, string[]> EntryLists = new(StringComparer.Ordinal);
+
+    // The entry attribute is a constant in the view, so its split is cached instead of re-split on every render.
+    private static string[] SplitEntries(string entry)
+    {
+        if (EntryLists.TryGetValue(entry, out var entries))
+        {
+            return entries;
+        }
+
+        entries = entry.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (EntryLists.Count < MaxCachedEntryLists)
+        {
+            EntryLists.TryAdd(entry, entries);
+        }
+
+        return entries;
     }
 }
 
@@ -74,6 +102,6 @@ public sealed class ViteReactRefreshTagHelper(ViteAssets vite) : TagHelper
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
         output.TagName = null;
-        output.Content.SetHtmlContent(vite.RenderReactRefresh(ViewContext.HttpContext));
+        output.Content.SetHtmlContent(new Utf8HtmlContent(vite.RenderReactRefreshUtf8(ViewContext.HttpContext)));
     }
 }

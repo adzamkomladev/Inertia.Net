@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -43,9 +44,15 @@ internal sealed partial class SsrGateway(
     IHttpClientFactory httpClients,
     IHostEnvironment environment,
     SsrNodeProcess nodeProcess,
+    TimeProvider timeProvider,
     ILogger<SsrGateway> logger) : IInertiaSsrRenderer
 {
     internal const string HttpClientName = "Inertia.Net.Ssr";
+
+    // Bundle presence is cached like the manifest: a present bundle is never stat-ed again in production, a missing one is re-checked
+    // at most once per second (every second in Development), instead of a File.Exists on every server-rendered page.
+    private readonly FileCache<string> _bundles = new(static path => path, environment.IsDevelopment(), timeProvider);
+    private RenderEndpoint? _renderUrl;
 
     public async ValueTask<SsrRender?> RenderAsync(InertiaRootViewContext context)
     {
@@ -60,12 +67,12 @@ internal sealed partial class SsrGateway(
         http.RequestAborted.ThrowIfCancellationRequested();
         if (devOrigin is null && ssr.NodeProcess is not null && !nodeProcess.IsReadyFor(ssr.Url))
             return Fail(ssr, "startup", "The managed SSR process is not ready for the configured endpoint.", null, null);
-        if (devOrigin is null && ssr.BundlePath is { Length: > 0 } bundle && !File.Exists(Path.Combine(environment.ContentRootPath, bundle)))
+        if (devOrigin is null && ssr.BundlePath is { Length: > 0 } bundle && _bundles.Get(Path.Combine(environment.ContentRootPath, bundle)) is null)
         {
             return null;
         }
 
-        var url = devOrigin is null ? $"{ssr.Url.TrimEnd('/')}/render" : $"{devOrigin}/__inertia_ssr";
+        var url = devOrigin is null ? RenderUrl(ssr.Url) : $"{devOrigin}/__inertia_ssr";
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
         timeout.CancelAfter(ssr.Timeout);
         try
@@ -80,18 +87,23 @@ internal sealed partial class SsrGateway(
                 return await FailedResponseAsync(ssr, (int)response.StatusCode, stream, timeout.Token);
             }
 
-            SsrResponse? page = null;
-            try
+            // The bounded body goes into a pooled buffer and head/body are unescaped once into UTF-8 arrays that the root view writes
+            // as-is: no UTF-16 strings (twice the size) and no re-encoding on the way out.
+            using var buffer = new PooledBufferWriter(InitialBufferSize(response.Content.Headers.ContentLength));
+            var known = response.Content.Headers.ContentLength is not null;
+            while (true)
             {
-                page = await JsonSerializer.DeserializeAsync(stream, InertiaJsonContext.Default.SsrResponse, timeout.Token);
-            }
-            catch (JsonException)
-            {
-                if (ssr.MaxResponseBytes is not null) await stream.CopyToAsync(Stream.Null, timeout.Token);
+                var read = await stream.ReadAsync(buffer.GetMemory(known ? 1 : 4096), timeout.Token);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                buffer.Advance(read);
             }
 
-            return page is { Body.Length: > 0 }
-                ? new SsrRender(string.Join('\n', page.Head ?? []), page.Body)
+            return ParseRender(buffer.WrittenMemory.Span) is { Body.Length: > 0 } page
+                ? page
                 : Fail(ssr, "response", "The SSR server returned an empty or invalid response.", null, null);
         }
         catch (OperationCanceledException) when (http.RequestAborted.IsCancellationRequested)
@@ -116,6 +128,104 @@ internal sealed partial class SsrGateway(
             return Fail(ssr, "unknown", $"SSR request to {url} failed: {ex.Message}", null, ex);
         }
     }
+
+    // Exact for a declared length (plus one byte, so the final zero-length read does not grow the buffer); 16 KiB otherwise.
+    private static int InitialBufferSize(long? contentLength) =>
+        contentLength is { } length ? (int)Math.Clamp(length + 1, 1, 64 * 1024 * 1024) : 16 * 1024;
+
+    /// <summary>
+    /// Reads <c>{"head": string[], "body": string}</c> into UTF-8 HTML: head entries joined with <c>\n</c>. Null when the JSON is
+    /// malformed, not an object, or not valid UTF-8.
+    /// </summary>
+    internal static SsrRender? ParseRender(ReadOnlySpan<byte> json)
+    {
+        try
+        {
+            var reader = new Utf8JsonReader(json);
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            {
+                return null;
+            }
+
+            ReadOnlyMemory<byte> head = default, body = default;
+            while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+            {
+                if (reader.ValueTextEquals("body"u8))
+                {
+                    reader.Read();
+                    body = reader.TokenType == JsonTokenType.String ? ReadString(ref reader) : default;
+                    reader.Skip();
+                }
+                else if (reader.ValueTextEquals("head"u8))
+                {
+                    reader.Read();
+                    head = reader.TokenType == JsonTokenType.StartArray ? ReadHead(ref reader) : default;
+                    reader.Skip();
+                }
+                else
+                {
+                    reader.Read();
+                    reader.Skip();
+                }
+            }
+
+            return System.Text.Unicode.Utf8.IsValid(head.Span) && System.Text.Unicode.Utf8.IsValid(body.Span) ? new SsrRender(head, body) : null;
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException) // InvalidOperationException: an unpaired \uD800 escape
+        {
+            return null;
+        }
+    }
+
+    // One allocation of at most the escaped length; unescaping only shrinks.
+    private static ReadOnlyMemory<byte> ReadString(ref Utf8JsonReader reader)
+    {
+        if (!reader.ValueIsEscaped)
+        {
+            return reader.ValueSpan.ToArray();
+        }
+
+        var bytes = new byte[reader.ValueSpan.Length];
+        return bytes.AsMemory(0, reader.CopyString(bytes));
+    }
+
+    private static ReadOnlyMemory<byte> ReadHead(ref Utf8JsonReader reader)
+    {
+        var head = new ArrayBufferWriter<byte>(256);
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+        {
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                reader.Skip();
+                continue;
+            }
+
+            if (head.WrittenCount > 0)
+            {
+                head.Write("\n"u8);
+            }
+
+            var span = head.GetSpan(reader.ValueSpan.Length);
+            head.Advance(reader.CopyString(span));
+        }
+
+        return head.WrittenMemory;
+    }
+
+    // The render endpoint, rebuilt only when Ssr.Url changes (options can be reloaded).
+    private string RenderUrl(string baseUrl)
+    {
+        if (_renderUrl is { } cached && string.Equals(cached.Base, baseUrl, StringComparison.Ordinal))
+        {
+            return cached.Render;
+        }
+
+        var render = $"{baseUrl.TrimEnd('/')}/render";
+        _renderUrl = new RenderEndpoint(baseUrl, render);
+        return render;
+    }
+
+    private sealed record RenderEndpoint(string Base, string Render);
 
     /// <summary>Matches the request path against exact entries and entries ending in <c>*</c> (prefix match).</summary>
     internal static bool IsExcluded(IList<string> patterns, string? path)

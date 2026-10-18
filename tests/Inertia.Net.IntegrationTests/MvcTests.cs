@@ -135,6 +135,17 @@ public sealed class MvcRazorTests
     }
 
     [Fact]
+    public async Task Large_pages_with_multi_byte_text_stream_intact_through_the_view()
+    {
+        await using var app = await StartAsync();
+        var html = await HtmlAsync(app.CreateClient(), "/mvc/razor-large");
+        Assert.Equal(1, html.Split("</script><div id=\"app\">").Length - 1);
+        using var parsed = new HttpResponseMessage { Content = new StringContent(html) };
+        var page = await parsed.PageAsync();
+        Assert.Equal(ConformanceController.LargeText, (string?)page["props"]!["text"]);
+    }
+
+    [Fact]
     public async Task Inertia_requests_still_get_json()
     {
         await using var app = await StartAsync();

@@ -11,7 +11,7 @@ internal static class RenderProbe
         for (var repetition = 1; repetition <= 3; repetition++)
         {
             foreach (var (name, render) in new (string, Func<Task>)[]
-                { ("json", benchmark.Json20Props), ("partial", benchmark.PartialReload), ("html", benchmark.Html20Props) })
+                { ("json", benchmark.Json20Props), ("poco", benchmark.JsonTypedPoco), ("partial", benchmark.PartialReload), ("html", benchmark.Html20Props) })
             {
                 for (var i = 0; i < 2000; i++) await render();
                 var before = GC.GetTotalAllocatedBytes(true);

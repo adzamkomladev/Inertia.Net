@@ -7,6 +7,59 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+Adds public API (`UseInertiaAntiforgery`, `InertiaAntiforgeryOptions`, `InertiaStateOptions.CookieSecurePolicy`), so the next release is a
+minor version. Public signatures, the Inertia v3 JSON protocol and the cookie, session and TempData formats are unchanged. Update all four
+packages together.
+
+### Upgrade notes
+
+- **Turn on CSRF protection.** Replace `UseInertiaAntiforgeryCookie()` (and `UseAntiforgery()`) with
+  `services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken)` and `app.UseInertiaAntiforgery()` after `app.UseInertia()`.
+  Every POST, PUT, PATCH and DELETE then needs the token: exempt webhooks and token-authenticated APIs with `.DisableAntiforgery()` or
+  `ShouldValidate`. Rejected requests get `419`; return `Back().WithFlash(...)` from `OnRejected` to show a message instead.
+- **Root views** (`RootView`, `WithRootView(...)`) that resolve outside the content root now throw. Razor view names are unaffected.
+- **Relaxed app encoder.** With a custom encoder on the HTTP JSON options, declared property names are HTML-escaped (`<`, `>`, `&`, `/`, ...)
+  in page JSON. The parsed JSON is identical; only byte-exact snapshots of such names change.
+- **SSR bundle.** In production a present `Ssr.BundlePath` is not checked again, so deleting it at runtime no longer turns SSR off; set
+  `Ssr.Enabled = false` or restart. A missing bundle, manifest or template is re-checked once per second.
+- **SSR responses** with invalid UTF-8 or an unpaired `\uD800` escape are a `response` failure (fallback or throw) instead of being decoded
+  with replacement characters.
+- **Releases** run in a `release` GitHub environment: add required reviewers and store `NUGET_API_KEY` as an environment secret there.
+
+### Added
+
+- `app.UseInertiaAntiforgery(configure?)`: issues the `XSRF-TOKEN` cookie and validates every unsafe request (JSON and form bodies),
+  answering `419` (or `OnRejected`, e.g. `Back().WithFlash(...)`). Endpoints opt out with `DisableAntiforgery()`, areas with `ShouldValidate`.
+  It also satisfies form-binding endpoints, so `UseAntiforgery()` is not needed. The samples use it.
+- `InertiaAntiforgeryOptions.SecurePolicy` and `InertiaStateOptions.CookieSecurePolicy` for TLS-terminating proxies that do not forward the scheme.
+- Managed SSR logs a warning when the Node server also answers on a non-loopback address.
+- README sections: "Deploying behind a proxy", the SSR trust model, payload size guidance, and CSRF in every quick start.
+- Repository: Dependabot (NuGet, npm, Actions), CodeQL, SHA-pinned actions, a read-only CI token, a `release` environment
+  for publishing, and NuGet audit of transitive packages at every severity.
+
+### Fixed
+
+- Typed dictionaries (`Dictionary<TKey, TValue>`) whose values hold `InertiaProp` members are walked instead of throwing
+  `InertiaProp values can only be serialized by Inertia.Net`; keys follow System.Text.Json (key policy, non-string keys).
+- With a custom app encoder such as `UnsafeRelaxedJsonEscaping`, a declared property name containing `</script>` could close the page
+  `<script>` element in the initial HTML. Property names now use the HTML-safe encoder in that case.
+
+### Security
+
+- The `XSRF-TOKEN` cookie is essential, so a cookie-consent policy no longer withholds it.
+- `Back()` upgrades an `http` Referer to `https` on HTTPS requests.
+- Root views that resolve outside the content root are refused; the template, manifest and path caches are bounded.
+
+### Performance
+
+- SSR responses are parsed from a pooled buffer into UTF-8 head/body bytes written as-is: about half the allocation of 1.1 and faster.
+- The MVC `<inertia />`, `<vite />` and `<vite-react-refresh />` tag helpers stream pre-encoded UTF-8 (a 1 MiB page: about 3 MiB to 80 B).
+- The session and TempData state stores skip loading when the request has no session or TempData cookie.
+- The SSR bundle check and render URL are cached; `Location()` reads one header; typed objects no longer allocate an enumerator;
+  members that differ only by number handling share serializer options; the page buffer starts at the component's recent size.
+- `@vite(...)` tags are resolved before the template is written, so a manifest error is a clean exception, not half a page.
+- A Vite manifest, template or SSR bundle missing at startup is re-checked once per second in production instead of never.
+
 ## [1.1.0] - 2026-10-13
 
 See [migration guidance](docs/migrating-to-1.1.md) for observable behavior changes. This minor release includes behavior corrections that may require application changes, despite retaining public APIs and redirect-state formats. Update all four packages together.

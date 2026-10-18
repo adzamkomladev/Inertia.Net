@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.Tests;
 
@@ -258,6 +259,55 @@ public class PageWriterTests
         Assert.Equal("</script>", (string?)page["flash"]!["</script>"]);
         Assert.Equal(1, (int)page["props"]!["</script>"]!);
         Assert.StartsWith("/%3C/script%3E", (string?)page["url"], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Html_embedding_stays_safe_with_a_relaxed_app_encoder()
+    {
+        var harness = new Harness(configureServices: s => s.PostConfigure<Microsoft.AspNetCore.Http.Json.JsonOptions>(
+            o => o.SerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping));
+        var context = harness.Context();
+        context.Inertia().Flash("dto", new BreakoutDto());
+        var html = await Harness.ExecuteAsync(context, Inertia.Render("Page", new InertiaProps
+        {
+            ["dto"] = new BreakoutDto(),
+            ["list"] = new List<BreakoutDto> { new() },
+            ["text"] = "</script><!--",
+        }));
+
+        var json = Harness.ExtractPageJson(html);
+        Assert.DoesNotContain('<', json);
+        Assert.Equal(1, CountOf(html, "</script>"));
+        var page = JsonNode.Parse(json)!;
+        Assert.Equal("x", (string?)page["props"]!["dto"]!["</script><!--"]);
+        Assert.Equal("x", (string?)page["props"]!["list"]![0]!["</script><!--"]);
+        Assert.Equal("x", (string?)page["flash"]!["dto"]!["</script><!--"]);
+        Assert.Equal("</script><!--", (string?)page["props"]!["text"]);
+    }
+
+    public sealed class BreakoutDto
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("</script><!--")]
+        public string Value { get; init; } = "x";
+    }
+
+    [Fact]
+    public async Task The_page_buffer_starts_at_the_recent_size_of_the_component()
+    {
+        var harness = new Harness();
+        var writer = harness.Services.GetRequiredService<InertiaPageWriter>();
+        Assert.Equal(4096, writer.InitialCapacity("Big"));
+
+        await harness.PageAsync(new InertiaProps { ["text"] = new string('x', 100_000) }, component: "Big");
+        var grown = writer.InitialCapacity("Big");
+        Assert.InRange(grown, 100_000 + 12_500, 100_000 + 12_700);
+
+        // Smaller renders shrink the hint gradually; other components are unaffected.
+        await harness.PageAsync(new InertiaProps { ["text"] = "small" }, component: "Big");
+        Assert.InRange(writer.InitialCapacity("Big"), 4096, grown - 1);
+        Assert.True(writer.InitialCapacity("Big") > grown / 2);
+        await harness.PageAsync(null, component: "Small");
+        Assert.Equal(4096, writer.InitialCapacity("Small"));
     }
 
     [Fact]
