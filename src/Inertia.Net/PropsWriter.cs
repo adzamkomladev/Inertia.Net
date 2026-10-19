@@ -18,7 +18,6 @@ internal readonly record struct PropEntry(string Key, object? Value, Type Type);
 internal sealed class PropsWriter : IDisposable
 {
     private readonly InertiaPageWriter _owner;
-    private readonly JsonSerializerOptions _options;
     private readonly Utf8JsonWriter _writer;
     private readonly InertiaRequest _request;
     private readonly bool _isPartial;
@@ -40,7 +39,6 @@ internal sealed class PropsWriter : IDisposable
     public PropsWriter(InertiaPageWriter owner, Utf8JsonWriter writer, InertiaRequest request, string component, CancellationToken cancellationToken)
     {
         _owner = owner;
-        _options = owner.SerializerOptions;
         _writer = writer;
         _request = request;
         _isPartial = string.Equals(request.PartialComponent, component, StringComparison.Ordinal);
@@ -358,7 +356,7 @@ internal sealed class PropsWriter : IDisposable
         }
 
         var type = declaredType == typeof(object) ? value.GetType() : declaredType;
-        var info = _options.GetTypeInfo(type);
+        var info = _owner.SerializerOptions.GetTypeInfo(type);
         if (_owner.ContainsProps(type))
         {
             if (info.Kind == JsonTypeInfoKind.Object)
@@ -678,10 +676,10 @@ internal sealed class PropsWriter : IDisposable
         if (value is null or string) return false;
         if (value is JsonElement element) return element.ValueKind == JsonValueKind.Array;
         if (value is JsonNode node) return node is JsonArray;
-        if (value is InertiaProp prop) return prop.ValueType != typeof(object) && _options.GetTypeInfo(prop.ValueType).Kind == JsonTypeInfoKind.Enumerable;
+        if (value is InertiaProp prop) return prop.ValueType != typeof(object) && _owner.SerializerOptions.GetTypeInfo(prop.ValueType).Kind == JsonTypeInfoKind.Enumerable;
         if (value is InertiaPageWriter.PropertyValue member)
             return member.TypeInfo.Kind == JsonTypeInfoKind.Enumerable;
-        return value is IEnumerable && _options.GetTypeInfo(declaredType == typeof(object) ? value.GetType() : declaredType).Kind == JsonTypeInfoKind.Enumerable;
+        return value is IEnumerable && _owner.SerializerOptions.GetTypeInfo(declaredType == typeof(object) ? value.GetType() : declaredType).Kind == JsonTypeInfoKind.Enumerable;
     }
 
     // path == filter, or path is a descendant of filter.
