@@ -81,7 +81,7 @@ internal sealed class PropsPlanner : IDisposable
         {
             if (planned.Task is { } task)
             {
-                await ((Task)task).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 _ = task.Exception; // observed: the walk reports failures itself
             }
         }
