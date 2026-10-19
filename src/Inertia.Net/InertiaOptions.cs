@@ -43,6 +43,9 @@ public sealed class InertiaOptions
     /// <summary>Where flash data, errors and history flags are kept across redirects.</summary>
     public InertiaStateOptions State { get; } = new();
 
+    /// <summary>Prop resolution settings.</summary>
+    public InertiaPropsOptions Props { get; } = new();
+
     /// <summary>Shares a prop with every page. Page props with the same key win.</summary>
     public InertiaOptions Share(string key, object? value)
     {
@@ -275,4 +278,14 @@ public sealed class InertiaStateOptions
         UsesSession = true;
         return this;
     }
+}
+
+/// <summary>Prop resolution settings.</summary>
+public sealed class InertiaPropsOptions
+{
+    /// <summary>
+    /// How many <see cref="InertiaProp.Parallel"/> loaders of one render may run at the same time. Default 4; must be positive.
+    /// Props that are not marked parallel are resolved one after another.
+    /// </summary>
+    public int MaxConcurrency { get; set; } = 4;
 }

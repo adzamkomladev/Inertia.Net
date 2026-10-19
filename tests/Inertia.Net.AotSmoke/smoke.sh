@@ -101,6 +101,7 @@ has '"mergeProps":["feed.data"]'
 has '"scrollProps":{"feed":{"pageName":"page","previousPage":null,"nextPage":2,"currentPage":1,"reset":false}}'
 has '"onceProps":{"countries":{"prop":"countries","expiresAt":'
 has '"countries":["BE","FR"]'
+has '"today":{"name":"today","value":7}'
 lacks '"lazy":'
 lacks '"flash":'
 

@@ -30,9 +30,16 @@ public abstract class InertiaProp
     internal string? ScrollWrapper;
     internal ScrollMetadata? ScrollMetadata;
     internal bool ShouldRescue;
+    internal bool IsParallel;
+
+    // Set once any prop is marked Parallel(): until then no render pays for the planning walk.
+    internal static volatile bool ParallelUsed;
 
     /// <summary>The declared type of the value, used to pick the <see cref="System.Text.Json.Serialization.Metadata.JsonTypeInfo"/>.</summary>
     internal abstract Type ValueType { get; }
+
+    /// <summary>Whether the prop has a <see cref="Task{TResult}"/> or <see cref="ValueTask{TResult}"/> loader.</summary>
+    internal abstract bool HasAsyncLoader { get; }
 
     /// <summary>Returns the constant value or runs the loader.</summary>
     internal abstract ValueTask<object?> ResolveAsync(CancellationToken cancellationToken);
@@ -104,6 +111,27 @@ public abstract class InertiaProp
     public InertiaProp Rescue(bool rescue = true)
     {
         ShouldRescue = rescue;
+        return this;
+    }
+
+    /// <summary>
+    /// Starts the loader before the props walk reaches it, concurrently with the other parallel props of the render (at most
+    /// <see cref="InertiaPropsOptions.MaxConcurrency"/> at a time). Props are resolved one after another unless marked, because loaders
+    /// commonly share request-scoped services that are not thread-safe: a parallel loader must not use the request's <c>DbContext</c>
+    /// (use <c>IDbContextFactory</c> or a scope of its own) or touch the <c>HttpContext</c>.
+    /// Top-level props and props in literal objects (<see cref="InertiaProps"/> and other string-keyed dictionaries) start early; elsewhere
+    /// the prop resolves in turn. Loaders of props that are not part of the response are never started.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The prop is a value or has a synchronous loader.</exception>
+    public InertiaProp Parallel()
+    {
+        if (!HasAsyncLoader)
+        {
+            throw new InvalidOperationException("Parallel() needs an async (Task or ValueTask) loader; values and synchronous loaders are resolved in turn.");
+        }
+
+        IsParallel = true;
+        ParallelUsed = true;
         return this;
     }
 
@@ -185,6 +213,8 @@ internal sealed class InertiaProp<T> : InertiaProp
     }
 
     internal override Type ValueType => typeof(T);
+
+    internal override bool HasAsyncLoader => _loader is not null;
 
     internal override async ValueTask<object?> ResolveAsync(CancellationToken cancellationToken) =>
         _loader is not null ? await _loader(cancellationToken) : _syncLoader is not null ? _syncLoader() : _value;

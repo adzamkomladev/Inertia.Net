@@ -8,6 +8,7 @@ internal sealed class InertiaOptionsValidator : IValidateOptions<InertiaOptions>
     public ValidateOptionsResult Validate(string? name, InertiaOptions options)
     {
         List<string>? failures = null;
+        Check(options.Props.MaxConcurrency > 0, "Props.MaxConcurrency must be positive.");
         var ssr = options.Ssr;
         Check(IsDeadline(ssr.Timeout, allowZero: false), "Ssr.Timeout must be positive and supported by CancellationTokenSource, or Timeout.InfiniteTimeSpan.");
         Check(ssr.MaxResponseBytes > 0, "Ssr.MaxResponseBytes must be positive.");
