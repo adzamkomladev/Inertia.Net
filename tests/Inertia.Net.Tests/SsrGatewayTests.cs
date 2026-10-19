@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using static Inertia.Net.Inertia;
 
@@ -34,7 +33,7 @@ public sealed class SsrGatewayTests
         new(
             o =>
             {
-                o.Ssr.Enabled = true;
+                o.Ssr.Mode = SsrMode.Preferred;
                 configure?.Invoke(o.Ssr);
                 options?.Invoke(o);
             },
@@ -77,7 +76,7 @@ public sealed class SsrGatewayTests
         var harness = Create(handler, s => s.MaxResponseBytes = length - 1);
         AssertClientRendered(await GetAsync(harness));
         Assert.Contains(harness.Logs.Entries, e => e.Message.Contains("response-too-large", StringComparison.Ordinal));
-        var throwing = Create(handler, s => { s.MaxResponseBytes = length - 1; s.ThrowOnError = true; });
+        var throwing = Create(handler, s => { s.MaxResponseBytes = length - 1; s.Mode = SsrMode.Required; });
         var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(throwing));
         Assert.Equal("response-too-large", exception.Type);
     }
@@ -85,15 +84,14 @@ public sealed class SsrGatewayTests
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
-    [InlineData(null)]
-    public async Task Response_at_or_below_the_limit_or_with_limit_disabled_renders(int? extra)
+    public async Task Response_at_or_below_the_limit_renders(int extra)
     {
         const string body = """{"head":[],"body":"SSR"}""";
         var handler = new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StreamContent(new NonSeekableStream(Encoding.UTF8.GetBytes(body))),
         }));
-        var html = await GetAsync(Create(handler, s => s.MaxResponseBytes = extra is { } bytes ? Encoding.UTF8.GetByteCount(body) + bytes : null));
+        var html = await GetAsync(Create(handler, s => s.MaxResponseBytes = Encoding.UTF8.GetByteCount(body) + extra));
         Assert.Contains("SSR", html, StringComparison.Ordinal);
         Assert.DoesNotContain("data-page", html, StringComparison.Ordinal);
     }
@@ -123,7 +121,7 @@ public sealed class SsrGatewayTests
         {
             Content = new StreamContent(new NonSeekableStream(Encoding.UTF8.GetBytes("!" + new string('x', 40000)))),
         }));
-        var throwing = Create(handler, s => { s.MaxResponseBytes = 20000; s.ThrowOnError = true; });
+        var throwing = Create(handler, s => { s.MaxResponseBytes = 20000; s.Mode = SsrMode.Required; });
         var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(throwing));
         Assert.Equal("response-too-large", exception.Type);
     }
@@ -142,7 +140,7 @@ public sealed class SsrGatewayTests
     public async Task Posts_the_page_json_to_render()
     {
         var handler = Ok();
-        var html = await GetAsync(Create(handler, s => s.Url = "http://ssr.test:1234/"));
+        var html = await GetAsync(Create(handler, s => s.Urls.Add("http://ssr.test:1234/")));
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
@@ -219,7 +217,7 @@ public sealed class SsrGatewayTests
     [Fact]
     public async Task Misconfigured_url_falls_back_instead_of_failing_the_page()
     {
-        // What HttpClient throws for e.g. Ssr.Url = "localhost:13714" (no scheme).
+        // What a handler might throw for a request it cannot send at all.
         var harness = Create(new FakeHandler((_, _) => throw new NotSupportedException("The 'localhost' scheme is not supported.")));
         AssertClientRendered(await GetAsync(harness));
 
@@ -243,16 +241,16 @@ public sealed class SsrGatewayTests
     }
 
     [Fact]
-    public async Task ThrowOnError_throws_with_type_and_hint()
+    public async Task Required_mode_throws_with_type_and_hint()
     {
         var handler = new FakeHandler((_, _) => Task.FromResult(Json(HttpStatusCode.InternalServerError, """{"error":"boom","type":"component-resolution","hint":"Check the page path"}""")));
-        var ex = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(Create(handler, s => s.ThrowOnError = true)));
+        var ex = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(Create(handler, s => s.Mode = SsrMode.Required)));
 
         Assert.Equal("component-resolution", ex.Type);
         Assert.Equal("Check the page path", ex.Hint);
 
         var connection = new FakeHandler((_, _) => throw new HttpRequestException("refused"));
-        var inner = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(Create(connection, s => s.ThrowOnError = true)));
+        var inner = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(Create(connection, s => s.Mode = SsrMode.Required)));
         Assert.Equal("connection", inner.Type);
         Assert.IsType<HttpRequestException>(inner.InnerException);
     }
@@ -280,7 +278,7 @@ public sealed class SsrGatewayTests
     public async Task Disabled_makes_no_http_call()
     {
         var handler = Ok();
-        AssertClientRendered(await GetAsync(Create(handler, s => s.Enabled = false)));
+        AssertClientRendered(await GetAsync(Create(handler, s => s.Mode = SsrMode.Disabled)));
         Assert.Empty(handler.Requests);
     }
 
@@ -312,7 +310,7 @@ public sealed class SsrGatewayTests
         var harness = new Harness(
             o =>
             {
-                o.Ssr.Enabled = true;
+                o.Ssr.Mode = SsrMode.Preferred;
                 o.Ssr.BundlePath = "ssr/ssr.mjs";
             },
             timeProvider: clock,
@@ -338,7 +336,8 @@ public sealed class SsrGatewayTests
     [InlineData("""{"head":null,"body":"first","body":"last"}""", "", "last")]
     public void Ssr_responses_parse_into_utf8_html(string json, string head, string body)
     {
-        var render = Assert.NotNull(SsrGateway.ParseRender(Encoding.UTF8.GetBytes(json)));
+        using var render = SsrGateway.ParseRender(Encoding.UTF8.GetBytes(json));
+        Assert.NotNull(render);
         Assert.Equal(head, Encoding.UTF8.GetString(render.Head.Span));
         Assert.Equal(body, Encoding.UTF8.GetString(render.Body.Span));
     }
@@ -364,49 +363,5 @@ public sealed class SsrGatewayTests
 
         Assert.Empty(handler.Requests);
         Assert.Equal("Home", (string?)Harness.ParsePage(body)["component"]);
-    }
-
-    private static async Task<HealthCheckResult> CheckAsync(FakeHandler handler)
-    {
-        var services = new ServiceCollection();
-        services.AddHealthChecks().AddInertiaSsr();
-        services.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler);
-        services.AddInertia(o => o.Ssr.Timeout = TimeSpan.FromMilliseconds(200));
-        await using var provider = services.BuildServiceProvider();
-
-        var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync();
-        var entry = report.Entries["inertia-ssr"];
-        return new HealthCheckResult(entry.Status, entry.Description, entry.Exception);
-    }
-
-    [Fact]
-    public async Task Health_check_is_healthy_on_2xx()
-    {
-        var handler = new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
-        var result = await CheckAsync(handler);
-
-        Assert.Equal(HealthStatus.Healthy, result.Status);
-        Assert.Equal(HttpMethod.Get, handler.Requests[0].Method);
-        Assert.Equal("http://127.0.0.1:13714/health", handler.Requests[0].Uri.ToString());
-    }
-
-    [Fact]
-    public async Task Health_check_is_unhealthy_on_error_status_connection_failure_or_timeout()
-    {
-        var statuses = new[]
-        {
-            new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable))),
-            new FakeHandler((_, _) => throw new HttpRequestException("refused")),
-            new FakeHandler(async (_, ct) =>
-            {
-                await Task.Delay(Timeout.Infinite, ct);
-                return null!;
-            }),
-        };
-
-        foreach (var handler in statuses)
-        {
-            Assert.Equal(HealthStatus.Unhealthy, (await CheckAsync(handler)).Status);
-        }
     }
 }

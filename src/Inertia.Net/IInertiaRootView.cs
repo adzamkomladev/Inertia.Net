@@ -17,8 +17,9 @@ public sealed class InertiaRootViewContext
 {
     internal static readonly Dictionary<string, object?> EmptyViewData = [];
 
-    internal InertiaRootViewContext(HttpContext httpContext, string component, string rootView, IReadOnlyDictionary<string, object?> viewData, ReadOnlyMemory<byte> pageJson, string rootElementId)
+    internal InertiaRootViewContext(HttpContext httpContext, string component, string rootView, IReadOnlyDictionary<string, object?> viewData, ReadOnlyMemory<byte> pageJson, string rootElementId, SsrMode? ssrMode = null)
     {
+        SsrMode = ssrMode;
         HttpContext = httpContext;
         Component = component;
         RootView = rootView;
@@ -44,6 +45,9 @@ public sealed class InertiaRootViewContext
 
     /// <summary>The root element id.</summary>
     public string RootElementId { get; }
+
+    /// <summary>The SSR mode the response asked for with <see cref="InertiaResult.WithSsr"/>; null to follow the configuration.</summary>
+    public SsrMode? SsrMode { get; }
 
     /// <summary>Writes <c>&lt;script data-page="{id}" type="application/json"&gt;{page}&lt;/script&gt;&lt;div id="{id}"&gt;&lt;/div&gt;</c>.</summary>
     public void WriteBody(IBufferWriter<byte> writer)

@@ -1,30 +1,59 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
-/// <summary>Reports healthy while the SSR server answers <c>GET {Ssr.Url}/health</c> with a 2xx status.</summary>
-public sealed class InertiaSsrHealthCheck(IHttpClientFactory httpClients, IOptionsMonitor<InertiaOptions> options) : IHealthCheck
+/// <summary>
+/// Reports what the SSR gateway already knows, without calling the SSR servers: healthy while SSR is disabled, goes through the Vite
+/// dev server, or every server is usable; degraded while some servers' circuits are open or some managed processes are not ready; the
+/// registration's failure status when no server can take a render. A server that has not received a render since it went down is
+/// reported healthy until renders fail.
+/// </summary>
+public sealed class InertiaSsrHealthCheck : IHealthCheck
 {
+    private readonly SsrGateway _gateway;
+
+    internal InertiaSsrHealthCheck(SsrGateway gateway) => _gateway = gateway;
+
     /// <inheritdoc />
-    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var ssr = options.CurrentValue.Ssr;
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(ssr.Timeout);
-        try
+        return Task.FromResult(Check(context.Registration.FailureStatus));
+    }
+
+    internal HealthCheckResult Check(HealthStatus failureStatus)
+    {
+        if (_gateway.Options.Mode == SsrMode.Disabled)
         {
-            using var response = await httpClients.CreateClient(SsrGateway.HttpClientName).GetAsync($"{ssr.Url.TrimEnd('/')}/health", timeout.Token);
-            return response.IsSuccessStatusCode
-                ? HealthCheckResult.Healthy("The Inertia SSR server is up.")
-                : new HealthCheckResult(context.Registration.FailureStatus, $"The Inertia SSR server responded with HTTP {(int)response.StatusCode}.");
+            return HealthCheckResult.Healthy("Inertia SSR is disabled.");
         }
-        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+
+        if (_gateway.DevServerRunning)
         {
-            return new HealthCheckResult(context.Registration.FailureStatus, "The Inertia SSR server is unreachable.", ex);
+            return HealthCheckResult.Healthy("Inertia SSR goes through the Vite dev server.");
         }
+
+        var endpoints = _gateway.Endpoints;
+        var data = new Dictionary<string, object>(endpoints.Count);
+        var usable = 0;
+        foreach (var endpoint in endpoints)
+        {
+            var ready = endpoint.Instance is not { } instance || _gateway.IsInstanceReady(instance);
+            var state = endpoint.Breaker.State;
+            data[endpoint.Name] = ready ? InertiaMetrics.StateName(state) : "not-ready";
+            if (ready && state != SsrCircuitState.Open)
+            {
+                usable++;
+            }
+        }
+
+        var servers = _gateway.IsManaged ? "managed Inertia SSR processes" : "Inertia SSR servers";
+        return usable == endpoints.Count
+            ? HealthCheckResult.Healthy($"All {endpoints.Count} {servers} can take renders.", data)
+            : usable == 0
+                ? new HealthCheckResult(failureStatus, $"None of the {endpoints.Count} {servers} can take renders.", data: data)
+                : HealthCheckResult.Degraded($"{usable} of {endpoints.Count} {servers} can take renders.", data: data);
     }
 }
 
@@ -35,6 +64,6 @@ public static class InertiaSsrHealthChecksBuilderExtensions
     public static IHealthChecksBuilder AddInertiaSsr(this IHealthChecksBuilder builder, string name = "inertia-ssr", HealthStatus? failureStatus = null, IEnumerable<string>? tags = null, TimeSpan? timeout = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddCheck<InertiaSsrHealthCheck>(name, failureStatus, tags, timeout);
+        return builder.Add(new HealthCheckRegistration(name, static sp => new InertiaSsrHealthCheck(sp.GetRequiredService<SsrGateway>()), failureStatus, tags, timeout));
     }
 }

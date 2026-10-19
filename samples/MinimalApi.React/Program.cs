@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,8 +22,8 @@ builder.Services.AddInertia(o =>
     o.Ssr.BundlePath = "ssr/ssr.js";
     if (ssr)
     {
-        o.Ssr.Url = $"http://127.0.0.1:{Environment.GetEnvironmentVariable("INERTIA_SSR_PORT") ?? "13714"}";
-        o.Ssr.UseNodeProcess(); // Match the port used when building the SSR bundle.
+        // Sets Ssr.Mode to Preferred. The port must match the one baked into the SSR bundle (vite.config.ts).
+        o.Ssr.UseNodeProcess(n => n.BasePort = int.Parse(Environment.GetEnvironmentVariable("INERTIA_SSR_PORT") ?? "13714", CultureInfo.InvariantCulture));
     }
 });
 
