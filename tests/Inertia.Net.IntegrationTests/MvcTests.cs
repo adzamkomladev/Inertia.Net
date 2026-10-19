@@ -196,6 +196,17 @@ public sealed class MvcRazorTests
     }
 
     [Fact]
+    public async Task Required_ssr_failure_in_the_razor_root_view_throws_before_any_html_is_sent()
+    {
+        await using var app = await StartAsync();
+        var ssr = app.App.Services.GetRequiredService<FakeSsr>();
+        ssr.Error = new InertiaSsrException("Inertia SSR failed (connection): refused", "connection");
+
+        var error = await Assert.ThrowsAsync<InertiaSsrException>(() => app.CreateClient().GetAsync("/mvc/razor", TestContext.Current.CancellationToken));
+        Assert.Equal("connection", error.Type);
+    }
+
+    [Fact]
     public async Task With_root_view_names_another_razor_view()
     {
         await using var app = await StartAsync();
@@ -210,12 +221,14 @@ public sealed class MvcRazorTests
 
         public SsrRender? Result { get; set; }
 
+        public Exception? Error { get; set; }
+
         public int Calls => _calls;
 
         public ValueTask<SsrRender?> RenderAsync(InertiaRootViewContext context)
         {
             Interlocked.Increment(ref _calls);
-            return ValueTask.FromResult(Result);
+            return Error is { } error ? ValueTask.FromException<SsrRender?>(error) : ValueTask.FromResult(Result);
         }
     }
 

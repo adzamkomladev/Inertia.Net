@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -12,6 +13,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     private int _statusCode = StatusCodes.Status200OK;
     private string? _rootView;
     private Dictionary<string, object?>? _viewData;
+    private SsrMode? _ssrMode;
 
     internal InertiaResult(string component, object? props)
     {
@@ -58,6 +60,19 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         return this;
     }
 
+    /// <summary>
+    /// Sets how this response uses server-side rendering, overriding <see cref="SsrOptions.Mode"/> and <see cref="SsrOptions.ExcludePaths"/>.
+    /// A global <see cref="SsrMode.Disabled"/> still wins. Has no effect on Inertia (JSON) visits.
+    /// </summary>
+    public InertiaResult WithSsr(SsrMode mode)
+    {
+        _ssrMode = mode;
+        return this;
+    }
+
+    /// <summary>Renders this response on the client only: same as <c>WithSsr(SsrMode.Disabled)</c>.</summary>
+    public InertiaResult WithoutSsr() => WithSsr(SsrMode.Disabled);
+
     /// <inheritdoc />
     public async Task ExecuteAsync(HttpContext httpContext)
     {
@@ -65,11 +80,16 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         var services = httpContext.RequestServices;
         var pageWriter = services.GetService<InertiaPageWriter>()
             ?? throw new InvalidOperationException("Inertia.Net services are not registered. Call services.AddInertia() at startup.");
+        var metrics = services.GetService<InertiaMetrics>();
+        var started = metrics?.PageDurationEnabled == true ? Stopwatch.GetTimestamp() : 0;
         var request = new InertiaRequest(httpContext.Request.Headers);
         var response = httpContext.Response;
+        using var activity = InertiaDiagnostics.ActivitySource.StartActivity("inertia.render");
+        activity?.SetTag("inertia.component", Component);
 
         // The page is fully buffered first, so a failing loader never produces a partial 200.
         using var page = await pageWriter.WritePageAsync(httpContext, Component, Props, request, htmlSafe: !request.IsInertia);
+        var partial = string.Equals(request.PartialComponent, Component, StringComparison.Ordinal);
 
         response.StatusCode = _statusCode;
         InertiaHeaders.AppendVary(response.Headers);
@@ -80,6 +100,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
             response.ContentType = "application/json; charset=utf-8";
             response.ContentLength = page.WrittenMemory.Length;
             await response.BodyWriter.WriteAsync(page.WrittenMemory, httpContext.RequestAborted);
+            metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: true, partial);
             return;
         }
 
@@ -91,7 +112,9 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
             _rootView ?? pageWriter.Options.RootView,
             _viewData ?? (IReadOnlyDictionary<string, object?>)InertiaRootViewContext.EmptyViewData,
             page.WrittenMemory,
-            pageWriter.Options.RootElementId));
+            pageWriter.Options.RootElementId,
+            _ssrMode));
+        metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: false, partial);
     }
 
     /// <inheritdoc />

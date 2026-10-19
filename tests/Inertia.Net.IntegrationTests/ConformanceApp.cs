@@ -48,6 +48,9 @@ public sealed record ConformanceSetup
     public bool UseSession { get; init; }
 
     public string? PathBase { get; init; }
+
+    /// <summary>Runs after the host's services, e.g. to replace the SSR HTTP handler.</summary>
+    public Action<IServiceCollection>? Services { get; init; }
 }
 
 /// <summary>A started TestServer app for one <see cref="IConformanceHost"/>.</summary>
@@ -86,6 +89,7 @@ public sealed class ConformanceApp : IAsyncDisposable
         }
 
         THost.ConfigureServices(builder.Services);
+        setup.Services?.Invoke(builder.Services);
         var app = builder.Build();
         if (setup.PathBase is { } pathBase)
         {
@@ -159,4 +163,28 @@ public static class InertiaClientExtensions
         response.Headers.TryGetValues(name, out var values) || response.Content.Headers.TryGetValues(name, out values) ? string.Join(", ", values) : null;
 
     public static void WithHeader(this HttpRequestMessage request, string name, string value) => request.Headers.TryAddWithoutValidation(name, value);
+}
+
+/// <summary>Stands in for the SSR server behind the <c>Inertia.Net.Ssr</c> HTTP client: renders a fixed body, or refuses connections.</summary>
+public sealed class FakeSsrServer : HttpMessageHandler
+{
+    public const string Body = "<div data-server-rendered=\"true\" id=\"app\">ssr</div>";
+
+    private int _calls;
+
+    public int Calls => Volatile.Read(ref _calls);
+
+    public bool Down { get; set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref _calls);
+        if (Down)
+        {
+            throw new HttpRequestException("Connection refused");
+        }
+
+        var json = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object> { ["head"] = Array.Empty<string>(), ["body"] = Body });
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") });
+    }
 }

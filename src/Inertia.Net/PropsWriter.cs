@@ -18,7 +18,6 @@ internal readonly record struct PropEntry(string Key, object? Value, Type Type);
 internal sealed class PropsWriter : IDisposable
 {
     private readonly InertiaPageWriter _owner;
-    private readonly JsonSerializerOptions _options;
     private readonly Utf8JsonWriter _writer;
     private readonly InertiaRequest _request;
     private readonly bool _isPartial;
@@ -35,11 +34,11 @@ internal sealed class PropsWriter : IDisposable
     private Dictionary<string, List<string>>? _deferredProps;
     private Dictionary<string, (ScrollMetadata Metadata, bool Reset)>? _scrollProps;
     private Dictionary<string, (string Prop, long? ExpiresAt)>? _onceProps;
+    private PropsPlanner? _planner;
 
     public PropsWriter(InertiaPageWriter owner, Utf8JsonWriter writer, InertiaRequest request, string component, CancellationToken cancellationToken)
     {
         _owner = owner;
-        _options = owner.SerializerOptions;
         _writer = writer;
         _request = request;
         _isPartial = string.Equals(request.PartialComponent, component, StringComparison.Ordinal);
@@ -50,6 +49,42 @@ internal sealed class PropsWriter : IDisposable
 
     public async ValueTask WritePropsAsync(List<PropEntry> props)
     {
+        if (InertiaProp.ParallelUsed)
+        {
+            Plan(props);
+        }
+
+        if (_planner is null)
+        {
+            await WriteEntriesAsync(props);
+            return;
+        }
+
+        try
+        {
+            await WriteEntriesAsync(props);
+            await _planner.DrainAsync(cancel: false);
+        }
+        catch (Exception ex)
+        {
+            // No loader outlives the render. The walk meets failures in protocol order, except a cancellation caused by a parallel
+            // loader that failed further on: then that loader's failure (the first such, in protocol order) is the render's.
+            await _planner.DrainAsync(cancel: true);
+            if (ex is OperationCanceledException && _planner.Failed && !_cancellationToken.IsCancellationRequested)
+            {
+                _planner.FirstFailure()?.Throw();
+            }
+
+            throw;
+        }
+        finally
+        {
+            _planner.Dispose();
+        }
+    }
+
+    private async ValueTask WriteEntriesAsync(List<PropEntry> props)
+    {
         _writer.WriteStartObject();
         foreach (var entry in props)
         {
@@ -58,6 +93,87 @@ internal sealed class PropsWriter : IDisposable
 
         _writer.WriteEndObject();
     }
+
+    // Finds the Parallel() props the walk will resolve, with the walk's own inclusion rules, and starts their loaders. Covers top-level
+    // props and literal objects (their children keep partial filtering); props anywhere else resolve in turn.
+    private void Plan(List<PropEntry> props)
+    {
+        try
+        {
+            foreach (var entry in props)
+            {
+                PlanEntry(entry.Key, entry.Value, entry.Type);
+            }
+        }
+        catch
+        {
+            _planner?.Dispose(); // nothing was started yet
+            throw;
+        }
+
+        _planner?.Start();
+    }
+
+    private void PlanEntry(string key, object? value, Type declaredType)
+    {
+        var mark = Push(key);
+        try
+        {
+            if (value is InertiaProp prop)
+            {
+                if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
+                {
+                    Prefetch(prop);
+                }
+
+                return;
+            }
+
+            // A lazy object's loader can start early; the dot keys below it are only known once it resolves, so they resolve in turn.
+            if (value is InertiaPageWriter.LazyDotObject { Source.IsParallel: true } lazy
+                && Decide(null, value, declaredType, parentWasResolved: false) == Inclusion.Resolved)
+            {
+                Prefetch(lazy.Source);
+                return;
+            }
+
+            if (value is not IEnumerable<KeyValuePair<string, object?>> || Decide(null, value, declaredType, parentWasResolved: false) != Inclusion.Resolved)
+            {
+                return;
+            }
+
+            switch (value)
+            {
+                case Dictionary<string, object?> dictionary:
+                    foreach (var (childKey, child) in dictionary)
+                    {
+                        PlanEntry(childKey, child, typeof(object));
+                    }
+
+                    break;
+                case IReadOnlyDictionary<string, object?> dictionary:
+                    foreach (var (childKey, child) in dictionary)
+                    {
+                        PlanEntry(childKey, child, typeof(object));
+                    }
+
+                    break;
+                case IDictionary<string, object?> dictionary:
+                    foreach (var (childKey, child) in dictionary)
+                    {
+                        PlanEntry(childKey, child, typeof(object));
+                    }
+
+                    break;
+            }
+        }
+        finally
+        {
+            _pathLength = mark;
+        }
+    }
+
+    private void Prefetch(InertiaProp prop) => (_planner ??= new PropsPlanner(_owner.Options.Props.MaxConcurrency, _cancellationToken)).Add(prop);
 
     /// <summary>Writes sharedProps through onceProps, in protocol order, omitting empty ones.</summary>
     public void WriteMetadata(List<string>? sharedPropKeys)
@@ -139,24 +255,16 @@ internal sealed class PropsWriter : IDisposable
         try
         {
             _cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfPlanFailed();
             var p = prop as InertiaProp;
-
-            // Always props and the children of resolved values bypass partial filtering.
-            if (_isPartial && !parentWasResolved && p is not { IsAlways: true } && !PathMatchesPartialRequest())
+            switch (Decide(p, prop, declaredType, parentWasResolved))
             {
-                return;
-            }
-
-            if (_isPartial && !parentWasResolved && p is not { IsAlways: true }
-                && _request.Except is { } excluded && LeadsToAny(excluded, Path) && IsArray(prop, declaredType))
-            {
-                return;
-            }
-
-            if (p is not null && !_isPartial && ExcludeFromInitialResponse(p))
-            {
-                if (key is null) _writer.WriteNullValue();
-                return;
+                case Inclusion.Filtered:
+                    return;
+                case Inclusion.Excluded:
+                    CollectExcludedMetadata(p!);
+                    if (key is null) _writer.WriteNullValue();
+                    return;
             }
 
             var value = prop;
@@ -175,8 +283,9 @@ internal sealed class PropsWriter : IDisposable
                 if (value is InertiaProp inner)
                 {
                     p = inner;
-                    if (!_isPartial && ExcludeFromInitialResponse(p))
+                    if (!_isPartial && IsExcludedFromInitialResponse(p))
                     {
+                        CollectExcludedMetadata(p);
                         if (key is null) _writer.WriteNullValue();
                         return;
                     }
@@ -229,6 +338,12 @@ internal sealed class PropsWriter : IDisposable
             case JsonNode node:
                 _owner.WriteNode(_writer, node);
                 return;
+            case InertiaPageWriter.LazyDotObject lazy:
+                // Deviation 7: the lazy prop under dot keys resolves only now that its path is part of the response. Plain props
+                // are never rescued, so it always resolves.
+                var (_, source) = await ResolveAsync(lazy.Source);
+                await WriteObjectAsync(lazy.Apply(source), parentWasResolved);
+                return;
             case Dictionary<string, object?> dictionary: // InertiaProps: struct enumerator, no boxing
                 await WriteObjectAsync(dictionary, parentWasResolved);
                 return;
@@ -241,7 +356,7 @@ internal sealed class PropsWriter : IDisposable
         }
 
         var type = declaredType == typeof(object) ? value.GetType() : declaredType;
-        var info = _options.GetTypeInfo(type);
+        var info = _owner.SerializerOptions.GetTypeInfo(type);
         if (_owner.ContainsProps(type))
         {
             if (info.Kind == JsonTypeInfoKind.Object)
@@ -352,9 +467,10 @@ internal sealed class PropsWriter : IDisposable
         _cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            return (true, await prop.ResolveAsync(_cancellationToken));
+            return (true, _planner is not null && _planner.TryTake(prop, out var started) ? await started : await prop.ResolveAsync(_cancellationToken));
         }
-        catch (Exception ex) when (prop.ShouldRescue && !(ex is OperationCanceledException && _cancellationToken.IsCancellationRequested))
+        catch (Exception ex) when (prop.ShouldRescue
+            && !(ex is OperationCanceledException && (_cancellationToken.IsCancellationRequested || _planner is { Failed: true })))
         {
             var path = new string(Path);
             _owner.Logger.LogError(ex, "Inertia prop '{Path}' failed to resolve and was rescued.", path);
@@ -363,38 +479,78 @@ internal sealed class PropsWriter : IDisposable
         }
     }
 
-    private bool ExcludeFromInitialResponse(InertiaProp prop)
+    // A parallel loader failed: the render fails, so stop walking (WritePropsAsync reports that loader's failure).
+    private void ThrowIfPlanFailed()
     {
-        // Optional and deferred props are never part of the initial response; they still report their metadata.
-        if (prop.Load != PropLoad.Eager)
+        if (_planner is { Failed: true })
         {
-            if (prop.Load == PropLoad.Deferred && !WasAlreadyLoadedByClient(prop))
-            {
-                _deferredProps ??= new(StringComparer.Ordinal);
-                if (!_deferredProps.TryGetValue(prop.Group, out var paths))
-                {
-                    _deferredProps[prop.Group] = paths = [];
-                }
+            throw new OperationCanceledException("A parallel prop loader failed.");
+        }
+    }
 
-                paths.Add(new string(Path));
+    private enum Inclusion
+    {
+        /// <summary>Not part of this response (partial reload filtering): nothing is written.</summary>
+        Filtered,
+
+        /// <summary>Left out of the initial response (optional, deferred, or a once prop the client has): only its metadata is written.</summary>
+        Excluded,
+
+        /// <summary>Resolved and written.</summary>
+        Resolved,
+    }
+
+    // Whether the prop (or plain value) at Path is part of this response, decided before any loader runs and without side effects,
+    // so the parallel planner and the writer agree on which loaders run.
+    private Inclusion Decide(InertiaProp? p, object? prop, Type declaredType, bool parentWasResolved)
+    {
+        // Always props and the children of resolved values bypass partial filtering.
+        if (_isPartial && !parentWasResolved && p is not { IsAlways: true })
+        {
+            if (!PathMatchesPartialRequest())
+            {
+                return Inclusion.Filtered;
             }
 
-            if (prop.IsMerge)
+            if (_request.Except is { } excluded && LeadsToAny(excluded, Path) && IsArray(prop, declaredType))
             {
-                CollectMergeable(prop);
+                return Inclusion.Filtered;
             }
-
-            CollectOnce(prop);
-            return true;
         }
 
-        if (_request.IsInertia && WasAlreadyLoadedByClient(prop))
+        return p is not null && !_isPartial && IsExcludedFromInitialResponse(p) ? Inclusion.Excluded : Inclusion.Resolved;
+    }
+
+    // Optional and deferred props are never part of the initial response, nor are once props an Inertia client already has.
+    private bool IsExcludedFromInitialResponse(InertiaProp prop) =>
+        prop.Load != PropLoad.Eager || (_request.IsInertia && WasAlreadyLoadedByClient(prop));
+
+    // Props left out of the initial response still report their metadata.
+    private void CollectExcludedMetadata(InertiaProp prop)
+    {
+        if (prop.Load == PropLoad.Eager)
         {
             CollectOnce(prop);
-            return true;
+            return;
         }
 
-        return false;
+        if (prop.Load == PropLoad.Deferred && !WasAlreadyLoadedByClient(prop))
+        {
+            _deferredProps ??= new(StringComparer.Ordinal);
+            if (!_deferredProps.TryGetValue(prop.Group, out var paths))
+            {
+                _deferredProps[prop.Group] = paths = [];
+            }
+
+            paths.Add(new string(Path));
+        }
+
+        if (prop.IsMerge)
+        {
+            CollectMergeable(prop);
+        }
+
+        CollectOnce(prop);
     }
 
     private bool WasAlreadyLoadedByClient(InertiaProp prop)
@@ -520,10 +676,10 @@ internal sealed class PropsWriter : IDisposable
         if (value is null or string) return false;
         if (value is JsonElement element) return element.ValueKind == JsonValueKind.Array;
         if (value is JsonNode node) return node is JsonArray;
-        if (value is InertiaProp prop) return prop.ValueType != typeof(object) && _options.GetTypeInfo(prop.ValueType).Kind == JsonTypeInfoKind.Enumerable;
+        if (value is InertiaProp prop) return prop.ValueType != typeof(object) && _owner.SerializerOptions.GetTypeInfo(prop.ValueType).Kind == JsonTypeInfoKind.Enumerable;
         if (value is InertiaPageWriter.PropertyValue member)
             return member.TypeInfo.Kind == JsonTypeInfoKind.Enumerable;
-        return value is IEnumerable && _options.GetTypeInfo(declaredType == typeof(object) ? value.GetType() : declaredType).Kind == JsonTypeInfoKind.Enumerable;
+        return value is IEnumerable && _owner.SerializerOptions.GetTypeInfo(declaredType == typeof(object) ? value.GetType() : declaredType).Kind == JsonTypeInfoKind.Enumerable;
     }
 
     // path == filter, or path is a descendant of filter.

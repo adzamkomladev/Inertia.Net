@@ -7,6 +7,76 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-19
+
+Reworks server-side rendering so that a slow, failing or overloaded SSR server cannot slow down or take down the app, adds several SSR
+servers and a supervised Node process pool, metrics and traces, and opt-in parallel prop loading. The SSR options change shape, so
+existing SSR configuration must be updated; see [docs/migrating-to-1.3.md](docs/migrating-to-1.3.md). The Inertia v3 JSON protocol and
+the cookie, session and TempData formats are unchanged. Update all four packages together.
+
+### Breaking changes
+
+| Before | After |
+|---|---|
+| `o.Ssr.Enabled = true` | `o.Ssr.Mode = SsrMode.Preferred` (`UseNodeProcess()` still turns SSR on) |
+| `o.Ssr.ThrowOnError = true` | `o.Ssr.Mode = SsrMode.Required`, or `Render(...).WithSsr(SsrMode.Required)` for one response |
+| `o.Ssr.Url = "..."` | `o.Ssr.Urls.Add("...")`; with `UseNodeProcess()`, `n.BasePort` instead (`Urls` together with `UseNodeProcess()` fails validation) |
+| `o.Ssr.MaxResponseBytes = null` (unlimited) | A positive limit is required (default 16 MiB) |
+| `o.Ssr.Timeout = TimeSpan.Zero` | Must be positive or `Timeout.InfiniteTimeSpan`; it now also covers the wait for a render slot |
+| Unlimited concurrent renders | 8 per server in flight, 32 queued for up to 250 ms, the rest fall back (`overloaded`); `Concurrency.MaxActive = 0` removes the limit |
+| Every render tries the server | After 5 consecutive server failures a server is skipped for 10 s (`circuit-open`); `CircuitBreaker.Enabled = false` turns it off |
+| Any page size is sent to the server | Pages over `Ssr.MaxPageBytes` (2 MiB) render on the client (`page-too-large`) |
+| `AddInertiaSsr()` calls `GET {Url}/health` | Reports the gateway's circuit and readiness state without a call; `Degraded` when some servers are paused |
+| `new InertiaSsrHealthCheck(...)` | Not public; register it with `AddInertiaSsr()` |
+| A managed Node server that answers beyond loopback logs a warning | It is stopped and not restarted; `NodeProcess.AllowNetworkExposure = true` keeps the warning |
+| A managed Node server that hangs keeps getting renders | It is killed and restarted after 3 failed liveness checks (every 5 s) |
+| SSR options changed through `IOptionsMonitor` apply | Options are read once at startup |
+| The SSR HTTP client follows redirects and uses the system proxy | It does neither; a 3xx is an `http` failure |
+| `"auth" = Prop(...)` with `"auth.user"` next to it runs the `auth` loader while unpacking | The `auth` loader runs only when `auth` is part of the response |
+| `Ssr.ExcludePaths` entries are not checked | Entries must start with `/` |
+
+### Added
+
+- `SsrMode` (`Disabled`, `Preferred`, `Required`) and `InertiaResult.WithSsr(mode)` / `WithoutSsr()`. A global `Disabled` is a kill switch;
+  otherwise the response's mode wins over `ExcludePaths`. `InertiaRootViewContext.SsrMode` carries it to custom root views.
+- Several SSR servers in `Ssr.Urls`: each render goes to the least busy server whose circuit is closed; a refused connection is retried
+  once on another server.
+- A circuit breaker per server (`Ssr.CircuitBreaker`): consecutive connection, timeout, HTTP and malformed-response failures open it; one
+  render probes after `BreakDuration`. A page's own render error never opens it.
+- Render slots per server (`Ssr.Concurrency.MaxActive`, `MaxQueued`, `QueueTimeout`), so renders fall back instead of piling up.
+- `Ssr.MaxPageBytes`.
+- `NodeProcess.Instances` and `BasePort`: the app runs a pool of Node SSR processes on consecutive loopback ports, each told its port in
+  `INERTIA_SSR_PORT`. `LivenessInterval` and `LivenessFailureThreshold` kill and restart an instance that stops answering.
+  `AllowNetworkExposure`.
+- Metrics on the `Inertia.Net` meter (`inertia.page.*`, `inertia.ssr.*`) and `inertia.render` / `inertia.ssr` activities on the
+  `Inertia.Net` activity source; `InertiaDiagnostics` holds both names.
+- `InertiaSsr.HttpClientName` for configuring the SSR HTTP client (e.g. adding an auth header for a remote renderer).
+- Startup validation of every SSR option, naming each invalid setting.
+- A startup warning for plain-`http` SSR URLs that are not loopback.
+- `InertiaProp.Parallel()` and `InertiaOptions.Props.MaxConcurrency` (default 4): independent async loaders start together, bounded per
+  render. Props left out of the response never start; a failure cancels the others and fails the render with the first failure in prop order.
+
+### Fixed
+
+- After a managed Node process exited and its port was taken by another program, the supervisor kept waiting on the exited process
+  instead of backing off and restarting once the port was free.
+- A managed instance is checked for network exposure before it takes renders, not after.
+
+### Security
+
+- A managed Node SSR server that is reachable beyond loopback is stopped by default (it serves unauthenticated `/render` and `/shutdown`).
+- The SSR HTTP client no longer follows redirects (a render POST, with the page props, is never replayed to another host) and no longer
+  uses a proxy.
+- SSR error text in logs is cut to 2 KB, credentials in SSR URLs are left out of logs and exceptions, and repeated skips are logged at most
+  once per 30 seconds per reason.
+
+### Performance
+
+- A failing or overloaded SSR server costs a volatile read per render while its circuit is open, instead of a timeout per page.
+- The SSR render keeps its head and body in one pooled array, returned after the root view is written.
+- The page and SSR instruments record only while a listener is attached.
+
+
 ## [1.2.0] - 2026-10-18
 
 Adds public API (`UseInertiaAntiforgery`, `InertiaAntiforgeryOptions`, `InertiaStateOptions.CookieSecurePolicy`), so the next release is a

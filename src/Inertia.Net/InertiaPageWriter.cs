@@ -93,7 +93,7 @@ internal sealed class InertiaPageWriter
             var entries = BuildProps(httpContext, feature, props, request, sharedPropKeys, out var hasDotKey);
             if (hasDotKey)
             {
-                entries = await UnpackDotPropsAsync(entries, httpContext.RequestAborted);
+                entries = UnpackDotProps(entries);
             }
 
             using var writer = new Utf8JsonWriter(buffer, htmlSafe ? _htmlWriterOptions : _jsonWriterOptions);
@@ -448,7 +448,7 @@ internal sealed class InertiaPageWriter
     }
 
     // Top-level "a.b.c" keys become nested objects (Laravel unpackDotProps). Nested dictionaries are copied, never mutated.
-    private static async ValueTask<List<PropEntry>> UnpackDotPropsAsync(List<PropEntry> entries, CancellationToken cancellationToken)
+    private static List<PropEntry> UnpackDotProps(List<PropEntry> entries)
     {
         var result = new List<PropEntry>(entries.Count);
         var positions = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -470,48 +470,62 @@ internal sealed class InertiaPageWriter
             }
 
             var segments = entry.Key.Split('.');
-            InertiaProps parent;
-            if (positions.TryGetValue(segments[0], out var position))
+            if (!positions.TryGetValue(segments[0], out var position))
             {
-                parent = await ToOwnedObjectAsync(result[position].Value, owned, cancellationToken);
-                result[position] = new PropEntry(segments[0], parent, typeof(object));
-            }
-            else
-            {
-                parent = await ToOwnedObjectAsync(null, owned, cancellationToken);
-                positions[segments[0]] = result.Count;
-                result.Add(new PropEntry(segments[0], parent, typeof(object)));
+                positions[segments[0]] = position = result.Count;
+                result.Add(new PropEntry(segments[0], null, typeof(object)));
             }
 
-            for (var i = 1; i < segments.Length - 1; i++)
-            {
-                parent.TryGetValue(segments[i], out var existing);
-                var child = await ToOwnedObjectAsync(existing, owned, cancellationToken);
-                parent[segments[i]] = child;
-                parent = child;
-            }
-
-            parent[segments[^1]] = entry.Value;
+            var top = ToTraversable(result[position].Value, owned);
+            result[position] = new PropEntry(segments[0], top, typeof(object));
+            Assign(top, segments, 1, entry.Value, owned);
         }
 
         return result;
     }
 
-    // Like Laravel's ensurePathIsTraversable + Arr::set: plain lazy props are resolved (they are closures there),
-    // dictionaries are copied, anything else is replaced by an empty object.
-    private static async ValueTask<InertiaProps> ToOwnedObjectAsync(object? value, HashSet<object> owned, CancellationToken cancellationToken)
+    // Laravel's Arr::set from segments[start], copying the objects on the way. Below a lazy object the rest of the path is
+    // replayed once that object is resolved.
+    private static void Assign(object container, string[] segments, int start, object? value, HashSet<object> owned)
     {
-        if (value is InertiaProps props && owned.Contains(props))
+        for (var i = start; ; i++)
         {
-            return props;
+            if (container is LazyDotObject lazy)
+            {
+                lazy.Add(segments, i, value);
+                return;
+            }
+
+            var parent = (InertiaProps)container;
+            if (i == segments.Length - 1)
+            {
+                parent[segments[i]] = value;
+                return;
+            }
+
+            parent.TryGetValue(segments[i], out var existing);
+            container = ToTraversable(existing, owned);
+            parent[segments[i]] = container;
+        }
+    }
+
+    // Laravel's ensurePathIsTraversable: owned objects are reused, plain lazy props (closures there) become lazy objects that
+    // resolve only when their path is part of the response (deviation 7), dictionaries are copied, anything else is replaced by an
+    // empty object.
+    private static object ToTraversable(object? value, HashSet<object> owned)
+    {
+        if (value is LazyDotObject || (value is InertiaProps props && owned.Contains(props)))
+        {
+            return value;
         }
 
-        if (value is InertiaProp { Load: PropLoad.Eager, IsAlways: false, IsOnce: false, IsMerge: false, ShouldRescue: false } plain)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            value = await plain.ResolveAsync(cancellationToken);
-        }
+        return value is InertiaProp { Load: PropLoad.Eager, IsAlways: false, IsOnce: false, IsMerge: false, ShouldRescue: false } plain
+            ? new LazyDotObject(plain)
+            : CopyObject(value, owned);
+    }
 
+    private static InertiaProps CopyObject(object? value, HashSet<object> owned)
+    {
         var copy = new InertiaProps();
         owned.Add(copy);
         switch (value)
@@ -533,6 +547,31 @@ internal sealed class InertiaPageWriter
         }
 
         return copy;
+    }
+
+    /// <summary>
+    /// A plain lazy prop with dot keys below it. <see cref="PropsWriter"/> resolves <see cref="Source"/> only when this path is part of
+    /// the response, then <see cref="Apply"/> sets the dot keys on a copy of its value, in the order they were unpacked.
+    /// </summary>
+    internal sealed class LazyDotObject(InertiaProp source)
+    {
+        private readonly List<(string[] Segments, int Start, object? Value)> _assignments = [];
+
+        public InertiaProp Source { get; } = source;
+
+        public void Add(string[] segments, int start, object? value) => _assignments.Add((segments, start, value));
+
+        public InertiaProps Apply(object? value)
+        {
+            var owned = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            var root = CopyObject(value, owned);
+            foreach (var (segments, start, item) in _assignments)
+            {
+                Assign(root, segments, start, item, owned);
+            }
+
+            return root;
+        }
     }
 
     internal void WritePlainValue(Utf8JsonWriter writer, object? value)

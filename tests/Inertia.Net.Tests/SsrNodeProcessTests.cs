@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using static Inertia.Net.Inertia;
 
 namespace Inertia.Net.Tests;
@@ -23,9 +22,15 @@ public sealed class SsrNodeProcessTests
           if (req.url === '/shutdown') process.exit(0)
           if (req.url === '/crash') process.exit(3)
           res.writeHead(200, { 'Content-Type': 'application/json' })
+          if (req.url === '/hang') {
+            res.end('{}')
+            const until = Date.now() + 60000
+            while (Date.now() < until) {} // blocks the event loop: alive but unresponsive
+          }
           if (req.url === '/render') {
             const page = JSON.parse(body)
-            return res.end(JSON.stringify({ head: ['<title>fixture</title>'], body: `<div data-server-rendered="true" id="app">${page.component}</div>` }))
+            const port = `<meta name="port" content="${process.env.INERTIA_SSR_PORT}">`
+            return res.end(JSON.stringify({ head: ['<title>fixture</title>', port], body: `<div data-server-rendered="true" id="app">${page.component}</div>` }))
           }
           res.end('{"status":"OK"}')
         }).listen(Number(process.env.INERTIA_SSR_PORT), process.env.FIXTURE_HOST ?? '127.0.0.1')
@@ -47,7 +52,7 @@ public sealed class SsrNodeProcessTests
         }
     }
 
-    private static (Harness Harness, SsrNodeProcess Process, string Url) Create(bool writeBundle = true, Action<InertiaOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+    private static (Harness Harness, SsrNodeProcess Process, string Url) Create(bool writeBundle = true, Action<InertiaOptions>? configure = null, Action<IServiceCollection>? configureServices = null, int instances = 1)
     {
         var root = Path.Combine(Path.GetTempPath(), "inertia-ssr-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "ssr"));
@@ -57,16 +62,17 @@ public sealed class SsrNodeProcessTests
             File.WriteAllText(Path.Combine(root, "ssr", "ssr.mjs"), Fixture);
         }
 
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var url = $"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}";
-        listener.Stop();
-
+        var port = FreePorts(instances);
+        var url = $"http://127.0.0.1:{port}";
         var harness = new Harness(
             o =>
             {
-                o.Ssr.Url = url;
-                o.Ssr.UseNodeProcess(n => n.StartupTimeout = TimeSpan.FromSeconds(15));
+                o.Ssr.UseNodeProcess(n =>
+                {
+                    n.BasePort = port;
+                    n.Instances = instances;
+                    n.StartupTimeout = TimeSpan.FromSeconds(15);
+                });
                 configure?.Invoke(o);
             },
             contentRoot: root,
@@ -74,7 +80,45 @@ public sealed class SsrNodeProcessTests
         return (harness, harness.Services.GetServices<IHostedService>().OfType<SsrNodeProcess>().Single(), url);
     }
 
+    // The first of `count` consecutive free loopback ports.
+    private static int FreePorts(int count)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            using var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            if (port + count - 1 <= IPEndPoint.MaxPort && Enumerable.Range(port + 1, count - 1).All(IsFree) || attempt == 20)
+            {
+                return port;
+            }
+        }
+
+        static bool IsFree(int port)
+        {
+            try
+            {
+                using var listener = new TcpListener(IPAddress.Loopback, port);
+                listener.Start();
+                listener.Stop();
+                return true;
+            }
+            catch (SocketException)
+            {
+                return false;
+            }
+        }
+    }
+
     private static Task<string> RenderAsync(Harness harness) => Harness.ExecuteAsync(harness.Context(), Render("Home"));
+
+    private static string? RenderedPort(string html)
+    {
+        const string marker = "<meta name=\"port\" content=\"";
+        var start = html.IndexOf(marker, StringComparison.Ordinal);
+        return start < 0 ? null : html[(start + marker.Length)..html.IndexOf('"', start + marker.Length)];
+    }
 
     private static bool IsAlive(int pid)
     {
@@ -89,12 +133,12 @@ public sealed class SsrNodeProcessTests
         }
     }
 
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition, TimeSpan? timeout = null)
     {
         var started = Stopwatch.GetTimestamp();
         while (!await condition())
         {
-            Assert.True(Stopwatch.GetElapsedTime(started) < TimeSpan.FromSeconds(15), "Timed out.");
+            Assert.True(Stopwatch.GetElapsedTime(started) < (timeout ?? TimeSpan.FromSeconds(15)), "Timed out.");
             await Task.Delay(100, TestContext.Current.CancellationToken);
         }
     }
@@ -126,9 +170,10 @@ public sealed class SsrNodeProcessTests
     }
 
     [Theory]
+    [InlineData("0.0.0.0", false)]
     [InlineData("0.0.0.0", true)]
     [InlineData("127.0.0.1", false)]
-    public async Task Warns_when_the_ssr_server_is_reachable_beyond_loopback(string host, bool exposed)
+    public async Task Stops_an_ssr_server_reachable_beyond_loopback_unless_exposure_is_allowed(string host, bool allowExposure)
     {
         Assert.SkipUnless(NodeAvailable, "node is not on PATH");
         var nonLoopback = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
@@ -136,26 +181,34 @@ public sealed class SsrNodeProcessTests
             .SelectMany(n => n.GetIPProperties().UnicastAddresses)
             .Any(a => a.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a.Address));
         Assert.SkipUnless(nonLoopback, "no non-loopback IPv4 interface");
-        var (harness, ssr, _) = Create(configure: o => o.Ssr.NodeProcess!.Environment["FIXTURE_HOST"] = host);
+        var exposed = host == "0.0.0.0";
+        var (harness, ssr, _) = Create(configure: o =>
+        {
+            o.Ssr.NodeProcess!.Environment["FIXTURE_HOST"] = host;
+            o.Ssr.NodeProcess.AllowNetworkExposure = allowExposure;
+        });
         try
         {
-            await ssr.StartAsync(TestContext.Current.CancellationToken);
-            await WaitUntilAsync(() => Task.FromResult(harness.Logs.Entries.Any(e => e.Message.StartsWith("The SSR server at", StringComparison.Ordinal))));
-            await Task.Delay(exposed ? 0 : 3000, TestContext.Current.CancellationToken); // the negative case: give the probe time to finish
-            if (exposed)
-            {
-                await WaitUntilAsync(() => Task.FromResult(harness.Logs.Entries.Any(e => e is { Level: LogLevel.Warning } && e.Message.Contains("also accepts connections", StringComparison.Ordinal))));
-            }
-            else
-            {
-                Assert.DoesNotContain(harness.Logs.Entries, e => e.Message.Contains("also accepts connections", StringComparison.Ordinal));
-            }
+            await ssr.StartAsync(TestContext.Current.CancellationToken); // returns once the exposed instance was stopped
+            var stopped = false;
+            await WaitUntilAsync(() => Task.FromResult(harness.Logs.Entries.Any(e =>
+                e.Message.StartsWith("The SSR server at", StringComparison.Ordinal)
+                || (stopped = e is { Level: LogLevel.Error } && e.Message.StartsWith("Stopped the SSR server: it also accepts connections", StringComparison.Ordinal)))));
+            await Task.Delay(1500, TestContext.Current.CancellationToken); // no restart follows a stop for exposure
+            var warned = harness.Logs.Entries.Any(e => e is { Level: LogLevel.Warning } && e.Message.StartsWith("The SSR server also accepts connections", StringComparison.Ordinal));
+            Assert.Equal(exposed && !allowExposure, stopped);
+            Assert.Equal(exposed && allowExposure, warned);
+            Assert.Equal(!stopped, ssr.IsReady);
+            Assert.Equal(!stopped, IsServerRendered(await RenderAsync(harness)));
+            Assert.Single(harness.Logs.Entries, e => e.Message.StartsWith("Started the Node SSR process", StringComparison.Ordinal));
         }
         finally
         {
             await ssr.StopAsync(CancellationToken.None);
         }
     }
+
+    private static bool IsServerRendered(string html) => html.Contains("data-server-rendered", StringComparison.Ordinal);
 
     [Fact]
     public async Task Stops_the_owned_process_without_sending_a_shutdown_request()
@@ -250,9 +303,9 @@ public sealed class SsrNodeProcessTests
     }
 
     [Fact]
-    public async Task Missing_bundle_throws_with_ThrowOnError()
+    public async Task Missing_bundle_throws_when_ssr_is_required()
     {
-        var (_, ssr, _) = Create(writeBundle: false, o => o.Ssr.ThrowOnError = true);
+        var (_, ssr, _) = Create(writeBundle: false, o => o.Ssr.Mode = SsrMode.Required);
         var ex = await Assert.ThrowsAsync<InertiaSsrException>(() => ssr.StartAsync(TestContext.Current.CancellationToken));
         Assert.Equal("startup", ex.Type);
     }
@@ -265,7 +318,7 @@ public sealed class SsrNodeProcessTests
         Assert.Null(ssr.ProcessId);
         Assert.Contains(harness.Logs.Entries, e => e.Message.StartsWith("The Vite dev server is running", StringComparison.Ordinal));
 
-        var plain = new Harness(o => o.Ssr.Enabled = true).Services.GetServices<IHostedService>().OfType<SsrNodeProcess>().Single();
+        var plain = new Harness(o => o.Ssr.Mode = SsrMode.Preferred).Services.GetServices<IHostedService>().OfType<SsrNodeProcess>().Single();
         await plain.StartAsync(TestContext.Current.CancellationToken);
         Assert.Null(plain.ProcessId);
     }
@@ -288,48 +341,130 @@ public sealed class SsrNodeProcessTests
         }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Managed_render_does_not_follow_a_changed_url_to_another_server(bool throwOnError)
+    [Fact]
+    public async Task Occupied_port_throws_on_startup_when_ssr_is_required()
     {
-        Assert.SkipUnless(NodeAvailable, "node is not on PATH");
-        var (harness, ssr, _) = Create(configure: o => o.Ssr.ThrowOnError = throwOnError);
-        using var other = new TcpListener(IPAddress.Loopback, 0);
-        other.Start();
-        using (ssr)
+        var (_, occupied, url) = Create(configure: o => o.Ssr.Mode = SsrMode.Required);
+        using var listener = new TcpListener(IPAddress.Loopback, new Uri(url).Port);
+        listener.Start();
+        using (occupied)
         {
-            await ssr.StartAsync(TestContext.Current.CancellationToken);
-            var pid = Assert.NotNull(ssr.ProcessId);
-            harness.Services.GetRequiredService<IOptionsMonitor<InertiaOptions>>().CurrentValue.Ssr.Url =
-                $"http://127.0.0.1:{((IPEndPoint)other.LocalEndpoint).Port}";
-            if (throwOnError)
-            {
-                var error = await Assert.ThrowsAsync<InertiaSsrException>(() => RenderAsync(harness));
-                Assert.Equal("startup", error.Type);
-            }
-            else Assert.DoesNotContain("data-server-rendered", await RenderAsync(harness), StringComparison.Ordinal);
-            Assert.False(other.Pending());
-            Assert.Equal(pid, ssr.ProcessId);
-            Assert.True(ssr.IsReady);
+            var error = await Assert.ThrowsAsync<InertiaSsrException>(() => occupied.StartAsync(TestContext.Current.CancellationToken));
+            Assert.Equal("startup", error.Type);
+            Assert.Null(occupied.ProcessId);
         }
     }
 
     [Fact]
-    public async Task Managed_ssr_rejects_external_urls_and_can_throw_on_an_occupied_endpoint()
+    public async Task Kills_and_restarts_a_process_that_stops_answering()
     {
-        var (_, remote, _) = Create(configure: o => { o.Ssr.Url = "https://ssr.example.com"; o.Ssr.ThrowOnError = true; });
-        using (remote)
+        Assert.SkipUnless(NodeAvailable, "node is not on PATH");
+        var (harness, ssr, url) = Create(configure: o =>
         {
-            var error = await Assert.ThrowsAsync<InertiaSsrException>(() => remote.StartAsync(TestContext.Current.CancellationToken));
-            Assert.Equal("startup", error.Type);
-            Assert.Null(remote.ProcessId);
+            o.Ssr.NodeProcess!.LivenessInterval = TimeSpan.FromMilliseconds(200);
+            o.Ssr.NodeProcess.LivenessFailureThreshold = 2;
+        });
+        try
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            var first = Assert.NotNull(ssr.ProcessId);
+            using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+            try
+            {
+                (await http.GetAsync($"{url}/hang", TestContext.Current.CancellationToken)).Dispose();
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                // The answer may never arrive once the event loop is blocked; only the hang matters here.
+            }
+
+            await WaitUntilAsync(async () => ssr.ProcessId is { } pid && pid != first && IsServerRendered(await RenderAsync(harness)), TimeSpan.FromSeconds(30));
+            Assert.Contains(harness.Logs.Entries, e => e.Message.Contains("failed 2 health checks in a row", StringComparison.Ordinal));
+            Assert.False(IsAlive(first));
         }
-        var (_, occupied, url) = Create(configure: o => o.Ssr.ThrowOnError = true);
-        using var listener = new TcpListener(IPAddress.Loopback, new Uri(url).Port);
-        listener.Start();
-        using (occupied)
-            await Assert.ThrowsAsync<InertiaSsrException>(() => occupied.StartAsync(TestContext.Current.CancellationToken));
+        finally
+        {
+            await ssr.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task Several_instances_share_the_renders_and_cover_for_each_other()
+    {
+        Assert.SkipUnless(NodeAvailable, "node is not on PATH");
+        var (harness, ssr, url) = Create(instances: 2);
+        var basePort = new Uri(url).Port;
+        try
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            Assert.NotNull(ssr.ProcessIdOf(0));
+            Assert.NotNull(ssr.ProcessIdOf(1));
+            var ports = new HashSet<string?>();
+            for (var i = 0; i < 4; i++)
+            {
+                ports.Add(RenderedPort(await RenderAsync(harness)));
+            }
+
+            Assert.Equal(new[] { $"{basePort}", $"{basePort + 1}" }, ports.Order());
+
+            var first = ssr.ProcessIdOf(0);
+            using var http = new HttpClient();
+            await Assert.ThrowsAnyAsync<HttpRequestException>(() => http.GetAsync($"{url}/crash", TestContext.Current.CancellationToken));
+            for (var i = 0; i < 4; i++)
+            {
+                Assert.Equal($"{basePort + 1}", RenderedPort(await RenderAsync(harness))); // a refused render fails over to the other instance
+            }
+
+            await WaitUntilAsync(() => Task.FromResult(ssr.ProcessIdOf(0) is { } pid && pid != first && ssr.IsInstanceReady(0)));
+        }
+        finally
+        {
+            await ssr.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task Restarts_once_an_occupied_port_is_free_again()
+    {
+        Assert.SkipUnless(NodeAvailable, "node is not on PATH");
+        TcpListener? squatter = null;
+        var port = 0;
+        var occupier = new LogHook(message =>
+        {
+            if (squatter is null && message.StartsWith("Restarting the Node", StringComparison.Ordinal))
+            {
+                squatter = new TcpListener(IPAddress.Loopback, port); // another program takes the port while the restart waits
+                squatter.Start();
+            }
+        });
+        var (harness, ssr, url) = Create(configureServices: s => s.AddLogging(b => b.AddProvider(occupier)));
+        port = new Uri(url).Port;
+        try
+        {
+            await ssr.StartAsync(TestContext.Current.CancellationToken);
+            var first = Assert.NotNull(ssr.ProcessId);
+            using var http = new HttpClient();
+            await Assert.ThrowsAnyAsync<HttpRequestException>(() => http.GetAsync($"{url}/crash", TestContext.Current.CancellationToken));
+            await WaitUntilAsync(() => Task.FromResult(harness.Logs.Entries.Any(e => e.Message.EndsWith("is occupied; restart was skipped.", StringComparison.Ordinal))));
+            Assert.Null(ssr.ProcessId);
+            squatter!.Dispose();
+
+            await WaitUntilAsync(async () => ssr.ProcessId is { } pid && pid != first && IsServerRendered(await RenderAsync(harness)));
+        }
+        finally
+        {
+            squatter?.Dispose();
+            await ssr.StopAsync(CancellationToken.None);
+        }
+    }
+
+    private sealed class LogHook(Action<string> onMessage) : ILoggerProvider, ILogger
+    {
+        public ILogger CreateLogger(string categoryName) => this;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> formatter) => onMessage(formatter(state, error));
+        public void Dispose() { }
     }
 
     [Fact]

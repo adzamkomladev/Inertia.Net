@@ -217,4 +217,18 @@ public static class FastEndpointsRoutes
         public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) =>
             Task.FromResult(Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404));
     }
+
+    public sealed class SsrOffEndpoint : EndpointWithoutRequest<InertiaResult>
+    {
+        public override void Configure() => Get("/ssr-off");
+
+        public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) => Task.FromResult(Render("Page").WithoutSsr());
+    }
+
+    public sealed class SsrRequiredEndpoint : EndpointWithoutRequest<InertiaResult>
+    {
+        public override void Configure() => Get("/ssr-required");
+
+        public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) => Task.FromResult(Render("Page").WithSsr(SsrMode.Required));
+    }
 }

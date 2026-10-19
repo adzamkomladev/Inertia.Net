@@ -12,53 +12,81 @@ using Microsoft.Extensions.Options;
 namespace Inertia.Net;
 
 /// <summary>
-/// Starts, supervises and stops <c>node {bundle}</c> when <see cref="SsrOptions.UseNodeProcess"/> is set.
+/// Starts, supervises and stops <c>node {bundle}</c> instances when <see cref="SsrOptions.UseNodeProcess"/> is set.
 /// The v3 SSR server takes its port from the build (<c>inertia({ ssr: { port } })</c>, default 13714), not from the command line;
-/// the process gets <c>INERTIA_SSR_PORT</c> (the port of <see cref="SsrOptions.Url"/>) for entries that read it.
+/// each instance gets <c>INERTIA_SSR_PORT</c> (its own port) for entries that read it, which several instances require.
 /// </summary>
 internal sealed partial class SsrNodeProcess(
     IOptions<InertiaOptions> options,
     ViteAssets vite,
     IHttpClientFactory httpClients,
     IHostEnvironment environment,
+    InertiaMetrics metrics,
     ILoggerFactory loggers) : IHostedService, IDisposable
 {
     private static readonly string[] BundleCandidates = ["ssr/ssr.js", "ssr/ssr.mjs", "bootstrap/ssr/ssr.js", "bootstrap/ssr/ssr.mjs", "dist/ssr.js", "dist/ssr.mjs"];
     private static readonly TimeSpan MinRestartDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MaxRestartDelay = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ShutdownGrace = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan LivenessTimeout = TimeSpan.FromSeconds(2);
 
     private readonly ILogger _logger = loggers.CreateLogger("Inertia.Net.Ssr");
     private readonly CancellationTokenSource _stopping = new();
     private readonly object _gate = new();
-    private Task _supervisor = Task.CompletedTask;
+    private Instance[] _instances = [];
     private Task? _stopTask;
-    private Process? _process;
-    private Uri? _managedUrl;
-    private string? _managedUrlText;
-    private bool _ready;
     private bool _stopRequested;
     private bool _disposed;
 
-    /// <summary>The id of the running Node process; null when none runs.</summary>
-    internal int? ProcessId { get { lock (_gate) return _process is { HasExited: false } process ? process.Id : null; } }
+    /// <summary>Raised with the instance index whenever an instance becomes healthy (after startup or a restart).</summary>
+    internal event Action<int>? InstanceReady;
 
-    internal bool IsReady { get { lock (_gate) return !_disposed && !_stopRequested && _ready && _process is { HasExited: false }; } }
+    /// <summary>The URL of the managed instance listening on <paramref name="port"/>.</summary>
+    internal static string InstanceUrl(int port) => $"http://127.0.0.1:{port.ToString(CultureInfo.InvariantCulture)}";
 
-    // Called on every server-rendered page: the configured URL string is compared first, so the Uri is only parsed after a change.
-    internal bool IsReadyFor(string url)
+    /// <summary>The id of the first instance's running Node process; null when none runs.</summary>
+    internal int? ProcessId => ProcessIdOf(0);
+
+    internal int? ProcessIdOf(int instance)
     {
         lock (_gate)
         {
-            return IsReady && (string.Equals(url, _managedUrlText, StringComparison.Ordinal)
-                || (Uri.TryCreate(url, UriKind.Absolute, out var endpoint) && endpoint.Equals(_managedUrl)));
+            return instance < _instances.Length && _instances[instance].Process is { HasExited: false } process ? process.Id : null;
         }
     }
+
+    /// <summary>Whether at least one instance is healthy.</summary>
+    internal bool IsReady
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _instances.Any(IsReadyLocked);
+            }
+        }
+    }
+
+    // Called for every server-rendered page: one lock and a field read per candidate instance.
+    internal bool IsInstanceReady(int instance)
+    {
+        lock (_gate)
+        {
+            return instance < _instances.Length && IsReadyLocked(_instances[instance]);
+        }
+    }
+
+    private bool IsReadyLocked(Instance instance) => !_disposed && !_stopRequested && instance.Ready && instance.Process is { HasExited: false };
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         var ssr = options.Value.Ssr;
-        if (ssr is not { Enabled: true, NodeProcess: { } node })
+        if (ssr.Mode != SsrMode.Disabled && ssr.NodeProcess is null)
+        {
+            WarnAboutPlainHttpRemotes(ssr);
+        }
+
+        if (ssr is not { Mode: not SsrMode.Disabled, NodeProcess: { } node })
         {
             return;
         }
@@ -69,23 +97,27 @@ internal sealed partial class SsrNodeProcess(
             return;
         }
 
-        if (!Uri.TryCreate(ssr.Url, UriKind.Absolute, out var url) || !url.IsLoopback || url.Scheme is not ("http" or "https"))
-        {
-            StartupFailure(ssr, "Managed SSR requires an HTTP(S) loopback URL. Use unmanaged SSR for an external server.");
-            return;
-        }
         if (node.StartupTimeout <= TimeSpan.Zero)
         {
             StartupFailure(ssr, "The managed SSR startup timeout must be positive.");
             return;
         }
+
+        if (node.Instances < 1 || node.BasePort < 1 || node.BasePort + node.Instances - 1 > IPEndPoint.MaxPort)
+        {
+            StartupFailure(ssr, "NodeProcess.Instances must be at least 1 and every instance port (BasePort + index) a valid TCP port.");
+            return;
+        }
+
         lock (_gate)
         {
-            if (_disposed || _stopRequested || _process is { HasExited: false }) return;
+            if (_disposed || _stopRequested || _instances.Length > 0) return;
         }
-        if (IsOccupied(url, cancellationToken))
+
+        var ports = Enumerable.Range(node.BasePort, node.Instances).ToArray();
+        if (ports.FirstOrDefault(port => IsOccupied(port, cancellationToken)) is var occupied and > 0)
         {
-            StartupFailure(ssr, $"The managed SSR endpoint {url} is already occupied; no process was started.");
+            StartupFailure(ssr, $"The managed SSR endpoint {InstanceUrl(occupied)} is already occupied; no process was started.");
             return;
         }
 
@@ -100,6 +132,58 @@ internal sealed partial class SsrNodeProcess(
             return;
         }
 
+        lock (_gate)
+        {
+            if (_disposed || _stopRequested) return;
+            _instances = [.. ports.Select((port, index) => new Instance(index, port, CreateStartInfo(node, bundle, port)))];
+            foreach (var instance in _instances)
+            {
+                if (!TryStart(instance))
+                {
+                    Fail(ssr, $"Could not start '{node.Executable}'.");
+                    return;
+                }
+            }
+
+            foreach (var instance in _instances)
+            {
+                instance.Supervisor = SuperviseAsync(instance, node, _stopping.Token);
+            }
+        }
+
+        var started = Stopwatch.GetTimestamp();
+        while (Stopwatch.GetElapsedTime(started) < node.StartupTimeout)
+        {
+            var settled = true;
+            for (var i = 0; i < ports.Length; i++)
+            {
+                if (!IsInstanceReady(i) && !_instances[i].Supervisor.IsCompleted) settled = false;
+            }
+
+            if (settled)
+            {
+                if (!IsReady) Fail(ssr, "No managed SSR process is running."); // e.g. stopped for network exposure
+                return;
+            }
+
+            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+        }
+
+        var waiting = string.Join(", ", ports.Where((_, i) => !IsInstanceReady(i)).Select(InstanceUrl));
+        if (ports.Length > 1)
+        {
+            LogInstancesNotHealthy(_logger, waiting, node.StartupTimeout);
+        }
+        else
+        {
+            LogStartupTimeout(_logger, waiting, node.StartupTimeout);
+        }
+
+        Fail(ssr, $"The SSR server did not become healthy within {node.StartupTimeout} at {waiting}.");
+    }
+
+    private ProcessStartInfo CreateStartInfo(SsrNodeProcessOptions node, string bundle, int port)
+    {
         var startInfo = new ProcessStartInfo(node.Executable)
         {
             UseShellExecute = false,
@@ -116,38 +200,25 @@ internal sealed partial class SsrNodeProcess(
 
         startInfo.ArgumentList.Add(bundle);
         startInfo.Environment.TryAdd("NODE_ENV", "production");
-        startInfo.Environment["INERTIA_SSR_PORT"] = url.Port.ToString(CultureInfo.InvariantCulture);
-
         foreach (var (name, value) in node.Environment)
         {
             startInfo.Environment[name] = value;
         }
 
-        lock (_gate)
-        {
-            if (_disposed || _stopRequested) return;
-            if (!TryStart(startInfo))
-            {
-                Fail(ssr, $"Could not start '{node.Executable}'.");
-                return;
-            }
-            _managedUrl = url;
-            _managedUrlText = ssr.Url;
-            _supervisor = SuperviseAsync(startInfo, url, node.RestartOnExit, _stopping.Token);
-        }
-        var started = Stopwatch.GetTimestamp();
-        while (Stopwatch.GetElapsedTime(started) < node.StartupTimeout)
-        {
-            if (IsReady)
-            {
-                return;
-            }
+        startInfo.Environment["INERTIA_SSR_PORT"] = port.ToString(CultureInfo.InvariantCulture);
+        return startInfo;
+    }
 
-            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+    // Page props travel to the renderer in clear text over plain HTTP: fine on loopback or a private network, worth a warning otherwise.
+    private void WarnAboutPlainHttpRemotes(SsrOptions ssr)
+    {
+        foreach (var url in ssr.Urls)
+        {
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttp && !uri.IsLoopback)
+            {
+                LogPlainHttpRemote(_logger, uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped));
+            }
         }
-
-        LogStartupTimeout(_logger, ssr.Url, node.StartupTimeout);
-        Fail(ssr, $"The SSR server did not become healthy within {node.StartupTimeout}.");
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -165,35 +236,48 @@ internal sealed partial class SsrNodeProcess(
     private Task BeginStop()
     {
         _stopRequested = true;
-        _ready = false;
+        foreach (var instance in _instances)
+        {
+            instance.Ready = false;
+        }
+
         return _stopTask ??= Task.Run(StopCoreAsync);
     }
 
     private async Task StopCoreAsync()
     {
         LogStopping(_logger);
-        Process? process;
+        Instance[] instances;
+        lock (_gate) instances = _instances;
         try
         {
             await _stopping.CancelAsync().ConfigureAwait(false);
-            await _supervisor.ConfigureAwait(false);
+            await Task.WhenAll(instances.Select(i => i.Supervisor)).ConfigureAwait(false);
         }
         finally
         {
+            var exits = new List<Task>();
             lock (_gate)
             {
-                process = _process;
-                Kill();
+                foreach (var instance in instances)
+                {
+                    if (instance.Process is { } process)
+                    {
+                        Kill(process);
+                        exits.Add(process.WaitForExitAsync().WaitAsync(ShutdownGrace));
+                    }
+                }
             }
-            if (process is not null)
+
+            if (exits.Count > 0)
             {
-                await process.WaitForExitAsync().WaitAsync(ShutdownGrace).ConfigureAwait(false);
+                await Task.WhenAll(exits).ConfigureAwait(false);
                 LogStopped(_logger);
             }
         }
     }
 
-    /// <summary>Kills the process tree if it still runs (e.g. the host was disposed without being stopped).</summary>
+    /// <summary>Kills the process trees if they still run (e.g. the host was disposed without being stopped).</summary>
     public void Dispose()
     {
         Task stop;
@@ -211,51 +295,37 @@ internal sealed partial class SsrNodeProcess(
         {
             lock (_gate)
             {
-                _process?.Dispose();
-                _process = null;
+                foreach (var instance in _instances)
+                {
+                    instance.Process?.Dispose();
+                    instance.Process = null;
+                }
+
                 _stopping.Dispose();
             }
         }
     }
 
-    private async Task SuperviseAsync(ProcessStartInfo startInfo, Uri url, bool restart, CancellationToken stopping)
+    private async Task SuperviseAsync(Instance instance, SsrNodeProcessOptions node, CancellationToken stopping)
     {
         var delay = MinRestartDelay;
+        Process? process;
+        lock (_gate) process = instance.Process;
         try
         {
             while (true)
             {
                 var started = Stopwatch.GetTimestamp();
-                Process? process;
-                lock (_gate) process = _process;
+                var cause = "exit";
                 if (process is not null)
                 {
-                    while (!process.HasExited && !IsReady)
-                    {
-                        stopping.ThrowIfCancellationRequested();
-                        if (await PingAsync(url, TimeSpan.FromSeconds(1), stopping).ConfigureAwait(false))
-                        {
-                            lock (_gate)
-                            {
-                                if (!_disposed && !_stopRequested && !process.HasExited && ReferenceEquals(process, _process)) _ready = true;
-                            }
-                            if (IsReady)
-                            {
-                                LogHealthy(_logger, url.ToString());
-                                if (await FindExposedAddressAsync(url.Port, stopping).ConfigureAwait(false) is { } exposed)
-                                {
-                                    LogExposed(_logger, exposed.ToString(), url.Port);
-                                }
-                            }
-                        }
-                        if (!IsReady) await Task.Delay(100, stopping).ConfigureAwait(false);
-                    }
-                    await process.WaitForExitAsync(stopping).ConfigureAwait(false);
-                    lock (_gate) _ready = false;
-                    LogExited(_logger, process.ExitCode);
+                    cause = await RunAsync(instance, process, node, stopping).ConfigureAwait(false);
+                    lock (_gate) instance.Ready = false;
+                    if (cause == "exit") LogExited(_logger, process.ExitCode);
+                    if (cause == "exposure") return; // restarting would expose it again
                 }
 
-                if (!restart)
+                if (!node.RestartOnExit)
                 {
                     return;
                 }
@@ -268,15 +338,22 @@ internal sealed partial class SsrNodeProcess(
                 LogRestarting(_logger, delay);
                 await Task.Delay(delay, stopping).ConfigureAwait(false);
                 delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, MaxRestartDelay.Ticks));
-                if (IsOccupied(url, stopping))
+                if (IsOccupied(instance.Port, stopping))
                 {
-                    LogStartupFailure(_logger, $"The managed SSR endpoint {url} is occupied; restart was skipped.");
+                    LogStartupFailure(_logger, $"The managed SSR endpoint {InstanceUrl(instance.Port)} is occupied; restart was skipped.");
+                    process = null; // nothing of ours runs: back off again instead of waiting on the old exit
                     continue;
                 }
+
                 lock (_gate)
                 {
                     if (_disposed || _stopRequested) return;
-                    TryStart(startInfo);
+                    process = TryStart(instance) ? instance.Process : null;
+                }
+
+                if (process is not null)
+                {
+                    metrics.RecordRestart(cause);
                 }
             }
         }
@@ -285,9 +362,84 @@ internal sealed partial class SsrNodeProcess(
         }
     }
 
-    private bool TryStart(ProcessStartInfo startInfo)
+    // Waits for the instance to become healthy, then checks it every LivenessInterval until it exits or stops answering.
+    // Returns why it ended: "exit", "liveness" (killed after repeated failed checks) or "exposure" (killed for answering beyond loopback).
+    private async Task<string> RunAsync(Instance instance, Process process, SsrNodeProcessOptions node, CancellationToken stopping)
+    {
+        var url = InstanceUrl(instance.Port);
+        while (!process.HasExited && !IsInstanceReady(instance.Index))
+        {
+            stopping.ThrowIfCancellationRequested();
+            if (await PingAsync(url, TimeSpan.FromSeconds(1), stopping).ConfigureAwait(false))
+            {
+                // Checked before the instance takes renders: an exposed instance never serves a page.
+                if (await FindExposedAddressAsync(instance.Port, stopping).ConfigureAwait(false) is { } exposed)
+                {
+                    if (!node.AllowNetworkExposure)
+                    {
+                        LogExposedStopped(_logger, exposed.ToString(), instance.Port);
+                        lock (_gate) Kill(process);
+                        await process.WaitForExitAsync(stopping).ConfigureAwait(false);
+                        return "exposure";
+                    }
+
+                    LogExposed(_logger, exposed.ToString(), instance.Port);
+                }
+
+                lock (_gate)
+                {
+                    if (!_disposed && !_stopRequested && !process.HasExited && ReferenceEquals(process, instance.Process)) instance.Ready = true;
+                }
+
+                if (IsInstanceReady(instance.Index))
+                {
+                    LogHealthy(_logger, url);
+                    InstanceReady?.Invoke(instance.Index);
+                }
+            }
+
+            if (!IsInstanceReady(instance.Index)) await Task.Delay(100, stopping).ConfigureAwait(false);
+        }
+
+        // Alive is not healthy: a blocked event loop keeps the process running but answers nothing.
+        var exited = process.WaitForExitAsync(stopping);
+        var failures = 0;
+        while (!process.HasExited)
+        {
+            var completed = await Task.WhenAny(exited, Task.Delay(node.LivenessInterval, stopping)).ConfigureAwait(false);
+            await completed.ConfigureAwait(false); // surfaces cancellation on stop
+            if (completed == exited)
+            {
+                break;
+            }
+
+            if (await PingAsync(url, LivenessTimeout, stopping).ConfigureAwait(false))
+            {
+                failures = 0;
+            }
+            else if (++failures >= node.LivenessFailureThreshold && !process.HasExited)
+            {
+                LogUnresponsive(_logger, url, failures);
+                lock (_gate)
+                {
+                    instance.Ready = false;
+                    Kill(process);
+                }
+
+                await exited.ConfigureAwait(false);
+                return "liveness";
+            }
+        }
+
+        await exited.ConfigureAwait(false);
+        return "exit";
+    }
+
+    // Called under the lifecycle gate.
+    private bool TryStart(Instance instance)
     {
         if (_disposed || _stopRequested) return false;
+        var startInfo = instance.StartInfo;
         var process = new Process { StartInfo = startInfo };
         process.OutputDataReceived += (_, e) =>
         {
@@ -317,18 +469,18 @@ internal sealed partial class SsrNodeProcess(
 
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        _process?.Dispose();
-        _process = process;
-        _ready = false;
+        instance.Process?.Dispose();
+        instance.Process = process;
+        instance.Ready = false;
         LogSpawned(_logger, process.Id, startInfo.FileName, string.Join(' ', startInfo.ArgumentList));
         return true;
     }
 
-    private void Kill()
+    private void Kill(Process process)
     {
         try
         {
-            if (_process is { HasExited: false } process)
+            if (!process.HasExited)
             {
                 process.Kill(entireProcessTree: true);
                 LogKilled(_logger, process.Id);
@@ -340,16 +492,17 @@ internal sealed partial class SsrNodeProcess(
         }
     }
 
-    private async Task<bool> PingAsync(Uri url, TimeSpan timeout, CancellationToken cancellationToken)
+    private async Task<bool> PingAsync(string url, TimeSpan timeout, CancellationToken cancellationToken)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(timeout);
         try
         {
-            using var response = await httpClients.CreateClient(SsrGateway.HttpClientName).GetAsync($"{url.ToString().TrimEnd('/')}/health", HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+            using var response = await httpClients.CreateClient(SsrGateway.HttpClientName).GetAsync($"{url}/health", HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
             return response.IsSuccessStatusCode;
         }
-        catch (Exception ex) when (ex is HttpRequestException or SocketException or OperationCanceledException or InvalidOperationException or FormatException)
+        catch (Exception ex) when (ex is HttpRequestException or SocketException or InvalidOperationException or FormatException
+            || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             return false;
         }
@@ -394,18 +547,12 @@ internal sealed partial class SsrNodeProcess(
         return null;
     }
 
-    private static bool IsOccupied(Uri url, CancellationToken cancellationToken)
+    private static bool IsOccupied(int port, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IPAddress[] addresses = IPAddress.TryParse(url.DnsSafeHost, out var address)
-            ? [address] : [IPAddress.Loopback, IPAddress.IPv6Loopback];
-        foreach (var local in addresses)
-        {
-            if (local.AddressFamily == AddressFamily.InterNetworkV6 && !Socket.OSSupportsIPv6) continue;
-            using var socket = new Socket(local.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { ExclusiveAddressUse = true };
-            try { socket.Bind(new IPEndPoint(local, url.Port)); }
-            catch (SocketException) { return true; }
-        }
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp) { ExclusiveAddressUse = true };
+        try { socket.Bind(new IPEndPoint(IPAddress.Loopback, port)); }
+        catch (SocketException) { return true; }
         return false;
     }
 
@@ -417,10 +564,20 @@ internal sealed partial class SsrNodeProcess(
 
     private static void Fail(SsrOptions ssr, string message)
     {
-        if (ssr.ThrowOnError)
+        if (ssr.Mode == SsrMode.Required)
         {
             throw new InertiaSsrException($"Inertia SSR failed (startup): {message}", "startup");
         }
+    }
+
+    private sealed class Instance(int index, int port, ProcessStartInfo startInfo)
+    {
+        public int Index { get; } = index;
+        public int Port { get; } = port;
+        public ProcessStartInfo StartInfo { get; } = startInfo;
+        public Process? Process { get; set; }
+        public bool Ready { get; set; }
+        public Task Supervisor { get; set; } = Task.CompletedTask;
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The Vite dev server is running: SSR goes through it and no Node SSR process is started.")]
@@ -441,13 +598,25 @@ internal sealed partial class SsrNodeProcess(
     [LoggerMessage(Level = LogLevel.Warning, Message = "The SSR server also accepts connections on {Address}:{Port}. It serves unauthenticated /render and /shutdown endpoints; bind it to loopback with inertia({{ ssr: {{ host: '127.0.0.1' }} }}) in the Vite config.")]
     private static partial void LogExposed(ILogger logger, string address, int port);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Stopped the SSR server: it also accepts connections on {Address}:{Port} and serves unauthenticated /render and /shutdown endpoints. Bind it to loopback with inertia({{ ssr: {{ host: '127.0.0.1' }} }}) in the Vite config, or set NodeProcess.AllowNetworkExposure. Pages render on the client.")]
+    private static partial void LogExposedStopped(ILogger logger, string address, int port);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "The SSR server at {Url} did not become healthy within {Timeout}; pages render on the client until it does.")]
     private static partial void LogStartupTimeout(ILogger logger, string url, TimeSpan timeout);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The SSR servers at {Urls} did not become healthy within {Timeout}. With NodeProcess.Instances > 1 every instance needs its own port: the SSR entry must listen on process.env.INERTIA_SSR_PORT, e.g. createServer(render, {{ port: Number(process.env.INERTIA_SSR_PORT) }}).")]
+    private static partial void LogInstancesNotHealthy(ILogger logger, string urls, TimeSpan timeout);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The SSR server at {Url} failed {Failures} health checks in a row; killing it so it can be restarted.")]
+    private static partial void LogUnresponsive(ILogger logger, string url, int failures);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The SSR server {Url} is reached over plain HTTP: page props cross the network unencrypted. Use HTTPS or keep the renderer on a private network.")]
+    private static partial void LogPlainHttpRemote(ILogger logger, string url);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Managed SSR startup failed: {Reason}")]
     private static partial void LogStartupFailure(ILogger logger, string reason);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Stopping the owned Node SSR process.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Stopping the owned Node SSR processes.")]
     private static partial void LogStopping(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Line}")]

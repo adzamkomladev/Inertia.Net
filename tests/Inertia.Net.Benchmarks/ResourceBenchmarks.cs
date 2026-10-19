@@ -82,7 +82,14 @@ public class SsrBufferingBenchmarks
         services.AddSingleton<Microsoft.Extensions.Hosting.IHostEnvironment>(new BenchHostEnvironment(BenchApp.CreateContentRoot()));
         services.AddLogging();
         services.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => new Handler(_body));
-        services.AddInertia(o => { o.Ssr.Enabled = true; o.Ssr.Url = url; o.Ssr.Timeout = timeout; o.Ssr.MaxResponseBytes = _body.Length; });
+        services.AddInertia(o =>
+        {
+            o.Ssr.Mode = SsrMode.Preferred;
+            o.Ssr.Urls.Add(url);
+            o.Ssr.Timeout = timeout;
+            o.Ssr.MaxResponseBytes = _body.Length;
+            o.Ssr.CircuitBreaker.Enabled = false; // measure the failure paths themselves, not the open-circuit skip
+        });
         var provider = services.BuildServiceProvider();
         _services.Add(provider);
         return provider;
@@ -97,13 +104,20 @@ public class SsrBufferingBenchmarks
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         using var response = await _clients.CreateClient(SsrGateway.HttpClientName).SendAsync(request, timeout.Token);
         var bytes = await response.Content.ReadAsByteArrayAsync(timeout.Token);
-        return JsonSerializer.Deserialize(bytes, InertiaJsonContext.Default.SsrResponse)?.Body?.Length;
+        using var render = SsrGateway.ParseRender(bytes);
+        return render?.Body.Length;
     }
 
     // Body lengths: the 1.1 gateway returned a string (1 char per ASCII byte); the gateway now returns UTF-8 bytes.
-    [Benchmark] public async ValueTask<int?> Streaming() => (await _renderer.RenderAsync(_context))?.Body.Length;
-    [Benchmark] public async ValueTask<int?> Oversized() => (await _oversizedRenderer.RenderAsync(_context))?.Body.Length;
-    [Benchmark] public async ValueTask<int?> Timeout() => (await _timeoutRenderer.RenderAsync(_context))?.Body.Length;
+    [Benchmark] public ValueTask<int?> Streaming() => BodyLength(_renderer);
+    [Benchmark] public ValueTask<int?> Oversized() => BodyLength(_oversizedRenderer);
+    [Benchmark] public ValueTask<int?> Timeout() => BodyLength(_timeoutRenderer);
+
+    private async ValueTask<int?> BodyLength(IInertiaSsrRenderer renderer)
+    {
+        using var render = await renderer.RenderAsync(_context);
+        return render?.Body.Length;
+    }
     [Benchmark]
     public async Task Cancellation()
     {

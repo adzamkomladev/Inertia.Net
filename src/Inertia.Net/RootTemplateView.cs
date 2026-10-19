@@ -9,12 +9,43 @@ using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
-/// <summary>The server-side-rendered head and body of a page, as UTF-8 HTML. Supplied by the SSR phase; null means render on the client.</summary>
-internal readonly record struct SsrRender(ReadOnlyMemory<byte> Head, ReadOnlyMemory<byte> Body)
+/// <summary>
+/// The server-side-rendered head and body of a page, as UTF-8 HTML. Supplied by the SSR phase; null means render on the client.
+/// A render parsed from an SSR response lives in a pooled array: dispose it once the HTML is written.
+/// </summary>
+internal sealed class SsrRender : IDisposable
 {
+    private byte[]? _rented;
+
+    public SsrRender(ReadOnlyMemory<byte> head, ReadOnlyMemory<byte> body)
+    {
+        Head = head;
+        Body = body;
+    }
+
     public SsrRender(string head, string body)
         : this(Encoding.UTF8.GetBytes(head), Encoding.UTF8.GetBytes(body))
     {
+    }
+
+    internal SsrRender(byte[] rented, Range head, Range body)
+    {
+        _rented = rented;
+        Head = rented.AsMemory(head);
+        Body = rented.AsMemory(body);
+    }
+
+    public ReadOnlyMemory<byte> Head { get; private set; }
+
+    public ReadOnlyMemory<byte> Body { get; private set; }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _rented, null) is { } rented)
+        {
+            Head = Body = default;
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 }
 
@@ -52,7 +83,7 @@ internal sealed class RootTemplateView : IInertiaRootView
             ?? throw new FileNotFoundException($"The Inertia root template '{path}' was not found. Create it (it must contain @inertia), or set InertiaOptions.RootView / InertiaResult.WithRootView.", path);
 
         var http = context.HttpContext;
-        var ssr = _ssr is null ? null : await _ssr.RenderAsync(context);
+        using var ssr = _ssr is null ? null : await _ssr.RenderAsync(context);
 
         // The Vite tags can fail (no manifest, unknown entry): resolve them before the first byte goes out, so a failure surfaces
         // as a clean exception instead of an error page appended to half a document.

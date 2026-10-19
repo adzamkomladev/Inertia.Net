@@ -24,9 +24,20 @@ internal sealed class RazorInertiaRootView(IActionResultExecutor<ViewResult> exe
             viewData[key] = value;
         }
 
-        await executor.ExecuteAsync(
-            new ActionContext(http, http.GetRouteData(), new ActionDescriptor()),
-            new ViewResult { ViewName = context.RootView, ViewData = viewData });
+        try
+        {
+            await executor.ExecuteAsync(
+                new ActionContext(http, http.GetRouteData(), new ActionDescriptor()),
+                new ViewResult { ViewName = context.RootView, ViewData = viewData });
+        }
+        finally
+        {
+            // The rendered HTML is in a pooled buffer that the tag helpers have written by now.
+            if (http.Items[SsrKey] is Task<SsrRender?> { IsCompletedSuccessfully: true, Result: { } ssr })
+            {
+                ssr.Dispose();
+            }
+        }
     }
 
     /// <summary>The context of the page being rendered; the tag helpers only work inside the root view.</summary>
