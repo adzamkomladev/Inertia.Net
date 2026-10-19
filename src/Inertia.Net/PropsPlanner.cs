@@ -79,7 +79,8 @@ internal sealed class PropsPlanner : IDisposable
 
         foreach (var planned in _planned)
         {
-            if (planned.Task is { } task)
+            Task? task = planned.Task; // awaited as a Task: Task<T> rejects SuppressThrowing at runtime (CA2261)
+            if (task is not null)
             {
                 await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 _ = task.Exception; // observed: the walk reports failures itself
