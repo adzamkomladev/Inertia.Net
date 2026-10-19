@@ -87,7 +87,7 @@ public sealed class ViteOptions
 }
 
 /// <summary>How a page uses server-side rendering.</summary>
-public enum SsrMode
+public enum SsrMode : byte // a byte keeps InertiaResult and InertiaRootViewContext within their existing object size
 {
     /// <summary>The page is rendered on the client only.</summary>
     Disabled,
