@@ -337,6 +337,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         }
         catch (OperationCanceledException) when (!aborted.IsCancellationRequested)
         {
+            // The queue timeout or the render deadline elapsed first: no slot, which the caller reports as overloaded.
         }
         finally
         {

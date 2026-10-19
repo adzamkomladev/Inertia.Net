@@ -371,10 +371,11 @@ public sealed class SsrNodeProcessTests
             using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
             try
             {
-                await http.GetAsync($"{url}/hang", TestContext.Current.CancellationToken);
+                (await http.GetAsync($"{url}/hang", TestContext.Current.CancellationToken)).Dispose();
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
+                // The answer may never arrive once the event loop is blocked; only the hang matters here.
             }
 
             await WaitUntilAsync(async () => ssr.ProcessId is { } pid && pid != first && IsServerRendered(await RenderAsync(harness)), TimeSpan.FromSeconds(30));
@@ -446,13 +447,13 @@ public sealed class SsrNodeProcessTests
             await Assert.ThrowsAnyAsync<HttpRequestException>(() => http.GetAsync($"{url}/crash", TestContext.Current.CancellationToken));
             await WaitUntilAsync(() => Task.FromResult(harness.Logs.Entries.Any(e => e.Message.EndsWith("is occupied; restart was skipped.", StringComparison.Ordinal))));
             Assert.Null(ssr.ProcessId);
-            squatter!.Stop();
+            squatter!.Dispose();
 
             await WaitUntilAsync(async () => ssr.ProcessId is { } pid && pid != first && IsServerRendered(await RenderAsync(harness)));
         }
         finally
         {
-            squatter?.Stop();
+            squatter?.Dispose();
             await ssr.StopAsync(CancellationToken.None);
         }
     }

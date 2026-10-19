@@ -77,13 +77,10 @@ internal sealed class SsrCircuitBreaker(SsrCircuitBreakerOptions options, TimePr
 
         lock (_gate)
         {
-            if (probe || ++_failures >= _threshold)
+            if ((probe || ++_failures >= _threshold) && _state != (int)SsrCircuitState.Open)
             {
-                if (_state != (int)SsrCircuitState.Open)
-                {
-                    Volatile.Write(ref _openUntil, timeProvider.GetUtcNow().UtcTicks + _breakDuration.Ticks);
-                    Transition(SsrCircuitState.Open);
-                }
+                Volatile.Write(ref _openUntil, timeProvider.GetUtcNow().UtcTicks + _breakDuration.Ticks);
+                Transition(SsrCircuitState.Open);
             }
         }
     }
