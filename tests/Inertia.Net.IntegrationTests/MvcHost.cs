@@ -119,6 +119,12 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     [HttpGet("/error-page")]
     public IResult ErrorPage() => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
 
+    [HttpGet("/ssr-off")]
+    public IResult SsrOff() => Render("Page").WithoutSsr();
+
+    [HttpGet("/ssr-required")]
+    public IResult SsrRequired() => Render("Page").WithSsr(SsrMode.Required);
+
     // MVC-specific routes, used by MvcTests.
     [HttpPost("/mvc/nested")]
     public IActionResult Nested([FromBody] MvcNestedInput input) => Ok();

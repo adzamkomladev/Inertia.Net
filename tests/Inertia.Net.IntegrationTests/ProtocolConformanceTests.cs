@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.IntegrationTests;
 
@@ -29,6 +30,8 @@ namespace Inertia.Net.IntegrationTests;
 /// <item><term>GET /preserve-fragment</term><description><c>PreserveFragment()</c>; 302 to <c>/page</c>.</description></item>
 /// <item><term>GET /encrypt</term><description><c>EncryptHistory()</c>; render <c>Page</c>.</description></item>
 /// <item><term>GET /error-page</term><description>render <c>Error</c> with <c>{ status: 404 }</c> and status code 404.</description></item>
+/// <item><term>GET /ssr-off</term><description>render <c>Page</c> with <c>WithoutSsr()</c>.</description></item>
+/// <item><term>GET /ssr-required</term><description>render <c>Page</c> with <c>WithSsr(SsrMode.Required)</c>.</description></item>
 /// </list>
 /// </summary>
 public abstract class ProtocolConformanceTests<THost>
@@ -49,6 +52,28 @@ public abstract class ProtocolConformanceTests<THost>
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         JsonAssert.Equal("""[{"name":"first","extra":10},{"name":"second","extra":20}]""", (await response.PageAsync())["props"]!["rows"]);
+    }
+
+    [Fact]
+    public async Task Responses_choose_their_own_ssr_mode()
+    {
+        var ssr = new FakeSsrServer();
+        await using var app = await StartAsync(new ConformanceSetup
+        {
+            Inertia = o => o.Ssr.Mode = SsrMode.Preferred,
+            Services = s => s.AddHttpClient(InertiaSsr.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => ssr),
+        });
+        var client = app.CreateClient();
+
+        Assert.Contains(FakeSsrServer.Body, await client.GetStringAsync("/page", TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.DoesNotContain(FakeSsrServer.Body, await client.GetStringAsync("/ssr-off", TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal(1, ssr.Calls);
+
+        ssr.Down = true;
+        Assert.DoesNotContain(FakeSsrServer.Body, await client.GetStringAsync("/page", TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        var error = await Assert.ThrowsAsync<InertiaSsrException>(() => client.GetAsync("/ssr-required", TestContext.Current.CancellationToken));
+        Assert.Equal("connection", error.Type); // thrown before the response started, so the app's error handling sees it
+        Assert.Equal(3, ssr.Calls);
     }
 
     [Fact]

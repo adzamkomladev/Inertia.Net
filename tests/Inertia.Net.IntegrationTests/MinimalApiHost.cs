@@ -92,6 +92,8 @@ public sealed class MinimalApiHost : IConformanceHost
         });
 
         app.MapGet("/error-page", () => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404));
+        app.MapGet("/ssr-off", () => Render("Page").WithoutSsr());
+        app.MapGet("/ssr-required", () => Render("Page").WithSsr(SsrMode.Required));
     }
 
     internal static InertiaProps ArrayProps() => new() { ["rows"] = new object[]
