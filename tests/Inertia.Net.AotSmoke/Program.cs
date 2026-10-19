@@ -57,12 +57,17 @@ app.MapGet("/dashboard", (HttpContext context) =>
         ["count"] = 3,
         ["tags"] = new[] { "a", "b" },
         ["user"] = new InertiaProps { ["name"] = "Ada", ["roles"] = Always(new[] { "admin" }) },
-        ["stats"] = Defer(ct => ValueTask.FromResult(new Stat("visits", 1234))),
+        ["stats"] = Defer(ct => ValueTask.FromResult(new Stat("visits", 1234))).Parallel(),
         ["chart"] = Defer(() => new[] { 1, 2, 3 }, "charts"),
         ["countries"] = Once(() => new[] { "BE", "FR" }).Until(TimeSpan.FromHours(1)),
         ["feed"] = Scroll(() => new FeedPage([new Stat($"post-{page}", page)], page, page < 3)),
         ["filters"] = Always(() => "all"),
         ["lazy"] = Optional(() => "loaded"),
+        ["today"] = Prop(async ct =>
+        {
+            await Task.Yield();
+            return new Stat("today", 7);
+        }).Parallel(),
     });
 });
 

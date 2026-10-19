@@ -20,6 +20,7 @@ public static class InertiaServiceCollectionExtensions
         options.Validate(o => o.Ssr.MaxResponseBytes is null or > 0, "Ssr.MaxResponseBytes must be positive or null.")
             .Validate(o => o.Ssr.Timeout == Timeout.InfiniteTimeSpan || (o.Ssr.Timeout >= TimeSpan.Zero && o.Ssr.Timeout.TotalMilliseconds <= uint.MaxValue - 1),
                 "Ssr.Timeout must be nonnegative and supported by CancellationTokenSource, or Timeout.InfiniteTimeSpan.")
+            .Validate(o => o.Props.MaxConcurrency > 0, "Props.MaxConcurrency must be positive.")
             .ValidateOnStart();
 
         services.TryAddSingleton(TimeProvider.System);

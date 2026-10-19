@@ -35,6 +35,7 @@ internal sealed class PropsWriter : IDisposable
     private Dictionary<string, List<string>>? _deferredProps;
     private Dictionary<string, (ScrollMetadata Metadata, bool Reset)>? _scrollProps;
     private Dictionary<string, (string Prop, long? ExpiresAt)>? _onceProps;
+    private PropsPlanner? _planner;
 
     public PropsWriter(InertiaPageWriter owner, Utf8JsonWriter writer, InertiaRequest request, string component, CancellationToken cancellationToken)
     {
@@ -50,6 +51,42 @@ internal sealed class PropsWriter : IDisposable
 
     public async ValueTask WritePropsAsync(List<PropEntry> props)
     {
+        if (InertiaProp.ParallelUsed)
+        {
+            Plan(props);
+        }
+
+        if (_planner is null)
+        {
+            await WriteEntriesAsync(props);
+            return;
+        }
+
+        try
+        {
+            await WriteEntriesAsync(props);
+            await _planner.DrainAsync(cancel: false);
+        }
+        catch (Exception ex)
+        {
+            // No loader outlives the render. The walk meets failures in protocol order, except a cancellation caused by a parallel
+            // loader that failed further on: then that loader's failure (the first such, in protocol order) is the render's.
+            await _planner.DrainAsync(cancel: true);
+            if (ex is OperationCanceledException && _planner.Failed && !_cancellationToken.IsCancellationRequested)
+            {
+                _planner.FirstFailure()?.Throw();
+            }
+
+            throw;
+        }
+        finally
+        {
+            _planner.Dispose();
+        }
+    }
+
+    private async ValueTask WriteEntriesAsync(List<PropEntry> props)
+    {
         _writer.WriteStartObject();
         foreach (var entry in props)
         {
@@ -57,6 +94,77 @@ internal sealed class PropsWriter : IDisposable
         }
 
         _writer.WriteEndObject();
+    }
+
+    // Finds the Parallel() props the walk will resolve, with the walk's own inclusion rules, and starts their loaders. Covers top-level
+    // props and literal objects (their children keep partial filtering); props anywhere else resolve in turn.
+    private void Plan(List<PropEntry> props)
+    {
+        try
+        {
+            foreach (var entry in props)
+            {
+                PlanEntry(entry.Key, entry.Value, entry.Type);
+            }
+        }
+        catch
+        {
+            _planner?.Dispose(); // nothing was started yet
+            throw;
+        }
+
+        _planner?.Start();
+    }
+
+    private void PlanEntry(string key, object? value, Type declaredType)
+    {
+        var mark = Push(key);
+        try
+        {
+            if (value is InertiaProp prop)
+            {
+                if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
+                {
+                    (_planner ??= new PropsPlanner(_owner.Options.Props.MaxConcurrency, _cancellationToken)).Add(prop);
+                }
+
+                return;
+            }
+
+            if (value is not IEnumerable<KeyValuePair<string, object?>> || Decide(null, value, declaredType, parentWasResolved: false) != Inclusion.Resolved)
+            {
+                return;
+            }
+
+            switch (value)
+            {
+                case Dictionary<string, object?> dictionary:
+                    foreach (var (childKey, child) in dictionary)
+                    {
+                        PlanEntry(childKey, child, typeof(object));
+                    }
+
+                    break;
+                case IReadOnlyDictionary<string, object?> dictionary:
+                    foreach (var (childKey, child) in dictionary)
+                    {
+                        PlanEntry(childKey, child, typeof(object));
+                    }
+
+                    break;
+                case IDictionary<string, object?> dictionary:
+                    foreach (var (childKey, child) in dictionary)
+                    {
+                        PlanEntry(childKey, child, typeof(object));
+                    }
+
+                    break;
+            }
+        }
+        finally
+        {
+            _pathLength = mark;
+        }
     }
 
     /// <summary>Writes sharedProps through onceProps, in protocol order, omitting empty ones.</summary>
@@ -139,6 +247,7 @@ internal sealed class PropsWriter : IDisposable
         try
         {
             _cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfPlanFailed();
             var p = prop as InertiaProp;
             switch (Decide(p, prop, declaredType, parentWasResolved))
             {
@@ -344,14 +453,24 @@ internal sealed class PropsWriter : IDisposable
         _cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            return (true, await prop.ResolveAsync(_cancellationToken));
+            return (true, _planner is not null && _planner.TryTake(prop, out var started) ? await started : await prop.ResolveAsync(_cancellationToken));
         }
-        catch (Exception ex) when (prop.ShouldRescue && !(ex is OperationCanceledException && _cancellationToken.IsCancellationRequested))
+        catch (Exception ex) when (prop.ShouldRescue
+            && !(ex is OperationCanceledException && (_cancellationToken.IsCancellationRequested || _planner is { Failed: true })))
         {
             var path = new string(Path);
             _owner.Logger.LogError(ex, "Inertia prop '{Path}' failed to resolve and was rescued.", path);
             (_rescuedProps ??= []).Add(path);
             return (false, null);
+        }
+    }
+
+    // A parallel loader failed: the render fails, so stop walking (WritePropsAsync reports that loader's failure).
+    private void ThrowIfPlanFailed()
+    {
+        if (_planner is { Failed: true })
+        {
+            throw new OperationCanceledException("A parallel prop loader failed.");
         }
     }
 
