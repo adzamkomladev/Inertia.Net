@@ -140,23 +140,14 @@ internal sealed class PropsWriter : IDisposable
         {
             _cancellationToken.ThrowIfCancellationRequested();
             var p = prop as InertiaProp;
-
-            // Always props and the children of resolved values bypass partial filtering.
-            if (_isPartial && !parentWasResolved && p is not { IsAlways: true } && !PathMatchesPartialRequest())
+            switch (Decide(p, prop, declaredType, parentWasResolved))
             {
-                return;
-            }
-
-            if (_isPartial && !parentWasResolved && p is not { IsAlways: true }
-                && _request.Except is { } excluded && LeadsToAny(excluded, Path) && IsArray(prop, declaredType))
-            {
-                return;
-            }
-
-            if (p is not null && !_isPartial && ExcludeFromInitialResponse(p))
-            {
-                if (key is null) _writer.WriteNullValue();
-                return;
+                case Inclusion.Filtered:
+                    return;
+                case Inclusion.Excluded:
+                    CollectExcludedMetadata(p!);
+                    if (key is null) _writer.WriteNullValue();
+                    return;
             }
 
             var value = prop;
@@ -175,8 +166,9 @@ internal sealed class PropsWriter : IDisposable
                 if (value is InertiaProp inner)
                 {
                     p = inner;
-                    if (!_isPartial && ExcludeFromInitialResponse(p))
+                    if (!_isPartial && IsExcludedFromInitialResponse(p))
                     {
+                        CollectExcludedMetadata(p);
                         if (key is null) _writer.WriteNullValue();
                         return;
                     }
@@ -363,38 +355,69 @@ internal sealed class PropsWriter : IDisposable
         }
     }
 
-    private bool ExcludeFromInitialResponse(InertiaProp prop)
+    private enum Inclusion
     {
-        // Optional and deferred props are never part of the initial response; they still report their metadata.
-        if (prop.Load != PropLoad.Eager)
-        {
-            if (prop.Load == PropLoad.Deferred && !WasAlreadyLoadedByClient(prop))
-            {
-                _deferredProps ??= new(StringComparer.Ordinal);
-                if (!_deferredProps.TryGetValue(prop.Group, out var paths))
-                {
-                    _deferredProps[prop.Group] = paths = [];
-                }
+        /// <summary>Not part of this response (partial reload filtering): nothing is written.</summary>
+        Filtered,
 
-                paths.Add(new string(Path));
+        /// <summary>Left out of the initial response (optional, deferred, or a once prop the client has): only its metadata is written.</summary>
+        Excluded,
+
+        /// <summary>Resolved and written.</summary>
+        Resolved,
+    }
+
+    // Whether the prop (or plain value) at Path is part of this response, decided before any loader runs and without side effects,
+    // so the parallel planner and the writer agree on which loaders run.
+    private Inclusion Decide(InertiaProp? p, object? prop, Type declaredType, bool parentWasResolved)
+    {
+        // Always props and the children of resolved values bypass partial filtering.
+        if (_isPartial && !parentWasResolved && p is not { IsAlways: true })
+        {
+            if (!PathMatchesPartialRequest())
+            {
+                return Inclusion.Filtered;
             }
 
-            if (prop.IsMerge)
+            if (_request.Except is { } excluded && LeadsToAny(excluded, Path) && IsArray(prop, declaredType))
             {
-                CollectMergeable(prop);
+                return Inclusion.Filtered;
             }
-
-            CollectOnce(prop);
-            return true;
         }
 
-        if (_request.IsInertia && WasAlreadyLoadedByClient(prop))
+        return p is not null && !_isPartial && IsExcludedFromInitialResponse(p) ? Inclusion.Excluded : Inclusion.Resolved;
+    }
+
+    // Optional and deferred props are never part of the initial response, nor are once props an Inertia client already has.
+    private bool IsExcludedFromInitialResponse(InertiaProp prop) =>
+        prop.Load != PropLoad.Eager || (_request.IsInertia && WasAlreadyLoadedByClient(prop));
+
+    // Props left out of the initial response still report their metadata.
+    private void CollectExcludedMetadata(InertiaProp prop)
+    {
+        if (prop.Load == PropLoad.Eager)
         {
             CollectOnce(prop);
-            return true;
+            return;
         }
 
-        return false;
+        if (prop.Load == PropLoad.Deferred && !WasAlreadyLoadedByClient(prop))
+        {
+            _deferredProps ??= new(StringComparer.Ordinal);
+            if (!_deferredProps.TryGetValue(prop.Group, out var paths))
+            {
+                _deferredProps[prop.Group] = paths = [];
+            }
+
+            paths.Add(new string(Path));
+        }
+
+        if (prop.IsMerge)
+        {
+            CollectMergeable(prop);
+        }
+
+        CollectOnce(prop);
     }
 
     private bool WasAlreadyLoadedByClient(InertiaProp prop)
