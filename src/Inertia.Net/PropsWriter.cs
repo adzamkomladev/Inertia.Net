@@ -125,9 +125,17 @@ internal sealed class PropsWriter : IDisposable
             {
                 if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    (_planner ??= new PropsPlanner(_owner.Options.Props.MaxConcurrency, _cancellationToken)).Add(prop);
+                    Prefetch(prop);
                 }
 
+                return;
+            }
+
+            // A lazy object's loader can start early; the dot keys below it are only known once it resolves, so they resolve in turn.
+            if (value is InertiaPageWriter.LazyDotObject { Source.IsParallel: true } lazy
+                && Decide(null, value, declaredType, parentWasResolved: false) == Inclusion.Resolved)
+            {
+                Prefetch(lazy.Source);
                 return;
             }
 
@@ -166,6 +174,8 @@ internal sealed class PropsWriter : IDisposable
             _pathLength = mark;
         }
     }
+
+    private void Prefetch(InertiaProp prop) => (_planner ??= new PropsPlanner(_owner.Options.Props.MaxConcurrency, _cancellationToken)).Add(prop);
 
     /// <summary>Writes sharedProps through onceProps, in protocol order, omitting empty ones.</summary>
     public void WriteMetadata(List<string>? sharedPropKeys)
@@ -329,6 +339,12 @@ internal sealed class PropsWriter : IDisposable
                 return;
             case JsonNode node:
                 _owner.WriteNode(_writer, node);
+                return;
+            case InertiaPageWriter.LazyDotObject lazy:
+                // Deviation 7: the lazy prop under dot keys resolves only now that its path is part of the response. Plain props
+                // are never rescued, so it always resolves.
+                var (_, source) = await ResolveAsync(lazy.Source);
+                await WriteObjectAsync(lazy.Apply(source), parentWasResolved);
                 return;
             case Dictionary<string, object?> dictionary: // InertiaProps: struct enumerator, no boxing
                 await WriteObjectAsync(dictionary, parentWasResolved);

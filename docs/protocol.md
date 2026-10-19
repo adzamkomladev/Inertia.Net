@@ -88,7 +88,7 @@ ctor:
 resolve(shared, props):
   sharedPropKeys = top-level keys of shared (first segment of dotted keys)
   all = shared overlaid with props            // page props override shared at the top level
-  all = unpackDotProps(all)                   // top-level "a.b" keys become nested objects
+  all = unpackDotProps(all)                   // top-level "a.b" keys become nested objects; lazy parents stay lazy (deviation 7)
   return (resolveProps(all, "", false), metadata)
 
 resolveProps(props, prefix, parentWasResolved):
@@ -256,7 +256,7 @@ The React refresh preamble is:
 4. **Flash, errors and history flags** go through a Data-Protection-encrypted cookie by default (AOT-safe; no Session/TempData requirement).
 5. **Validation errors survive chained redirects** like flash data does. Laravel re-flashes only its Inertia flash data, so its `errors` are lost when the redirect target redirects again.
 6. **Typed objects given directly are literal objects.** A POCO with `InertiaProp` members passed as a prop (not returned by a loader) keeps partial-reload filtering for its members, like an `InertiaProps` dictionary. Laravel resolves `JsonSerializable`/`Arrayable` objects first, so their children bypass the filter. The client deep-merges nested partial responses, so the result on the page is the same.
-7. **Lazy values at dot keys stay lazy.** `"auth.user" = Prop(...)` is unpacked as a prop and only resolved when included; Laravel calls closures at dot keys while unpacking. Intermediate plain lazy props are resolved, as in Laravel's `ensurePathIsTraversable`.
+7. **Lazy values at dot keys stay lazy.** `"auth.user" = Prop(...)` is unpacked as a prop and only resolved when included; Laravel calls closures at dot keys while unpacking. A plain lazy prop with dot keys below it (`"auth" = Prop(...)` next to `"auth.user"`) stays lazy too: it is resolved only when its path is part of the response, then the dot keys are applied to a copy of its value in their original order, giving the object Laravel's `ensurePathIsTraversable` builds. A partial reload that leaves it out never runs its loader; Laravel resolves it on every request.
 8. **Supersets of Laravel's prop flags.** Any prop can be `Once()`, `Rescue()`d, merged or deferred (Laravel limits e.g. rescue to `DeferProp`), and list headers are trimmed (`"a, b"` works; Laravel does not trim).
 9. **SSR returning an empty body falls back to client rendering.** Laravel echoes the empty body.
 10. **The Vite hot file is only read in Development** (or use `Vite.DevServerUrl`), so a stale `hot` file deployed to production cannot point pages at a dev server. Laravel reads it in any environment.

@@ -285,6 +285,36 @@ public class ParallelPropsTests
     }
 
     [Fact]
+    public async Task A_parallel_prop_with_dot_keys_below_it_starts_early()
+    {
+        var barrier = new Barrier(2);
+        var loads = 0;
+        InertiaProps Props() => new()
+        {
+            ["auth"] = Inertia.Prop(async () =>
+            {
+                Interlocked.Increment(ref loads);
+                await barrier.ArriveAsync();
+                return new InertiaProps { ["user"] = "Ada" };
+            }).Parallel(),
+            ["auth.permissions"] = new[] { "edit" },
+            ["b"] = Inertia.Prop(async () =>
+            {
+                await barrier.ArriveAsync();
+                return "b";
+            }).Parallel(),
+        };
+
+        var page = await Page(Props());
+        JsonAssert.Equal("""{"errors":{},"auth":{"user":"Ada","permissions":["edit"]},"b":"b"}""", page["props"]);
+
+        barrier = new Barrier(1);
+        var partial = await Page(Props(), c => c.AsPartial(only: "b"));
+        JsonAssert.Equal("""{"errors":{},"b":"b"}""", partial["props"]);
+        Assert.Equal(1, loads);
+    }
+
+    [Fact]
     public async Task A_prop_instance_at_two_paths_resolves_at_each()
     {
         var calls = 0;

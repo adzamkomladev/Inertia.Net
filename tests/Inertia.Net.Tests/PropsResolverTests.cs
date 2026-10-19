@@ -546,6 +546,57 @@ public class PropsResolverTests
         JsonAssert.Equal("""{"user":{"name":"Jonathan Reinink","permissions":["edit-posts"]}}""", page["props"]!["auth"]);
     }
 
+    // Deviation 7: a lazy prop with dot keys below it resolves only when its path is part of the response.
+    [Fact]
+    public async Task Dot_notation_parent_closure_does_not_run_when_left_out_of_a_partial_reload()
+    {
+        var loads = 0;
+        InertiaProps Props() => new()
+        {
+            ["auth"] = Inertia.Prop(() =>
+            {
+                loads++;
+                return new InertiaProps { ["user"] = new InertiaProps { ["name"] = "Jonathan Reinink" } };
+            }),
+            ["auth.user.permissions"] = Inertia.Prop(() => new[] { "edit-posts" }),
+            ["other"] = "value",
+        };
+
+        var excluded = await Page(Props(), c => c.AsPartial("other"));
+        JsonAssert.Equal("""{"errors":{},"other":"value"}""", excluded["props"]);
+        var excepted = await Page(Props(), c => c.AsPartial(except: "auth"));
+        JsonAssert.Equal("""{"errors":{},"other":"value"}""", excepted["props"]);
+        Assert.Equal(0, loads);
+
+        var included = await Page(Props(), c => c.AsPartial("auth.user.permissions"));
+        JsonAssert.Equal("""{"errors":{},"auth":{"user":{"permissions":["edit-posts"]}}}""", included["props"]);
+        var whole = await Page(Props(), c => c.AsPartial("auth"));
+        JsonAssert.Equal("""{"errors":{},"auth":{"user":{"name":"Jonathan Reinink","permissions":["edit-posts"]}}}""", whole["props"]);
+        Assert.Equal(2, loads);
+    }
+
+    [Fact]
+    public async Task Dot_notation_keys_below_lazy_props_apply_in_order()
+    {
+        var page = await Page(new InertiaProps
+        {
+            ["auth"] = Inertia.Prop(() => new InertiaProps
+            {
+                ["user"] = Inertia.Prop(() => new InertiaProps { ["name"] = "Jonathan Reinink", ["email"] = "jonathan@example.com" }),
+                ["team"] = new InertiaProps { ["name"] = "Core", ["size"] = 3 },
+                ["scalar"] = 1,
+            }),
+            ["auth.user.permissions"] = Inertia.Prop(() => new[] { "edit-posts" }),
+            ["auth.team"] = new InertiaProps { ["name"] = "Replaced" },
+            ["auth.team.lead"] = "Ada",
+            ["auth.scalar.value"] = 2,
+        });
+
+        JsonAssert.Equal(
+            """{"user":{"name":"Jonathan Reinink","email":"jonathan@example.com","permissions":["edit-posts"]},"team":{"name":"Replaced","lead":"Ada"},"scalar":{"value":2}}""",
+            page["props"]!["auth"]);
+    }
+
     [Fact]
     public async Task Dot_notation_optional_prop_is_excluded_on_initial_load_and_included_on_partial_request()
     {
