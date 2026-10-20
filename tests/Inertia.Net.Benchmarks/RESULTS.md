@@ -12,16 +12,22 @@ Measured on the Windows laptop (i5-8265U, .NET 10.0.13, Release). "Before" is co
 | Partial reload, 2 of 20 (`--render-probe`) | 1,584 B | 1,592 B |
 | HTML + Vite tags, 20 props (`--render-probe`) | 2,800 B | 2,824 B |
 
-Timings, from BenchmarkDotNet (`--filter '*RenderBenchmarks.Json*'`), alternating 1.3.0 and 1.4.0 twice from clean worktrees:
+Timings, from BenchmarkDotNet (`--filter '*JsonTypedPoco*' '*Json20Props*'`), alternating 1.3.0 and 1.4.0 from clean worktrees.
+The final 1.4.0 skips two lookups per render that the first 1.4.0 build made (the pages check from DI, the DevTools capture from the
+request features) unless that feature is on:
 
-| Benchmark | 1.3.0, run 1 | 1.4.0, run 1 | 1.3.0, run 2 | 1.4.0, run 2 |
+| Round | 20 props, 1.3.0 | 20 props, 1.4.0 | Typed, 1.3.0 | Typed, 1.4.0 |
 |---|---:|---:|---:|---:|
-| JSON, 20 mixed props | 17.13 ± 0.86 µs | 18.24 ± 0.68 µs | 31.25 ± 3.93 µs | 17.09 ± 0.51 µs |
-| JSON, typed POCO props | 11.38 ± 0.26 µs | 20.31 ± 3.29 µs | 10.59 ± 0.20 µs | 13.13 ± 0.98 µs |
+| First build, 1 | 15.06 ± 0.30 µs | 14.73 ± 0.22 µs | 10.37 ± 0.21 µs | 12.38 ± 0.87 µs |
+| First build, 2 | 28.08 ± 3.03 µs | 16.65 ± 0.81 µs | 10.49 ± 0.39 µs | 10.64 ± 0.21 µs |
+| First build, 3 | 15.06 ± 0.22 µs | 14.52 ± 0.25 µs | 10.27 ± 0.19 µs | 10.42 ± 0.21 µs |
+| Final, 1 | 16.85 ± 0.24 µs | 14.44 ± 0.29 µs | 9.88 ± 0.17 µs | 11.26 ± 0.41 µs |
+| Final, 2 | 16.36 ± 0.32 µs | 18.00 ± 0.34 µs | 13.58 ± 0.42 µs | 11.95 ± 0.20 µs |
+| Final, 3 | 17.68 ± 0.28 µs | 15.11 ± 0.28 µs | 9.81 ± 0.19 µs | 9.96 ± 0.08 µs |
 
-The laptop's load changes between runs (the same build differs by up to 2x), so these runs cannot resolve a difference of 10%. The
-20-prop page is level. The typed page was slower in both 1.4.0 runs, with wide errors, while the alternating render probes had it
-level; re-measure on a quiet machine before relying on either. Allocation is exact and is the stable signal.
+The same build moves by 10–90% between processes on this laptop, so single rounds disagree in both directions. Where both sides of a
+round ran with a tight error, the typed page is 0.15–0.3 µs (1.5–3%) slower and the 20-prop page is level or faster; that is about
+the size of the work added to every render, and below what this machine can resolve. Allocation is exact and is the stable signal.
 
 | Workload (`--cache-probe`) | Without the cache | With the cache |
 |---|---:|---:|

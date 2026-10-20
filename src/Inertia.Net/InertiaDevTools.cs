@@ -126,10 +126,14 @@ internal sealed partial class DevToolsRecorder
         _options = options.Value;
         _development = environment.IsDevelopment();
         _enabled = _options.Enabled ?? _development;
+        if (_enabled) Recording = true;
         _time = time;
         _pages = pages;
         _logger = logger;
     }
+
+    // Set once any app records: until then a render skips the capture lookup (the same idea as InertiaProp.ParallelUsed).
+    internal static volatile bool Recording;
 
     public bool Enabled => _enabled;
 

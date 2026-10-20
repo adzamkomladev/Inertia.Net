@@ -43,13 +43,15 @@ internal sealed class InertiaPageWriter
         ILogger<InertiaPageWriter> logger,
         VersionProvider versionProvider,
         InertiaMetrics metrics,
-        IMemoryCache propCache)
+        IMemoryCache propCache,
+        PageComponentCheck pages)
     {
         Options = options.Value;
         TimeProvider = timeProvider;
         Logger = logger;
         Metrics = metrics;
         PropCache = propCache;
+        Pages = pages.Enabled ? pages : null;
         _versionProvider = versionProvider;
 
         var source = jsonOptions.Value.SerializerOptions;
@@ -90,6 +92,9 @@ internal sealed class InertiaPageWriter
 
     /// <summary>The app's memory cache, which holds <see cref="InertiaProp.Cache"/> values.</summary>
     public IMemoryCache PropCache { get; }
+
+    /// <summary>The Development pages check, or null while it is off (no per-render lookup).</summary>
+    public PageComponentCheck? Pages { get; }
 
     /// <summary>Writer options whose output is valid JSON and safe inside a <c>&lt;script&gt;</c> element.</summary>
     public JsonWriterOptions HtmlWriterOptions => _htmlWriterOptions;

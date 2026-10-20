@@ -96,14 +96,14 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         var started = metrics?.PageDurationEnabled == true ? Stopwatch.GetTimestamp() : 0;
         var request = new InertiaRequest(httpContext.Request.Headers);
         var response = httpContext.Response;
-        services.GetService<PageComponentCheck>()?.EnsureExists(Component);
+        pageWriter.Pages?.EnsureExists(Component);
         using var activity = InertiaDiagnostics.ActivitySource.StartActivity("inertia.render");
         activity?.SetTag("inertia.component", Component);
 
         // The page is fully buffered first, so a failing loader never produces a partial 200.
         using var page = await pageWriter.WritePageAsync(httpContext, Component, Props, request, htmlSafe: !request.IsInertia);
         var partial = string.Equals(request.PartialComponent, Component, StringComparison.Ordinal);
-        var devTools = httpContext.Features.Get<DevToolsCapture>();
+        var devTools = DevToolsRecorder.Recording ? httpContext.Features.Get<DevToolsCapture>() : null;
         if (devTools is not null)
         {
             devTools.Component = Component;
