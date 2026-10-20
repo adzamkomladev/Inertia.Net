@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Inertia.Net;
 
 /// <summary>
-/// A page prop with Inertia loading behavior (lazy, optional, deferred, always, merge, once, scroll, rescue).
+/// A page prop with Inertia loading behavior (lazy, optional, deferred, always, merge, once, scroll, rescue, parallel, cached).
 /// Create instances with the factories on <see cref="Inertia"/>; the fluent methods mutate and return the same instance.
 /// </summary>
 [JsonConverter(typeof(InertiaPropJsonConverter))]
@@ -31,6 +31,8 @@ public abstract class InertiaProp
     internal ScrollMetadata? ScrollMetadata;
     internal bool ShouldRescue;
     internal bool IsParallel;
+    internal string? CacheKey;
+    internal TimeSpan CacheDuration;
 
     // Set once any prop is marked Parallel(): until then no render pays for the planning walk.
     internal static volatile bool ParallelUsed;
@@ -132,6 +134,24 @@ public abstract class InertiaProp
 
         IsParallel = true;
         ParallelUsed = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Keeps the resolved value as JSON in the app's <c>IMemoryCache</c> under <paramref name="key"/> for <paramref name="duration"/>:
+    /// while it is cached the loader does not run and the JSON is written as it is. Every request that uses the key gets the same value,
+    /// so put the user or tenant in the key for data that depends on them (<c>$"orders:{userId}"</c>). Only the loading changes: an
+    /// optional, deferred, merged or once prop keeps that behavior. The value must be plain data, without <see cref="InertiaProp"/> values
+    /// inside it. Each app instance has its own cache, and two requests that miss at the same time both run the loader.
+    /// </summary>
+    /// <param name="key">The cache key, unique to the value; keys live in their own space, apart from the app's cache keys.</param>
+    /// <param name="duration">How long the value is reused, from when it was resolved.</param>
+    public InertiaProp Cache(string key, TimeSpan duration)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(duration, TimeSpan.Zero);
+        CacheKey = key;
+        CacheDuration = duration;
         return this;
     }
 

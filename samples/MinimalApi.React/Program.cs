@@ -15,10 +15,16 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResol
 builder.Services.AddValidation();
 // CSRF: the Inertia client sends the XSRF-TOKEN cookie back as X-XSRF-TOKEN; UseInertiaAntiforgery() issues and validates it.
 builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+builder.Services.AddResponseCompression(); // gzip and Brotli for the page JSON and HTML (see the README on HTTPS)
 builder.Services.AddInertia(o =>
 {
     o.Share("appName", "Inertia.Net Sample");
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
+    o.Vite.Prefetch = VitePrefetch.Waterfall; // fetch the other pages' chunks after load, three at a time
+    // Development only: Render("Users/Indx") fails fast, and the TypeScript declarations are rewritten at startup.
+    o.Pages.Directory = "ClientApp/pages";
+    o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";
+    o.TypeScript.FlashData<Flash>();
     o.Ssr.BundlePath = "ssr/ssr.js";
     if (ssr)
     {
@@ -27,13 +33,27 @@ builder.Services.AddInertia(o =>
     }
 });
 
+builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension, in Development only
+
 var app = builder.Build();
 
-app.UseStaticFiles();
+app.UseResponseCompression();
+app.UseStaticFiles(new StaticFileOptions
+{
+    // Vite puts a content hash in every file name under build/assets, so browsers can keep them for good.
+    OnPrepareResponse = c =>
+    {
+        if (c.Context.Request.Path.StartsWithSegments("/build/assets"))
+        {
+            c.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        }
+    },
+});
 app.UseInertia();
 app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
 
-app.MapGet("/", () => Render("Home"));
+app.MapInertiaDevTools();
+app.MapInertia("/", "Home");
 
 app.MapGet("/users", () => Render("Users/Index", new InertiaProps
 {
@@ -109,6 +129,9 @@ namespace MinimalApi.React
 
     public sealed record DeferredRow(string Name, InertiaProp Extra);
 
+    /// <summary>The flash data the pages read (<c>page.flash</c>), for the generated TypeScript declarations.</summary>
+    public sealed record Flash(string? Success);
+
     public sealed class ContactForm
     {
         [Required]
@@ -132,6 +155,7 @@ namespace MinimalApi.React
     [JsonSerializable(typeof(ContactForm))]
     [JsonSerializable(typeof(NewsletterForm))]
     [JsonSerializable(typeof(List<DeferredRow>))]
+    [JsonSerializable(typeof(Flash))]
     internal sealed partial class AppJsonContext : JsonSerializerContext;
 
     /// <summary>In-memory demo state shared by all requests (a sample, not a database).</summary>

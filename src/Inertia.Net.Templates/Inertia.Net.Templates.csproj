@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- dotnet new templates: an Inertia.Net app with a React, Vue or Svelte client. The content is packed as-is, never compiled here. -->
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <Description>dotnet new templates for Inertia.js v3 apps on ASP.NET Core with Inertia.Net: React, Vue or Svelte with Vite.</Description>
+    <PackageTags>$(PackageTags) templates dotnet-new</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <!-- Items keep their path under the project: content/.template.config, content/common, ... -->
+    <ContentTargetFolders>.</ContentTargetFolders>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <IncludeSymbols>false</IncludeSymbols>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <!-- No lib/ folder: a template package has no assemblies. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="content\**\*" Exclude="content\**\bin\**;content\**\obj\**;content\**\node_modules\**;content\**\wwwroot\build\**" />
+  </ItemGroup>
+</Project>

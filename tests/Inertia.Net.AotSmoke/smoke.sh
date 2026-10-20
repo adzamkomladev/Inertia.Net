@@ -207,6 +207,27 @@ header_is Location /fe/page
 inertia GET /fe/page
 has '"flash":{"toast":"Contact Ada"}'
 
+# 15. 1.4: MapInertia, cached props, CSP nonce, Vite prefetch, DevTools entries.
+inertia GET /about
+status_is 200
+has '"component":"About"'
+has '"since":2026'
+inertia GET /dashboard
+has '"cached":{"name":"cached","value":5}'
+inertia GET /dashboard
+has '"cached":{"name":"cached","value":5}'
+req GET / -H 'X-Nonce: c21va2U='
+has '<script data-page="app" nonce="c21va2U=" type="application/json">'
+has '<script type="module" nonce="c21va2U=" src="/build/assets/app-4f2a91c3.js"></script>'
+inertia GET /about -H 'X-Inertia-Devtools-Tab: smoke-tab'
+ID=$(tr -d '\r' <"$T/h" | sed -n 's/^X-Inertia-Devtools-Id: //Ip')
+[ -n "$ID" ] || fail "no X-Inertia-Devtools-Id header"
+req GET "/_inertia/devtools/entries/$ID"
+status_is 200
+has '"requestType":"navigate"'
+has '"tabUuid":"smoke-tab"'
+has '"component":"About"'
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES smoke check(s) failed. App log:"
   cat "$T/app.log"

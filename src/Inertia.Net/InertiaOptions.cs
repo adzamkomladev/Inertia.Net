@@ -34,6 +34,29 @@ public sealed class InertiaOptions
     /// <summary>Lists the top-level shared prop keys in <c>sharedProps</c>. Default true.</summary>
     public bool ExposeSharedPropKeys { get; set; } = true;
 
+    /// <summary>
+    /// Returns the request's Content Security Policy nonce, for example the one a security-headers middleware generated. When it returns a
+    /// value, every script and stylesheet tag Inertia.Net writes (the page script, the Vite tags, the React refresh preamble and the prefetch
+    /// script) carries <c>nonce="..."</c>. The value must be a base64 or base64url string. Null (the default) writes no nonce.
+    /// </summary>
+    public Func<HttpContext, string?>? CspNonce { get; set; }
+
+    /// <summary>
+    /// Turns a redirect to another origin, answered to an Inertia request, into a <c>409</c> with <c>X-Inertia-Location</c>, so the client
+    /// makes a full page visit instead of following the redirect with XHR (which the browser blocks without CORS). Prefetch requests are
+    /// left alone. Default true.
+    /// </summary>
+    public bool ConvertExternalRedirects { get; set; } = true;
+
+    /// <summary>Returns the page <c>url</c>. Null (the default) uses PathBase, Path and QueryString, e.g. <c>/app/users?page=2</c>.</summary>
+    public Func<HttpContext, string>? UrlResolver { get; set; }
+
+    /// <summary>Where the page components live, for the Development check that a rendered component exists.</summary>
+    public InertiaPagesOptions Pages { get; } = new();
+
+    /// <summary>TypeScript declarations for typed page props, shared props and flash data, written in Development.</summary>
+    public InertiaTypeScriptOptions TypeScript { get; } = new();
+
     /// <summary>Vite integration settings.</summary>
     public ViteOptions Vite { get; } = new();
 
@@ -84,6 +107,29 @@ public sealed class ViteOptions
 
     /// <summary>Replaces <c>{PathBase}/{BuildDirectory}</c> as the URL prefix of built assets, e.g. <c>https://cdn.example.com/build</c>.</summary>
     public string? AssetBaseUrl { get; set; }
+
+    /// <summary>
+    /// Prefetches the code-split chunks the entries can load later (their dynamic imports, such as lazily resolved page components) once
+    /// the page has loaded, at low priority, so the next navigation does not wait for them. Default <see cref="VitePrefetch.None"/>.
+    /// Production tags only.
+    /// </summary>
+    public VitePrefetch Prefetch { get; set; }
+
+    /// <summary>How many chunks <see cref="VitePrefetch.Waterfall"/> downloads at a time. Default 3.</summary>
+    public int PrefetchConcurrency { get; set; } = 3;
+}
+
+/// <summary>How <see cref="ViteOptions.Prefetch"/> downloads the chunks.</summary>
+public enum VitePrefetch
+{
+    /// <summary>No prefetching.</summary>
+    None,
+
+    /// <summary>A few chunks at a time (<see cref="ViteOptions.PrefetchConcurrency"/>), each finished download starting the next.</summary>
+    Waterfall,
+
+    /// <summary>Every chunk at once.</summary>
+    Aggressive,
 }
 
 /// <summary>How a page uses server-side rendering.</summary>
@@ -151,6 +197,9 @@ public sealed class SsrOptions
     /// <summary>Stops sending renders to an SSR server that keeps failing, and probes it again after a pause.</summary>
     public SsrCircuitBreakerOptions CircuitBreaker { get; } = new();
 
+    /// <summary>Keeps rendered HTML in memory, keyed by the page JSON, so an identical page is not rendered twice. Off by default.</summary>
+    public SsrCacheOptions Cache { get; } = new();
+
     /// <summary>The managed Node SSR process settings; null (the default) when the SSR servers run on their own. Set by <see cref="UseNodeProcess"/>.</summary>
     public SsrNodeProcessOptions? NodeProcess { get; private set; }
 
@@ -203,6 +252,39 @@ public sealed class SsrCircuitBreakerOptions
 
     /// <summary>How long an open circuit skips the server before one render probes it again. Default 10 seconds.</summary>
     public TimeSpan BreakDuration { get; set; } = TimeSpan.FromSeconds(10);
+}
+
+/// <summary>
+/// The SSR response cache. A render is a function of the page JSON (component, props, url, version and the other page fields), so a page
+/// whose JSON is byte-for-byte the same as one rendered within <see cref="Duration"/> reuses that HTML without a call to the SSR server.
+/// It pays off for pages many visitors see identically (anonymous landing, catalog and article pages); pages with per-user props make one
+/// entry per user. Disabled while the Vite dev server runs.
+/// </summary>
+public sealed class SsrCacheOptions
+{
+    /// <summary>
+    /// How long a render is reused. Default <see cref="TimeSpan.Zero"/>: no caching, unless a response sets its own duration with
+    /// <see cref="InertiaResult.WithSsrCache"/>.
+    /// </summary>
+    public TimeSpan Duration { get; set; }
+
+    /// <summary>The cache size in bytes of HTML (head and body); the least recently used renders are evicted beyond it. Default 64 MiB.</summary>
+    public long MaxBytes { get; set; } = 64 * 1024 * 1024;
+}
+
+/// <summary>Where the client-side page components live (<see cref="InertiaOptions.Pages"/>).</summary>
+public sealed class InertiaPagesOptions
+{
+    /// <summary>
+    /// The pages directory, relative to the content root, e.g. <c>ClientApp/pages</c>. When set, rendering a component in Development
+    /// throws <see cref="InvalidOperationException"/> unless <c>{Directory}/{component}{extension}</c> exists for one of
+    /// <see cref="Extensions"/>, and names the closest existing component. Null (the default) disables the check. Never checked outside
+    /// Development.
+    /// </summary>
+    public string? Directory { get; set; }
+
+    /// <summary>The page file extensions to look for. Default <c>.tsx</c>, <c>.jsx</c>, <c>.ts</c>, <c>.js</c>, <c>.vue</c>, <c>.svelte</c>.</summary>
+    public IList<string> Extensions { get; } = [".tsx", ".jsx", ".ts", ".js", ".vue", ".svelte"];
 }
 
 /// <summary>Settings for the Node SSR processes that the app starts and supervises (<see cref="SsrOptions.UseNodeProcess"/>).</summary>

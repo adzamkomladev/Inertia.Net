@@ -9,10 +9,14 @@ internal sealed class InertiaOptionsValidator : IValidateOptions<InertiaOptions>
     {
         List<string>? failures = null;
         Check(options.Props.MaxConcurrency > 0, "Props.MaxConcurrency must be positive.");
+        Check(options.Vite.PrefetchConcurrency > 0, "Vite.PrefetchConcurrency must be positive.");
+        Check(options.Pages.Extensions.All(e => e is ['.', _, ..]), "Pages.Extensions entries must start with '.', e.g. \".tsx\".");
         var ssr = options.Ssr;
         Check(IsDeadline(ssr.Timeout, allowZero: false), "Ssr.Timeout must be positive and supported by CancellationTokenSource, or Timeout.InfiniteTimeSpan.");
         Check(ssr.MaxResponseBytes > 0, "Ssr.MaxResponseBytes must be positive.");
         Check(ssr.MaxPageBytes > 0, "Ssr.MaxPageBytes must be positive.");
+        Check(ssr.Cache.Duration >= TimeSpan.Zero, "Ssr.Cache.Duration must not be negative.");
+        Check(ssr.Cache.MaxBytes > 0, "Ssr.Cache.MaxBytes must be positive.");
         foreach (var url in ssr.Urls)
         {
             Check(Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps),

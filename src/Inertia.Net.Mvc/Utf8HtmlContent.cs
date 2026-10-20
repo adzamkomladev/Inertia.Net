@@ -54,6 +54,12 @@ internal sealed class PageBodyHtmlContent(InertiaRootViewContext context) : IHtm
         var id = HtmlEncoder.Default.Encode(context.RootElementId);
         writer.Write("<script data-page=\"");
         writer.Write(id);
+        if (context.CspNonce is { } nonce)
+        {
+            writer.Write("\" nonce=\"");
+            writer.Write(nonce);
+        }
+
         writer.Write("\" type=\"application/json\">");
         Utf8HtmlContent.Write(writer, context.PageJson.Span);
         writer.Write("</script><div id=\"");

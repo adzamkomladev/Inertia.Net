@@ -170,6 +170,21 @@ public sealed class MvcRazorTests
     }
 
     [Fact]
+    public async Task Tag_helpers_and_the_page_script_carry_the_csp_nonce()
+    {
+        await using var app = await StartAsync(o =>
+        {
+            o.Vite.DevServerUrl = "http://localhost:5173";
+            o.CspNonce = _ => "bm9uY2U=";
+        });
+        var html = await HtmlAsync(app.CreateClient());
+
+        Assert.Contains("""<script type="module" nonce="bm9uY2U=">import RefreshRuntime""", html, StringComparison.Ordinal);
+        Assert.Contains("""<script type="module" nonce="bm9uY2U=" src="http://localhost:5173/@vite/client"></script>""", html, StringComparison.Ordinal);
+        Assert.Contains("""<script data-page="app" nonce="bm9uY2U=" type="application/json">""", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Ssr_head_and_body_come_from_a_single_ssr_call()
     {
         await using var app = await StartAsync();

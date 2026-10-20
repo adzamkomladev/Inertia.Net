@@ -10,6 +10,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.Unicode;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
@@ -35,11 +36,20 @@ internal sealed class InertiaPageWriter
 
     private readonly VersionProvider _versionProvider;
 
-    public InertiaPageWriter(IOptions<InertiaOptions> options, IOptions<HttpJsonOptions> jsonOptions, TimeProvider timeProvider, ILogger<InertiaPageWriter> logger, VersionProvider versionProvider)
+    public InertiaPageWriter(
+        IOptions<InertiaOptions> options,
+        IOptions<HttpJsonOptions> jsonOptions,
+        TimeProvider timeProvider,
+        ILogger<InertiaPageWriter> logger,
+        VersionProvider versionProvider,
+        InertiaMetrics metrics,
+        IMemoryCache propCache)
     {
         Options = options.Value;
         TimeProvider = timeProvider;
         Logger = logger;
+        Metrics = metrics;
+        PropCache = propCache;
         _versionProvider = versionProvider;
 
         var source = jsonOptions.Value.SerializerOptions;
@@ -76,6 +86,14 @@ internal sealed class InertiaPageWriter
 
     public ILogger Logger { get; }
 
+    public InertiaMetrics Metrics { get; }
+
+    /// <summary>The app's memory cache, which holds <see cref="InertiaProp.Cache"/> values.</summary>
+    public IMemoryCache PropCache { get; }
+
+    /// <summary>Writer options whose output is valid JSON and safe inside a <c>&lt;script&gt;</c> element.</summary>
+    public JsonWriterOptions HtmlWriterOptions => _htmlWriterOptions;
+
     /// <summary>
     /// Resolves the props and writes the whole page object. With <paramref name="htmlSafe"/> the JSON can be embedded
     /// in a <c>&lt;script&gt;</c> element as-is. The caller disposes the returned buffer.
@@ -105,7 +123,7 @@ internal sealed class InertiaPageWriter
             await propsWriter.WritePropsAsync(entries);
             rootInfo?.OnSerialized?.Invoke(props!);
             feature = httpContext.Features.Get<InertiaFeature>();
-            writer.WriteString("url", GetUrl(httpContext.Request));
+            writer.WriteString("url", Options.UrlResolver?.Invoke(httpContext) ?? GetUrl(httpContext.Request));
             writer.WriteString("version", _versionProvider.GetVersion(httpContext));
             propsWriter.WriteMetadata(sharedPropKeys);
 

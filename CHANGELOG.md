@@ -7,6 +7,60 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-20
+
+Adds cached props, an SSR response cache, Vite chunk prefetching, CSP nonces, generated TypeScript declarations, the Inertia DevTools
+protocol, `MapInertia`, `InertiaView` for MVC and `dotnet new` templates (`Inertia.Net.Templates`). One default changes: a redirect to
+another origin, answered to an Inertia request, becomes a `409` with `X-Inertia-Location`; see
+[docs/migrating-to-1.4.md](docs/migrating-to-1.4.md). The Inertia v3 JSON protocol and the cookie, session and TempData formats are
+unchanged. Update all packages together.
+
+### Changed
+
+- `InertiaOptions.ConvertExternalRedirects` (default `true`): a 301, 302, 303, 307 or 308 whose `Location` has another scheme, host or
+  port, answered to an Inertia request that is not a prefetch, becomes `409` with `X-Inertia-Location`, so the client makes a full visit
+  instead of an XHR the browser blocks. Same-origin and relative redirects are unchanged; `false` restores 1.3.
+
+### Added
+
+- `InertiaProp.Cache(key, duration)`: the resolved value is kept as JSON in the app's `IMemoryCache` and reused without running the
+  loader. Works with optional, deferred, merged, once and scroll props; a parallel cached prop does not start its loader on a hit.
+  `AddInertia()` now calls `AddMemoryCache()`.
+- `Ssr.Cache.Duration`, `Ssr.Cache.MaxBytes` and `InertiaResult.WithSsrCache(duration)`: server-rendered HTML reused by the SHA-256 of
+  the page JSON, in a bounded cache of its own. Hits are recorded as `inertia.ssr.outcomes` with reason `cache`.
+- `ViteOptions.Prefetch` (`None`, `Waterfall`, `Aggressive`) and `PrefetchConcurrency`: the code-split chunks the entries can import
+  later are prefetched at low priority after the page loads.
+- `InertiaOptions.CspNonce`: a nonce on the page script, the Vite tags, the React refresh preamble, the prefetch script and the MVC tag
+  helpers. `InertiaRootViewContext.CspNonce` gives it to custom root views.
+- `InertiaAntiforgeryOptions.CookieRefresh` (`Always`, `Lazy`): with `Lazy`, a page load whose token still validates keeps it, so the
+  response has no `Set-Cookie` and no antiforgery `no-store`.
+- `InertiaOptions.TypeScript` (`OutputPath`, `Page<T>`, `SharedProps<T>`, `FlashData<T>`) and `InertiaPropTypeAttribute`: TypeScript
+  declarations for typed pages, shared props, flash data and the `InertiaConfig` augmentation, written in Development from the JSON
+  contracts.
+- `services.AddInertiaDevTools()` and `app.MapInertiaDevTools()`: the Inertia DevTools protocol (discovery tag, correlation headers,
+  per-tab entries with redaction, `GET /_inertia/devtools/entries[/{id}]`). Records in Development only by default.
+- `InertiaOptions.Pages` (`Directory`, `Extensions`): in Development, rendering a component without a page file throws and names the
+  closest component.
+- `app.MapInertia(pattern, component, props)`, a GET and HEAD page endpoint; `this.InertiaView(props)` and
+  `InertiaMvcOptions.ComponentResolver` in `Inertia.Net.Mvc`.
+- `InertiaOptions.UrlResolver` for the page `url`.
+- The `inertia.props.rescued` counter.
+- `Inertia.Net.Templates`: `dotnet new inertia --framework react|vue|svelte`, a Minimal API app with a typed Todos page.
+- Samples: response compression, immutable caching of `build/assets`, the pages check, DevTools; the React sample also prefetches,
+  generates its TypeScript declarations and maps `/` with `MapInertia`.
+
+### Performance
+
+- A cached prop hit skips the loader and the serialization: a 500-row loader went from 123–170 µs and 25 KB to 5–6 µs and 1.1 KB
+  per render (`--cache-probe`). An SSR cache hit skips the render call: 130–221 µs to 12–22 µs with an in-memory SSR server.
+- A render allocates 8 bytes more (JSON) and 24 bytes more (HTML) for the new per-response settings; timings are unchanged within noise.
+  See `tests/Inertia.Net.Benchmarks/RESULTS.md`.
+
+### Fixed
+
+- The FastEndpoints antiforgery conformance tests ran concurrently with the other FastEndpoints apps, which share static configuration,
+  and could fail intermittently.
+
 ## [1.3.0] - 2026-10-19
 
 Reworks server-side rendering so that a slow, failing or overloaded SSR server cannot slow down or take down the app, adds several SSR

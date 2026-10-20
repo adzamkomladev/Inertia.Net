@@ -4,6 +4,7 @@
     <Project Path="src/Inertia.Net.Mvc/Inertia.Net.Mvc.csproj" />
     <Project Path="src/Inertia.Net.Testing/Inertia.Net.Testing.csproj" />
     <Project Path="src/Inertia.Net/Inertia.Net.csproj" />
+    <Project Path="src/Inertia.Net.Templates/Inertia.Net.Templates.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/MinimalApi.React/MinimalApi.React.csproj" />

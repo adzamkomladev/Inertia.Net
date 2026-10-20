@@ -1,6 +1,6 @@
 # Inertia.Net
 
-Version 1.2 keeps the Inertia v3 JSON protocol and public signatures, and adds one-call CSRF protection (`UseInertiaAntiforgery()`). Review the [upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md) before updating; coming from 1.0, also read the [1.1 migration guidance](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.1.md).
+Version 1.4 adds cached props, an SSR response cache, Vite chunk prefetching, CSP nonces, generated TypeScript declarations and the Inertia DevTools protocol. One default changed: redirects to another origin become a full visit. Read the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md) and the [changelog](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md). Start a new app with `dotnet new install Inertia.Net.Templates` and `dotnet new inertia`.
 
 The core of Inertia.Net, a .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs (this package), MVC (`Inertia.Net.Mvc`) and FastEndpoints (`Inertia.Net.FastEndpoints`), with the React, Vue and Svelte clients, and is Native AOT and trim compatible.
 
@@ -39,7 +39,7 @@ app.Run();
 
 `Render`, `Defer`, `Back()` and `Location(...)` are called unqualified: the package adds `global using Inertia.Net;` and `global using static Inertia.Net.Inertia;` when `ImplicitUsings` is enabled (`Inertia.Render` does not compile outside the `Inertia.Net` namespace). Opt out with `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>`.
 
-What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll) with opt-in parallel loaders, partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR (several servers, a supervised Node process pool, circuit breakers, render slots, per-response modes, metrics and a health check), validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), CSRF protection (`UseInertiaAntiforgery()`), and an encrypted-cookie state store.
+What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll) with opt-in parallel loaders and cached props, partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR (several servers, a supervised Node process pool, circuit breakers, render slots, per-response modes, metrics and a health check), validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), CSRF protection (`UseInertiaAntiforgery()`), an encrypted-cookie state store, an SSR response cache, Vite chunk prefetching and CSP nonces, `MapInertia` page endpoints, TypeScript declarations from your C# page types, and the Inertia DevTools recorder (`AddInertiaDevTools()`).
 
 Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
 - [Quick start](https://github.com/adzamkomladev/Inertia.Net#quick-start) and [client setup](https://github.com/adzamkomladev/Inertia.Net#client-setup)

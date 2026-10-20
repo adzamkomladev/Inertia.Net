@@ -12,9 +12,10 @@ internal static class BenchApp
 {
     public const string Component = "Users/Index";
 
-    public static IServiceProvider CreateServices(Action<InertiaOptions>? configure = null)
+    public static IServiceProvider CreateServices(Action<InertiaOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
     {
         var services = new ServiceCollection();
+        configureServices?.Invoke(services);
         services.AddSingleton<IHostEnvironment>(new BenchHostEnvironment(CreateContentRoot()));
         services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
         services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, BenchJsonContext.Default));

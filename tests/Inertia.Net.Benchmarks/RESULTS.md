@@ -1,5 +1,40 @@
 # Inertia.Net benchmark results
 
+## 1.4 caches and per-response settings — 2026-10-20
+
+Measured on the Windows laptop (i5-8265U, .NET 10.0.13, Release), three repetitions in one process each. "Before" is commit `3adc319`
+(1.3.0) built from a separate worktree with the same probe source; timings on this laptop vary by tens of percent between runs, so
+ranges are given and allocation is the stable signal.
+
+| Workload (probe) | 1.3.0 | 1.4.0 |
+|---|---:|---:|
+| JSON, 20 mixed props (`--render-probe`) | 2,752 B; 18.9–43.2 µs | 2,760 B; 21.9–36.6 µs |
+| Typed POCO page (`--render-probe`) | 2,472 B; 13.8–19.5 µs | 2,480 B; 13.0–17.8 µs |
+| Partial reload, 2 of 20 (`--render-probe`) | 1,584 B; 9.8–15.9 µs | 1,592 B; 8.5–10.4 µs |
+| HTML + Vite tags, 20 props (`--render-probe`) | 2,800 B; 24.4–28.5 µs | 2,824 B; 19.2–28.0 µs |
+
+| Workload (`--cache-probe`) | Without the cache | With the cache |
+|---|---:|---:|
+| A prop whose loader maps 500 rows | 25,496 B; 123–170 µs | 1,136 B; 5.0–6.3 µs |
+| A server-rendered page (64 KiB of HTML, in-memory SSR server) | 3,448 B; 129–221 µs | 1,328 B; 11.6–22.3 µs |
+
+What changed:
+
+- **Per-response settings.** `InertiaResult` holds the SSR cache duration (8 bytes, a `TimeSpan` with a sentinel rather than a
+  nullable, which takes 16), and `InertiaRootViewContext` holds it and the CSP nonce (16 bytes). That is the whole allocation difference
+  of an ordinary render; the cache checks themselves allocate nothing when no prop uses `Cache()`.
+- **Cached props.** A hit writes the stored HTML-safe JSON with `WriteRawValue`: no loader, no serialization. The probe's loader does no
+  I/O, so a real query makes the gap wider.
+- **SSR cache.** A hit costs a SHA-256 of the page JSON and one `SsrRender`; the probe's SSR server answers from memory, so a real Node
+  render (milliseconds) makes the gap far wider.
+
+Reproduce:
+
+```sh
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --render-probe
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --cache-probe
+```
+
 ## Antiforgery, SSR and MVC streaming changes — 2026-10-18
 
 Measured in a cloud Linux container (Intel Xeon @ 2.10 GHz, 4 vCPUs, SDK 10.0.402, .NET 10.0.13), a different and noisier host than

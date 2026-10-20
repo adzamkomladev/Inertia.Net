@@ -14,6 +14,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     private string? _rootView;
     private Dictionary<string, object?>? _viewData;
     private SsrMode? _ssrMode;
+    private TimeSpan _ssrCacheDuration = InertiaRootViewContext.NoSsrCache; // not a TimeSpan?: 8 bytes less per result
 
     internal InertiaResult(string component, object? props)
     {
@@ -73,6 +74,17 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     /// <summary>Renders this response on the client only: same as <c>WithSsr(SsrMode.Disabled)</c>.</summary>
     public InertiaResult WithoutSsr() => WithSsr(SsrMode.Disabled);
 
+    /// <summary>
+    /// Reuses this page's server-rendered HTML for <paramref name="duration"/> when the page JSON is the same, overriding
+    /// <see cref="SsrCacheOptions.Duration"/>; <see cref="TimeSpan.Zero"/> turns the cache off for this response.
+    /// </summary>
+    public InertiaResult WithSsrCache(TimeSpan duration)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
+        _ssrCacheDuration = duration;
+        return this;
+    }
+
     /// <inheritdoc />
     public async Task ExecuteAsync(HttpContext httpContext)
     {
@@ -84,12 +96,19 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         var started = metrics?.PageDurationEnabled == true ? Stopwatch.GetTimestamp() : 0;
         var request = new InertiaRequest(httpContext.Request.Headers);
         var response = httpContext.Response;
+        services.GetService<PageComponentCheck>()?.EnsureExists(Component);
         using var activity = InertiaDiagnostics.ActivitySource.StartActivity("inertia.render");
         activity?.SetTag("inertia.component", Component);
 
         // The page is fully buffered first, so a failing loader never produces a partial 200.
         using var page = await pageWriter.WritePageAsync(httpContext, Component, Props, request, htmlSafe: !request.IsInertia);
         var partial = string.Equals(request.PartialComponent, Component, StringComparison.Ordinal);
+        var devTools = httpContext.Features.Get<DevToolsCapture>();
+        if (devTools is not null)
+        {
+            devTools.Component = Component;
+            devTools.PageJson = page.WrittenMemory.ToArray();
+        }
 
         response.StatusCode = _statusCode;
         InertiaHeaders.AppendVary(response.Headers);
@@ -113,7 +132,15 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
             _viewData ?? (IReadOnlyDictionary<string, object?>)InertiaRootViewContext.EmptyViewData,
             page.WrittenMemory,
             pageWriter.Options.RootElementId,
-            _ssrMode));
+            _ssrMode,
+            CspNonce.Resolve(pageWriter.Options.CspNonce, httpContext),
+            _ssrCacheDuration));
+        if (devTools is not null)
+        {
+            // The extension reads the first page's entry id from this tag; after the document is fine for a script data block.
+            await response.BodyWriter.WriteAsync(DevToolsRecorder.DiscoveryTag(devTools.Id), httpContext.RequestAborted);
+        }
+
         metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: false, partial);
     }
 

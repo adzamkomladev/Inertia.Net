@@ -17,9 +17,16 @@ public sealed class InertiaRootViewContext
 {
     internal static readonly Dictionary<string, object?> EmptyViewData = [];
 
-    internal InertiaRootViewContext(HttpContext httpContext, string component, string rootView, IReadOnlyDictionary<string, object?> viewData, ReadOnlyMemory<byte> pageJson, string rootElementId, SsrMode? ssrMode = null)
+    /// <summary>No SSR cache duration from the response (a sentinel instead of a nullable, which is twice the size).</summary>
+    internal static readonly TimeSpan NoSsrCache = TimeSpan.MinValue;
+
+    private readonly TimeSpan _ssrCacheDuration;
+
+    internal InertiaRootViewContext(HttpContext httpContext, string component, string rootView, IReadOnlyDictionary<string, object?> viewData, ReadOnlyMemory<byte> pageJson, string rootElementId, SsrMode? ssrMode = null, string? cspNonce = null, TimeSpan? ssrCacheDuration = null)
     {
         SsrMode = ssrMode;
+        CspNonce = cspNonce;
+        _ssrCacheDuration = ssrCacheDuration ?? NoSsrCache;
         HttpContext = httpContext;
         Component = component;
         RootView = rootView;
@@ -49,14 +56,31 @@ public sealed class InertiaRootViewContext
     /// <summary>The SSR mode the response asked for with <see cref="InertiaResult.WithSsr"/>; null to follow the configuration.</summary>
     public SsrMode? SsrMode { get; }
 
-    /// <summary>Writes <c>&lt;script data-page="{id}" type="application/json"&gt;{page}&lt;/script&gt;&lt;div id="{id}"&gt;&lt;/div&gt;</c>.</summary>
+    /// <summary>The request's CSP nonce (<see cref="InertiaOptions.CspNonce"/>), already checked; null when there is none.</summary>
+    public string? CspNonce { get; }
+
+    /// <summary>The SSR cache duration the response asked for with <see cref="InertiaResult.WithSsrCache"/>; null to follow the configuration.</summary>
+    internal TimeSpan? SsrCacheDuration => _ssrCacheDuration == NoSsrCache ? null : _ssrCacheDuration;
+
+    /// <summary>
+    /// Writes <c>&lt;script data-page="{id}" type="application/json"&gt;{page}&lt;/script&gt;&lt;div id="{id}"&gt;&lt;/div&gt;</c>, with
+    /// <c>nonce="..."</c> on the script when <see cref="CspNonce"/> is set.
+    /// </summary>
     public void WriteBody(IBufferWriter<byte> writer)
     {
         ArgumentNullException.ThrowIfNull(writer);
         var id = HtmlEncoder.Default.Encode(RootElementId);
         writer.Write("<script data-page=\""u8);
         Write(writer, id);
-        writer.Write("\" type=\"application/json\">"u8);
+        writer.Write("\""u8);
+        if (CspNonce is { } nonce)
+        {
+            writer.Write(" nonce=\""u8);
+            Write(writer, nonce);
+            writer.Write("\""u8);
+        }
+
+        writer.Write(" type=\"application/json\">"u8);
         writer.Write(PageJson.Span);
         writer.Write("</script><div id=\""u8);
         Write(writer, id);

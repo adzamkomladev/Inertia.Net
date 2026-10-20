@@ -17,6 +17,10 @@
     <PackageReference Include="FastEndpoints.Generator" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The SSR client never uses HTTP/3: trimming it out makes the binary smaller. -->
+    <RuntimeHostConfigurationOption Include="System.Net.SocketsHttpHandler.Http3Support" Value="false" Trim="true" />
+  </ItemGroup>
+  <ItemGroup>
     <None Update="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="wwwroot\build\.vite\manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Remove="wwwroot\build\.vite\manifest.json" />

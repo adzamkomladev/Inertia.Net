@@ -47,6 +47,15 @@ Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
 - Root template `app.html` with `@inertiaHead`, `@vite("<entry>")` (plus `@viteReactRefresh` for React) and `@inertia`.
 - Backend started for E2E as `dotnet run --project samples/<X> -c Release --no-launch-profile --urls http://localhost:510N` (Production environment, so the hot file is ignored).
 
+## Production and development extras (all samples)
+
+- Response compression (`AddResponseCompression()`) and `Cache-Control: public, max-age=31536000, immutable` for `/build/assets`.
+- Development only: the pages check (`o.Pages.Directory = "ClientApp/pages"`) and the Inertia DevTools recorder
+  (`AddInertiaDevTools()`, `MapInertiaDevTools()`); install the browser extension to see the visits.
+- React sample: `o.Vite.Prefetch = VitePrefetch.Waterfall`, `MapInertia("/", "Home")`, and TypeScript declarations in
+  `ClientApp/types/inertia.d.ts` (shared props and flash data), rewritten when the app starts in Development and committed so the
+  build type-checks without running the app.
+
 ## SSR (React sample only)
 
 Enabled with the environment variable `INERTIA_SSR=1`:
