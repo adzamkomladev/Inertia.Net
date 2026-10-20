@@ -2,16 +2,26 @@
 
 ## 1.4 caches and per-response settings — 2026-10-20
 
-Measured on the Windows laptop (i5-8265U, .NET 10.0.13, Release), three repetitions in one process each. "Before" is commit `3adc319`
-(1.3.0) built from a separate worktree with the same probe source; timings on this laptop vary by tens of percent between runs, so
-ranges are given and allocation is the stable signal.
+Measured on the Windows laptop (i5-8265U, .NET 10.0.13, Release). "Before" is commit `3adc319`
+(1.3.0) built from a separate worktree with the same probe source.
 
 | Workload (probe) | 1.3.0 | 1.4.0 |
 |---|---:|---:|
-| JSON, 20 mixed props (`--render-probe`) | 2,752 B; 18.9–43.2 µs | 2,760 B; 21.9–36.6 µs |
-| Typed POCO page (`--render-probe`) | 2,472 B; 13.8–19.5 µs | 2,480 B; 13.0–17.8 µs |
-| Partial reload, 2 of 20 (`--render-probe`) | 1,584 B; 9.8–15.9 µs | 1,592 B; 8.5–10.4 µs |
-| HTML + Vite tags, 20 props (`--render-probe`) | 2,800 B; 24.4–28.5 µs | 2,824 B; 19.2–28.0 µs |
+| JSON, 20 mixed props (`--render-probe`) | 2,752 B | 2,760 B |
+| Typed POCO page (`--render-probe`) | 2,472 B | 2,480 B |
+| Partial reload, 2 of 20 (`--render-probe`) | 1,584 B | 1,592 B |
+| HTML + Vite tags, 20 props (`--render-probe`) | 2,800 B | 2,824 B |
+
+Timings, from BenchmarkDotNet (`--filter '*RenderBenchmarks.Json*'`), alternating 1.3.0 and 1.4.0 twice from clean worktrees:
+
+| Benchmark | 1.3.0, run 1 | 1.4.0, run 1 | 1.3.0, run 2 | 1.4.0, run 2 |
+|---|---:|---:|---:|---:|
+| JSON, 20 mixed props | 17.13 ± 0.86 µs | 18.24 ± 0.68 µs | 31.25 ± 3.93 µs | 17.09 ± 0.51 µs |
+| JSON, typed POCO props | 11.38 ± 0.26 µs | 20.31 ± 3.29 µs | 10.59 ± 0.20 µs | 13.13 ± 0.98 µs |
+
+The laptop's load changes between runs (the same build differs by up to 2x), so these runs cannot resolve a difference of 10%. The
+20-prop page is level. The typed page was slower in both 1.4.0 runs, with wide errors, while the alternating render probes had it
+level; re-measure on a quiet machine before relying on either. Allocation is exact and is the stable signal.
 
 | Workload (`--cache-probe`) | Without the cache | With the cache |
 |---|---:|---:|

@@ -53,7 +53,8 @@ unchanged. Update all packages together.
 
 - A cached prop hit skips the loader and the serialization: a 500-row loader went from 123–170 µs and 25 KB to 5–6 µs and 1.1 KB
   per render (`--cache-probe`). An SSR cache hit skips the render call: 130–221 µs to 12–22 µs with an in-memory SSR server.
-- A render allocates 8 bytes more (JSON) and 24 bytes more (HTML) for the new per-response settings; timings are unchanged within noise.
+- A render allocates 8 bytes more (JSON) and 24 bytes more (HTML) for the new per-response settings. Timings on the measuring laptop were
+  too noisy to resolve 10%: the 20-prop page was level, the typed page slower in two BenchmarkDotNet runs but level in the probes.
   See `tests/Inertia.Net.Benchmarks/RESULTS.md`.
 
 ### Fixed
