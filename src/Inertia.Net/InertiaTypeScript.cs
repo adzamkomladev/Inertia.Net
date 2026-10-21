@@ -84,7 +84,7 @@ internal sealed partial class InertiaTypeScriptWriter(
             return Task.CompletedTask;
         }
 
-        var path = Path.GetFullPath(Path.Combine(environment.ContentRootPath, output));
+        var path = Path.GetFullPath(output, environment.ContentRootPath); // an absolute OutputPath is used as is
         try
         {
             var generator = new TypeScriptGenerator(pageWriter.SerializerOptions, options.Value);

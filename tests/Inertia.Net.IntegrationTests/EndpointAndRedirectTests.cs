@@ -22,7 +22,8 @@ public sealed class EndpointAndRedirectTests
         var again = await (await client.InertiaGetAsync("/about")).PageAsync();
         Assert.Equal("Inertia.Net", (string?)again["props"]!["name"]);
 
-        var head = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/about"), TestContext.Current.CancellationToken);
+        using var headRequest = new HttpRequestMessage(HttpMethod.Head, "/about");
+        using var head = await client.SendAsync(headRequest, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, head.StatusCode);
         Assert.Equal(HttpStatusCode.MethodNotAllowed, (await client.InertiaAsync(HttpMethod.Post, "/about")).StatusCode);
     }

@@ -25,12 +25,13 @@ internal sealed class PageComponentCheck
         _time = time;
         if (environment.IsDevelopment() && pages.Directory is { Length: > 0 } directory)
         {
-            _root = Path.GetFullPath(Path.Combine(environment.ContentRootPath, directory));
+            _root = Path.GetFullPath(directory, environment.ContentRootPath); // an absolute Directory is used as is
         }
     }
 
     public bool Enabled => _root is not null;
 
+    /// <summary>Throws, with the closest page name, when <paramref name="component"/> has no page file and the check is on.</summary>
     /// <exception cref="InvalidOperationException">The component has no page file.</exception>
     public void EnsureExists(string component)
     {
