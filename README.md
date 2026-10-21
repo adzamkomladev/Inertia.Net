@@ -81,7 +81,8 @@ dotnet new inertia -n MyApp --framework react      # or vue, svelte
 
 - [x] Page object: `component`, `props`, `url`, `version`; JSON responses and the initial `<script data-page="app" type="application/json">` payload
 - [x] Asset versioning with a `409` + `X-Inertia-Location` (checked before your handler runs)
-- [x] `Vary: X-Inertia`, 302 to 303 for PUT/PATCH/DELETE, fragment redirects (`X-Inertia-Redirect`), `Location()`, `Back()`
+- [x] `Vary: X-Inertia`, 302 to 303 for PUT/PATCH/DELETE, fragment redirects (`X-Inertia-Redirect`), `Location()`, `Back()`, and
+  redirects to another origin turned into `409` + `X-Inertia-Location`
 - [x] Partial reloads (`only`, `except`, nested dot paths), `Always`, `Optional`, lazy loaders, opt-in parallel loaders
 - [x] Deferred props with groups (`deferredProps`)
 - [x] Merge props: append, prepend, deep merge, `matchPropsOn`, reset (`mergeProps`, `prependProps`, `deepMergeProps`)
@@ -1761,27 +1762,32 @@ Flash and errors travel in a cookie across the redirect, so use a client that ke
 
 ## Performance
 
-Measured in Release on a laptop (i5-8265U, .NET 10.0.12). Warm render probes reuse a `DefaultHttpContext` with a null body and cover header parsing, shared props, the prop walk, the pooled buffer and response copying. Values below summarize three measurement processes; they are not production throughput estimates.
+Render times for 1.4.0, measured with BenchmarkDotNet on a 4-vCPU cloud Linux VM (.NET 10.0): the median of five rounds that
+alternated with 1.3.0. The benchmarks reuse a `DefaultHttpContext` with a null body and cover header parsing, shared props, the prop
+walk, the pooled buffer and response copying. They are not production throughput estimates.
 
-| Workload | Warm time | Allocated/request |
-|---|---:|---:|
-| JSON, 20 mixed props | 13.43 µs | 2,752 B |
-| Partial reload, 2 of 20 props | 6.15 µs | 1,584 B |
-| HTML + Vite tags, 20 props | 14.62 µs | 2,792 B |
-| 1 MiB SSR, buffered reference | 0.79 ms | 4,101 KiB |
-| 1 MiB SSR, streaming gateway | 0.94 ms | 2,053 KiB |
-| Middleware: non-Inertia, empty endpoint | 0.23–0.26 µs | 0 B |
-| Middleware: Inertia, empty endpoint | 0.80–1.51 µs | 48 B |
+| Workload | Time (1.4.0) | 1.3.0 | Allocated/request |
+|---|---:|---:|---:|
+| JSON, 20 mixed props | 10.30 µs | 10.33 µs | 2,760 B |
+| JSON, typed page object | 6.81 µs | 6.94 µs | 2,480 B |
+| Partial reload, 2 of 20 props | 4.85 µs | 4.92 µs | 1,592 B |
+| Deferred group load | 3.96 µs | 3.99 µs | 1,600 B |
+| HTML + Vite tags, 20 props | 11.33 µs | 11.22 µs | 2,824 B |
+
+Every difference from 1.3.0 is under 2%, inside the ±4% that a benchmark without Inertia.Net code moved between rounds. Earlier
+measurements on a laptop (i5-8265U), for scale: a 1 MiB SSR page through the streaming gateway took 0.94 ms and 2,053 KiB (the
+buffered reference 0.79 ms and 4,101 KiB), and the middleware adds 0.23–0.26 µs and 0 B to a non-Inertia request and 0.80–1.51 µs and
+48 B to an Inertia one.
 
 Since then, SSR responses stay UTF-8 end to end (about half the allocation again, and faster), and the MVC `<inertia />` tag helper
 streams the page instead of building a string: a 1 MiB page went from about 3 MiB allocated to 80 bytes. Those measurements, taken on a
-different host, are in the first section of RESULTS.md.
+different host, are in RESULTS.md.
 
 Warm SSR allocation fell about 50%, with a timing tradeoff and sensitivity to pool reuse. A measured 2,000-prop page with 32 shared props rendered about 20% faster after indexing shared keys, at a cost of about 1.1 KiB more allocation. MemoryPack was evaluated in benchmarks; production transport and redirect state remain JSON.
 
-In 1.4 a cached prop hit took a 500-row loader from about 150 µs and 25 KB to 5 µs and 1.1 KB per render, and an SSR cache hit took an
-in-memory render from about 160 µs to 15 µs (`--cache-probe`). The new per-response settings add 8 bytes to a JSON render and 24 to an
-HTML one.
+The 1.4 caches, on the same VM (`--cache-probe`): a cached prop hit took a 500-row loader from 66–88 µs and 25 KB to 3–4 µs and 1.1 KB
+per render, and an SSR cache hit took an in-memory render of a 64 KiB page from 80–136 µs to 7–13 µs. A real database query or Node
+render makes both gaps wider. With the caches unused, 1.4 adds 8 bytes to a JSON render, 24 to an HTML one and 8 to each prop.
 
 Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` (also `--ssr-probe`, `--mvc-probe`, `--payload-probe`, `--cache-probe`) or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
 
@@ -1931,7 +1937,7 @@ The 1.0 API is close to the Laravel adapter's names. The table maps the typical 
 | `Inertia.Defer(...)` / `Inertia.Defer(..., "group")` | `Defer(..., group: "group")` |
 | `Inertia.Always(...)` | `Always(...)` |
 | `Inertia.Merge(...)` / `DeepMerge` | `Merge(...)`, `DeepMerge(...)`, plus `.Prepend()`, `.MatchOn()` |
-| (not supported) | `Once(...)`, `Scroll(...)`, `.Rescue()` |
+| (not supported) | `Once(...)`, `Scroll(...)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)` |
 | `Inertia.Share("key", value)` | `o.Share("key", value)`, `o.Share("key", ctx => ...)`, or `ctx.Inertia().Share(...)` |
 | `Inertia.Location(url)` | `Location(url)` |
 | `Inertia.Back()` | `Back()` / `Back(fallback)` |
@@ -1971,6 +1977,17 @@ The `@vite("...")` argument must equal the manifest key, which is the path relat
 the `XSRF-TOKEN` cookie), that the cookie reaches the browser (`Secure` on plain HTTP is dropped; see [Deploying behind a proxy](#deploying-behind-a-proxy)),
 that all instances share the Data Protection key ring, and that `UseAuthentication()` runs before it. A sign-in or sign-out changes the
 token: reload the page, or return `Back()` from `OnRejected`. Exempt webhooks and token-authenticated APIs with `.DisableAntiforgery()` or `ShouldValidate`.
+
+**`The Inertia page component '...' was not found in '...'` (Development).**
+`o.Pages.Directory` is set and the component passed to `Render(...)` has no page file there. Names match exactly, as the client's page
+resolver does, even on a case-insensitive file system; the message suggests the closest page. Fix the name, or check
+`Pages.Extensions` when your pages use another extension. The check never runs outside Development.
+
+**A redirect to another site turns into a `409`.**
+That is `ConvertExternalRedirects` (on by default): an Inertia request cannot follow a redirect to another origin, so it gets
+`409` + `X-Inertia-Location` and the client does a full visit. If it happens for your own host, the app is behind a proxy that does
+not forward the scheme (see [Deploying behind a proxy](#deploying-behind-a-proxy)), or use relative redirects.
+`o.ConvertExternalRedirects = false` keeps the 1.3 behavior.
 
 **`The Inertia root view '...' resolves outside the content root`.**
 `RootView` and `WithRootView(...)` take a path relative to the content root; absolute paths and `..` are refused. Never derive them from request data.
@@ -2035,6 +2052,6 @@ bash eng/aot-smoke.sh                    # Native AOT publish + protocol smoke t
 
 - Warnings are errors; the code is nullable-annotated and the public API is documented.
 - Every protocol rule should be backed by a test in `tests/Inertia.Net.Tests` or a conformance case in `tests/Inertia.Net.IntegrationTests` (which runs against Minimal API, MVC and FastEndpoints hosts). The protocol itself is in [docs/protocol.md](docs/protocol.md), including the deliberate deviations from inertia-laravel.
-- Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet using the repository's `NUGET_API_KEY` secret.
+- Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet with the `NUGET_API_KEY` secret of the `release` environment. Give that environment required reviewers, so that a pushed tag alone cannot publish.
 
 Licensed under the [MIT license](LICENSE).
