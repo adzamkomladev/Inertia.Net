@@ -2,7 +2,9 @@
 
 A .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs, MVC controllers and FastEndpoints, with the React, Vue and Svelte clients, and it is **Native AOT and trim compatible**.
 
-For the 1.2 release, review the upgrade notes in the [changelog](CHANGELOG.md), especially CSRF protection with `UseInertiaAntiforgery()`. Coming from 1.0, also read the [1.1 migration guidance](docs/migrating-to-1.1.md).
+Version 1.4 adds cached props, an SSR response cache, Vite chunk prefetching, CSP nonces, generated TypeScript types, the Inertia DevTools
+protocol and `dotnet new` templates. Read the [1.4 upgrade notes](docs/migrating-to-1.4.md): one default changed (redirects to another
+origin become a full visit). The [changelog](CHANGELOG.md) lists every release.
 
 ```csharp
 app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
@@ -17,6 +19,12 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 - **AOT first.** No reflection over your props, one source-generated JSON context for the library's own types. See [Native AOT](#native-aot).
 - **Measured.** Benchmarks cover page rendering, SSR and state storage; Inertia requests track response writes without another body buffer. See [Performance](#performance).
 - **Tested.** Unit tests ported from inertia-laravel 3.x, a protocol conformance suite that runs against all three backends, an AOT smoke test and Playwright end-to-end tests.
+- **Typed and inspectable.** TypeScript declarations generated from your C# page types, and the Inertia DevTools browser extension in Development.
+
+```sh
+dotnet new install Inertia.Net.Templates
+dotnet new inertia -n MyApp --framework react      # or vue, svelte
+```
 
 ## Contents
 
@@ -25,7 +33,7 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 3. [Quick start](#quick-start): [Minimal API](#minimal-api), [MVC](#mvc), [FastEndpoints](#fastendpoints)
 4. [Client setup](#client-setup): [Vite config](#vite-config), [React](#react), [Vue](#vue), [Svelte](#svelte)
 5. [The root template](#the-root-template)
-6. [Props reference](#props-reference) and [parallel props](#parallel-props)
+6. [Props reference](#props-reference), [parallel props](#parallel-props) and [cached props](#cached-props)
 7. [Shared data](#shared-data)
 8. [Partial reloads](#partial-reloads)
 9. [Deferred props](#deferred-props)
@@ -37,17 +45,18 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 15. [Redirects, Location and Back](#redirects-location-and-back)
 16. [History encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
 17. [Asset versioning](#asset-versioning)
-18. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability)
+18. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
 19. [Vite integration](#vite-integration)
 20. [CSRF and antiforgery](#csrf-and-antiforgery)
 21. [Deploying behind a proxy](#deploying-behind-a-proxy)
 22. [Native AOT](#native-aot)
-23. [Testing](#testing)
-24. [Performance](#performance)
-25. [Configuration reference](#configuration-reference)
-26. [Migrating from other .NET adapters](#migrating-from-other-net-adapters)
-27. [Troubleshooting and FAQ](#troubleshooting-and-faq)
-28. [Contributing and license](#contributing-and-license)
+23. [TypeScript types](#typescript-types), [DevTools](#devtools) and [development checks](#development-checks)
+24. [Testing](#testing)
+25. [Performance](#performance)
+26. [Configuration reference](#configuration-reference)
+27. [Migrating from other .NET adapters](#migrating-from-other-net-adapters)
+28. [Troubleshooting and FAQ](#troubleshooting-and-faq)
+29. [Contributing and license](#contributing-and-license)
 
 ---
 
@@ -85,7 +94,8 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
 - [x] Flash data (`flash`)
 - [x] `encryptHistory`, `clearHistory`, `preserveFragment`, `preserveBigIntegers`
 - [x] Server-side rendering (production Node servers, optionally started and supervised by the app, Vite dev server, per-response modes, circuit breakers, render slots, metrics, health check)
-- [x] Vite manifest and dev-server tags, CDN asset base URL
+- [x] Vite manifest and dev-server tags, CDN asset base URL, chunk prefetching, CSP nonces
+- [x] Inertia DevTools protocol (discovery, correlation headers, entries, read API)
 
 No v2 protocol compatibility. MVC TempData storage is available through `AddInertiaMvc(o => o.UseTempDataStateStore())`.
 
@@ -99,6 +109,7 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` to errors filter, Razor root view and tag helpers |
 | `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor, Precognition |
 | `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
+| `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
 dotnet add package Inertia.Net
@@ -569,7 +580,7 @@ Prop(ct => repo.GetValueTaskAsync(ct))             // Func<CancellationToken, Va
 
 The token is `HttpContext.RequestAborted`. Overloads bind so that an `async` lambda always means the awaiting overload, never "a prop whose value is a Task".
 
-Fluent methods on every prop (they mutate and return the same instance): `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`.
+Fluent methods on every prop (they mutate and return the same instance): `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)`.
 
 **Loaders run sequentially** by default, in prop order, and only when their prop is included in the response. That makes a scoped EF Core `DbContext` safe to use in several loaders. Mark independent async loaders with [`.Parallel()`](#parallel-props) to start them together. A loader that returns another prop (for example `Prop(() => Defer(...))`) is unwrapped once.
 
@@ -603,6 +614,28 @@ return Render("Dashboard", new InertiaProps
     return await db.Orders.CountAsync(ct);
 }).Parallel(),
 ```
+
+### Cached props
+
+`.Cache(key, duration)` keeps a prop's value as JSON in the app's `IMemoryCache`. While the entry lives, the loader does not run and
+the stored JSON is written as it is, so a hit costs neither the query nor the serialization:
+
+```csharp
+return Render("Dashboard", new InertiaProps
+{
+    ["stats"] = Prop(ct => stats.ComputeAsync(ct)).Cache("dashboard-stats", TimeSpan.FromMinutes(5)),
+    ["orders"] = Defer(ct => orders.RecentAsync(userId, ct)).Cache($"orders:{userId}", TimeSpan.FromMinutes(1)),
+    ["catalog"] = Optional(() => catalog.All()).Cache("catalog", TimeSpan.FromHours(1)),
+});
+```
+
+- **The key is the value's identity.** Every request that uses a key gets the same value: put the user, tenant or anything else the
+  value depends on in the key. Keys live in their own space in the cache, so they cannot collide with the app's own entries.
+- **Only loading changes.** Optional, deferred, merged, once and scroll props keep their behavior; their metadata is written from the
+  cache too. A parallel cached prop does not start its loader on a hit. A rescued failure is not cached.
+- **Plain values only.** The value must not contain `InertiaProp` values (a loader that returns a prop cannot be cached).
+- **Per instance.** Each app instance has its own memory cache, and two requests that miss at the same moment both run the loader.
+  Entries carry a `Size` (their byte length), so an `IMemoryCache` with a `SizeLimit` works.
 
 ### What each prop produces
 
@@ -748,7 +781,8 @@ app.Use((context, next) =>
 });
 ```
 
-Shared values can be any prop: `o.Share("permissions", ctx => Once(() => LoadPermissions(ctx)))` works too. The top-level shared keys are listed in `"sharedProps": ["errors", "appName", "auth"]` so the client can keep them across navigations. Turn that list off with `o.ExposeSharedPropKeys = false`.
+Shared values can be any prop: `o.Share("permissions", ctx => Once(() => LoadPermissions(ctx)))` works too, and
+`o.Share("plans", Once(() => plans.All()))` is the equivalent of Laravel's `shareOnce`: the client keeps the value across visits. The top-level shared keys are listed in `"sharedProps": ["errors", "appName", "auth"]` so the client can keep them across navigations. Turn that list off with `o.ExposeSharedPropKeys = false`.
 
 ---
 
@@ -1024,6 +1058,7 @@ What `UseInertia()` does for Inertia requests:
 | Situation | Result |
 |---|---|
 | 302 for PUT, PATCH or DELETE | changed to **303 See Other**, so the browser follows with a GET |
+| Redirect to another origin (scheme, host or port), and the request is not a prefetch | `409` with `X-Inertia-Location: <url>`: the client makes a full visit instead of following it with XHR, which the browser would block. Turn it off with `o.ConvertExternalRedirects = false`. |
 | Redirect whose `Location` contains `#`, and the request is not a prefetch | `409` with `X-Inertia-Redirect: <url>` (the client performs a full visit that keeps the fragment) |
 | `Location(url)` | `409` with `X-Inertia-Location: <url>` for Inertia requests, a plain `302` otherwise |
 | An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE), falling back to the app root (`PathBase/`) |
@@ -1032,6 +1067,13 @@ What `UseInertia()` does for Inertia requests:
 The same-origin rule on `Referer` exists so `Back()` cannot become an open redirect. The scheme is not compared, so it keeps working behind a TLS-terminating proxy. On an HTTPS request an `http` Referer is upgraded to `https`, so going back never downgrades the connection.
 
 `Vary: X-Inertia` is added to every response that passes through the middleware.
+
+**Pages without a handler.** `app.MapInertia("/about", "About", props)` maps GET and HEAD to `Render("About", props)`, like Laravel's
+`Route::inertia`. In MVC, `return this.InertiaView(props);` renders the action's own component, `{Controller}/{Action}` by default
+(`Admin/Users/Index` in an `Admin` area); `AddInertiaMvc(o => o.ComponentResolver = ctx => ...)` changes the rule.
+
+**The page URL.** The page object's `url` is PathBase, Path and QueryString. Behind a proxy that rewrites paths, set
+`o.UrlResolver = ctx => ...` to return the URL the browser sees.
 
 ---
 
@@ -1305,13 +1347,34 @@ builder.Services.AddOpenTelemetry()
 | `inertia.ssr.duration` (s) | histogram | `inertia.ssr.outcome` (`rendered`, `fallback`) |
 | `inertia.ssr.queue.duration` (s) | histogram | |
 | `inertia.ssr.active` | up-down counter | |
-| `inertia.ssr.outcomes` | counter | `inertia.ssr.outcome` (`rendered`, `fallback`, `error`), `inertia.ssr.reason` (`ok` or a type from the table above) |
+| `inertia.ssr.outcomes` | counter | `inertia.ssr.outcome` (`rendered`, `fallback`, `error`), `inertia.ssr.reason` (`ok`, `cache` or a type from the table above) |
 | `inertia.ssr.response.size` (By) | histogram | |
 | `inertia.ssr.circuit.state` | gauge (0 closed, 1 half-open, 2 open) | `inertia.ssr.endpoint` (the index in `Urls` or of the instance, or `dev`) |
 | `inertia.ssr.circuit.transitions` | counter | `inertia.ssr.endpoint`, `to` |
 | `inertia.ssr.process.restarts` | counter | `cause` (`exit`, `liveness`) |
+| `inertia.props.rescued` | counter | |
 
 Tag values are bounded: no URLs, component names or user data. The `inertia.render` activity carries `inertia.component`; the `inertia.ssr` activity carries `inertia.ssr.endpoint`, `inertia.ssr.outcome` and `inertia.ssr.reason`. Nothing is recorded unless a listener is attached.
+
+### 6. Response cache
+
+A render depends only on the page JSON, so a page that many visitors see byte for byte the same (a landing page, a catalog or an
+article) can reuse its HTML instead of calling the SSR server again:
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Ssr.Cache.Duration = TimeSpan.FromMinutes(5);   // every server-rendered page; default Zero (off)
+    o.Ssr.Cache.MaxBytes = 64 * 1024 * 1024;          // default; least recently used renders are evicted beyond it
+});
+
+return Render("Pricing", props).WithSsrCache(TimeSpan.FromHours(1));   // one page; WithSsrCache(TimeSpan.Zero) opts out
+```
+
+The key is the SHA-256 of the page JSON (component, props, url, version and the rest), so a new deploy (another asset version) or
+different props never reuse a stale render. Pages with per-user props make one entry per user: cache the pages that are shared. A hit
+is counted as `inertia.ssr.outcomes{inertia.ssr.outcome=rendered, inertia.ssr.reason=cache}` and bypasses the render slots and circuit
+breakers. Nothing is cached while the Vite dev server renders.
 
 ---
 
@@ -1347,6 +1410,38 @@ Only plain http(s) origins without quotes or markup are accepted from the hot fi
 
 With `AssetBaseUrl` set, Vite's own `base` must match, so lazily imported chunks resolve against the CDN too: `base: 'https://cdn.example.com/build/'`.
 
+**Prefetching.** Page components resolved with lazy `import.meta.glob` (the `@inertiajs/vite` default) are separate chunks that the
+browser downloads only when a page needs them. `o.Vite.Prefetch` downloads them after the page has loaded, at low priority, so the next
+navigation does not wait (Laravel's `Vite::useWaterfallPrefetching`):
+
+```csharp
+o.Vite.Prefetch = VitePrefetch.Waterfall;   // PrefetchConcurrency (default 3) at a time; VitePrefetch.Aggressive starts all at once
+```
+
+The tags get one small inline script with the list of chunks the entries can import later (dynamic imports, then their static imports
+and CSS), minus those already loaded. It is rendered once per entry set like the other tags.
+
+### Content Security Policy
+
+With a nonce-based CSP, set `o.CspNonce` to the request's nonce. Every script and stylesheet tag Inertia.Net writes then carries it:
+the page `<script data-page>`, the Vite tags, the React refresh preamble and the prefetch script (whose links get it too). The MVC tag
+helpers follow the same option.
+
+```csharp
+builder.Services.AddInertia(o => o.CspNonce = ctx => ctx.Items["csp-nonce"] as string);
+
+app.Use((ctx, next) =>
+{
+    var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+    ctx.Items["csp-nonce"] = nonce;
+    ctx.Response.Headers.ContentSecurityPolicy = $"script-src 'nonce-{nonce}' 'strict-dynamic'; object-src 'none'; base-uri 'none'";
+    return next(ctx);
+});
+```
+
+The nonce must be base64 or base64url (anything else throws). The cached tags are split where the nonce goes, so a nonce costs one copy
+of the tag bytes per request and no re-rendering.
+
 ---
 
 ## CSRF and antiforgery
@@ -1381,6 +1476,12 @@ app.UseInertiaAntiforgery(o =>
     o.OnRejected = (ctx, error) => Back().WithFlash("error", "The page expired, please try again.");
 });
 ```
+
+**Lazy refresh.** By default every page load issues a fresh token, and antiforgery marks that response `Cache-Control: no-cache, no-store`
+(which also keeps the page out of the browser's back/forward cache). `o.CookieRefresh = XsrfCookieRefresh.Lazy` keeps a token that still
+validates: such responses get no `Set-Cookie` and stay cacheable, and a token issued before a sign-in or sign-out is replaced on the next
+page load. Validating costs about what issuing does, so the gain is in the responses, not in CPU. Set your own `Cache-Control` on
+pages with private data.
 
 A session that expires or a sign-in that changes the user invalidates the token in an open tab; the next page load issues a new one.
 Returning `Back()` from `OnRejected` gives that tab a fresh token and a message instead of the client's error dialog.
@@ -1419,6 +1520,36 @@ app.UseInertiaAntiforgery(o => o.SecurePolicy = CookieSecurePolicy.Always);
 
 On several instances, share the Data Protection key ring (`AddDataProtection().PersistKeysTo...`): the state cookie and the antiforgery
 tokens are protected with it. Keep the SSR server on loopback on each instance (see [Server-side rendering](#server-side-rendering)).
+
+### Compression and asset caching
+
+Page JSON and HTML compress five to ten times. Compress at the proxy, or in the app (the samples and the template do):
+
+```csharp
+builder.Services.AddResponseCompression();   // Brotli and gzip; Zstandard too from .NET 11
+app.UseResponseCompression();                // before UseStaticFiles and UseInertia
+```
+
+Over HTTPS the middleware compresses only with `o.EnableForHttps = true`. Review BREACH for your pages first: Inertia.Net keeps the
+antiforgery token in a cookie, not in the body, but a page that reflects request input next to a secret is still exposed.
+
+Vite puts a content hash in every built file name, so the files under `build/assets` can be cached for good:
+
+```csharp
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = c =>
+    {
+        if (c.Context.Request.Path.StartsWithSegments("/build/assets"))
+        {
+            c.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        }
+    },
+});
+```
+
+`app.MapStaticAssets()` does the same with build-time Brotli when the client is built before `dotnet publish`, so the files are in
+`wwwroot` when the static web assets manifest is generated.
 
 ---
 
@@ -1474,7 +1605,96 @@ builder.Services.AddFastEndpoints(DiscoveredTypes.All);
 
 (`DiscoveredTypes` is generated by the `FastEndpoints.Generator` package, in the namespace named after the assembly. See [samples/FastEndpoints.Svelte](samples/FastEndpoints.Svelte).)
 
+**8. A smaller binary.** The SSR client never uses HTTP/3, so it can be trimmed out:
+
+```xml
+<ItemGroup>
+  <RuntimeHostConfigurationOption Include="System.Net.SocketsHttpHandler.Http3Support" Value="false" Trim="true" />
+</ItemGroup>
+```
+
+Cached props, the SSR cache, nonces, prefetching, `MapInertia` and the DevTools recorder are all AOT safe and covered by the smoke test.
+
 The reference app is [tests/Inertia.Net.AotSmoke](tests/Inertia.Net.AotSmoke/Program.cs). Run it end to end with `bash eng/aot-smoke.sh` (Linux, needs clang and zlib).
+
+---
+
+## TypeScript types
+
+Inertia.Net can write TypeScript declarations for your typed page props, the shared props and the flash data. They follow the app's JSON
+contracts (the HTTP JSON options and their source-generated contexts), so the names, nullability and enum values are those the page JSON
+holds:
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";   // written when the app starts in Development, only when it changed
+    o.TypeScript.Page<UsersPage>("Users/Index").Page<HomePage>("Home");
+    o.TypeScript.FlashData<Flash>();                             // optional; SharedProps<T>() too
+});
+
+public sealed record UsersPage(List<User> Users, [property: InertiaPropType(typeof(UserStats))] InertiaProp Stats);
+```
+
+```ts
+// ClientApp/types/inertia.d.ts (excerpt)
+export interface InertiaPages {
+  'Users/Index': UsersPage
+  Home: HomePage
+}
+export interface UsersPage {
+  users: User[]
+  stats?: UserStats
+}
+declare module '@inertiajs/core' {
+  export interface InertiaConfig {
+    sharedPageProps: SharedProps
+    flashDataType: FlashData
+    errorValueType: string
+  }
+}
+```
+
+```tsx
+import type { InertiaPages } from '../../types/inertia'
+export default function Index({ users, stats }: InertiaPages['Users/Index']) { /* ... */ }
+```
+
+- **Shared props** are inferred from the values passed to `o.Share(...)` (dot keys nest); factories and per-request shares are `unknown`.
+  `o.TypeScript.SharedProps<T>()` replaces the inference with a type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+- **Prop members.** An `InertiaProp` member is optional (it can be deferred, optional or rescued) and `unknown`, unless
+  `[InertiaPropType(typeof(T))]` names its value type.
+- **Mapping.** Numbers are `number` (`number | bigint` for 64-bit and larger with `PreserveBigIntegers`), dates, GUIDs and `byte[]`
+  are `string`, enums are unions of their JSON values (string names with a string enum converter), dictionaries are `Record<string, T>`,
+  polymorphic types are unions tagged with their discriminator, and nullable members get `| null`.
+- Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.
+  Commit the file, so `tsc` passes in CI without running the app.
+
+## DevTools
+
+The [Inertia DevTools](https://inertiajs.com/docs/v3/advanced/devtools) browser extension shows every visit, its props, headers and the
+page state. Inertia.Net implements its server protocol:
+
+```csharp
+builder.Services.AddInertiaDevTools();   // records in Development only
+app.UseInertia();
+app.MapInertiaDevTools();                // GET /_inertia/devtools/entries/{id} and /entries
+```
+
+Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry in memory (per browser tab, at most
+`MaxEntriesPerTab` and `MaxEntries`, for `MaxAge`): request type, timings, headers, bodies, the page object and its props metadata. The
+first page carries the discovery tag the extension reads. Values of names containing `password`, `secret`, `token`, `authorization`,
+`cookie` or `api_key` are replaced with `[REDACTED]` in props, bodies and headers; add names with `RedactedKeys`. Nothing leaves the app.
+
+Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize` accepts
+(`404` otherwise). With `Pages.Directory` set, entries link the component to its file.
+
+## Development checks
+
+`o.Pages.Directory = "ClientApp/pages"` makes `Render` throw in Development when the component has no page file, naming the closest
+one (`'Users/Indx' was not found in 'ClientApp/pages' ... Did you mean 'Users/Index'?`). Names match exactly, as the client's resolver
+does, even on case-insensitive file systems. `o.Pages.Extensions` lists the file types (`.tsx`, `.jsx`, `.ts`, `.js`, `.vue`, `.svelte`
+by default). Outside Development there is no check and no file access.
 
 ---
 
@@ -1559,7 +1779,11 @@ different host, are in the first section of RESULTS.md.
 
 Warm SSR allocation fell about 50%, with a timing tradeoff and sensitivity to pool reuse. A measured 2,000-prop page with 32 shared props rendered about 20% faster after indexing shared keys, at a cost of about 1.1 KiB more allocation. MemoryPack was evaluated in benchmarks; production transport and redirect state remain JSON.
 
-Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` (also `--ssr-probe`, `--mvc-probe`, `--payload-probe`) or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
+In 1.4 a cached prop hit took a 500-row loader from about 150 µs and 25 KB to 5 µs and 1.1 KB per render, and an SSR cache hit took an
+in-memory render from about 160 µs to 15 µs (`--cache-probe`). The new per-response settings add 8 bytes to a JSON render and 24 to an
+HTML one.
+
+Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` (also `--ssr-probe`, `--mvc-probe`, `--payload-probe`, `--cache-probe`) or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
 
 **Payload size.** The page JSON is fully buffered before the first byte is sent, so a failing loader never produces a half-written 200.
 Each concurrent request therefore holds its whole page in memory (pooled, and sized from the component's recent pages). Keep pages well
@@ -1595,6 +1819,11 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `WithAllErrors` | `false` | Send every validation message per field instead of the first. |
 | `PreserveBigIntegers` | `false` | Emit integers beyond ±(2^53−1) as `{"$bigint":"..."}` and set `preserveBigIntegers`. |
 | `ExposeSharedPropKeys` | `true` | List top-level shared keys in `sharedProps`. |
+| `CspNonce` | `null` | `Func<HttpContext, string?>`: the request's CSP nonce, written on every script and stylesheet tag. |
+| `ConvertExternalRedirects` | `true` | Turn an Inertia request's redirect to another origin into `409` + `X-Inertia-Location`. |
+| `UrlResolver` | `null` | `Func<HttpContext, string>`: the page `url`. |
+| `Pages.Directory` / `Pages.Extensions` | `null` / `.tsx .jsx .ts .js .vue .svelte` | Development check that a rendered component has a page file. |
+| `TypeScript.OutputPath`, `.Page<T>(component)`, `.SharedProps<T>()`, `.FlashData<T>()` | `null` | TypeScript declarations, written in Development. |
 | `Share(key, value)` / `Share(key, Func<HttpContext, object?>)` | none | Shared props. |
 
 ### `o.Vite`: `ViteOptions`
@@ -1607,6 +1836,8 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `HotFilePath` | `null` | Hot file relative to the content root. `null` = `{PublicDirectory}/hot`. Read in Development only. |
 | `DevServerUrl` | `null` | Dev server origin, e.g. `http://localhost:5173`. When set, dev tags always render and the hot file is ignored. |
 | `AssetBaseUrl` | `null` | Replaces `{PathBase}/{BuildDirectory}` as the URL prefix of built assets (CDN). |
+| `Prefetch` | `None` | `Waterfall` or `Aggressive`: prefetch the code-split chunks after load. |
+| `PrefetchConcurrency` | `3` | Chunks `Waterfall` downloads at a time. |
 
 ### `o.Ssr`: `SsrOptions`
 
@@ -1625,6 +1856,8 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `CircuitBreaker.Enabled` | `true` | Pause servers that keep failing. |
 | `CircuitBreaker.FailureThreshold` | `5` | Consecutive connection, timeout, HTTP or malformed-response failures that open a server's circuit. |
 | `CircuitBreaker.BreakDuration` | `10 s` | How long an open circuit skips the server before one render probes it. |
+| `Cache.Duration` | `Zero` (off) | Reuse a render for this long when the page JSON is the same. Per response: `WithSsrCache(duration)`. |
+| `Cache.MaxBytes` | `64 MiB` | Size of the render cache; least recently used renders are evicted. |
 | `UseNodeProcess(configure?)` | off | Start and supervise Node SSR processes with the app (sets `Mode = Preferred` when `Disabled`). Options below. |
 
 Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
@@ -1667,14 +1900,16 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 |---|---|
 | `services.AddInertia(configure?)` | Registers services and options. |
 | `app.UseInertia()` | The protocol middleware. Before the endpoints, after `UseSession()` when the session store is used. |
-| `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates every unsafe request (`419` on failure). Options: `CookieName`, `SecurePolicy`, `ShouldValidate`, `OnRejected`. |
+| `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates every unsafe request (`419` on failure). Options: `CookieName`, `SecurePolicy`, `ShouldValidate`, `OnRejected`, `CookieRefresh` (`Always`, `Lazy`). |
+| `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |
+| `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder (`Enabled`, `Authorize`, `MaxEntriesPerTab`, `MaxEntries`, `MaxAge`, `MaxBodyBytes`, `RedactedKeys`) and its read API. |
 | `app.UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` | Only writes the antiforgery request token to a script-readable cookie; validation is up to you. |
 | `endpoint.WithInertiaValidation()` | Minimal API: validation failures redirect back with errors. Endpoint or group. |
 | `endpoint.WithInertiaPrecognition()` | Minimal API: `WithInertiaValidation()` plus Precognition. |
 | `healthChecks.AddInertiaSsr(name = "inertia-ssr", failureStatus?, tags?, timeout?)` | SSR health check, from the gateway's state (no call to the servers). |
-| `mvc.AddInertiaMvc(o => o.UseRazorRootView("App"))` | MVC filter, optional Razor root view. |
+| `mvc.AddInertiaMvc(o => o.UseRazorRootView("App"))` | MVC filter, optional Razor root view, `ComponentResolver` for `this.InertiaView(props)`. |
 | `config.UseInertia(configure?)` | FastEndpoints: validation redirect and Precognition (`app.UseFastEndpoints(c => ...)`). |
-| `Render(component, props?)` | `InertiaResult`: `.WithStatusCode(int)`, `.WithRootView(string)`, `.WithViewData(key, value)`, `.WithSsr(SsrMode)`, `.WithoutSsr()`. |
+| `Render(component, props?)` | `InertiaResult`: `.WithStatusCode(int)`, `.WithRootView(string)`, `.WithViewData(key, value)`, `.WithSsr(SsrMode)`, `.WithoutSsr()`, `.WithSsrCache(TimeSpan)`. |
 | `Location(url)` | `InertiaLocationResult`. |
 | `Back(fallback = "~/")` | `InertiaBackResult`: `.WithErrors(errors, bag = "default")`, `.WithFlash(key, value)`. |
 | `httpContext.Inertia()` | `InertiaFeature`: `Share`, `Flash`, `WithErrors`, `ClearHistory`, `EncryptHistory(bool = true)`, `PreserveFragment`. |

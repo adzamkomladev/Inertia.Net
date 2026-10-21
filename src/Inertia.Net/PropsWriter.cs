@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace Inertia.Net;
@@ -121,7 +122,7 @@ internal sealed class PropsWriter : IDisposable
         {
             if (value is InertiaProp prop)
             {
-                if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
+                if (prop.IsParallel && !IsCached(prop) && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
                     Prefetch(prop);
                 }
@@ -271,11 +272,25 @@ internal sealed class PropsWriter : IDisposable
             var type = declaredType;
             if (p is not null)
             {
+                // A cached prop: a hit is written without a loader; a miss resolves below, then is stored and written the same way.
+                // (Kept in this method's existing await, not a second one: the walk runs it for every entry.)
+                if (p.Caching is not null && FindCached(p) is { } hit)
+                {
+                    WriteCached(key, p, hit, parentWasResolved);
+                    return;
+                }
+
                 bool resolved;
                 (resolved, value) = await ResolveAsync(p);
                 if (!resolved)
                 {
                     if (key is null) _writer.WriteNullValue();
+                    return;
+                }
+
+                if (p.Caching is not null)
+                {
+                    WriteCached(key, p, Store(p, value), parentWasResolved);
                     return;
                 }
 
@@ -319,6 +334,64 @@ internal sealed class PropsWriter : IDisposable
             _arrayPathLength = arrayMark;
         }
     }
+
+    private CachedProp? FindCached(InertiaProp prop) =>
+        _owner.PropCache.TryGetValue(prop.Caching!.Key, out CachedProp? cached) ? cached : null;
+
+    // Serializes the loader's value once and keeps it for the prop's duration.
+    private CachedProp Store(InertiaProp prop, object? value)
+    {
+        var cached = Serialize(prop, value);
+        _owner.PropCache.Set(prop.Caching!.Key, cached, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = prop.Caching!.Duration,
+            Size = cached.Json.Length, // required when the app's cache has a SizeLimit
+        });
+        return cached;
+    }
+
+    // Writes a cached prop's JSON with the same partial-reload rules as a resolved value (see WriteEntryAsync). The caller restores
+    // the path marks.
+    private void WriteCached(string? key, InertiaProp prop, CachedProp cached, bool parentWasResolved)
+    {
+        if (_isPartial && !parentWasResolved && !prop.IsAlways && _request.Except is { } except && LeadsToAny(except, Path) && cached.IsArray) return;
+        if (_isPartial && _arrayPathLength == 0 && cached.IsArray) _arrayPathLength = _pathLength;
+        CollectMetadata(prop, cached.Scroll);
+        if (key is not null)
+        {
+            _writer.WritePropertyName(key);
+        }
+
+        _writer.WriteRawValue(cached.Json, skipInputValidation: true);
+    }
+
+    // HTML-safe JSON, so the bytes fit both JSON responses and the page <script>.
+    private CachedProp Serialize(InertiaProp prop, object? value)
+    {
+        if (value is InertiaProp)
+        {
+            throw new InvalidOperationException($"The cached prop at '{new string(Path)}' resolved to an InertiaProp. Cache() needs a plain value.");
+        }
+
+        var buffer = new ArrayBufferWriter<byte>(256);
+        using (var writer = new Utf8JsonWriter(buffer, _owner.HtmlWriterOptions))
+        {
+            if (value is null or JsonElement or JsonNode || prop.ValueType == typeof(object))
+            {
+                _owner.WritePlainValue(writer, value);
+            }
+            else
+            {
+                JsonSerializer.Serialize(writer, value, _owner.SerializerOptions.GetTypeInfo(prop.ValueType));
+            }
+        }
+
+        var json = buffer.WrittenSpan.ToArray();
+        var scroll = prop.ScrollWrapper is null ? null : prop.ScrollMetadata ?? (value as IProvidesScrollMetadata)?.GetScrollMetadata();
+        return new CachedProp(json, json is [(byte)'[', ..], scroll);
+    }
+
+    private bool IsCached(InertiaProp prop) => prop.Caching is not null && FindCached(prop) is not null;
 
     private async ValueTask WriteValueAsync(object? value, Type declaredType, bool parentWasResolved)
     {
@@ -475,6 +548,7 @@ internal sealed class PropsWriter : IDisposable
             var path = new string(Path);
             _owner.Logger.LogError(ex, "Inertia prop '{Path}' failed to resolve and was rescued.", path);
             (_rescuedProps ??= []).Add(path);
+            _owner.Metrics.RecordRescued();
             return (false, null);
         }
     }
@@ -575,6 +649,7 @@ internal sealed class PropsWriter : IDisposable
             var path = new string(Path);
             var metadata = prop.ScrollMetadata
                 ?? (value as IProvidesScrollMetadata)?.GetScrollMetadata()
+                ?? value as ScrollMetadata // a cached prop passes its stored metadata
                 ?? throw new InvalidOperationException($"The scroll prop at '{path}' has no metadata. Pass a ScrollMetadata or return a value that implements IProvidesScrollMetadata.");
             (_scrollProps ??= new(StringComparer.Ordinal))[path] = (metadata, Contains(_request.Reset, Path));
         }
@@ -801,3 +876,12 @@ internal sealed class PropsWriter : IDisposable
         }
     }
 }
+
+/// <summary>A <see cref="InertiaProp.Cache"/> key, in a key space of its own within the app's memory cache.</summary>
+internal readonly record struct PropCacheKey(string Key);
+
+/// <summary>A prop's <see cref="InertiaProp.Cache"/> settings.</summary>
+internal sealed record PropCaching(PropCacheKey Key, TimeSpan Duration);
+
+/// <summary>A cached prop: its HTML-safe JSON, whether that is an array, and a scroll prop's paging metadata.</summary>
+internal sealed record CachedProp(byte[] Json, bool IsArray, ScrollMetadata? Scroll);

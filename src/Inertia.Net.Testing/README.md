@@ -1,6 +1,6 @@
 # Inertia.Net.Testing
 
-Use the 1.2 packages together. Update response expectations for whole-array reloads, corrected JSON contracts and dotted validation indices (1.1). See the [upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md).
+Use the 1.4 packages together; see the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md).
 
 Test helpers for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net): Laravel-style fluent assertions over Inertia responses, for any test framework. It parses JSON responses and the first-visit HTML `<script data-page>`, and throws `InertiaAssertionException` when an assertion fails.
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
@@ -29,6 +30,29 @@ public sealed class InertiaAntiforgeryOptions
     /// <c>Back().WithFlash(...)</c> to send the user back with a message instead (needs <c>app.UseInertia()</c> to run first).
     /// </summary>
     public Func<HttpContext, AntiforgeryValidationException, IResult>? OnRejected { get; set; }
+
+    /// <summary>
+    /// When page loads write the token cookie. Default <see cref="XsrfCookieRefresh.Always"/>. With <see cref="XsrfCookieRefresh.Lazy"/>
+    /// a page load that already carries a valid token keeps it, so the response has no <c>Set-Cookie</c> and no
+    /// <c>Cache-Control: no-cache, no-store</c> from antiforgery.
+    /// </summary>
+    public XsrfCookieRefresh CookieRefresh { get; set; }
+}
+
+/// <summary>When <see cref="InertiaAntiforgeryApplicationBuilderExtensions.UseInertiaAntiforgery"/> writes the token cookie.</summary>
+public enum XsrfCookieRefresh
+{
+    /// <summary>On every page load (GET or HEAD that is an Inertia request or accepts HTML), like Laravel.</summary>
+    Always,
+
+    /// <summary>
+    /// Only when the request has no token cookie, or its token no longer validates (for example after sign-in or sign-out, or a new
+    /// antiforgery cookie). Responses that keep the token are left cacheable: antiforgery marks every response it issues a token on with
+    /// <c>Cache-Control: no-cache, no-store</c>, which also keeps such pages out of the browser's back/forward cache. Set your own
+    /// <c>Cache-Control</c> on pages with private data. Each page load validates the token instead of issuing one, which costs about the
+    /// same; the gain is in the response, not in CPU.
+    /// </summary>
+    Lazy,
 }
 
 /// <summary>Antiforgery support for the Inertia client, which reads <c>XSRF-TOKEN</c> and sends it back as <c>X-XSRF-TOKEN</c>.</summary>
@@ -75,12 +99,17 @@ public static class InertiaAntiforgeryApplicationBuilderExtensions
         configure?.Invoke(options);
         ArgumentException.ThrowIfNullOrEmpty(options.CookieName, nameof(options.CookieName));
         var antiforgery = GetAntiforgery(app);
+        var headerName = app.ApplicationServices.GetService<IOptions<AntiforgeryOptions>>()?.Value.HeaderName;
         return app.Use(async (httpContext, next) =>
         {
             var method = httpContext.Request.Method;
             if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method) || HttpMethods.IsTrace(method))
             {
-                IssueToken(antiforgery, options, httpContext);
+                if (options.CookieRefresh == XsrfCookieRefresh.Always || headerName is null || !await HoldsValidTokenAsync(antiforgery, options, headerName, httpContext))
+                {
+                    IssueToken(antiforgery, options, httpContext);
+                }
+
                 MarkHandled(httpContext);
             }
             else if (options.ShouldValidate?.Invoke(httpContext) ?? RequiresValidation(httpContext))
@@ -125,11 +154,47 @@ public static class InertiaAntiforgeryApplicationBuilderExtensions
     private static bool RequiresValidation(HttpContext httpContext) =>
         httpContext.GetEndpoint()?.Metadata.GetMetadata<IAntiforgeryMetadata>() is not { RequiresValidation: false };
 
+    private static bool IsPageLoad(HttpRequest request) =>
+        (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+        && (!string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]) || request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase));
+
+    // Lazy refresh: validates the token the client holds in the cookie as if it had sent it in the header, so a token issued for
+    // another user or another antiforgery cookie is replaced. Requests that are not page loads count as holding one (nothing is issued).
+    private static async ValueTask<bool> HoldsValidTokenAsync(IAntiforgery antiforgery, InertiaAntiforgeryOptions options, string headerName, HttpContext httpContext)
+    {
+        var request = httpContext.Request;
+        if (!IsPageLoad(request))
+        {
+            return true;
+        }
+
+        if (!request.Cookies.TryGetValue(options.CookieName, out var token) || string.IsNullOrEmpty(token) || request.HasFormContentType)
+        {
+            return false;
+        }
+
+        var headers = request.Headers;
+        var sent = headers[headerName];
+        headers[headerName] = token;
+        try
+        {
+            await antiforgery.ValidateRequestAsync(httpContext);
+            return true;
+        }
+        catch (AntiforgeryValidationException)
+        {
+            return false;
+        }
+        finally
+        {
+            headers[headerName] = sent;
+        }
+    }
+
     private static void IssueToken(IAntiforgery antiforgery, InertiaAntiforgeryOptions options, HttpContext httpContext)
     {
         var request = httpContext.Request;
-        if ((HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
-            && (!string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]) || request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase)))
+        if (IsPageLoad(request))
         {
             var tokens = antiforgery.GetAndStoreTokens(httpContext);
             httpContext.Response.Cookies.Append(options.CookieName, tokens.RequestToken!, new CookieOptions

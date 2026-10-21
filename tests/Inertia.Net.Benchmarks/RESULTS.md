@@ -1,5 +1,202 @@
 # Inertia.Net benchmark results
 
+## 1.4.0 on a 4-vCPU cloud Linux VM — 2026-10-20
+
+Measured in a cloud Linux container: a Firecracker microVM on a shared KVM host, Intel Xeon @ 2.10 GHz, 4 vCPUs (1 thread per
+core), 15 GiB RAM, no swap, Ubuntu 24.04.5, SDK 10.0.100, .NET 10.0.0 (RyuJIT x86-64-v4), BenchmarkDotNet 0.15.8. The host is
+shared with other tenants; nothing else ran in the VM during the measurements (load average 1.0, the benchmark itself). Compare
+rows within this section only.
+
+"1.3.0" is commit `3adc319` and "1.4.0" is `e8be5cb` (the tip of `release/1.4.0`), each built in Release from its own worktree;
+the benchmark source is the same on both sides. Five rounds alternated 1.3.0 and 1.4.0, each run
+`--filter '*RenderBenchmarks*' --launchCount 3 --memory` (three processes, about 295 measured iterations per benchmark per run).
+Round 3's first 1.3.0 run was stopped partway by a job time limit; it was discarded and rerun. Medians are taken over every measured iteration of a run.
+Times are in µs: mean ± StdDev, then the median.
+
+**JSON, 20 mixed props**
+
+| Round | 1.3.0 | 1.3.0 median | 1.4.0 | 1.4.0 median | Δ median |
+|---|---:|---:|---:|---:|---:|
+| 1 | 10.74 ± 1.07 | 10.74 | 10.59 ± 0.92 | 10.56 | −1.7% |
+| 2 | 10.43 ± 0.80 | 10.49 | 10.72 ± 0.84 | 10.77 | +2.7% |
+| 3 | 10.24 ± 0.89 | 10.29 | 10.22 ± 0.93 | 10.27 | −0.2% |
+| 4 | 10.29 ± 0.86 | 10.33 | 10.18 ± 0.75 | 10.30 | −0.3% |
+| 5 | 9.70 ± 0.91 | 9.82 | 9.97 ± 0.82 | 10.12 | +3.0% |
+
+**JSON, typed POCO props**
+
+| Round | 1.3.0 | 1.3.0 median | 1.4.0 | 1.4.0 median | Δ median |
+|---|---:|---:|---:|---:|---:|
+| 1 | 7.09 ± 0.65 | 7.12 | 6.98 ± 0.57 | 6.96 | −2.2% |
+| 2 | 6.94 ± 0.49 | 6.97 | 7.00 ± 0.54 | 7.05 | +1.1% |
+| 3 | 6.92 ± 0.51 | 6.94 | 6.71 ± 0.62 | 6.77 | −2.4% |
+| 4 | 6.73 ± 0.45 | 6.76 | 6.74 ± 0.62 | 6.81 | +0.8% |
+| 5 | 6.60 ± 0.54 | 6.73 | 6.66 ± 0.57 | 6.73 | +0.1% |
+
+**Partial reload, 2 of 20**
+
+| Round | 1.3.0 | 1.3.0 median | 1.4.0 | 1.4.0 median | Δ median |
+|---|---:|---:|---:|---:|---:|
+| 1 | 5.14 ± 0.57 | 5.11 | 4.89 ± 0.46 | 4.87 | −4.7% |
+| 2 | 4.92 ± 0.37 | 4.92 | 4.89 ± 0.33 | 4.91 | −0.3% |
+| 3 | 4.92 ± 0.40 | 4.95 | 4.74 ± 0.44 | 4.81 | −2.9% |
+| 4 | 4.63 ± 0.39 | 4.67 | 4.83 ± 0.38 | 4.83 | +3.4% |
+| 5 | 4.59 ± 0.40 | 4.64 | 4.79 ± 0.34 | 4.85 | +4.6% |
+
+**Deferred group load**
+
+| Round | 1.3.0 | 1.3.0 median | 1.4.0 | 1.4.0 median | Δ median |
+|---|---:|---:|---:|---:|---:|
+| 1 | 4.15 ± 0.35 | 4.11 | 4.06 ± 0.35 | 4.05 | −1.4% |
+| 2 | 4.08 ± 0.31 | 4.09 | 3.96 ± 0.30 | 3.99 | −2.4% |
+| 3 | 3.97 ± 0.31 | 3.99 | 3.96 ± 0.31 | 3.96 | −0.6% |
+| 4 | 3.81 ± 0.37 | 3.84 | 3.87 ± 0.33 | 3.91 | +1.9% |
+| 5 | 3.78 ± 0.35 | 3.86 | 3.92 ± 0.35 | 3.96 | +2.7% |
+
+**HTML + Vite tags, 20 props**
+
+| Round | 1.3.0 | 1.3.0 median | 1.4.0 | 1.4.0 median | Δ median |
+|---|---:|---:|---:|---:|---:|
+| 1 | 11.62 ± 1.11 | 11.58 | 11.57 ± 0.92 | 11.57 | −0.1% |
+| 2 | 11.47 ± 0.86 | 11.50 | 11.52 ± 0.90 | 11.57 | +0.6% |
+| 3 | 11.17 ± 0.89 | 11.22 | 11.27 ± 0.91 | 11.30 | +0.7% |
+| 4 | 10.62 ± 1.05 | 10.82 | 11.14 ± 0.85 | 11.20 | +3.5% |
+| 5 | 10.71 ± 0.89 | 10.91 | 11.29 ± 0.80 | 11.33 | +3.8% |
+
+**Reference: STJ, same page as plain data** (no Inertia.Net code: the noise floor)
+
+| Round | 1.3.0 | 1.3.0 median | 1.4.0 | 1.4.0 median | Δ median |
+|---|---:|---:|---:|---:|---:|
+| 1 | 6.22 ± 0.74 | 6.09 | 6.11 ± 0.53 | 6.17 | +1.3% |
+| 2 | 5.99 ± 0.43 | 6.00 | 5.99 ± 0.39 | 6.03 | +0.5% |
+| 3 | 5.86 ± 0.43 | 5.88 | 5.78 ± 0.52 | 5.82 | −1.0% |
+| 4 | 5.78 ± 0.50 | 5.80 | 5.54 ± 0.52 | 5.65 | −2.6% |
+| 5 | 5.57 ± 0.48 | 5.63 | 5.82 ± 0.48 | 5.85 | +3.9% |
+
+**Build 20 props (handler side)**
+
+| Round | 1.3.0 | 1.3.0 median | 1.4.0 | 1.4.0 median | Δ median |
+|---|---:|---:|---:|---:|---:|
+| 1 | 1.100 ± 0.060 | 1.099 | 1.083 ± 0.069 | 1.088 | −1.0% |
+| 2 | 1.085 ± 0.071 | 1.088 | 1.064 ± 0.065 | 1.068 | −1.8% |
+| 3 | 1.065 ± 0.071 | 1.075 | 1.064 ± 0.069 | 1.066 | −0.9% |
+| 4 | 1.079 ± 0.067 | 1.085 | 1.035 ± 0.063 | 1.046 | −3.6% |
+| 5 | 1.043 ± 0.068 | 1.046 | 1.067 ± 0.054 | 1.065 | +1.8% |
+
+Summary: the median of the five per-round medians. Allocation was the same in every run of a version.
+
+| Benchmark | 1.3.0 median | 1.4.0 median | Difference | Allocated, 1.3.0 → 1.4.0 |
+|---|---:|---:|---:|---:|
+| JSON, 20 mixed props | 10.33 µs | 10.30 µs | −0.03 µs (−0.3%) | 2,752 B → 2,760 B |
+| JSON, typed POCO props | 6.94 µs | 6.81 µs | −0.12 µs (−1.7%) | 2,472 B → 2,480 B |
+| Partial reload, 2 of 20 | 4.92 µs | 4.85 µs | −0.07 µs (−1.5%) | 1,584 B → 1,592 B |
+| Deferred group load | 3.99 µs | 3.96 µs | −0.03 µs (−0.6%) | 1,592 B → 1,600 B |
+| HTML + Vite tags, 20 props | 11.22 µs | 11.33 µs | +0.11 µs (+0.9%) | 2,800 B → 2,824 B |
+| Reference: STJ, plain data | 5.88 µs | 5.85 µs | −0.03 µs (−0.5%) | 312 B → 312 B |
+| Build 20 props (handler side) | 1.085 µs | 1.066 µs | −0.02 µs (−1.8%) | 4,232 B → 4,392 B |
+
+How far to trust it:
+
+- **No round was tight.** On this shared VM each run's StdDev is 5–12% of its mean, so no round meets a 5% bar on both sides. Most of
+  the spread is between iterations within a process: the three launch means of a run agree within 0.5–11% (usually under 5%), the
+  99.9% error of each mean is 1.1–2.4%, and none of the 10–90% swings between processes seen on the laptop showed up here.
+- **The noise floor is ±4% per round.** The STJ reference runs no Inertia.Net code and still moved −2.6% to +3.9% between the two
+  sides of a round. Every Inertia.Net benchmark's per-round difference falls inside −4.7% to +4.6%, and every summary difference is
+  under 2%, so no benchmark crossed the 5% threshold for a confirmation rerun. Both versions got faster as the session went on:
+  1.3.0 by 5–9% from round 1 to round 5 and 1.4.0 by 0–5%, the STJ reference included (−7.5% and −5.1%), which points to the host
+  rather than the code for the late rounds where 1.4.0 looks slower. Alternating rounds is what keeps that drift out of the medians.
+- **HTML** is the only path whose 1.4.0 median is above 1.3.0's: +0.11 µs, from two rounds (4 and 5) where the 1.3.0 run was
+  unusually fast; the 1.4.0 median stayed at 11.2–11.6 µs throughout. While CSP nonces, the SSR cache and DevTools are off, this
+  path adds a null delegate check (`CspNonce.Resolve`), one more 1-byte write in `InertiaRootViewContext.WriteBody` and 16 bytes on
+  `InertiaRootViewContext`, which is in line with a cost below what these runs can resolve.
+
+`--render-probe` (one process per version; the third repetition, after 2,000 warm-up renders and the tiered-JIT transition):
+
+| Workload (probe) | 1.3.0 | 1.4.0 |
+|---|---:|---:|
+| JSON, 20 mixed props | 2,752 B; 7.7 µs | 2,760 B; 10.5 µs |
+| Typed POCO page | 2,472 B; 5.3 µs | 2,480 B; 6.8 µs |
+| Partial reload, 2 of 20 | 1,584 B; 3.7 µs | 1,592 B; 4.8 µs |
+| HTML + Vite tags, 20 props | 2,800 B; 9.4 µs | 2,824 B; 10.4 µs |
+
+That single 1.3.0 process was 13–22% faster than the fastest 1.3.0 BenchmarkDotNet median. Two more alternating pairs of probe processes
+(not part of the plan, added to check this) gave third repetitions of 10.2/11.4 µs (1.3.0) and 10.3/9.7 µs (1.4.0) for the
+20-prop page, and 4.4/5.2 µs against 3.8/4.6 µs for the partial reload: one probe process cannot separate the versions. Its
+allocation is exact and matches the benchmarks.
+
+| Workload (`--cache-probe`, 1.4.0) | Without the cache | With the cache |
+|---|---:|---:|
+| A prop whose loader maps 500 rows | 25,488 B; 66–88 µs | 1,128 B; 2.9–3.7 µs |
+| A server-rendered page (64 KiB of HTML, in-memory SSR server) | 3,432–3,439 B; 80–136 µs | 1,312 B; 7.2–13.4 µs |
+
+The cache probe allocates 8–16 bytes less here than in the Windows laptop section above; the ratios are the same.
+
+Conclusion: on this machine 1.4.0 renders every page in the same time as 1.3.0. The render paths' summary differences are −1.7% to +0.9%
+(at most 0.12 µs), below the ±4% that a benchmark with no Inertia.Net code moves between rounds, and none reaches the 5% bar for a
+rerun. The typed page is not slower (−1.7%), so the laptop's 1.5–3% does not hold. What is certain is allocation: +8 B per JSON
+render, +24 B per HTML render, and +16 B for each `InertiaProp` a handler creates (+160 B for the 20-prop page's 10 props), from
+`CacheKey` and `CacheDuration` in `InertiaProp`. Those two fields have since become one reference set only by `Cache()`: the 20-prop
+handler side now allocates 4,312 B (+80 B over 1.3.0, +8 B per prop).
+
+Reproduce (from each worktree's `tests/Inertia.Net.Benchmarks`):
+
+```sh
+dotnet run -c Release --no-build -- --filter '*RenderBenchmarks*' --launchCount 3 --memory
+dotnet run -c Release --no-build -- --render-probe
+dotnet run -c Release --no-build -- --cache-probe
+```
+
+## 1.4 caches and per-response settings — 2026-10-20
+
+Measured on the Windows laptop (i5-8265U, .NET 10.0.13, Release). "Before" is commit `3adc319`
+(1.3.0) built from a separate worktree with the same probe source.
+
+| Workload (probe) | 1.3.0 | 1.4.0 |
+|---|---:|---:|
+| JSON, 20 mixed props (`--render-probe`) | 2,752 B | 2,760 B |
+| Typed POCO page (`--render-probe`) | 2,472 B | 2,480 B |
+| Partial reload, 2 of 20 (`--render-probe`) | 1,584 B | 1,592 B |
+| HTML + Vite tags, 20 props (`--render-probe`) | 2,800 B | 2,824 B |
+
+Timings, from BenchmarkDotNet (`--filter '*JsonTypedPoco*' '*Json20Props*'`), alternating 1.3.0 and 1.4.0 from clean worktrees.
+The final 1.4.0 skips two lookups per render that the first 1.4.0 build made (the pages check from DI, the DevTools capture from the
+request features) unless that feature is on:
+
+| Round | 20 props, 1.3.0 | 20 props, 1.4.0 | Typed, 1.3.0 | Typed, 1.4.0 |
+|---|---:|---:|---:|---:|
+| First build, 1 | 15.06 ± 0.30 µs | 14.73 ± 0.22 µs | 10.37 ± 0.21 µs | 12.38 ± 0.87 µs |
+| First build, 2 | 28.08 ± 3.03 µs | 16.65 ± 0.81 µs | 10.49 ± 0.39 µs | 10.64 ± 0.21 µs |
+| First build, 3 | 15.06 ± 0.22 µs | 14.52 ± 0.25 µs | 10.27 ± 0.19 µs | 10.42 ± 0.21 µs |
+| Final, 1 | 16.85 ± 0.24 µs | 14.44 ± 0.29 µs | 9.88 ± 0.17 µs | 11.26 ± 0.41 µs |
+| Final, 2 | 16.36 ± 0.32 µs | 18.00 ± 0.34 µs | 13.58 ± 0.42 µs | 11.95 ± 0.20 µs |
+| Final, 3 | 17.68 ± 0.28 µs | 15.11 ± 0.28 µs | 9.81 ± 0.19 µs | 9.96 ± 0.08 µs |
+
+The same build moves by 10–90% between processes on this laptop, so single rounds disagree in both directions. Where both sides of a
+round ran with a tight error, the typed page is 0.15–0.3 µs (1.5–3%) slower and the 20-prop page is level or faster; that is about
+the size of the work added to every render, and below what this machine can resolve. Allocation is exact and is the stable signal.
+
+| Workload (`--cache-probe`) | Without the cache | With the cache |
+|---|---:|---:|
+| A prop whose loader maps 500 rows | 25,496 B; 123–170 µs | 1,136 B; 5.0–6.3 µs |
+| A server-rendered page (64 KiB of HTML, in-memory SSR server) | 3,448 B; 129–221 µs | 1,328 B; 11.6–22.3 µs |
+
+What changed:
+
+- **Per-response settings.** `InertiaResult` holds the SSR cache duration (8 bytes, a `TimeSpan` with a sentinel rather than a
+  nullable, which takes 16), and `InertiaRootViewContext` holds it and the CSP nonce (16 bytes). That is the whole allocation difference
+  of an ordinary render; the cache checks themselves allocate nothing when no prop uses `Cache()`.
+- **Cached props.** A hit writes the stored HTML-safe JSON with `WriteRawValue`: no loader, no serialization. The probe's loader does no
+  I/O, so a real query makes the gap wider.
+- **SSR cache.** A hit costs a SHA-256 of the page JSON and one `SsrRender`; the probe's SSR server answers from memory, so a real Node
+  render (milliseconds) makes the gap far wider.
+
+Reproduce:
+
+```sh
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --render-probe
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --cache-probe
+```
+
 ## Antiforgery, SSR and MVC streaming changes — 2026-10-18
 
 Measured in a cloud Linux container (Intel Xeon @ 2.10 GHz, 4 vCPUs, SDK 10.0.402, .NET 10.0.13), a different and noisier host than

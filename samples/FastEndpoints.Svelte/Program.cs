@@ -16,13 +16,28 @@ builder.Services.AddInertia(o =>
 {
     o.Share("appName", "Inertia.Net Sample");
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
+    o.Pages.Directory = "ClientApp/pages"; // Development only: rendering a component without a page file fails fast
 });
+builder.Services.AddResponseCompression(); // gzip and Brotli for the page JSON and HTML (see the README on HTTPS)
+builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension, in Development only
 
 var app = builder.Build();
 
-app.UseStaticFiles();
+app.UseResponseCompression();
+app.UseStaticFiles(new StaticFileOptions
+{
+    // Vite puts a content hash in every file name under build/assets, so browsers can keep them for good.
+    OnPrepareResponse = c =>
+    {
+        if (c.Context.Request.Path.StartsWithSegments("/build/assets"))
+        {
+            c.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        }
+    },
+});
 app.UseInertia();
 app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
+app.MapInertiaDevTools();
 // Validation failures of Inertia requests become a redirect back with the errors (FluentValidation validators work as usual).
 app.UseFastEndpoints(c =>
 {

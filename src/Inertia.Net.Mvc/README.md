@@ -1,6 +1,6 @@
 # Inertia.Net.Mvc
 
-Use the 1.2 packages together. Collection validation keys use dotted indices (`items.0.email`); TempData state formats are unchanged. See the [upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md).
+Use the 1.4 packages together; see the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md). TempData state formats are unchanged.
 
 MVC integration for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
 
@@ -35,6 +35,7 @@ public sealed class UsersController : Controller
 - **Validation:** a global filter redirects an Inertia non-GET request with an invalid `ModelState` back with the errors, in the bag named by `X-Inertia-Error-Bag` (default `default`). Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). `[ApiController]` controllers are covered too.
 - **Razor root view (optional):** `UseRazorRootView("App")` renders `Views/Shared/App.cshtml` with an `InertiaRootViewContext` model. After `@addTagHelper *, Inertia.Net.Mvc` the view can use `<inertia />`, `<inertia-head />`, `<vite entry="resources/js/app.tsx" />` and `<vite-react-refresh />`.
 - **TempData state store (optional):** `AddInertiaMvc(o => o.UseTempDataStateStore())` keeps flash data, errors and history flags in TempData (cookie provider by default, or `AddSessionStateTempDataProvider()` plus `AddSession()`/`app.UseSession()` before `app.UseInertia()`). It also serves Minimal API endpoints.
+- **Action components:** `return this.InertiaView(props);` renders `{Controller}/{Action}` (`{Area}/...` in an area); change the rule with `AddInertiaMvc(o => o.ComponentResolver = ctx => ...)`.
 - Not Native AOT compatible (MVC is not).
 
 Documentation:

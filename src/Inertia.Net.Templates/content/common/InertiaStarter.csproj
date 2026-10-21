@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Props are serialized through AppJsonContext (source-generated), which keeps the app ready for Native AOT. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Inertia.Net" Version="1.4.0" />
+  </ItemGroup>
+  <!-- The client is built with npm (npm run build writes wwwroot/build); dotnet build never needs Node. -->
+  <ItemGroup>
+    <Content Remove="node_modules\**;ClientApp\**;package*.json;tsconfig*.json" />
+    <None Remove="node_modules\**;ClientApp\**" />
+    <Content Update="app.html" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

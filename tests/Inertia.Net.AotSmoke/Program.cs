@@ -23,6 +23,14 @@ builder.Services.AddInertia(o =>
     o.PreserveBigIntegers = true;
     o.Share("appName", "AotSmoke");
     o.Share("auth", ctx => new AuthInfo(ctx.Request.Headers["X-User"].ToString() is { Length: > 0 } user ? user : null));
+    o.CspNonce = ctx => ctx.Request.Headers["X-Nonce"].ToString();
+    o.Vite.Prefetch = VitePrefetch.Waterfall;
+});
+// Recording on in the published binary too, so the smoke checks cover the DevTools protocol under Native AOT.
+builder.Services.AddInertiaDevTools(o =>
+{
+    o.Enabled = true;
+    o.Authorize = _ => true;
 });
 
 var app = builder.Build();
@@ -35,6 +43,8 @@ app.UseFastEndpoints(c =>
 });
 
 app.MapGet("/healthz", () => "ok");
+app.MapInertiaDevTools();
+app.MapInertia("/about", "About", new InertiaProps { ["since"] = 2026 });
 app.MapGet("/serialization", () => Render("Serialization", new SerializationPage()));
 
 // Typed page props: plain members are serialized through AppJsonContext; InertiaProp members are resolved by Inertia.Net.
@@ -63,6 +73,7 @@ app.MapGet("/dashboard", (HttpContext context) =>
         ["feed"] = Scroll(() => new FeedPage([new Stat($"post-{page}", page)], page, page < 3)),
         ["filters"] = Always(() => "all"),
         ["lazy"] = Optional(() => "loaded"),
+        ["cached"] = Prop(() => new Stat("cached", 5)).Cache("smoke-cached", TimeSpan.FromMinutes(5)),
         ["today"] = Prop(async ct =>
         {
             await Task.Yield();

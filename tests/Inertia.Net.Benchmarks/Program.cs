@@ -6,6 +6,7 @@ if (args is ["--load-server"]) { await LoadProbe.ServerAsync(); return; }
 if (args is ["--render-probe"]) { await RenderProbe.RunAsync(); return; }
 if (args is ["--mvc-probe"]) { MvcProbe.Run(); return; }
 if (args is ["--payload-probe"]) { await PayloadProbe.RunAsync(); return; }
+if (args is ["--cache-probe"]) { await CacheProbe.RunAsync(); return; }
 if (args is ["--load", var output]) { await LoadProbe.RunAsync(output); return; }
 if (args is ["--ssr-probe"])
 {

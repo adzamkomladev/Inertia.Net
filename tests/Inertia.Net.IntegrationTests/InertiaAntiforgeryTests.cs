@@ -76,6 +76,8 @@ public sealed class MinimalApiAntiforgeryConformanceTests : InertiaAntiforgeryCo
 
 public sealed class MvcAntiforgeryConformanceTests : InertiaAntiforgeryConformanceTests<MvcHost>;
 
+// FastEndpoints keeps its configuration in statics: run with the other FastEndpoints apps, never concurrently.
+[Collection("FastEndpoints")]
 public sealed class FastEndpointsAntiforgeryConformanceTests : InertiaAntiforgeryConformanceTests<FastEndpointsHost>;
 
 /// <summary><c>UseInertiaAntiforgery()</c> options and its interplay with form binding and cookie consent.</summary>
@@ -194,6 +196,88 @@ public sealed class InertiaAntiforgeryTests
             app.UseCookiePolicy();
             app.UseInertiaAntiforgery();
             app.MapGet("/page", () => Render("Page"));
+        }
+    }
+}
+
+/// <summary><see cref="XsrfCookieRefresh.Lazy"/>: a page load that holds a valid token keeps it.</summary>
+public sealed class LazyXsrfCookieTests
+{
+    private static bool SetsToken(HttpResponseMessage response) =>
+        response.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.StartsWith("XSRF-TOKEN=", StringComparison.Ordinal));
+
+    private static bool NoStore(HttpResponseMessage response) => response.Headers.CacheControl?.NoStore == true;
+
+    [Fact]
+    public async Task A_valid_token_is_kept_and_the_page_stays_cacheable()
+    {
+        await using var app = await ConformanceApp.StartAsync<Host>();
+        var client = app.CreateClient();
+        var token = await InertiaAntiforgeryTests.TokenAsync(client);
+
+        var again = await client.InertiaGetAsync("/page");
+        Assert.False(SetsToken(again));
+        Assert.False(NoStore(again));
+        // A browser navigation sends no X-XSRF-TOKEN header; the cookie is still checked.
+        using var navigation = new HttpRequestMessage(HttpMethod.Get, "/page");
+        navigation.Headers.Add("Accept", "text/html");
+        var full = await client.SendAsync(navigation, TestContext.Current.CancellationToken);
+        Assert.Contains("data-page", await full.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.False(SetsToken(full));
+
+        var saved = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => r.WithHeader(InertiaHeaders.XsrfToken, token));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_token_for_another_user_is_replaced()
+    {
+        await using var app = await ConformanceApp.StartAsync<Host>();
+        var client = app.CreateClient();
+        var anonymous = await InertiaAntiforgeryTests.TokenAsync(client);
+
+        // Signed in now: the anonymous token no longer validates, so the page load issues a new one.
+        var signedIn = await client.InertiaGetAsync("/page", r => r.WithHeader("X-Test-User", "ann"));
+        Assert.True(SetsToken(signedIn));
+        var cookie = signedIn.Headers.GetValues("Set-Cookie").First(c => c.StartsWith("XSRF-TOKEN=", StringComparison.Ordinal));
+        var token = Uri.UnescapeDataString(cookie["XSRF-TOKEN=".Length..cookie.IndexOf(';')]);
+
+        var stale = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => { r.WithHeader("X-Test-User", "ann"); r.WithHeader(InertiaHeaders.XsrfToken, anonymous); });
+        Assert.Equal(419, (int)stale.StatusCode);
+        var fresh = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => { r.WithHeader("X-Test-User", "ann"); r.WithHeader(InertiaHeaders.XsrfToken, token); });
+        Assert.Equal(HttpStatusCode.OK, fresh.StatusCode);
+    }
+
+    [Fact]
+    public async Task Always_reissues_on_every_page_load()
+    {
+        await using var app = await ConformanceApp.StartAsync<InertiaAntiforgeryTests.Host>();
+        var client = app.CreateClient();
+        await InertiaAntiforgeryTests.TokenAsync(client);
+        var again = await client.InertiaGetAsync("/page");
+        Assert.True(SetsToken(again));
+        Assert.True(NoStore(again));
+    }
+
+    public sealed class Host : IConformanceHost
+    {
+        public static void ConfigureServices(IServiceCollection services) => services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+
+        public static void MapRoutes(WebApplication app)
+        {
+            // Stands in for authentication: the token is bound to this user.
+            app.Use((context, next) =>
+            {
+                if (context.Request.Headers["X-Test-User"].ToString() is { Length: > 0 } user)
+                {
+                    context.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new(System.Security.Claims.ClaimTypes.Name, user)], "Test"));
+                }
+
+                return next(context);
+            });
+            app.UseInertiaAntiforgery(o => o.CookieRefresh = XsrfCookieRefresh.Lazy);
+            app.MapGet("/page", () => Render("Page"));
+            app.MapPost("/save", () => Results.Text("saved"));
         }
     }
 }

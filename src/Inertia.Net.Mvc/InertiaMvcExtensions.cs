@@ -12,6 +12,12 @@ public sealed class InertiaMvcOptions
     internal bool TempDataStore { get; private set; }
 
     /// <summary>
+    /// The component <see cref="InertiaControllerExtensions.InertiaView"/> renders for the current action. Default
+    /// <c>{Controller}/{Action}</c>, prefixed with <c>{area}/</c> in an area: <c>UsersController.Index</c> renders <c>Users/Index</c>.
+    /// </summary>
+    public Func<ControllerContext, string>? ComponentResolver { get; set; }
+
+    /// <summary>
     /// Renders the first-visit HTML with a Razor view instead of the <c>app.html</c> template. The view gets an
     /// <see cref="InertiaRootViewContext"/> as its model and the <c>&lt;inertia /&gt;</c>, <c>&lt;inertia-head /&gt;</c>, <c>&lt;vite /&gt;</c> and
     /// <c>&lt;vite-react-refresh /&gt;</c> tag helpers (<c>@addTagHelper *, Inertia.Net.Mvc</c>). Sets <see cref="InertiaOptions.RootView"/>
@@ -51,6 +57,7 @@ public static class InertiaMvcExtensions
         var options = new InertiaMvcOptions();
         configure?.Invoke(options);
 
+        builder.Services.AddSingleton(options);
         builder.AddMvcOptions(o => o.Filters.Add(new InertiaModelStateFilter()));
 
         // ModelStateInvalidFilter (the [ApiController] 400) runs before global filters, so it is wrapped rather than followed.
@@ -74,5 +81,31 @@ public static class InertiaMvcExtensions
         }
 
         return builder;
+    }
+}
+
+/// <summary>Inertia helpers for controllers.</summary>
+public static class InertiaControllerExtensions
+{
+    /// <summary>
+    /// Renders the action's own page component, named by <see cref="InertiaMvcOptions.ComponentResolver"/> (default
+    /// <c>{Controller}/{Action}</c>): <c>return this.InertiaView(props);</c> in <c>UsersController.Index</c> renders <c>Users/Index</c>.
+    /// </summary>
+    /// <param name="controller">The controller.</param>
+    /// <param name="props">The page props, as for <c>Render</c>.</param>
+    public static InertiaResult InertiaView(this ControllerBase controller, object? props = null)
+    {
+        ArgumentNullException.ThrowIfNull(controller);
+        var context = controller.ControllerContext;
+        var resolver = context.HttpContext?.RequestServices?.GetService<InertiaMvcOptions>()?.ComponentResolver ?? DefaultComponent;
+        return Inertia.Render(resolver(context), props);
+    }
+
+    internal static string DefaultComponent(ControllerContext context)
+    {
+        var descriptor = context.ActionDescriptor
+            ?? throw new InvalidOperationException("InertiaView() needs the action's ControllerContext; call it from a controller action.");
+        var component = $"{descriptor.ControllerName}/{descriptor.ActionName}";
+        return descriptor.RouteValues.TryGetValue("area", out var area) && !string.IsNullOrEmpty(area) ? $"{area}/{component}" : component;
     }
 }

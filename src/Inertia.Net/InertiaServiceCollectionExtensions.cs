@@ -26,7 +26,9 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<InertiaMetrics>();
         services.TryAddSingleton<ViteAssets>();
         services.TryAddSingleton<IInertiaRootView, RootTemplateView>();
+        services.AddMemoryCache(); // holds InertiaProp.Cache() values
         services.TryAddSingleton<InertiaPageWriter>();
+        services.TryAddSingleton<PageComponentCheck>();
         // Ssr.Timeout is the only deadline. No redirects (a render POST must not be replayed elsewhere), no proxy (renderers are local or
         // on a private network), and pooled connections are recycled so a remote renderer's DNS changes are picked up. The default
         // primary handler is set first, so a handler the app configures for this client (before or after AddInertia) replaces it.
@@ -42,6 +44,7 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<IInertiaSsrRenderer>(static sp => sp.GetRequiredService<SsrGateway>());
         services.TryAddSingleton<SsrNodeProcess>();
         services.AddHostedService(sp => sp.GetRequiredService<SsrNodeProcess>()); // no-op unless o.Ssr.UseNodeProcess()
+        services.AddHostedService<InertiaTypeScriptWriter>(); // no-op unless o.TypeScript.OutputPath is set, in Development
         services.TryAddSingleton<VersionProvider>();
         services.AddDataProtection();
         services.TryAddSingleton<IInertiaStateStore>(sp => sp.GetRequiredService<IOptions<InertiaOptions>>().Value.State.UsesSession

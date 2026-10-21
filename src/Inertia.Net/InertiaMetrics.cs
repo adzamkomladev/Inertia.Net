@@ -6,7 +6,7 @@ namespace Inertia.Net;
 /// <summary>Names for collecting Inertia.Net telemetry, e.g. <c>.WithMetrics(m =&gt; m.AddMeter(InertiaDiagnostics.MeterName))</c> in OpenTelemetry.</summary>
 public static class InertiaDiagnostics
 {
-    /// <summary>The <see cref="Meter"/> name: <c>inertia.page.*</c> and <c>inertia.ssr.*</c> instruments.</summary>
+    /// <summary>The <see cref="Meter"/> name: <c>inertia.page.*</c>, <c>inertia.props.*</c> and <c>inertia.ssr.*</c> instruments.</summary>
     public const string MeterName = "Inertia.Net";
 
     /// <summary>The <see cref="System.Diagnostics.ActivitySource"/> name: <c>inertia.render</c> and <c>inertia.ssr</c> activities.</summary>
@@ -30,6 +30,7 @@ internal sealed class InertiaMetrics
     private readonly Histogram<long> _ssrResponseSize;
     private readonly Counter<long> _circuitTransitions;
     private readonly Counter<long> _processRestarts;
+    private readonly Counter<long> _rescued;
     private Func<IEnumerable<Measurement<int>>>? _circuitStates;
 
     public InertiaMetrics(IMeterFactory meterFactory)
@@ -44,6 +45,7 @@ internal sealed class InertiaMetrics
         _ssrResponseSize = meter.CreateHistogram<long>("inertia.ssr.response.size", "By", "Size of SSR server responses.");
         _circuitTransitions = meter.CreateCounter<long>("inertia.ssr.circuit.transitions", "{transition}", "SSR circuit state changes.");
         _processRestarts = meter.CreateCounter<long>("inertia.ssr.process.restarts", "{restart}", "Managed Node SSR process restarts.");
+        _rescued = meter.CreateCounter<long>("inertia.props.rescued", "{prop}", "Props whose loader failed and that were rescued (left out and listed in rescuedProps).");
         meter.CreateObservableGauge("inertia.ssr.circuit.state", () => _circuitStates?.Invoke() ?? [], "{state}", "SSR circuit state per server: 0 closed, 1 half-open, 2 open.");
     }
 
@@ -113,6 +115,14 @@ internal sealed class InertiaMetrics
         if (_processRestarts.Enabled)
         {
             _processRestarts.Add(1, new KeyValuePair<string, object?>("cause", cause));
+        }
+    }
+
+    public void RecordRescued()
+    {
+        if (_rescued.Enabled)
+        {
+            _rescued.Add(1);
         }
     }
 

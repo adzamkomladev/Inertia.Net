@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Inertia.Net contributors",
+  "classifications": ["Web", "Inertia", "React", "Vue", "Svelte", "Vite"],
+  "identity": "Inertia.Net.App",
+  "name": "Inertia.Net app",
+  "description": "An ASP.NET Core Minimal API app with an Inertia.js v3 client (React, Vue or Svelte) built with Vite.",
+  "shortName": "inertia",
+  "sourceName": "InertiaStarter",
+  "preferNameDirectory": true,
+  "tags": { "language": "C#", "type": "project" },
+  "symbols": {
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "react",
+      "description": "The client-side framework.",
+      "choices": [
+        { "choice": "react", "description": "React 19 with @inertiajs/react" },
+        { "choice": "vue", "description": "Vue 3 with @inertiajs/vue3" },
+        { "choice": "svelte", "description": "Svelte 5 with @inertiajs/svelte" }
+      ]
+    }
+  },
+  "sources": [
+    { "source": "./common/", "target": "./" },
+    { "source": "./react/", "target": "./", "condition": "(framework == \"react\")" },
+    { "source": "./vue/", "target": "./", "condition": "(framework == \"vue\")" },
+    { "source": "./svelte/", "target": "./", "condition": "(framework == \"svelte\")" }
+  ],
+  "primaryOutputs": [{ "path": "InertiaStarter.csproj" }]
+}

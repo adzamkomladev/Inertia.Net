@@ -1,9 +1,11 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -78,6 +80,9 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     // at most once per second (every second in Development), instead of a File.Exists on every server-rendered page.
     private readonly FileCache<string> _bundles;
 
+    // Rendered HTML by page JSON hash, bounded by Ssr.Cache.MaxBytes; only filled for responses that use the cache.
+    private readonly MemoryCache _renders;
+
     public SsrGateway(
         IOptions<InertiaOptions> options,
         ViteAssets vite,
@@ -98,6 +103,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         _logger = logger;
         _managed = _ssr.NodeProcess is not null;
         _bundles = new(static path => path, environment.IsDevelopment(), timeProvider);
+        _renders = new MemoryCache(new MemoryCacheOptions { SizeLimit = _ssr.Cache.MaxBytes, Clock = new CacheClock(timeProvider) });
         _endpoints = [.. EndpointUrls(_ssr).Select((url, i) => new SsrEndpoint(
             i.ToString(System.Globalization.CultureInfo.InvariantCulture), url, "/render", _managed ? i : null, _ssr, timeProvider, metrics))];
         nodeProcess.InstanceReady += instance =>
@@ -148,6 +154,19 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             return Skip(mode, SsrFailure.PageTooLarge, $"The page JSON is larger than Ssr.MaxPageBytes ({_ssr.MaxPageBytes} bytes).");
         }
 
+        // A render is a function of the page JSON. The dev server's output changes with every edit, so it is never cached.
+        var cacheDuration = devOrigin is null ? context.SsrCacheDuration ?? _ssr.Cache.Duration : TimeSpan.Zero;
+        string? cacheKey = null;
+        if (cacheDuration > TimeSpan.Zero)
+        {
+            cacheKey = Convert.ToHexString(SHA256.HashData(context.PageJson.Span));
+            if (_renders.TryGetValue(cacheKey, out CachedRender? hit) && hit is not null)
+            {
+                _metrics.RecordOutcome("rendered", "cache");
+                return new SsrRender(hit.Head, hit.Body);
+            }
+        }
+
         using var activity = InertiaDiagnostics.ActivitySource.StartActivity("inertia.ssr");
         var started = Stopwatch.GetTimestamp();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
@@ -180,7 +199,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             if (attempt.Render is { } render)
             {
                 Complete(activity, started, render, null);
-                return render;
+                return cacheKey is null ? render : Store(cacheKey, cacheDuration, render);
             }
 
             // A refused connection received nothing, so one other server can take the render within the same deadline.
@@ -646,8 +665,30 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         return true;
     }
 
+    // Keeps a copy of the render in arrays of its own and hands the copy out, so the pooled array goes back at once.
+    private SsrRender Store(string key, TimeSpan duration, SsrRender render)
+    {
+        var entry = new CachedRender(render.Head.ToArray(), render.Body.ToArray());
+        render.Dispose();
+        _renders.Set(key, entry, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = duration,
+            Size = entry.Head.Length + entry.Body.Length,
+        });
+        return new SsrRender(entry.Head, entry.Body);
+    }
+
+    private sealed record CachedRender(byte[] Head, byte[] Body);
+
+    // MemoryCacheOptions.Clock takes the older ISystemClock; this lets tests move the cache's time with a FakeTimeProvider.
+    private sealed class CacheClock(TimeProvider time) : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow => time.GetUtcNow();
+    }
+
     public void Dispose()
     {
+        _renders.Dispose();
         foreach (var endpoint in _endpoints)
         {
             endpoint.Dispose();

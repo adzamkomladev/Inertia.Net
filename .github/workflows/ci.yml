@@ -93,3 +93,41 @@ jobs:
             tests/e2e/playwright-report
             tests/e2e/test-results
           retention-days: 7
+
+  # dotnet new templates: create an app per framework, build it against the packages of this commit, then build its client.
+  templates:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [react, vue, svelte]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Pack
+        run: |
+          VERSION=$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' src/Directory.Build.props)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          # The template must reference the version it ships with.
+          grep -q "Include=\"Inertia.Net\" Version=\"$VERSION\"" src/Inertia.Net.Templates/content/common/InertiaStarter.csproj
+          dotnet pack Inertia.Net.slnx -c Release -warnaserror -o "$RUNNER_TEMP/packages"
+      - name: Create the app
+        run: |
+          dotnet new install "$RUNNER_TEMP/packages/Inertia.Net.Templates.$VERSION.nupkg"
+          dotnet new inertia -n Starter -o "$RUNNER_TEMP/Starter" --framework ${{ matrix.framework }}
+          cd "$RUNNER_TEMP/Starter"
+          dotnet new nugetconfig
+          dotnet nuget add source "$RUNNER_TEMP/packages" -n local
+      - name: Build the app
+        working-directory: ${{ runner.temp }}/Starter
+        run: dotnet build -warnaserror
+      - name: Build the client
+        working-directory: ${{ runner.temp }}/Starter
+        run: |
+          npm install --no-audit --no-fund
+          npm run build

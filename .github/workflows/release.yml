@@ -43,7 +43,7 @@ jobs:
       - run: dotnet build Inertia.Net.slnx -c Release -warnaserror -p:Version=$VERSION
       - run: dotnet test --solution Inertia.Net.slnx -c Release --no-build
 
-      # Only the four src projects are packable: Inertia.Net, .Mvc, .FastEndpoints and .Testing. They are packed one by one,
+      # Only the src projects are packable: Inertia.Net, .Mvc, .FastEndpoints, .Testing and .Templates. They are packed one by one,
       # because packing the solution also warns about every non-packable test project.
       # SourceLink and the snupkg symbol packages come from src/Directory.Build.props.
       - name: Pack
@@ -55,7 +55,7 @@ jobs:
       - name: Check the package set
         run: |
           ls -l artifacts
-          for id in Inertia.Net Inertia.Net.Mvc Inertia.Net.FastEndpoints Inertia.Net.Testing; do
+          for id in Inertia.Net Inertia.Net.Mvc Inertia.Net.FastEndpoints Inertia.Net.Testing Inertia.Net.Templates; do
             test -f "artifacts/$id.$VERSION.nupkg" || { echo "Missing artifacts/$id.$VERSION.nupkg"; exit 1; }
           done
 

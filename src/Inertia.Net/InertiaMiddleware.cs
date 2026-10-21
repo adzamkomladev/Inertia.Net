@@ -24,10 +24,12 @@ internal sealed class InertiaMiddleware
     private readonly IInertiaStateStore _store;
     private readonly InertiaPageWriter _pageWriter;
     private readonly Func<object, Task> _onStarting;
+    private readonly DevToolsRecorder? _devTools;
 
-    public InertiaMiddleware(RequestDelegate next, VersionProvider versionProvider, IInertiaStateStore store, InertiaPageWriter pageWriter)
+    public InertiaMiddleware(RequestDelegate next, VersionProvider versionProvider, IInertiaStateStore store, InertiaPageWriter pageWriter, DevToolsRecorder? devTools = null)
     {
         _next = next;
+        _devTools = devTools;
         _versionProvider = versionProvider;
         _store = store;
         _pageWriter = pageWriter;
@@ -88,9 +90,55 @@ internal sealed class InertiaMiddleware
         }
     }
 
+    /// <summary>The middleware with DevTools recording around it; only used while the recorder is on.</summary>
+    public async Task InvokeRecordedAsync(HttpContext httpContext)
+    {
+        if (_devTools!.Begin(httpContext) is not { } capture)
+        {
+            await InvokeAsync(httpContext);
+            return;
+        }
+
+        var failed = false;
+        try
+        {
+            await InvokeAsync(httpContext);
+        }
+        catch
+        {
+            failed = true;
+            throw;
+        }
+        finally
+        {
+            await _devTools.CompleteAsync(httpContext, capture, failed);
+        }
+    }
+
     private static bool IsInertia(HttpRequest request) => !string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]);
 
     private static bool IsPutPatchDelete(string method) => HttpMethods.IsPut(method) || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method);
+
+    // An absolute (or protocol-relative) http(s) URL whose scheme, host or port differs from the request's. Relative URLs are same-origin.
+    internal static bool IsOtherOrigin(HttpRequest request, string location)
+    {
+        if (location.StartsWith("//", StringComparison.Ordinal))
+        {
+            location = request.Scheme + ":" + location;
+        }
+
+        if (!Uri.TryCreate(location, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return false;
+        }
+
+        // Host is bracketed for IPv6 like HostString.Host; IdnHost is the punycode form a Host header carries.
+        var host = request.Host.Host;
+        var requestPort = request.Host.Port ?? (request.IsHttps ? 443 : 80);
+        return !string.Equals(uri.Scheme, request.Scheme, StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase) && !string.Equals(uri.IdnHost, host, StringComparison.OrdinalIgnoreCase))
+            || uri.Port != requestPort;
+    }
 
     // Symfony's Response::isRedirect() codes (minus 201): a 304 or 300 is not a redirect.
     private static bool IsRedirect(int statusCode) => statusCode is 301 or 302 or 303 or 307 or 308;
@@ -110,12 +158,22 @@ internal sealed class InertiaMiddleware
             }
 
             if (IsRedirect(response.StatusCode)
-                && headers.Location.ToString() is var location && location.Contains('#', StringComparison.Ordinal)
+                && headers.Location.ToString() is { Length: > 0 } location
                 && !string.Equals(httpContext.Request.Headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase))
             {
-                response.StatusCode = StatusCodes.Status409Conflict;
-                headers.Location = default;
-                headers[InertiaHeaders.Redirect] = location;
+                // Another origin: XHR cannot follow it, so the client visits it in full (which keeps any fragment, too).
+                if (_pageWriter.Options.ConvertExternalRedirects && IsOtherOrigin(httpContext.Request, location))
+                {
+                    response.StatusCode = StatusCodes.Status409Conflict;
+                    headers.Location = default;
+                    headers[InertiaHeaders.Location] = location;
+                }
+                else if (location.Contains('#', StringComparison.Ordinal))
+                {
+                    response.StatusCode = StatusCodes.Status409Conflict;
+                    headers.Location = default;
+                    headers[InertiaHeaders.Redirect] = location;
+                }
             }
         }
 
@@ -157,6 +215,11 @@ public static class InertiaApplicationBuilderExtensions
             ?? throw new InvalidOperationException("Inertia.Net services are not registered. Call services.AddInertia() at startup.");
         var store = services.GetRequiredService<IInertiaStateStore>();
         var pageWriter = services.GetRequiredService<InertiaPageWriter>();
-        return app.Use(next => new InertiaMiddleware(next, versionProvider, store, pageWriter).InvokeAsync);
+        var devTools = services.GetService<DevToolsRecorder>() is { Enabled: true } recorder ? recorder : null;
+        return app.Use(next =>
+        {
+            var middleware = new InertiaMiddleware(next, versionProvider, store, pageWriter, devTools);
+            return devTools is null ? middleware.InvokeAsync : middleware.InvokeRecordedAsync;
+        });
     }
 }

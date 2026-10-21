@@ -64,7 +64,8 @@ The middleware runs in this order:
 3. If the request is not an Inertia request, return the response unchanged.
 4. If the status is 200 and the body is empty, redirect back (same-host Referer, falling back to the app root `PathBase/`).
 5. If the status is 302 and the method is PUT, PATCH or DELETE, change it to 303.
-6. If the response is a redirect, its `Location` contains `#`, and the request is not a prefetch, replace it with `409` and `X-Inertia-Redirect: <Location>` (empty body).
+6. If the response is a redirect to another origin (an absolute or protocol-relative http(s) URL whose scheme, host or port differs from the request's), and the request is not a prefetch, replace it with `409` and `X-Inertia-Location: <Location>` (empty body), unless `ConvertExternalRedirects` is off (deliberate deviation 12).
+7. Otherwise, if the response is a redirect, its `Location` contains `#`, and the request is not a prefetch, replace it with `409` and `X-Inertia-Redirect: <Location>` (empty body).
 
 "Redirect" means status 301, 302, 303, 307 or 308 (Symfony's `isRedirect()`, without 201). When the response is a redirect, or a `409` carrying `X-Inertia-Location`/`X-Inertia-Redirect`, the flash/errors/history flags (set during this request **or** restored and not rendered yet) are saved to the state store; any other response consumes the loaded state (§7).
 
@@ -244,6 +245,8 @@ The state is kept (not consumed) when the response is a version-mismatch 409.
   1. `<link rel="stylesheet" href>` for the chunk's `css`, then recursively for each static import's `css`, de-duplicated.
   2. `<script type="module" src="/{base}/{file}">`.
   3. `<link rel="modulepreload" href>` for each static import's `file`, recursively and de-duplicated.
+- **Prefetch** (`Vite.Prefetch`, off by default): after the tags, one inline script that, after the `load` event, appends `<link rel="prefetch" fetchpriority="low">` for the chunks reachable through the loaded chunks' `dynamicImports` (then their `imports`, `dynamicImports` and `css`, breadth first), minus the files already emitted, `PrefetchConcurrency` at a time (`Aggressive`: all at once). Laravel's `Vite::useWaterfallPrefetching()` and `useAggressivePrefetching()`.
+- **CSP nonce** (`CspNonce`): every `<script>`, `<link rel="stylesheet">` and `<link rel="modulepreload">` above, the React refresh preamble, the prefetch script (and its links) and the page `<script data-page>` carry `nonce="..."`.
 - **Development** (hot file contains the dev server origin): emit the React refresh preamble (React only, `@viteReactRefresh`), then `<script type="module" src="{origin}/@vite/client">`, then `<script type="module" src="{origin}/{entry}">`.
 
 The React refresh preamble is:
@@ -265,3 +268,4 @@ The React refresh preamble is:
 9. **SSR returning an empty body falls back to client rendering.** Laravel echoes the empty body.
 10. **The Vite hot file is only read in Development** (or use `Vite.DevServerUrl`), so a stale `hot` file deployed to production cannot point pages at a dev server. Laravel reads it in any environment.
 11. **Array descendant reloads return complete arrays.** The client replaces arrays on ordinary partial merges, so fragments can lose sibling fields or move an element to another index. Selecting a descendant loads the whole array; excluding a descendant excludes the whole array, preserving `Always` precedence. Use keyed objects for independent updates.
+12. **Redirects to another origin become a full visit** (`409` + `X-Inertia-Location`), as in inertia-rails 3.23 (`convert_external_redirects`). Laravel lets the XHR follow them, which the browser blocks without CORS. Prefetches are left alone. `ConvertExternalRedirects = false` restores Laravel's behavior.
