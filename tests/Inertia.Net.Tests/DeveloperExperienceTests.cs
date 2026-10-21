@@ -89,7 +89,7 @@ public sealed class DeveloperExperienceTests : IDisposable
               'Users/Index': UsersPage
               'Orders/Show': OrdersPage
             }
-            """,
+            """.ReplaceLineEndings("\n"),
             ts,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -103,7 +103,7 @@ public sealed class DeveloperExperienceTests : IDisposable
               byRole: Record<string, TsUser[]>
               'display-name': string
             }
-            """,
+            """.ReplaceLineEndings("\n"),
             ts,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -115,7 +115,7 @@ public sealed class DeveloperExperienceTests : IDisposable
               createdAt: string
               score: number | null
             }
-            """,
+            """.ReplaceLineEndings("\n"),
             ts,
             StringComparison.Ordinal);
         Assert.Contains("export type Status = 'active' | 'disabled'", ts, StringComparison.Ordinal);
@@ -127,7 +127,7 @@ public sealed class DeveloperExperienceTests : IDisposable
               kind: 'circle'
               radius: number
             }
-            """,
+            """.ReplaceLineEndings("\n"),
             ts,
             StringComparison.Ordinal);
         Assert.Contains("lines: PagedTsUser", ts, StringComparison.Ordinal);
@@ -157,7 +157,7 @@ public sealed class DeveloperExperienceTests : IDisposable
               now: unknown
               plans?: string[]
             }
-            """,
+            """.ReplaceLineEndings("\n"),
             ts,
             StringComparison.Ordinal);
         Assert.Contains("export interface FlashData extends Flash {}", ts, StringComparison.Ordinal);
@@ -170,7 +170,7 @@ public sealed class DeveloperExperienceTests : IDisposable
                 errorValueType: string[]
               }
             }
-            """,
+            """.ReplaceLineEndings("\n"),
             ts,
             StringComparison.Ordinal);
     }
