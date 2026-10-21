@@ -31,8 +31,7 @@ public abstract class InertiaProp
     internal ScrollMetadata? ScrollMetadata;
     internal bool ShouldRescue;
     internal bool IsParallel;
-    internal string? CacheKey;
-    internal TimeSpan CacheDuration;
+    internal PropCaching? Caching; // one reference, set only by Cache(): 8 bytes per prop rather than 16
 
     // Set once any prop is marked Parallel(): until then no render pays for the planning walk.
     internal static volatile bool ParallelUsed;
@@ -150,8 +149,7 @@ public abstract class InertiaProp
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(duration, TimeSpan.Zero);
-        CacheKey = key;
-        CacheDuration = duration;
+        Caching = new PropCaching(new PropCacheKey(key), duration);
         return this;
     }
 

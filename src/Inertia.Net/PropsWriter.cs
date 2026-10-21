@@ -274,7 +274,7 @@ internal sealed class PropsWriter : IDisposable
             {
                 // A cached prop: a hit is written without a loader; a miss resolves below, then is stored and written the same way.
                 // (Kept in this method's existing await, not a second one: the walk runs it for every entry.)
-                if (p.CacheKey is not null && FindCached(p) is { } hit)
+                if (p.Caching is not null && FindCached(p) is { } hit)
                 {
                     WriteCached(key, p, hit, parentWasResolved);
                     return;
@@ -288,7 +288,7 @@ internal sealed class PropsWriter : IDisposable
                     return;
                 }
 
-                if (p.CacheKey is not null)
+                if (p.Caching is not null)
                 {
                     WriteCached(key, p, Store(p, value), parentWasResolved);
                     return;
@@ -336,15 +336,15 @@ internal sealed class PropsWriter : IDisposable
     }
 
     private CachedProp? FindCached(InertiaProp prop) =>
-        _owner.PropCache.TryGetValue(new PropCacheKey(prop.CacheKey!), out CachedProp? cached) ? cached : null;
+        _owner.PropCache.TryGetValue(prop.Caching!.Key, out CachedProp? cached) ? cached : null;
 
     // Serializes the loader's value once and keeps it for the prop's duration.
     private CachedProp Store(InertiaProp prop, object? value)
     {
         var cached = Serialize(prop, value);
-        _owner.PropCache.Set(new PropCacheKey(prop.CacheKey!), cached, new MemoryCacheEntryOptions
+        _owner.PropCache.Set(prop.Caching!.Key, cached, new MemoryCacheEntryOptions
         {
-            AbsoluteExpirationRelativeToNow = prop.CacheDuration,
+            AbsoluteExpirationRelativeToNow = prop.Caching!.Duration,
             Size = cached.Json.Length, // required when the app's cache has a SizeLimit
         });
         return cached;
@@ -391,7 +391,7 @@ internal sealed class PropsWriter : IDisposable
         return new CachedProp(json, json is [(byte)'[', ..], scroll);
     }
 
-    private bool IsCached(InertiaProp prop) => prop.CacheKey is not null && FindCached(prop) is not null;
+    private bool IsCached(InertiaProp prop) => prop.Caching is not null && FindCached(prop) is not null;
 
     private async ValueTask WriteValueAsync(object? value, Type declaredType, bool parentWasResolved)
     {
@@ -879,6 +879,9 @@ internal sealed class PropsWriter : IDisposable
 
 /// <summary>A <see cref="InertiaProp.Cache"/> key, in a key space of its own within the app's memory cache.</summary>
 internal readonly record struct PropCacheKey(string Key);
+
+/// <summary>A prop's <see cref="InertiaProp.Cache"/> settings.</summary>
+internal sealed record PropCaching(PropCacheKey Key, TimeSpan Duration);
 
 /// <summary>A cached prop: its HTML-safe JSON, whether that is an array, and a scroll prop's paging metadata.</summary>
 internal sealed record CachedProp(byte[] Json, bool IsArray, ScrollMetadata? Scroll);

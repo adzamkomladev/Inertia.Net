@@ -135,8 +135,8 @@ Conclusion: on this machine 1.4.0 renders every page in the same time as 1.3.0. 
 (at most 0.12 µs), below the ±4% that a benchmark with no Inertia.Net code moves between rounds, and none reaches the 5% bar for a
 rerun. The typed page is not slower (−1.7%), so the laptop's 1.5–3% does not hold. What is certain is allocation: +8 B per JSON
 render, +24 B per HTML render, and +16 B for each `InertiaProp` a handler creates (+160 B for the 20-prop page's 10 props), from
-`CacheKey` and `CacheDuration` in `InertiaProp`. Moving those two fields into one reference to a small key/duration object, set
-only by `Cache()`, would bring that to about +8 B per prop.
+`CacheKey` and `CacheDuration` in `InertiaProp`. Those two fields have since become one reference set only by `Cache()`: the 20-prop
+handler side now allocates 4,312 B (+80 B over 1.3.0, +8 B per prop).
 
 Reproduce (from each worktree's `tests/Inertia.Net.Benchmarks`):
 
