@@ -166,6 +166,27 @@ public sealed class SsrCacheTests
     }
 
     [Fact]
+    public async Task A_refresh_skips_the_render_when_a_fresh_one_was_stored_since()
+    {
+        var time = new FakeTimeProvider();
+        var (harness, handler) = Create(c =>
+        {
+            c.Duration = TimeSpan.FromMinutes(1);
+            c.StaleFor = TimeSpan.FromMinutes(5);
+        }, time);
+
+        await RenderAsync(harness);
+        time.Advance(TimeSpan.FromMinutes(2));
+        await RenderAsync(harness, out var refresh);
+
+        // The page is rendered and stored fresh before the stale read's refresh runs.
+        await harness.Services.GetRequiredService<IInertiaCache>().ClearSsrAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("render 2", await RenderAsync(harness), StringComparison.Ordinal);
+        await refresh.CompleteAsync();
+        Assert.Equal(2, handler.Calls);
+    }
+
+    [Fact]
     public async Task A_response_sets_its_own_stale_time()
     {
         var time = new FakeTimeProvider();

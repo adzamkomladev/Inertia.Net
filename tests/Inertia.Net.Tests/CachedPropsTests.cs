@@ -217,6 +217,25 @@ public sealed class CachedPropsTests
     }
 
     [Fact]
+    public async Task A_refresh_skips_its_loader_when_a_fresh_value_was_stored_since()
+    {
+        var time = new FakeTimeProvider();
+        var harness = new Harness(timeProvider: time);
+        InertiaProp Feed() => Prop(() => $"load {++_loads}").Cache("feed", TimeSpan.FromMinutes(1), staleFor: TimeSpan.FromMinutes(5));
+
+        await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
+        time.Advance(TimeSpan.FromMinutes(2));
+        var (_, refresh) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
+
+        // Another refresh (or another app instance sharing the store) stores a fresh value before this response's refresh runs.
+        await harness.Services.GetRequiredService<IInertiaCache>().SetPropAsync("feed", "saved", TimeSpan.FromMinutes(1), cancellationToken: TestContext.Current.CancellationToken);
+        await refresh.CompleteAsync();
+        Assert.Equal(1, _loads);
+        var (page, _) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
+        Assert.Equal("saved", (string?)page["props"]!["feed"]);
+    }
+
+    [Fact]
     public async Task A_failed_refresh_keeps_the_stale_value_and_is_logged()
     {
         var time = new FakeTimeProvider();

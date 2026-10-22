@@ -663,7 +663,8 @@ stale value too. Past `duration + staleFor` the loader runs during the request a
 - The refresh runs in the response's completion callbacks, which run before the request's services are disposed: a loader can keep
   using the request's `DbContext` and other scoped services. It must not touch the `HttpContext` (the response is already sent).
   On HTTP/1.1 the connection takes its next request once the refresh has finished.
-- One refresh runs per key and app instance at a time, and the stale props of one response refresh one after another.
+- One refresh runs per key and app instance at a time, and the stale props of one response refresh one after another. A refresh
+  that finds the value fresh again (another refresh, or another app instance sharing the store, stored one since) skips its loader.
 - A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
 
 **Another store.** Props and [SSR renders](#6-response-cache) are kept in an `IInertiaCacheStore`. Register your own as a singleton

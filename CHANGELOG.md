@@ -20,7 +20,7 @@ renders in a private cache bounded by `Ssr.Cache.MaxBytes`, as in 1.4.
 - `InertiaProp.Cache(key, duration, staleFor?, tags?)`. `tags` remove a prop with `RemoveByTagAsync`. `staleFor`
   (stale-while-revalidate) keeps serving a value once `duration` has passed: the first request that reads it gets it at once and the
   loader runs after that response has been sent, while the request's scoped services are still alive. One refresh runs per key and
-  app instance; a failed refresh is logged and keeps the stale value.
+  app instance, and one that finds a fresh value stored since skips its loader; a failed refresh is logged and keeps the stale value.
 - `Ssr.Cache.StaleFor` and `InertiaResult.WithSsrCache(duration, staleFor)`: the same for server-rendered HTML, which renders again after
   the response. A stale hit is recorded as `inertia.ssr.outcomes` with reason `stale`.
 - `IInertiaCacheStore`, `InertiaCacheKey`, `InertiaCacheEntryKind`, `InertiaCacheEntryOptions` and `InertiaCacheTags`: register an
