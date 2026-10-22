@@ -1802,34 +1802,11 @@ Flash and errors travel in a cookie across the redirect, so use a client that ke
 
 ## Performance
 
-Render times for 1.4.0, measured with BenchmarkDotNet on a 4-vCPU cloud Linux VM (.NET 10.0): the median of five rounds that
-alternated with 1.3.0. The benchmarks reuse a `DefaultHttpContext` with a null body and cover header parsing, shared props, the prop
-walk, the pooled buffer and response copying. They are not production throughput estimates.
+Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These are controlled microbenchmarks, not production throughput estimates.
 
-| Workload | Time (1.4.0) | 1.3.0 | Allocated/request |
-|---|---:|---:|---:|
-| JSON, 20 mixed props | 10.30 µs | 10.33 µs | 2,760 B |
-| JSON, typed page object | 6.81 µs | 6.94 µs | 2,480 B |
-| Partial reload, 2 of 20 props | 4.85 µs | 4.92 µs | 1,592 B |
-| Deferred group load | 3.96 µs | 3.99 µs | 1,600 B |
-| HTML + Vite tags, 20 props | 11.33 µs | 11.22 µs | 2,824 B |
+Run them against your build from `tests/Inertia.Net.Benchmarks` with `dotnet run -c Release -- --filter '*'`. Targeted probes are available with `--render-probe`, `--ssr-probe`, `--mvc-probe`, `--payload-probe` and `--cache-probe`.
 
-Every difference from 1.3.0 is under 2%, inside the ±4% that a benchmark without Inertia.Net code moved between rounds. Earlier
-measurements on a laptop (i5-8265U), for scale: a 1 MiB SSR page through the streaming gateway took 0.94 ms and 2,053 KiB (the
-buffered reference 0.79 ms and 4,101 KiB), and the middleware adds 0.23–0.26 µs and 0 B to a non-Inertia request and 0.80–1.51 µs and
-48 B to an Inertia one.
-
-Since then, SSR responses stay UTF-8 end to end (about half the allocation again, and faster), and the MVC `<inertia />` tag helper
-streams the page instead of building a string: a 1 MiB page went from about 3 MiB allocated to 80 bytes. Those measurements, taken on a
-different host, are in RESULTS.md.
-
-Warm SSR allocation fell about 50%, with a timing tradeoff and sensitivity to pool reuse. A measured 2,000-prop page with 32 shared props rendered about 20% faster after indexing shared keys, at a cost of about 1.1 KiB more allocation. MemoryPack was evaluated in benchmarks; production transport and redirect state remain JSON.
-
-The 1.4 caches, on the same VM (`--cache-probe`): a cached prop hit took a 500-row loader from 66–88 µs and 25 KB to 3–4 µs and 1.1 KB
-per render, and an SSR cache hit took an in-memory render of a 64 KiB page from 80–136 µs to 7–13 µs. A real database query or Node
-render makes both gaps wider. With the caches unused, 1.4 adds 8 bytes to a JSON render, 24 to an HTML one and 8 to each prop.
-
-Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` (also `--ssr-probe`, `--mvc-probe`, `--payload-probe`, `--cache-probe`) or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
+Historical measurements, workloads and raw data are in [the benchmark results](tests/Inertia.Net.Benchmarks/RESULTS.md). Those results identify the versions measured; they are not measurements of 1.5.0.
 
 **Payload size.** The page JSON is fully buffered before the first byte is sent, so a failing loader never produces a half-written 200.
 Each concurrent request therefore holds its whole page in memory (pooled, and sized from the component's recent pages). Keep pages well

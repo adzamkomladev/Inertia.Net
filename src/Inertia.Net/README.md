@@ -1,6 +1,6 @@
 # Inertia.Net
 
-Version 1.4 adds cached props, an SSR response cache, Vite chunk prefetching, CSP nonces, generated TypeScript declarations and the Inertia DevTools protocol. One default changed: redirects to another origin become a full visit. Read the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md) and the [changelog](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md). Start a new app with `dotnet new install Inertia.Net.Templates` and `dotnet new inertia`.
+Inertia.Net 1.5.0 connects ASP.NET Core endpoints to React, Vue and Svelte pages using Inertia.js v3. It includes deferred and cached props, Vite integration, optional server-side rendering, generated TypeScript declarations and development tools. Start a new app with `dotnet new install Inertia.Net.Templates::1.5.0` and `dotnet new inertia`.
 
 The core of Inertia.Net, a .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs (this package), MVC (`Inertia.Net.Mvc`) and FastEndpoints (`Inertia.Net.FastEndpoints`), with the React, Vue and Svelte clients, and is Native AOT and trim compatible.
 

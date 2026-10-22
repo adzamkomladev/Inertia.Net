@@ -1,6 +1,6 @@
 # Inertia.Net.FastEndpoints
 
-Use the 1.4 packages together; see the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md). Validation keys use dotted collection indices and FastEndpoints' binding serializer naming policy.
+Use version 1.5.0 for all Inertia.Net packages. Validation keys use dotted collection indices and FastEndpoints' binding serializer naming policy.
 
 FastEndpoints integration for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
 

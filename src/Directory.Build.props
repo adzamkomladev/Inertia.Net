@@ -2,7 +2,7 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Version>1.4.0</Version>
+    <Version>1.5.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Authors>Inertia.Net contributors</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

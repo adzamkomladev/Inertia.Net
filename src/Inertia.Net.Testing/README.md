@@ -1,6 +1,6 @@
 # Inertia.Net.Testing
 
-Use the 1.4 packages together; see the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md).
+Use version 1.5.0 for all Inertia.Net packages.
 
 Test helpers for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net): Laravel-style fluent assertions over Inertia responses, for any test framework. It parses JSON responses and the first-visit HTML `<script data-page>`, and throws `InertiaAssertionException` when an assertion fails.
 
