@@ -1,32 +1,13 @@
 # Inertia.Net
 
-A .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs, MVC controllers and FastEndpoints, with the React, Vue and Svelte clients, and it is **Native AOT and trim compatible**.
+Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Version 1.4 adds cached props, an SSR response cache, Vite chunk prefetching, CSP nonces, generated TypeScript types, the Inertia DevTools
-protocol and `dotnet new` templates. Read the [1.4 upgrade notes](docs/migrating-to-1.4.md): one default changed (redirects to another
-origin become a full visit). The [changelog](CHANGELOG.md) lists every release.
-
-```csharp
-app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
-{
-    ["users"] = db.Users.Select(u => new UserDto(u.Id, u.Name)).ToList(),
-    ["stats"] = Defer(ct => db.StatsAsync(ct), group: "sidebar"),
-    ["plans"] = Once(ct => db.PlansAsync(ct)).Until(TimeSpan.FromHours(1)),
-}));
-```
-
-- **v3 only.** No v2 compatibility mode. The wire format is documented in [docs/protocol.md](docs/protocol.md).
-- **AOT first.** No reflection over your props, one source-generated JSON context for the library's own types. See [Native AOT](#native-aot).
-- **Measured.** Benchmarks cover page rendering, SSR and state storage; Inertia requests track response writes without another body buffer. See [Performance](#performance).
-- **Tested.** Unit tests ported from inertia-laravel 3.x, a protocol conformance suite that runs against all three backends, an AOT smoke test and Playwright end-to-end tests.
-- **Typed and inspectable.** TypeScript declarations generated from your C# page types, and the Inertia DevTools browser extension in Development.
-
-```sh
-dotnet new install Inertia.Net.Templates
-dotnet new inertia -n MyApp --framework react      # or vue, svelte
-```
+Inertia.Net **1.5.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
+
+- [How it works](#how-it-works)
+- [Start a new app](#start-a-new-app)
 
 1. [Overview and feature matrix](#overview-and-feature-matrix)
 2. [Installation](#installation)
@@ -59,6 +40,65 @@ dotnet new inertia -n MyApp --framework react      # or vue, svelte
 29. [Contributing and license](#contributing-and-license)
 
 ---
+
+## How it works
+
+Your .NET endpoint chooses a frontend page and supplies its data as **props**. Inertia connects that endpoint to your React, Vue or Svelte component.
+
+1. The first visit returns an HTML document with the page's data.
+2. Subsequent Inertia links and form submissions request page data in the background.
+3. The client updates the page without a full browser reload. Your .NET app still owns routing, authentication and validation.
+
+For example, this endpoint renders a page named `Home` with a `greeting` prop:
+
+```csharp
+app.MapGet("/", () => Render("Home", new InertiaProps
+{
+    ["greeting"] = "Hello from .NET",
+}));
+```
+
+The matching React page receives it as a normal component prop:
+
+```tsx
+// ClientApp/pages/Home.tsx (in the starter template)
+export default function Home({ greeting }: { greeting: string }) {
+  return <h1>{greeting}</h1>
+}
+```
+
+The page name must match your client-side page resolver. The starter templates configure that resolver for you.
+
+## Start a new app
+
+You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clients are not supported.
+
+Create an app with the starter template:
+
+```sh
+dotnet new install Inertia.Net.Templates::1.5.0
+dotnet new inertia -n MyApp --framework react
+cd MyApp
+npm install
+```
+
+Choose `--framework vue` or `--framework svelte` for another frontend. Each template uses Minimal APIs and includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+
+Start Vite in one terminal, from `MyApp`:
+
+```sh
+npm run dev
+```
+
+Start ASP.NET Core in another terminal, also from `MyApp`:
+
+```sh
+dotnet watch
+```
+
+Open [http://localhost:5180](http://localhost:5180). Browse through ASP.NET Core; Vite supplies the frontend assets and hot reload.
+
+For a production build, run `npm run build`, then `dotnet publish -c Release`. Deploy the built frontend assets with the published app. SSR is optional and requires a Node server at runtime; ordinary client rendering does not.
 
 ## Overview and feature matrix
 
@@ -113,13 +153,13 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net
-dotnet add package Inertia.Net.Mvc              # MVC only
-dotnet add package Inertia.Net.FastEndpoints    # FastEndpoints only
-dotnet add package Inertia.Net.Testing          # test projects
+dotnet add package Inertia.Net --version 1.5.0
+dotnet add package Inertia.Net.Mvc --version 1.5.0 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.5.0 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.5.0 # test projects
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`).
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Install all Inertia.Net packages at version `1.5.0`. The library version and the Inertia protocol version are separate: Inertia.Net 1.5.0 uses Inertia.js v3 clients.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -1927,7 +1967,7 @@ Extension points: `IInertiaRootView`, `IInertiaStateStore`, `ViteAssets`, `Inert
 
 ## Migrating from other .NET adapters
 
-The 1.0 API is close to the Laravel adapter's names. The table maps the typical InertiaCore-style API (kapi2289/InertiaCore and its forks). Check names against the version you use.
+The API is close to the Laravel adapter's names. The table maps the typical InertiaCore-style API (kapi2289/InertiaCore and its forks). Check names against the version you use.
 
 | Other adapters | Inertia.Net |
 |---|---|
@@ -1987,7 +2027,7 @@ resolver does, even on a case-insensitive file system; the message suggests the 
 That is `ConvertExternalRedirects` (on by default): an Inertia request cannot follow a redirect to another origin, so it gets
 `409` + `X-Inertia-Location` and the client does a full visit. If it happens for your own host, the app is behind a proxy that does
 not forward the scheme (see [Deploying behind a proxy](#deploying-behind-a-proxy)), or use relative redirects.
-`o.ConvertExternalRedirects = false` keeps the 1.3 behavior.
+`o.ConvertExternalRedirects = false` disables this conversion.
 
 **`The Inertia root view '...' resolves outside the content root`.**
 `RootView` and `WithRootView(...)` take a path relative to the content root; absolute paths and `..` are refused. Never derive them from request data.
@@ -2046,7 +2086,7 @@ Yes. Inertia handles only the endpoints that return `Render(...)`. The middlewar
 
 ```sh
 dotnet build Inertia.Net.slnx -c Release -warnaserror
-dotnet test --solution Inertia.Net.slnx -c Release
+dotnet test --solution Inertia.Net.slnx -c Release --no-build
 bash eng/aot-smoke.sh                    # Native AOT publish + protocol smoke test (Linux, clang + zlib)
 ```
 
