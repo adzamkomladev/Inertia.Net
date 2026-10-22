@@ -1,33 +1,13 @@
 # Inertia.Net
 
-A .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs, MVC controllers and FastEndpoints, with the React, Vue and Svelte clients, and it is **Native AOT and trim compatible**.
+Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Version 1.5 lets you remove, replace and tag [cached props](#cached-props) and [SSR renders](#6-response-cache), serve them stale while
-they refresh (stale-while-revalidate), and keep them in a cache store of your choice; nothing changes for apps that do not use it.
-Upgrading from 1.3 or earlier? Read the [1.4 upgrade notes](docs/migrating-to-1.4.md): one default changed (redirects to another origin
-become a full visit). The [changelog](CHANGELOG.md) lists every release.
-
-```csharp
-app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
-{
-    ["users"] = db.Users.Select(u => new UserDto(u.Id, u.Name)).ToList(),
-    ["stats"] = Defer(ct => db.StatsAsync(ct), group: "sidebar"),
-    ["plans"] = Once(ct => db.PlansAsync(ct)).Until(TimeSpan.FromHours(1)),
-}));
-```
-
-- **v3 only.** No v2 compatibility mode. The wire format is documented in [docs/protocol.md](docs/protocol.md).
-- **AOT first.** No reflection over your props, one source-generated JSON context for the library's own types. See [Native AOT](#native-aot).
-- **Measured.** Benchmarks cover page rendering, SSR and state storage; Inertia requests track response writes without another body buffer. See [Performance](#performance).
-- **Tested.** Unit tests ported from inertia-laravel 3.x, a protocol conformance suite that runs against all three backends, an AOT smoke test and Playwright end-to-end tests.
-- **Typed and inspectable.** TypeScript declarations generated from your C# page types, and the Inertia DevTools browser extension in Development.
-
-```sh
-dotnet new install Inertia.Net.Templates
-dotnet new inertia -n MyApp --framework react      # or vue, svelte
-```
+Inertia.Net **1.5.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
+
+- [How it works](#how-it-works)
+- [Start a new app](#start-a-new-app)
 
 1. [Overview and feature matrix](#overview-and-feature-matrix)
 2. [Installation](#installation)
@@ -60,6 +40,65 @@ dotnet new inertia -n MyApp --framework react      # or vue, svelte
 29. [Contributing and license](#contributing-and-license)
 
 ---
+
+## How it works
+
+Your .NET endpoint chooses a frontend page and supplies its data as **props**. Inertia connects that endpoint to your React, Vue or Svelte component.
+
+1. The first visit returns an HTML document with the page's data.
+2. Subsequent Inertia links and form submissions request page data in the background.
+3. The client updates the page without a full browser reload. Your .NET app still owns routing, authentication and validation.
+
+For example, this endpoint renders a page named `Home` with a `greeting` prop:
+
+```csharp
+app.MapGet("/", () => Render("Home", new InertiaProps
+{
+    ["greeting"] = "Hello from .NET",
+}));
+```
+
+The matching React page receives it as a normal component prop:
+
+```tsx
+// ClientApp/pages/Home.tsx (in the starter template)
+export default function Home({ greeting }: { greeting: string }) {
+  return <h1>{greeting}</h1>
+}
+```
+
+The page name must match your client-side page resolver. The starter templates configure that resolver for you.
+
+## Start a new app
+
+You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clients are not supported.
+
+Create an app with the starter template:
+
+```sh
+dotnet new install Inertia.Net.Templates::1.5.0
+dotnet new inertia -n MyApp --framework react
+cd MyApp
+npm install
+```
+
+Choose `--framework vue` or `--framework svelte` for another frontend. Each template uses Minimal APIs and includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+
+Start Vite in one terminal, from `MyApp`:
+
+```sh
+npm run dev
+```
+
+Start ASP.NET Core in another terminal, also from `MyApp`:
+
+```sh
+dotnet watch
+```
+
+Open [http://localhost:5180](http://localhost:5180). Browse through ASP.NET Core; Vite supplies the frontend assets and hot reload.
+
+For a production build, run `npm run build`, then `dotnet publish -c Release`. Deploy the built frontend assets with the published app. SSR is optional and requires a Node server at runtime; ordinary client rendering does not.
 
 ## Overview and feature matrix
 
@@ -114,13 +153,13 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net
-dotnet add package Inertia.Net.Mvc              # MVC only
-dotnet add package Inertia.Net.FastEndpoints    # FastEndpoints only
-dotnet add package Inertia.Net.Testing          # test projects
+dotnet add package Inertia.Net --version 1.5.0
+dotnet add package Inertia.Net.Mvc --version 1.5.0 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.5.0 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.5.0 # test projects
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`).
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.5.0` for all Inertia.Net packages. Inertia.Net 1.5.0 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -131,6 +170,10 @@ Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`).
 ---
 
 ## Quick start
+
+Already using the starter template? Its services, middleware, root template and frontend are configured for you. The steps below are for adding Inertia to an existing app or building one manually. Choose one backend and one frontend.
+
+For a new project without the starter template, run `dotnet new web -n MyApp`, then `cd MyApp`, install the packages above, and run `npm init -y` before the client setup.
 
 Every backend needs the same four things: `AddInertia()`, `UseInertia()`, a root template, and a frontend (see [Client setup](#client-setup)).
 Add CSRF protection from the start: `AddAntiforgery(...)` and `UseInertiaAntiforgery()`, as below (see [CSRF and antiforgery](#csrf-and-antiforgery)).
@@ -189,20 +232,10 @@ app.MapGet("/", () => Render("Home", new InertiaProps
     ["greeting"] = "Hello from .NET",
 }));
 
-app.MapPost("/users", (CreateUserInput input, AppDb db) =>
-{
-    db.Add(input);
-    return Results.Redirect("/users");               // 302 becomes 303 for PUT/PATCH/DELETE
-}).WithInertiaValidation();                          // invalid input: redirect back with errors
-
 app.Run();
-
-public sealed class CreateUserInput                  // must be public for AddValidation()
-{
-    [Required] public string? Name { get; set; }
-    [Required, EmailAddress] public string? Email { get; set; }
-}
 ```
+
+This first page needs no database. Add a `Home` component using the client example for your framework below. The later CRUD examples use application-specific services such as `AppDb`; replace those with your own data layer. Form endpoints also need the validation setup in [Validation and error bags](#validation-and-error-bags).
 
 ### MVC
 
@@ -297,14 +330,18 @@ public sealed class HomeEndpoint : EndpointWithoutRequest<InertiaResult>
 
 ## Client setup
 
+Run the npm commands from the ASP.NET Core project directory (the directory containing your `.csproj`). Install only the row for your chosen framework, followed by the shared development dependencies.
+
 Inertia.Net speaks the v3 protocol: the initial page is the `<script data-page="app" type="application/json">` element, which the v3 clients read directly. Install the v3 client packages for your framework:
 
 ```sh
-npm install react react-dom @vitejs/plugin-react @inertiajs/react          # React
-npm install vue @vitejs/plugin-vue @inertiajs/vue3                          # Vue
-npm install svelte @sveltejs/vite-plugin-svelte @inertiajs/svelte           # Svelte
+npm install react react-dom @vitejs/plugin-react @inertiajs/react@^3          # React
+npm install vue @vitejs/plugin-vue @inertiajs/vue3@^3                          # Vue
+npm install svelte @sveltejs/vite-plugin-svelte @inertiajs/svelte@^3           # Svelte
 npm install -D vite typescript
 ```
+
+The starter templates use `ClientApp/pages`; the manual setup below uses `resources/js/Pages`. Keep the resolver, file paths and Vite entry consistent with the layout you choose.
 
 The examples keep the frontend in `resources/js` and the Vite output in `wwwroot/build`. Pages live in `resources/js/Pages`, so the component `Users/Index` is `resources/js/Pages/Users/Index.tsx`.
 
@@ -354,7 +391,7 @@ export default defineConfig(({ command }) => ({
 }))
 ```
 
-`package.json` scripts:
+Add these fields to your `package.json`, keeping the dependencies installed above:
 
 ```json
 { "type": "module", "scripts": { "dev": "vite", "build": "vite build" } }
@@ -381,6 +418,17 @@ createInertiaApp({
   },
 })
 ```
+
+For the `GET /` endpoint above, create this page first:
+
+```tsx
+// resources/js/Pages/Home.tsx
+export default function Home({ greeting }: { greeting: string }) {
+  return <h1>{greeting}</h1>
+}
+```
+
+The following `Users/Index` page illustrates a list supplied by your own `/users` endpoint:
 
 ```tsx
 // resources/js/Pages/Users/Index.tsx
@@ -415,7 +463,18 @@ createInertiaApp({
 })
 ```
 
-Use `@vite("resources/js/app.ts")` in the template and `input: 'resources/js/app.ts'` in the Vite config. Remove `@viteReactRefresh`.
+Use `@vite("resources/js/app.ts")` in the template and `input: 'resources/js/app.ts'` in the Vite config. Replace the React plugin with `import vue from '@vitejs/plugin-vue'` and `plugins: [vue(), hotFile()]`. Remove `@viteReactRefresh`.
+
+For the `GET /` endpoint above, create this page first:
+
+```vue
+<!-- resources/js/Pages/Home.vue -->
+<script setup lang="ts">
+defineProps<{ greeting: string }>()
+</script>
+
+<template><h1>{{ greeting }}</h1></template>
+```
 
 ```vue
 <!-- resources/js/Pages/Users/Index.vue -->
@@ -447,6 +506,19 @@ createInertiaApp({
 })
 ```
 
+Use `@vite("resources/js/app.ts")` in the root template and `input: 'resources/js/app.ts'` in the Vite config. Replace the React plugin with `import { svelte } from '@sveltejs/vite-plugin-svelte'` and `plugins: [svelte(), hotFile()]`. Remove `@viteReactRefresh`.
+
+For the `GET /` endpoint above, create this page first:
+
+```svelte
+<!-- resources/js/Pages/Home.svelte -->
+<script lang="ts">
+  let { greeting }: { greeting: string } = $props()
+</script>
+
+<h1>{greeting}</h1>
+```
+
 ```svelte
 <!-- resources/js/Pages/Users/Index.svelte -->
 <script lang="ts">
@@ -464,7 +536,9 @@ npm run dev          # terminal 1: Vite on :5173, writes wwwroot/hot
 dotnet watch         # terminal 2: the app, ASPNETCORE_ENVIRONMENT=Development
 ```
 
-In production run `npm run build`, then deploy `wwwroot/build` with the app. Samples for each framework live in [samples/](samples/).
+Open the ASP.NET Core URL printed by `dotnet watch`, rather than the Vite URL. The first visit to `/` should display "Hello from .NET". If you started with `dotnet new web`, ensure the launch profile sets `ASPNETCORE_ENVIRONMENT=Development` so the adapter reads the Vite hot file.
+
+For production, run `npm run build`, then `dotnet publish -c Release`. Deploy `wwwroot/build` and `app.html` with the published app. Node.js is needed to build the assets; it is only needed at runtime if you enable SSR. Samples for each framework live in [samples/](samples/).
 
 ---
 
@@ -1813,36 +1887,11 @@ Flash and errors travel in a cookie across the redirect, so use a client that ke
 
 ## Performance
 
-Render times for 1.4.0, measured with BenchmarkDotNet on a 4-vCPU cloud Linux VM (.NET 10.0): the median of five rounds that
-alternated with 1.3.0. The benchmarks reuse a `DefaultHttpContext` with a null body and cover header parsing, shared props, the prop
-walk, the pooled buffer and response copying. They are not production throughput estimates.
+Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
 
-| Workload | Time (1.4.0) | 1.3.0 | Allocated/request |
-|---|---:|---:|---:|
-| JSON, 20 mixed props | 10.30 µs | 10.33 µs | 2,760 B |
-| JSON, typed page object | 6.81 µs | 6.94 µs | 2,480 B |
-| Partial reload, 2 of 20 props | 4.85 µs | 4.92 µs | 1,592 B |
-| Deferred group load | 3.96 µs | 3.99 µs | 1,600 B |
-| HTML + Vite tags, 20 props | 11.33 µs | 11.22 µs | 2,824 B |
+In 1.5.0, cache invalidation, tags, stale-while-revalidate and the configurable cache store leave render and cached prop allocations unchanged, reduce an SSR cache hit by 56 bytes, and leave measured render times unchanged. Full measurements, comparison versions, workloads and raw data are in [the benchmark results](tests/Inertia.Net.Benchmarks/RESULTS.md).
 
-Every difference from 1.3.0 is under 2%, inside the ±4% that a benchmark without Inertia.Net code moved between rounds. Earlier
-measurements on a laptop (i5-8265U), for scale: a 1 MiB SSR page through the streaming gateway took 0.94 ms and 2,053 KiB (the
-buffered reference 0.79 ms and 4,101 KiB), and the middleware adds 0.23–0.26 µs and 0 B to a non-Inertia request and 0.80–1.51 µs and
-48 B to an Inertia one.
-
-Since then, SSR responses stay UTF-8 end to end (about half the allocation again, and faster), and the MVC `<inertia />` tag helper
-streams the page instead of building a string: a 1 MiB page went from about 3 MiB allocated to 80 bytes. Those measurements, taken on a
-different host, are in RESULTS.md.
-
-Warm SSR allocation fell about 50%, with a timing tradeoff and sensitivity to pool reuse. A measured 2,000-prop page with 32 shared props rendered about 20% faster after indexing shared keys, at a cost of about 1.1 KiB more allocation. MemoryPack was evaluated in benchmarks; production transport and redirect state remain JSON.
-
-The 1.4 caches, on the same VM (`--cache-probe`): a cached prop hit took a 500-row loader from 66–88 µs and 25 KB to 3–4 µs and 1.1 KB
-per render, and an SSR cache hit took an in-memory render of a 64 KiB page from 80–136 µs to 7–13 µs. A real database query or Node
-render makes both gaps wider. With the caches unused, 1.4 adds 8 bytes to a JSON render, 24 to an HTML one and 8 to each prop.
-1.5's invalidation, tags, stale-while-revalidate and cache store leave every render and a cached prop hit at 1.4's allocation, take
-56 bytes off an SSR cache hit, and leave render times unchanged (see RESULTS.md).
-
-Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` (also `--ssr-probe`, `--mvc-probe`, `--payload-probe`, `--cache-probe`) or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
+To measure your build, run `dotnet run -c Release -- --filter '*'` from `tests/Inertia.Net.Benchmarks`. Targeted probes are available with `--render-probe`, `--ssr-probe`, `--mvc-probe`, `--payload-probe` and `--cache-probe`.
 
 **Payload size.** The page JSON is fully buffered before the first byte is sent, so a failing loader never produces a half-written 200.
 Each concurrent request therefore holds its whole page in memory (pooled, and sized from the component's recent pages). Keep pages well
@@ -1981,7 +2030,7 @@ Extension points: `IInertiaRootView`, `IInertiaStateStore`, `ViteAssets`, `Inert
 
 ## Migrating from other .NET adapters
 
-The 1.0 API is close to the Laravel adapter's names. The table maps the typical InertiaCore-style API (kapi2289/InertiaCore and its forks). Check names against the version you use.
+The API is close to the Laravel adapter's names. The table maps the typical InertiaCore-style API (kapi2289/InertiaCore and its forks). Check names against the version you use.
 
 | Other adapters | Inertia.Net |
 |---|---|
@@ -2041,7 +2090,7 @@ resolver does, even on a case-insensitive file system; the message suggests the 
 That is `ConvertExternalRedirects` (on by default): an Inertia request cannot follow a redirect to another origin, so it gets
 `409` + `X-Inertia-Location` and the client does a full visit. If it happens for your own host, the app is behind a proxy that does
 not forward the scheme (see [Deploying behind a proxy](#deploying-behind-a-proxy)), or use relative redirects.
-`o.ConvertExternalRedirects = false` keeps the 1.3 behavior.
+`o.ConvertExternalRedirects = false` disables this conversion.
 
 **`The Inertia root view '...' resolves outside the content root`.**
 `RootView` and `WithRootView(...)` take a path relative to the content root; absolute paths and `..` are refused. Never derive them from request data.
@@ -2100,7 +2149,7 @@ Yes. Inertia handles only the endpoints that return `Render(...)`. The middlewar
 
 ```sh
 dotnet build Inertia.Net.slnx -c Release -warnaserror
-dotnet test --solution Inertia.Net.slnx -c Release
+dotnet test --solution Inertia.Net.slnx -c Release --no-build
 bash eng/aot-smoke.sh                    # Native AOT publish + protocol smoke test (Linux, clang + zlib)
 ```
 
