@@ -2,9 +2,10 @@
 
 A .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs, MVC controllers and FastEndpoints, with the React, Vue and Svelte clients, and it is **Native AOT and trim compatible**.
 
-Version 1.4 adds cached props, an SSR response cache, Vite chunk prefetching, CSP nonces, generated TypeScript types, the Inertia DevTools
-protocol and `dotnet new` templates. Read the [1.4 upgrade notes](docs/migrating-to-1.4.md): one default changed (redirects to another
-origin become a full visit). The [changelog](CHANGELOG.md) lists every release.
+Version 1.5 lets you remove, replace and tag [cached props](#cached-props) and [SSR renders](#6-response-cache), serve them stale while
+they refresh (stale-while-revalidate), and keep them in a cache store of your choice; nothing changes for apps that do not use it.
+Upgrading from 1.3 or earlier? Read the [1.4 upgrade notes](docs/migrating-to-1.4.md): one default changed (redirects to another origin
+become a full visit). The [changelog](CHANGELOG.md) lists every release.
 
 ```csharp
 app.MapGet("/users", (AppDb db) => Render("Users/Index", new InertiaProps
@@ -1837,6 +1838,8 @@ Warm SSR allocation fell about 50%, with a timing tradeoff and sensitivity to po
 The 1.4 caches, on the same VM (`--cache-probe`): a cached prop hit took a 500-row loader from 66–88 µs and 25 KB to 3–4 µs and 1.1 KB
 per render, and an SSR cache hit took an in-memory render of a 64 KiB page from 80–136 µs to 7–13 µs. A real database query or Node
 render makes both gaps wider. With the caches unused, 1.4 adds 8 bytes to a JSON render, 24 to an HTML one and 8 to each prop.
+1.5's invalidation, tags, stale-while-revalidate and cache store leave every render and a cached prop hit at 1.4's allocation, take
+56 bytes off an SSR cache hit, and leave render times unchanged (see RESULTS.md).
 
 Full results, workload details, concurrency measurements, raw data and the historical allocation-tuning results are in [tests/Inertia.Net.Benchmarks/RESULTS.md](tests/Inertia.Net.Benchmarks/RESULTS.md). Re-run with `dotnet run -c Release -- --render-probe` (also `--ssr-probe`, `--mvc-probe`, `--payload-probe`, `--cache-probe`) or `--filter '*'` in `tests/Inertia.Net.Benchmarks`.
 

@@ -7,6 +7,8 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-22
+
 Cached props and the SSR response cache can now be invalidated, replaced, served stale while they refresh, and kept in a store of the
 app's choice. Nothing changes for apps that do not use the new APIs: the default store keeps props in the app's `IMemoryCache` and
 renders in a private cache bounded by `Ssr.Cache.MaxBytes`, as in 1.4.
