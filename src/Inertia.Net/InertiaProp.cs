@@ -137,19 +137,30 @@ public abstract class InertiaProp
     }
 
     /// <summary>
-    /// Keeps the resolved value as JSON in the app's <c>IMemoryCache</c> under <paramref name="key"/> for <paramref name="duration"/>:
-    /// while it is cached the loader does not run and the JSON is written as it is. Every request that uses the key gets the same value,
-    /// so put the user or tenant in the key for data that depends on them (<c>$"orders:{userId}"</c>). Only the loading changes: an
-    /// optional, deferred, merged or once prop keeps that behavior. The value must be plain data, without <see cref="InertiaProp"/> values
-    /// inside it. Each app instance has its own cache, and two requests that miss at the same time both run the loader.
+    /// Keeps the resolved value as JSON in the cache (<see cref="IInertiaCacheStore"/>; by default the app's <c>IMemoryCache</c>) under
+    /// <paramref name="key"/> for <paramref name="duration"/>: while it is cached the loader does not run and the JSON is written as it is.
+    /// Every request that uses the key gets the same value, so put the user or tenant in the key for data that depends on them
+    /// (<c>$"orders:{userId}"</c>). Only the loading changes: an optional, deferred, merged or once prop keeps that behavior. The value
+    /// must be plain data, without <see cref="InertiaProp"/> values inside it. With the default store each app instance has its own cache,
+    /// and two requests that miss at the same time both run the loader. Remove or replace values with <see cref="IInertiaCache"/>.
     /// </summary>
     /// <param name="key">The cache key, unique to the value; keys live in their own space, apart from the app's cache keys.</param>
     /// <param name="duration">How long the value is reused, from when it was resolved.</param>
-    public InertiaProp Cache(string key, TimeSpan duration)
+    public InertiaProp Cache(string key, TimeSpan duration) => Cache(key, duration, staleFor: null);
+
+    /// <summary>
+    /// Caches the value like <see cref="Cache(string, TimeSpan)"/>, and once <paramref name="duration"/> has passed keeps serving it for
+    /// <paramref name="staleFor"/> more (stale-while-revalidate): a request that reads a stale value gets it at once, and the loader runs
+    /// after that response has been sent, with the request's services still available, to store a fresh value. One refresh runs per key
+    /// and app instance at a time; a refresh that fails keeps the stale value. Past both times the loader runs during the request again.
+    /// </summary>
+    /// <param name="key">The cache key, unique to the value; keys live in their own space, apart from the app's cache keys.</param>
+    /// <param name="duration">How long the value is fresh, from when it was resolved.</param>
+    /// <param name="staleFor">How long a value past <paramref name="duration"/> is still served while it is refreshed; null or zero for none.</param>
+    /// <param name="tags">Tags that remove the value with <see cref="IInertiaCache.RemoveByTagAsync"/>, e.g. <c>[$"user:{userId}"]</c>.</param>
+    public InertiaProp Cache(string key, TimeSpan duration, TimeSpan? staleFor = null, IEnumerable<string>? tags = null)
     {
-        ArgumentException.ThrowIfNullOrEmpty(key);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(duration, TimeSpan.Zero);
-        Caching = new PropCaching(new PropCacheKey(key), duration);
+        Caching = PropCaching.Create(key, duration, staleFor, tags);
         return this;
     }
 

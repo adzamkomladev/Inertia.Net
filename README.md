@@ -581,7 +581,7 @@ Prop(ct => repo.GetValueTaskAsync(ct))             // Func<CancellationToken, Va
 
 The token is `HttpContext.RequestAborted`. Overloads bind so that an `async` lambda always means the awaiting overload, never "a prop whose value is a Task".
 
-Fluent methods on every prop (they mutate and return the same instance): `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)`.
+Fluent methods on every prop (they mutate and return the same instance): `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)`, `.Cache(key, duration, staleFor?, tags?)`.
 
 **Loaders run sequentially** by default, in prop order, and only when their prop is included in the response. That makes a scoped EF Core `DbContext` safe to use in several loaders. Mark independent async loaders with [`.Parallel()`](#parallel-props) to start them together. A loader that returns another prop (for example `Prop(() => Defer(...))`) is unwrapped once.
 
@@ -618,15 +618,15 @@ return Render("Dashboard", new InertiaProps
 
 ### Cached props
 
-`.Cache(key, duration)` keeps a prop's value as JSON in the app's `IMemoryCache`. While the entry lives, the loader does not run and
-the stored JSON is written as it is, so a hit costs neither the query nor the serialization:
+`.Cache(key, duration)` keeps a prop's value as JSON in the cache (by default the app's `IMemoryCache`). While the entry lives, the
+loader does not run and the stored JSON is written as it is, so a hit costs neither the query nor the serialization:
 
 ```csharp
 return Render("Dashboard", new InertiaProps
 {
     ["stats"] = Prop(ct => stats.ComputeAsync(ct)).Cache("dashboard-stats", TimeSpan.FromMinutes(5)),
-    ["orders"] = Defer(ct => orders.RecentAsync(userId, ct)).Cache($"orders:{userId}", TimeSpan.FromMinutes(1)),
-    ["catalog"] = Optional(() => catalog.All()).Cache("catalog", TimeSpan.FromHours(1)),
+    ["orders"] = Defer(ct => orders.RecentAsync(userId, ct)).Cache($"orders:{userId}", TimeSpan.FromMinutes(1), tags: [$"user:{userId}"]),
+    ["catalog"] = Optional(() => catalog.All()).Cache("catalog", TimeSpan.FromHours(1), staleFor: TimeSpan.FromHours(23)),
 });
 ```
 
@@ -635,8 +635,50 @@ return Render("Dashboard", new InertiaProps
 - **Only loading changes.** Optional, deferred, merged, once and scroll props keep their behavior; their metadata is written from the
   cache too. A parallel cached prop does not start its loader on a hit. A rescued failure is not cached.
 - **Plain values only.** The value must not contain `InertiaProp` values (a loader that returns a prop cannot be cached).
-- **Per instance.** Each app instance has its own memory cache, and two requests that miss at the same moment both run the loader.
-  Entries carry a `Size` (their byte length), so an `IMemoryCache` with a `SizeLimit` works.
+- **Per instance.** With the default store each app instance has its own memory cache, and two requests that miss at the same moment
+  both run the loader. Entries carry a `Size` (their byte length), so an `IMemoryCache` with a `SizeLimit` works.
+
+**Removing and replacing values.** Inject `IInertiaCache` where the data changes:
+
+```csharp
+app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, CancellationToken ct) =>
+{
+    var order = await orders.CreateAsync(input, ct);
+    await cache.RemoveByTagAsync($"user:{order.UserId}", ct);    // every prop tagged with the user
+    await cache.RemovePropAsync("dashboard-stats", ct);           // one key, as given to Cache()
+    await cache.SetPropAsync("catalog", await catalog.AllAsync(ct), TimeSpan.FromHours(1), cancellationToken: ct); // replace it now
+    return Back();
+});
+```
+
+`ClearPropsAsync()` removes every cached prop and `ClearSsrAsync()` every [cached render](#6-response-cache). `SetPropAsync` serializes
+the value as a prop of its type would be (a scroll value's paging metadata comes from `IProvidesScrollMetadata`), and takes the same
+`staleFor` and `tags`. With the default store a removal frees the entries at once.
+
+**Stale-while-revalidate.** `staleFor` keeps serving a value once its `duration` has passed. The first request that reads a stale
+value gets it at once, and the loader runs after that response has been sent, to store a fresh value; requests in the meantime get the
+stale value too. Past `duration + staleFor` the loader runs during the request again, as without `staleFor`.
+
+- The refresh runs in the response's completion callbacks, which run before the request's services are disposed: a loader can keep
+  using the request's `DbContext` and other scoped services. It must not touch the `HttpContext` (the response is already sent).
+  On HTTP/1.1 the connection takes its next request once the refresh has finished.
+- One refresh runs per key and app instance at a time, and the stale props of one response refresh one after another.
+- A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
+
+**Another store.** Props and [SSR renders](#6-response-cache) are kept in an `IInertiaCacheStore`. Register your own as a singleton
+(before or after `AddInertia()`) to keep them elsewhere, e.g. in a cache every app instance shares:
+
+```csharp
+builder.Services.AddSingleton<IInertiaCacheStore, MyRedisInertiaCacheStore>();
+```
+
+The store gets and sets byte arrays by `InertiaCacheKey` (a kind and a key; `ToString()` gives `inertia:prop:{key}` or
+`inertia:ssr:{hash}` for stores keyed by strings), removes by key and by tag. The values carry their own fresh and expiry times, so a
+store only keeps each one for `InertiaCacheEntryOptions.Expiration`. Every entry also carries `InertiaCacheTags.Props` or
+`InertiaCacheTags.Ssr`, which the clear methods remove. While a page renders, a store that throws is
+logged (at most once every 30 seconds) and counts as a miss; `IInertiaCache` lets the exception through. A value in a format Inertia.Net
+does not know reads as a miss. Prop JSON outlives a deploy in a shared store: put a version in keys whose shape changes, or clear them
+on deploy.
 
 ### What each prop produces
 
@@ -1348,7 +1390,7 @@ builder.Services.AddOpenTelemetry()
 | `inertia.ssr.duration` (s) | histogram | `inertia.ssr.outcome` (`rendered`, `fallback`) |
 | `inertia.ssr.queue.duration` (s) | histogram | |
 | `inertia.ssr.active` | up-down counter | |
-| `inertia.ssr.outcomes` | counter | `inertia.ssr.outcome` (`rendered`, `fallback`, `error`), `inertia.ssr.reason` (`ok`, `cache` or a type from the table above) |
+| `inertia.ssr.outcomes` | counter | `inertia.ssr.outcome` (`rendered`, `fallback`, `error`), `inertia.ssr.reason` (`ok`, `cache`, `stale` or a type from the table above) |
 | `inertia.ssr.response.size` (By) | histogram | |
 | `inertia.ssr.circuit.state` | gauge (0 closed, 1 half-open, 2 open) | `inertia.ssr.endpoint` (the index in `Urls` or of the instance, or `dev`) |
 | `inertia.ssr.circuit.transitions` | counter | `inertia.ssr.endpoint`, `to` |
@@ -1366,16 +1408,23 @@ article) can reuse its HTML instead of calling the SSR server again:
 builder.Services.AddInertia(o =>
 {
     o.Ssr.Cache.Duration = TimeSpan.FromMinutes(5);   // every server-rendered page; default Zero (off)
+    o.Ssr.Cache.StaleFor = TimeSpan.FromMinutes(30);  // then served stale while it renders again; default Zero
     o.Ssr.Cache.MaxBytes = 64 * 1024 * 1024;          // default; least recently used renders are evicted beyond it
 });
 
 return Render("Pricing", props).WithSsrCache(TimeSpan.FromHours(1));   // one page; WithSsrCache(TimeSpan.Zero) opts out
+return Render("Pricing", props).WithSsrCache(TimeSpan.FromHours(1), staleFor: TimeSpan.FromDays(1));
 ```
 
 The key is the SHA-256 of the page JSON (component, props, url, version and the rest), so a new deploy (another asset version) or
 different props never reuse a stale render. Pages with per-user props make one entry per user: cache the pages that are shared. A hit
 is counted as `inertia.ssr.outcomes{inertia.ssr.outcome=rendered, inertia.ssr.reason=cache}` and bypasses the render slots and circuit
 breakers. Nothing is cached while the Vite dev server renders.
+
+With `StaleFor`, a render past its `Duration` is still served, counted with `inertia.ssr.reason=stale`, and the page is rendered again
+after that response has been sent, as for [stale props](#cached-props): one refresh per page and app instance at a time, and a failed
+one keeps the stale render. `IInertiaCache.ClearSsrAsync()` removes every render, for an SSR bundle deployed without a new asset
+version. Renders are kept in the same [`IInertiaCacheStore`](#cached-props) as props; `MaxBytes` bounds the default store only.
 
 ---
 
@@ -1863,7 +1912,8 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `CircuitBreaker.FailureThreshold` | `5` | Consecutive connection, timeout, HTTP or malformed-response failures that open a server's circuit. |
 | `CircuitBreaker.BreakDuration` | `10 s` | How long an open circuit skips the server before one render probes it. |
 | `Cache.Duration` | `Zero` (off) | Reuse a render for this long when the page JSON is the same. Per response: `WithSsrCache(duration)`. |
-| `Cache.MaxBytes` | `64 MiB` | Size of the render cache; least recently used renders are evicted. |
+| `Cache.StaleFor` | `Zero` | Then serve it for this long more while the page renders again after the response. Per response: `WithSsrCache(duration, staleFor)`. |
+| `Cache.MaxBytes` | `64 MiB` | Size of the default store's render cache; least recently used renders are evicted. |
 | `UseNodeProcess(configure?)` | off | Start and supervise Node SSR processes with the app (sets `Mode = Preferred` when `Disabled`). Options below. |
 
 Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
@@ -1915,7 +1965,7 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | `healthChecks.AddInertiaSsr(name = "inertia-ssr", failureStatus?, tags?, timeout?)` | SSR health check, from the gateway's state (no call to the servers). |
 | `mvc.AddInertiaMvc(o => o.UseRazorRootView("App"))` | MVC filter, optional Razor root view, `ComponentResolver` for `this.InertiaView(props)`. |
 | `config.UseInertia(configure?)` | FastEndpoints: validation redirect and Precognition (`app.UseFastEndpoints(c => ...)`). |
-| `Render(component, props?)` | `InertiaResult`: `.WithStatusCode(int)`, `.WithRootView(string)`, `.WithViewData(key, value)`, `.WithSsr(SsrMode)`, `.WithoutSsr()`, `.WithSsrCache(TimeSpan)`. |
+| `Render(component, props?)` | `InertiaResult`: `.WithStatusCode(int)`, `.WithRootView(string)`, `.WithViewData(key, value)`, `.WithSsr(SsrMode)`, `.WithoutSsr()`, `.WithSsrCache(TimeSpan[, staleFor])`. |
 | `Location(url)` | `InertiaLocationResult`. |
 | `Back(fallback = "~/")` | `InertiaBackResult`: `.WithErrors(errors, bag = "default")`, `.WithFlash(key, value)`. |
 | `httpContext.Inertia()` | `InertiaFeature`: `Share`, `Flash`, `WithErrors`, `ClearHistory`, `EncryptHistory(bool = true)`, `PreserveFragment`. |

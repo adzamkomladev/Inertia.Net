@@ -16,6 +16,7 @@ internal sealed class InertiaOptionsValidator : IValidateOptions<InertiaOptions>
         Check(ssr.MaxResponseBytes > 0, "Ssr.MaxResponseBytes must be positive.");
         Check(ssr.MaxPageBytes > 0, "Ssr.MaxPageBytes must be positive.");
         Check(ssr.Cache.Duration >= TimeSpan.Zero, "Ssr.Cache.Duration must not be negative.");
+        Check(ssr.Cache.StaleFor >= TimeSpan.Zero, "Ssr.Cache.StaleFor must not be negative.");
         Check(ssr.Cache.MaxBytes > 0, "Ssr.Cache.MaxBytes must be positive.");
         foreach (var url in ssr.Urls)
         {

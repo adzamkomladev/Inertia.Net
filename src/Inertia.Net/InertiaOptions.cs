@@ -197,7 +197,7 @@ public sealed class SsrOptions
     /// <summary>Stops sending renders to an SSR server that keeps failing, and probes it again after a pause.</summary>
     public SsrCircuitBreakerOptions CircuitBreaker { get; } = new();
 
-    /// <summary>Keeps rendered HTML in memory, keyed by the page JSON, so an identical page is not rendered twice. Off by default.</summary>
+    /// <summary>Keeps rendered HTML (in memory by default), keyed by the page JSON, so an identical page is not rendered twice. Off by default.</summary>
     public SsrCacheOptions Cache { get; } = new();
 
     /// <summary>The managed Node SSR process settings; null (the default) when the SSR servers run on their own. Set by <see cref="UseNodeProcess"/>.</summary>
@@ -258,17 +258,29 @@ public sealed class SsrCircuitBreakerOptions
 /// The SSR response cache. A render is a function of the page JSON (component, props, url, version and the other page fields), so a page
 /// whose JSON is byte-for-byte the same as one rendered within <see cref="Duration"/> reuses that HTML without a call to the SSR server.
 /// It pays off for pages many visitors see identically (anonymous landing, catalog and article pages); pages with per-user props make one
-/// entry per user. Disabled while the Vite dev server runs.
+/// entry per user. Disabled while the Vite dev server runs. Renders are kept in the <see cref="IInertiaCacheStore"/>; clear them with
+/// <see cref="IInertiaCache.ClearSsrAsync"/>.
 /// </summary>
 public sealed class SsrCacheOptions
 {
     /// <summary>
     /// How long a render is reused. Default <see cref="TimeSpan.Zero"/>: no caching, unless a response sets its own duration with
-    /// <see cref="InertiaResult.WithSsrCache"/>.
+    /// <see cref="InertiaResult.WithSsrCache(TimeSpan)"/>.
     /// </summary>
     public TimeSpan Duration { get; set; }
 
-    /// <summary>The cache size in bytes of HTML (head and body); the least recently used renders are evicted beyond it. Default 64 MiB.</summary>
+    /// <summary>
+    /// How long a render past <see cref="Duration"/> is still served (stale-while-revalidate): the request that reads it gets it at once,
+    /// and the page is rendered again after its response has been sent. One refresh runs per page and app instance at a time; one that
+    /// fails keeps the stale render. Default <see cref="TimeSpan.Zero"/>: a render is reused for <see cref="Duration"/> only.
+    /// Per response: <see cref="InertiaResult.WithSsrCache(TimeSpan, TimeSpan)"/>.
+    /// </summary>
+    public TimeSpan StaleFor { get; set; }
+
+    /// <summary>
+    /// The size in bytes of the default store's render cache (HTML head and body); the least recently used renders are evicted beyond
+    /// it. Default 64 MiB. Another <see cref="IInertiaCacheStore"/> sets its own limits.
+    /// </summary>
     public long MaxBytes { get; set; } = 64 * 1024 * 1024;
 }
 

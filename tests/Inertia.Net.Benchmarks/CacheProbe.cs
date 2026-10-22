@@ -8,7 +8,9 @@ namespace Inertia.Net.Benchmarks;
 /// <summary>
 /// <c>--cache-probe</c>: a page whose loader builds 500 rows, with and without <see cref="InertiaProp.Cache"/>, and a server-rendered
 /// page through an in-memory SSR server (about 64 KiB of HTML), with and without the SSR cache. The loader and the SSR server cost
-/// nothing beyond building their output here, so the gains in a real app (database queries, a Node render) are larger.
+/// nothing beyond building their output here, so the gains in a real app (database queries, a Node render) are larger. The stale cases
+/// serve entries past their fresh time whose refresh another request has claimed (stale-while-revalidate between refreshes), and the
+/// tagged case a prop with tags of its own.
 /// </summary>
 internal static class CacheProbe
 {
@@ -22,28 +24,42 @@ internal static class CacheProbe
 
         var ssrServices = SsrServices(cache: false);
         var cachedSsrServices = SsrServices(cache: true);
+        var staleSsrServices = SsrServices(cache: true, stale: true);
         var html = BenchApp.CreateContext(ssrServices);
         var cachedHtml = BenchApp.CreateContext(cachedSsrServices);
+        var staleHtml = BenchApp.CreateContext(staleSsrServices);
 
         for (var repetition = 1; repetition <= 3; repetition++)
         {
             await MeasureAsync(repetition, "prop loader", 20000, () => Render(BenchApp.Component, Page(cached: false)).ExecuteAsync(json));
             await MeasureAsync(repetition, "prop cached", 20000, () => Render(BenchApp.Component, Page(cached: true)).ExecuteAsync(json));
+            await MeasureAsync(repetition, "prop tagged", 20000, () => Render(BenchApp.Component, Page(cached: true, tagged: true)).ExecuteAsync(json));
+            await MeasureAsync(repetition, "prop stale", 20000, () => Render(BenchApp.Component, Page(cached: true, stale: true)).ExecuteAsync(json));
             await MeasureAsync(repetition, "ssr render", 5000, () => Render(BenchApp.Component, SsrPage()).ExecuteAsync(html));
             await MeasureAsync(repetition, "ssr cached", 5000, () => Render(BenchApp.Component, SsrPage()).ExecuteAsync(cachedHtml));
+            await MeasureAsync(repetition, "ssr stale", 5000, () => Render(BenchApp.Component, SsrPage()).ExecuteAsync(staleHtml));
         }
     }
 
     // The loader copies the rows as an app would map query results to DTOs.
-    private static InertiaProps Page(bool cached)
+    private static readonly string[] Tags = ["users", "tenant:1"];
+
+    private static InertiaProps Page(bool cached, bool tagged = false, bool stale = false)
     {
         var rows = Prop(() => Rows.Select(r => r with { }).ToArray());
-        return new InertiaProps { ["title"] = "Users", ["users"] = cached ? rows.Cache("bench-users", TimeSpan.FromMinutes(5)) : rows };
+        return new InertiaProps
+        {
+            ["title"] = "Users",
+            ["users"] = !cached ? rows
+                : stale ? rows.Cache("bench-users-stale", TimeSpan.FromTicks(1), staleFor: TimeSpan.FromHours(1))
+                : tagged ? rows.Cache("bench-users-tagged", TimeSpan.FromMinutes(5), tags: Tags)
+                : rows.Cache("bench-users", TimeSpan.FromMinutes(5)),
+        };
     }
 
     private static InertiaProps SsrPage() => new() { ["title"] = "Home", ["count"] = 3 };
 
-    private static IServiceProvider SsrServices(bool cache)
+    private static IServiceProvider SsrServices(bool cache, bool stale = false)
     {
         var body = new string('x', 64 * 1024);
         var response = Encoding.UTF8.GetBytes($$"""{"head":["<title>Bench</title>"],"body":"<div id=\"app\">{{body}}</div>"}""");
@@ -53,7 +69,8 @@ internal static class CacheProbe
             o.Ssr.Concurrency.MaxActive = 0;
             if (cache)
             {
-                o.Ssr.Cache.Duration = TimeSpan.FromMinutes(5);
+                o.Ssr.Cache.Duration = stale ? TimeSpan.FromTicks(1) : TimeSpan.FromMinutes(5);
+                o.Ssr.Cache.StaleFor = stale ? TimeSpan.FromHours(1) : TimeSpan.Zero;
             }
         }, s => s.AddHttpClient(InertiaSsr.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => new FixedHandler(response)));
     }

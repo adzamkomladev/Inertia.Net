@@ -14,7 +14,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     private string? _rootView;
     private Dictionary<string, object?>? _viewData;
     private SsrMode? _ssrMode;
-    private TimeSpan _ssrCacheDuration = InertiaRootViewContext.NoSsrCache; // not a TimeSpan?: 8 bytes less per result
+    private SsrCaching? _ssrCache; // one reference, set only by WithSsrCache()
 
     internal InertiaResult(string component, object? props)
     {
@@ -81,7 +81,20 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     public InertiaResult WithSsrCache(TimeSpan duration)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
-        _ssrCacheDuration = duration;
+        _ssrCache = new SsrCaching(duration, null);
+        return this;
+    }
+
+    /// <summary>
+    /// Reuses this page's server-rendered HTML like <see cref="WithSsrCache(TimeSpan)"/>, and once <paramref name="duration"/> has passed
+    /// keeps serving it for <paramref name="staleFor"/> more while the page is rendered again after the response has been sent
+    /// (stale-while-revalidate), overriding <see cref="SsrCacheOptions.StaleFor"/>.
+    /// </summary>
+    public InertiaResult WithSsrCache(TimeSpan duration, TimeSpan staleFor)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(staleFor, TimeSpan.Zero);
+        _ssrCache = new SsrCaching(duration, staleFor);
         return this;
     }
 
@@ -134,7 +147,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
             pageWriter.Options.RootElementId,
             _ssrMode,
             CspNonce.Resolve(pageWriter.Options.CspNonce, httpContext),
-            _ssrCacheDuration));
+            _ssrCache));
         if (devTools is not null)
         {
             // The extension reads the first page's entry id from this tag; after the document is fine for a script data block.

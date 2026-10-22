@@ -136,6 +136,34 @@ internal static class JsonAssert
     public static void Missing(JsonNode? node, string key) => Assert.False(node!.AsObject().ContainsKey(key), $"'{key}' should be missing in {node.ToJsonString()}");
 }
 
+/// <summary>
+/// Keeps the response's completion callbacks, which <see cref="DefaultHttpContext"/> never runs, and runs them on demand, last registered
+/// first like Kestrel.
+/// </summary>
+internal sealed class CompletingResponseFeature : Microsoft.AspNetCore.Http.Features.HttpResponseFeature
+{
+    private readonly Stack<(Func<object, Task> Callback, object State)> _callbacks = new();
+
+    public int Pending => _callbacks.Count;
+
+    public static CompletingResponseFeature On(HttpContext context)
+    {
+        var feature = new CompletingResponseFeature();
+        context.Features.Set<Microsoft.AspNetCore.Http.Features.IHttpResponseFeature>(feature);
+        return feature;
+    }
+
+    public override void OnCompleted(Func<object, Task> callback, object state) => _callbacks.Push((callback, state));
+
+    public async Task CompleteAsync()
+    {
+        while (_callbacks.TryPop(out var registered))
+        {
+            await registered.Callback(registered.State);
+        }
+    }
+}
+
 internal sealed class CapturingLoggerProvider : ILoggerProvider
 {
     public ConcurrentQueue<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = new();

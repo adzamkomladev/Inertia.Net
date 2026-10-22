@@ -17,16 +17,11 @@ public sealed class InertiaRootViewContext
 {
     internal static readonly Dictionary<string, object?> EmptyViewData = [];
 
-    /// <summary>No SSR cache duration from the response (a sentinel instead of a nullable, which is twice the size).</summary>
-    internal static readonly TimeSpan NoSsrCache = TimeSpan.MinValue;
-
-    private readonly TimeSpan _ssrCacheDuration;
-
-    internal InertiaRootViewContext(HttpContext httpContext, string component, string rootView, IReadOnlyDictionary<string, object?> viewData, ReadOnlyMemory<byte> pageJson, string rootElementId, SsrMode? ssrMode = null, string? cspNonce = null, TimeSpan? ssrCacheDuration = null)
+    internal InertiaRootViewContext(HttpContext httpContext, string component, string rootView, IReadOnlyDictionary<string, object?> viewData, ReadOnlyMemory<byte> pageJson, string rootElementId, SsrMode? ssrMode = null, string? cspNonce = null, SsrCaching? ssrCache = null)
     {
         SsrMode = ssrMode;
         CspNonce = cspNonce;
-        _ssrCacheDuration = ssrCacheDuration ?? NoSsrCache;
+        SsrCache = ssrCache;
         HttpContext = httpContext;
         Component = component;
         RootView = rootView;
@@ -59,8 +54,8 @@ public sealed class InertiaRootViewContext
     /// <summary>The request's CSP nonce (<see cref="InertiaOptions.CspNonce"/>), already checked; null when there is none.</summary>
     public string? CspNonce { get; }
 
-    /// <summary>The SSR cache duration the response asked for with <see cref="InertiaResult.WithSsrCache"/>; null to follow the configuration.</summary>
-    internal TimeSpan? SsrCacheDuration => _ssrCacheDuration == NoSsrCache ? null : _ssrCacheDuration;
+    /// <summary>The SSR cache settings the response asked for with <see cref="InertiaResult.WithSsrCache(TimeSpan)"/>; null to follow the configuration.</summary>
+    internal SsrCaching? SsrCache { get; }
 
     /// <summary>
     /// Writes <c>&lt;script data-page="{id}" type="application/json"&gt;{page}&lt;/script&gt;&lt;div id="{id}"&gt;&lt;/div&gt;</c>, with
