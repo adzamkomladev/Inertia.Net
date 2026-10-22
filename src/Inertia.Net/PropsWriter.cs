@@ -932,6 +932,13 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
             var caching = prop.Caching!;
             try
             {
+                // The response read the value stale, but another refresh (this instance's, between that read and this response's
+                // claim, or another instance's in a shared store) may have stored a fresh one since: then there is nothing to do.
+                if (await owner.Caching.GetPropAsync(caching, CancellationToken.None) is { IsStale: false })
+                {
+                    continue;
+                }
+
                 var value = await prop.ResolveAsync(CancellationToken.None);
                 var entry = owner.CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, path, out _);
                 await owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, CancellationToken.None);

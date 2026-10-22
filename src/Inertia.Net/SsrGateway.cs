@@ -258,6 +258,12 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     {
         try
         {
+            // As for props: a render stored fresh since this response read it stale needs no second render.
+            if (await _caching.GetRenderAsync(key, CancellationToken.None) is { IsStale: false })
+            {
+                return;
+            }
+
             // Preferred: a failed refresh is logged like any fallback, and the stale render stays until it expires.
             if (await RenderOnServersAsync(SsrMode.Preferred, pageJson, _endpoints, _managed, CancellationToken.None) is { } render)
             {

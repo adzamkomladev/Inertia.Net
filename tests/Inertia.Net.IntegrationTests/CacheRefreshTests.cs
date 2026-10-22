@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Inertia.Net.IntegrationTests;
 
@@ -15,13 +16,15 @@ public sealed class CacheRefreshTests
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
         builder.WebHost.UseTestServer();
+        var time = new FakeTimeProvider();
+        builder.Services.AddSingleton<TimeProvider>(time);
         builder.Services.AddInertia();
         builder.Services.AddSingleton<Loads>();
         builder.Services.AddScoped<RequestDb>();
         await using var app = builder.Build();
         app.MapGet("/stats", (RequestDb db) => Render("Stats", new InertiaProps
         {
-            ["n"] = Prop(ct => db.LoadAsync()).Cache("stats", TimeSpan.FromMilliseconds(1), staleFor: TimeSpan.FromMinutes(5)),
+            ["n"] = Prop(ct => db.LoadAsync()).Cache("stats", TimeSpan.FromMinutes(1), staleFor: TimeSpan.FromMinutes(5)),
         }));
         await app.StartAsync(TestContext.Current.CancellationToken);
         var client = app.GetTestClient();
@@ -36,13 +39,24 @@ public sealed class CacheRefreshTests
         }
 
         Assert.Equal(1, await GetAsync());
-        await Task.Delay(20, TestContext.Current.CancellationToken);
+        time.Advance(TimeSpan.FromMinutes(2));
 
         // The refresh's loader waits on the gate, so this response arriving at all shows the loader runs after it.
         Assert.Equal(1, await GetAsync());
         loads.Gate.SetResult();
         await loads.Refreshed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.Equal(2, await GetAsync());
+
+        // The refresh stores the value once its loader has returned; until then requests still get the stale one. One of them may read it
+        // just before the store and claim a refresh just after, which then finds the value fresh and does not run the loader again.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        int? n;
+        while ((n = await GetAsync()) == 1 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(2, n);
+        Assert.Equal(2, loads.Count);
     }
 
     private sealed class Loads

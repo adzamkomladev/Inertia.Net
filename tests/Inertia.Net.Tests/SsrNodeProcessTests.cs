@@ -80,6 +80,28 @@ public sealed class SsrNodeProcessTests
         return (harness, harness.Services.GetServices<IHostedService>().OfType<SsrNodeProcess>().Single(), url);
     }
 
+    // Sends GET /crash on one raw connection and waits for the process to drop it. Not HttpClient: it retries a GET whose new connection
+    // closes without a response, and the retry can reach whatever holds the port by then (a listener that never answers, so the test hung
+    // for the client's 100 s timeout) or the restarted process (crashing it again).
+    private static async Task CrashAsync(string url)
+    {
+        var uri = new Uri(url);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        using var connection = new TcpClient();
+        await connection.ConnectAsync(uri.Host, uri.Port, timeout.Token);
+        var stream = connection.GetStream();
+        await stream.WriteAsync("GET /crash HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"u8.ToArray(), timeout.Token);
+        try
+        {
+            Assert.Equal(0, await stream.ReadAsync(new byte[256], timeout.Token)); // closed without a response
+        }
+        catch (IOException)
+        {
+            // or reset
+        }
+    }
+
     // The first of `count` consecutive free loopback ports.
     private static int FreePorts(int count)
     {
@@ -247,8 +269,7 @@ public sealed class SsrNodeProcessTests
         {
             await ssr.StartAsync(TestContext.Current.CancellationToken);
             var first = Assert.NotNull(ssr.ProcessId);
-            using var http = new HttpClient();
-            await Assert.ThrowsAnyAsync<HttpRequestException>(() => http.GetAsync($"{url}/crash", TestContext.Current.CancellationToken));
+            await CrashAsync(url);
 
             await WaitUntilAsync(async () => ssr.ProcessId is { } pid && pid != first && (await RenderAsync(harness)).Contains("data-server-rendered", StringComparison.Ordinal));
             Assert.Contains(harness.Logs.Entries, e => e is { Level: LogLevel.Warning, Message: "The Node SSR process exited unexpectedly with code 3." });
@@ -408,8 +429,7 @@ public sealed class SsrNodeProcessTests
             Assert.Equal(new[] { $"{basePort}", $"{basePort + 1}" }, ports.Order());
 
             var first = ssr.ProcessIdOf(0);
-            using var http = new HttpClient();
-            await Assert.ThrowsAnyAsync<HttpRequestException>(() => http.GetAsync($"{url}/crash", TestContext.Current.CancellationToken));
+            await CrashAsync(url);
             for (var i = 0; i < 4; i++)
             {
                 Assert.Equal($"{basePort + 1}", RenderedPort(await RenderAsync(harness))); // a refused render fails over to the other instance
@@ -443,8 +463,7 @@ public sealed class SsrNodeProcessTests
         {
             await ssr.StartAsync(TestContext.Current.CancellationToken);
             var first = Assert.NotNull(ssr.ProcessId);
-            using var http = new HttpClient();
-            await Assert.ThrowsAnyAsync<HttpRequestException>(() => http.GetAsync($"{url}/crash", TestContext.Current.CancellationToken));
+            await CrashAsync(url);
             await WaitUntilAsync(() => Task.FromResult(harness.Logs.Entries.Any(e => e.Message.EndsWith("is occupied; restart was skipped.", StringComparison.Ordinal))));
             Assert.Null(ssr.ProcessId);
             squatter!.Dispose();
@@ -478,8 +497,7 @@ public sealed class SsrNodeProcessTests
         {
             await ssr.StartAsync(TestContext.Current.CancellationToken);
             var pid = Assert.NotNull(ssr.ProcessId);
-            using var client = new HttpClient();
-            await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync($"{url}/crash", TestContext.Current.CancellationToken));
+            await CrashAsync(url);
             Assert.True(barrier.RestartEntered.Wait(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken));
             disposal = Task.Run(ssr.Dispose, TestContext.Current.CancellationToken);
             Assert.True(barrier.StopEntered.Wait(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken));
