@@ -10,7 +10,6 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.Unicode;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
@@ -43,14 +42,14 @@ internal sealed class InertiaPageWriter
         ILogger<InertiaPageWriter> logger,
         VersionProvider versionProvider,
         InertiaMetrics metrics,
-        IMemoryCache propCache,
+        InertiaCaching caching,
         PageComponentCheck pages)
     {
         Options = options.Value;
         TimeProvider = timeProvider;
         Logger = logger;
         Metrics = metrics;
-        PropCache = propCache;
+        Caching = caching;
         Pages = pages.Enabled ? pages : null;
         _versionProvider = versionProvider;
 
@@ -90,8 +89,8 @@ internal sealed class InertiaPageWriter
 
     public InertiaMetrics Metrics { get; }
 
-    /// <summary>The app's memory cache, which holds <see cref="InertiaProp.Cache"/> values.</summary>
-    public IMemoryCache PropCache { get; }
+    /// <summary>The store access for <see cref="InertiaProp.Cache(string, TimeSpan)"/> values.</summary>
+    public InertiaCaching Caching { get; }
 
     /// <summary>The Development pages check, or null while it is off (no per-render lookup).</summary>
     public PageComponentCheck? Pages { get; }
@@ -126,6 +125,7 @@ internal sealed class InertiaPageWriter
             writer.WriteString("component", component);
             writer.WritePropertyName("props");
             await propsWriter.WritePropsAsync(entries);
+            propsWriter.ScheduleRefreshes(httpContext);
             rootInfo?.OnSerialized?.Invoke(props!);
             feature = httpContext.Features.Get<InertiaFeature>();
             writer.WriteString("url", Options.UrlResolver?.Invoke(httpContext) ?? GetUrl(httpContext.Request));
@@ -595,6 +595,35 @@ internal sealed class InertiaPageWriter
 
             return root;
         }
+    }
+
+    /// <summary>
+    /// A cached prop's store entry (<see cref="CacheEntry"/>), and the prop as the walk writes it. The JSON is HTML-safe, so the same bytes
+    /// fit JSON responses and the page <c>&lt;script&gt;</c>.
+    /// </summary>
+    internal byte[] CreateCacheEntry(Type valueType, object? value, ScrollMetadata? scroll, PropCaching caching, ReadOnlySpan<char> path, out CachedProp prop)
+    {
+        if (value is InertiaProp)
+        {
+            throw new InvalidOperationException($"The cached prop at '{new string(path)}' resolved to an InertiaProp. Cache() needs a plain value.");
+        }
+
+        var buffer = new ArrayBufferWriter<byte>(256);
+        var scrollLength = CacheEntry.BeginProp(buffer, scroll);
+        using (var writer = new Utf8JsonWriter(buffer, _htmlWriterOptions))
+        {
+            if (value is null or JsonElement or JsonNode || valueType == typeof(object))
+            {
+                WritePlainValue(writer, value);
+            }
+            else
+            {
+                JsonSerializer.Serialize(writer, value, SerializerOptions.GetTypeInfo(valueType));
+            }
+        }
+
+        var (freshUntil, expiresAt) = Caching.Times(caching.Duration, caching.Expiration);
+        return CacheEntry.EndProp(buffer, scroll, scrollLength, freshUntil, expiresAt, out prop);
     }
 
     internal void WritePlainValue(Utf8JsonWriter writer, object? value)

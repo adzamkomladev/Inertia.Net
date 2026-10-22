@@ -74,6 +74,8 @@ app.MapGet("/dashboard", (HttpContext context) =>
         ["filters"] = Always(() => "all"),
         ["lazy"] = Optional(() => "loaded"),
         ["cached"] = Prop(() => new Stat("cached", 5)).Cache("smoke-cached", TimeSpan.FromMinutes(5)),
+        ["tagged"] = Prop(() => new Stat("tagged", Interlocked.Increment(ref SmokeCounters.TaggedLoads)))
+            .Cache("smoke-tagged", TimeSpan.FromMinutes(5), staleFor: TimeSpan.FromMinutes(5), tags: ["smoke"]),
         ["today"] = Prop(async ct =>
         {
             await Task.Yield();
@@ -83,6 +85,15 @@ app.MapGet("/dashboard", (HttpContext context) =>
 });
 
 app.MapGet("/users/create", () => Render("Users/Create"));
+
+// Replacing and removing cached props.
+app.MapPost("/cache/reset", async (IInertiaCache cache, CancellationToken ct) =>
+{
+    await cache.SetPropAsync("smoke-cached", new Stat("set", 6), TimeSpan.FromMinutes(5), cancellationToken: ct);
+    await cache.RemoveByTagAsync("smoke", ct);
+    await cache.ClearSsrAsync(ct);
+    return Results.Redirect("/dashboard");
+});
 
 app.MapPost("/users", (HttpContext context, [Required] UserInput input) =>
 {
@@ -135,6 +146,11 @@ internal sealed class SmokeMaskConverter : JsonConverter<string>
 }
 
 internal sealed record Stat(string Name, int Value);
+
+internal static class SmokeCounters
+{
+    public static int TaggedLoads;
+}
 
 internal sealed record AuthInfo([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? User);
 

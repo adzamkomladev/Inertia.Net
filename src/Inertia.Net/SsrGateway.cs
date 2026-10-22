@@ -1,11 +1,10 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Net.Http.Headers;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -80,8 +79,8 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     // at most once per second (every second in Development), instead of a File.Exists on every server-rendered page.
     private readonly FileCache<string> _bundles;
 
-    // Rendered HTML by page JSON hash, bounded by Ssr.Cache.MaxBytes; only filled for responses that use the cache.
-    private readonly MemoryCache _renders;
+    // Rendered HTML by page JSON hash (bounded by Ssr.Cache.MaxBytes in the default store); only filled for responses that use the cache.
+    private readonly InertiaCaching _caching;
 
     public SsrGateway(
         IOptions<InertiaOptions> options,
@@ -91,6 +90,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         SsrNodeProcess nodeProcess,
         TimeProvider timeProvider,
         InertiaMetrics metrics,
+        InertiaCaching caching,
         ILogger<SsrGateway> logger)
     {
         _ssr = options.Value.Ssr;
@@ -103,7 +103,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         _logger = logger;
         _managed = _ssr.NodeProcess is not null;
         _bundles = new(static path => path, environment.IsDevelopment(), timeProvider);
-        _renders = new MemoryCache(new MemoryCacheOptions { SizeLimit = _ssr.Cache.MaxBytes, Clock = new CacheClock(timeProvider) });
+        _caching = caching;
         _endpoints = [.. EndpointUrls(_ssr).Select((url, i) => new SsrEndpoint(
             i.ToString(System.Globalization.CultureInfo.InvariantCulture), url, "/render", _managed ? i : null, _ssr, timeProvider, metrics))];
         nodeProcess.InstanceReady += instance =>
@@ -132,50 +132,76 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     internal static SsrMode ResolveMode(SsrMode global, SsrMode? response, bool excluded) =>
         global == SsrMode.Disabled ? SsrMode.Disabled : response ?? (excluded ? SsrMode.Disabled : global);
 
-    public async ValueTask<SsrRender?> RenderAsync(InertiaRootViewContext context)
+    // Not async itself: an uncached render runs in RenderOnServersAsync alone, one state machine as before the cache existed. Failures
+    // of the checks still come out of the returned task.
+    public ValueTask<SsrRender?> RenderAsync(InertiaRootViewContext context)
+    {
+        try
+        {
+            var http = context.HttpContext;
+            var mode = ResolveMode(_ssr.Mode, context.SsrMode, IsExcluded(_ssr.ExcludePaths, http.Request.Path.Value));
+            if (mode == SsrMode.Disabled)
+            {
+                return default;
+            }
+
+            http.RequestAborted.ThrowIfCancellationRequested();
+            var devOrigin = _vite.DevServerOrigin;
+            var endpoints = devOrigin is null ? _endpoints : DevEndpoints(devOrigin);
+            if (devOrigin is null && _ssr.BundlePath is { Length: > 0 } bundle && _bundles.Get(Path.Combine(_environment.ContentRootPath, bundle)) is null)
+            {
+                return new(Skip(mode, SsrFailure.BundleMissing, "The SSR bundle does not exist.", log: false));
+            }
+
+            if (context.PageJson.Length > _ssr.MaxPageBytes)
+            {
+                return new(Skip(mode, SsrFailure.PageTooLarge, $"The page JSON is larger than Ssr.MaxPageBytes ({_ssr.MaxPageBytes} bytes)."));
+            }
+
+            // A render is a function of the page JSON. The dev server's output changes with every edit, so it is never cached.
+            var settings = context.SsrCache;
+            var cacheDuration = devOrigin is null ? settings?.Duration ?? _ssr.Cache.Duration : TimeSpan.Zero;
+            return cacheDuration <= TimeSpan.Zero
+                ? RenderOnServersAsync(mode, context.PageJson, endpoints, managed: devOrigin is null && _managed, http.RequestAborted)
+                : RenderCachedAsync(mode, context, cacheDuration, settings?.StaleFor ?? _ssr.Cache.StaleFor);
+        }
+        catch (Exception ex)
+        {
+            return ValueTask.FromException<SsrRender?>(ex);
+        }
+    }
+
+    private async ValueTask<SsrRender?> RenderCachedAsync(SsrMode mode, InertiaRootViewContext context, TimeSpan duration, TimeSpan staleFor)
     {
         var http = context.HttpContext;
-        var mode = ResolveMode(_ssr.Mode, context.SsrMode, IsExcluded(_ssr.ExcludePaths, http.Request.Path.Value));
-        if (mode == SsrMode.Disabled)
+        var key = InertiaCaching.SsrKey(context.PageJson.Span);
+        if (await _caching.GetRenderAsync(key, http.RequestAborted) is { } hit)
         {
-            return null;
-        }
-
-        http.RequestAborted.ThrowIfCancellationRequested();
-        var devOrigin = _vite.DevServerOrigin;
-        var endpoints = devOrigin is null ? _endpoints : DevEndpoints(devOrigin);
-        if (devOrigin is null && _ssr.BundlePath is { Length: > 0 } bundle && _bundles.Get(Path.Combine(_environment.ContentRootPath, bundle)) is null)
-        {
-            return Skip(mode, SsrFailure.BundleMissing, "The SSR bundle does not exist.", log: false);
-        }
-
-        if (context.PageJson.Length > _ssr.MaxPageBytes)
-        {
-            return Skip(mode, SsrFailure.PageTooLarge, $"The page JSON is larger than Ssr.MaxPageBytes ({_ssr.MaxPageBytes} bytes).");
-        }
-
-        // A render is a function of the page JSON. The dev server's output changes with every edit, so it is never cached.
-        var cacheDuration = devOrigin is null ? context.SsrCacheDuration ?? _ssr.Cache.Duration : TimeSpan.Zero;
-        string? cacheKey = null;
-        if (cacheDuration > TimeSpan.Zero)
-        {
-            cacheKey = Convert.ToHexString(SHA256.HashData(context.PageJson.Span));
-            if (_renders.TryGetValue(cacheKey, out CachedRender? hit) && hit is not null)
+            if (hit.IsStale)
             {
-                _metrics.RecordOutcome("rendered", "cache");
-                return new SsrRender(hit.Head, hit.Body);
+                ScheduleRefresh(http, key, context.PageJson, duration, staleFor);
             }
+
+            _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache");
+            return new SsrRender(hit.Head, hit.Body);
         }
 
+        var render = await RenderOnServersAsync(mode, context.PageJson, _endpoints, _managed, http.RequestAborted);
+        return render is null ? null : await StoreAsync(key, duration, staleFor, render, http.RequestAborted);
+    }
+
+    // Selects a server, fails over once on a refused connection, and reports the outcome by the page's SSR mode.
+    private async ValueTask<SsrRender?> RenderOnServersAsync(SsrMode mode, ReadOnlyMemory<byte> pageJson, SsrEndpoint[] endpoints, bool managed, CancellationToken aborted)
+    {
         using var activity = InertiaDiagnostics.ActivitySource.StartActivity("inertia.ssr");
         var started = Stopwatch.GetTimestamp();
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(aborted);
         deadline.CancelAfter(_ssr.Timeout);
         SsrEndpoint? failed = null;
         Attempt? previous = null;
         while (true)
         {
-            var endpoint = Select(endpoints, failed, managed: devOrigin is null && _managed, out var probe, out var notReady);
+            var endpoint = Select(endpoints, failed, managed, out var probe, out var notReady);
             if (endpoint is null)
             {
                 if (previous is { } last)
@@ -195,11 +221,11 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             }
 
             activity?.SetTag("inertia.ssr.endpoint", endpoint.Name);
-            var attempt = await AttemptAsync(endpoint, probe, context.PageJson, deadline, http.RequestAborted);
+            var attempt = await AttemptAsync(endpoint, probe, pageJson, deadline, aborted);
             if (attempt.Render is { } render)
             {
                 Complete(activity, started, render, null);
-                return cacheKey is null ? render : Store(cacheKey, cacheDuration, render);
+                return render;
             }
 
             // A refused connection received nothing, so one other server can take the render within the same deadline.
@@ -211,6 +237,40 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             }
 
             return Complete(mode, activity, started, attempt);
+        }
+    }
+
+    // The first request to read a stale render renders the page again once its response has been sent; the others serve it meanwhile.
+    // The page JSON is copied: the response's buffer goes back to the pool when the response ends.
+    private void ScheduleRefresh(HttpContext http, InertiaCacheKey key, ReadOnlyMemory<byte> pageJson, TimeSpan duration, TimeSpan staleFor)
+    {
+        if (_caching.TryBeginRefresh(key))
+        {
+            OnCompleted(http, key, pageJson.ToArray(), duration, staleFor);
+        }
+    }
+
+    // Its own method: the closure would otherwise be allocated on every stale hit, refresh or not.
+    private void OnCompleted(HttpContext http, InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor) =>
+        http.Response.OnCompleted(() => RefreshAsync(key, pageJson, duration, staleFor));
+
+    private async Task RefreshAsync(InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor)
+    {
+        try
+        {
+            // Preferred: a failed refresh is logged like any fallback, and the stale render stays until it expires.
+            if (await RenderOnServersAsync(SsrMode.Preferred, pageJson, _endpoints, _managed, CancellationToken.None) is { } render)
+            {
+                (await StoreAsync(key, duration, staleFor, render, CancellationToken.None)).Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            _caching.LogRefreshFailure(ex, "an SSR render");
+        }
+        finally
+        {
+            _caching.EndRefresh(key);
         }
     }
 
@@ -665,30 +725,19 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         return true;
     }
 
-    // Keeps a copy of the render in arrays of its own and hands the copy out, so the pooled array goes back at once.
-    private SsrRender Store(string key, TimeSpan duration, SsrRender render)
+    // Keeps a copy of the render in a cache entry of its own and hands out the copy, so the pooled array goes back at once.
+    private async ValueTask<SsrRender> StoreAsync(InertiaCacheKey key, TimeSpan duration, TimeSpan staleFor, SsrRender render, CancellationToken cancellationToken)
     {
-        var entry = new CachedRender(render.Head.ToArray(), render.Body.ToArray());
+        var expiration = InertiaCaching.Expiration(duration, staleFor);
+        var (freshUntil, expiresAt) = _caching.Times(duration, expiration);
+        var entry = CacheEntry.CreateRender(render.Head.Span, render.Body.Span, freshUntil, expiresAt, out var stored);
         render.Dispose();
-        _renders.Set(key, entry, new MemoryCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = duration,
-            Size = entry.Head.Length + entry.Body.Length,
-        });
-        return new SsrRender(entry.Head, entry.Body);
-    }
-
-    private sealed record CachedRender(byte[] Head, byte[] Body);
-
-    // MemoryCacheOptions.Clock takes the older ISystemClock; this lets tests move the cache's time with a FakeTimeProvider.
-    private sealed class CacheClock(TimeProvider time) : Microsoft.Extensions.Internal.ISystemClock
-    {
-        public DateTimeOffset UtcNow => time.GetUtcNow();
+        await _caching.SetAsync(key, entry, expiration, InertiaCaching.SsrTags, cancellationToken);
+        return new SsrRender(stored.Head, stored.Body);
     }
 
     public void Dispose()
     {
-        _renders.Dispose();
         foreach (var endpoint in _endpoints)
         {
             endpoint.Dispose();

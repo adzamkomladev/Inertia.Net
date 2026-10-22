@@ -26,7 +26,10 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<InertiaMetrics>();
         services.TryAddSingleton<ViteAssets>();
         services.TryAddSingleton<IInertiaRootView, RootTemplateView>();
-        services.AddMemoryCache(); // holds InertiaProp.Cache() values
+        services.AddMemoryCache(); // the default cache store keeps InertiaProp.Cache() values in it
+        services.TryAddSingleton<IInertiaCacheStore, MemoryInertiaCacheStore>();
+        services.TryAddSingleton<InertiaCaching>();
+        services.TryAddSingleton<IInertiaCache, InertiaCache>();
         services.TryAddSingleton<InertiaPageWriter>();
         services.TryAddSingleton<PageComponentCheck>();
         // Ssr.Timeout is the only deadline. No redirects (a render POST must not be replayed elsewhere), no proxy (renderers are local or

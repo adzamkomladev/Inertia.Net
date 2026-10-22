@@ -207,7 +207,7 @@ header_is Location /fe/page
 inertia GET /fe/page
 has '"flash":{"toast":"Contact Ada"}'
 
-# 15. 1.4: MapInertia, cached props, CSP nonce, Vite prefetch, DevTools entries.
+# 15. 1.4: MapInertia, cached props and their invalidation, CSP nonce, Vite prefetch, DevTools entries.
 inertia GET /about
 status_is 200
 has '"component":"About"'
@@ -216,6 +216,12 @@ inertia GET /dashboard
 has '"cached":{"name":"cached","value":5}'
 inertia GET /dashboard
 has '"cached":{"name":"cached","value":5}'
+has '"tagged":{"name":"tagged","value":1}'
+inertia POST /cache/reset
+status_is 302
+inertia GET /dashboard
+has '"cached":{"name":"set","value":6}'
+has '"tagged":{"name":"tagged","value":2}'
 req GET / -H 'X-Nonce: c21va2U='
 has '<script data-page="app" nonce="c21va2U=" type="application/json">'
 has '<script type="module" nonce="c21va2U=" src="/build/assets/app-4f2a91c3.js"></script>'

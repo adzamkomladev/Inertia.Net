@@ -1,5 +1,67 @@
 # Inertia.Net benchmark results
 
+## Cache invalidation, tags, stale-while-revalidate and the cache store — 2026-10-22
+
+Measured on the same kind of 4-vCPU cloud Linux VM as the 1.4.0 section below (Intel Xeon @ 2.10 GHz, 15 GiB, Ubuntu 24.04.5),
+SDK 10.0.402, .NET 10.0.13, BenchmarkDotNet 0.15.8. "1.4.0" is commit `4cde6f0` built from its own worktree; the render
+benchmarks and probes are the same source on both sides (the cache probe gained the tagged and stale rows). Compare rows within this
+section only.
+
+Allocation is exact. Every path that does not use the new features allocates what 1.4.0 does, and a cache hit no more:
+
+| Workload | 1.4.0 | This change |
+|---|---:|---:|
+| JSON, 20 mixed props (`--render-probe`) | 2,760 B | 2,760 B |
+| Typed POCO page | 2,480 B | 2,480 B |
+| Partial reload, 2 of 20 | 1,592 B | 1,592 B |
+| HTML + Vite tags, 20 props | 2,824 B | 2,824 B |
+| Deferred group load (BenchmarkDotNet) | 1,600 B | 1,600 B |
+| Build 20 props, handler side (BenchmarkDotNet) | 4,312 B | 4,312 B |
+| SSR gateway call (`--ssr-probe`) | 2,568 B | 2,568 B |
+| A prop whose loader maps 500 rows, uncached (`--cache-probe`) | 25,480 B; 85–94 µs | 25,480 B; 84–93 µs |
+| The same prop, cache hit | 1,152 B; 3.6–5.1 µs | 1,152 B; 3.7–5.3 µs |
+| Cache hit, prop with two tags | — | 1,216 B; 3.8–5.2 µs |
+| Cache hit, stale prop (its refresh already claimed) | — | 1,168 B; 3.8–5.0 µs |
+| Server-rendered page (64 KiB of HTML), uncached | 3,432 B | 3,432 B |
+| Server-rendered page, cache hit | 1,312 B; 9.4–18.4 µs | 1,256 B; 10.5–18.2 µs |
+| Server-rendered page, stale hit | — | 1,256 B; 8.9–18.7 µs |
+
+What decides those numbers:
+
+- **No new per-render state.** The props writer, allocated by every render, keeps its size: the stale-refresh list shares one field
+  with the rescued-props list, and the page writer, which has the `HttpContext`, registers the refreshes after the walk.
+- **No key strings on a lookup.** `InertiaCacheKey` keeps the kind and the key apart, so the memory store looks a prop up exactly as 1.4
+  did; only a store keyed by strings builds `inertia:prop:{key}`. A render's key is the hex SHA-256 alone (one string, no hash array),
+  which is the 56 bytes an SSR hit saves.
+- **Settings sized by use.** A prop cached without `staleFor` or tags carries the same 32-byte settings object as in 1.4; one with tags
+  pays for an exact-size tag array (+64 B for two tags), one with `staleFor` 16 bytes more. A stale hit whose refresh another request
+  claimed allocates nothing more; the request that claims it allocates the refresh's state and, for SSR, a copy of the page JSON.
+
+Times, BenchmarkDotNet `--filter '*RenderBenchmarks*' --memory`, alternating with 1.4.0. Rounds 1–4 measured a first build that
+awaited cached props at a second await site in the walk: the deferred group load was 6–7% slower in three of those rounds. The final
+build shares the walk's existing await (as the walk's comment asks), and rounds 5–6 measured it. Medians in µs:
+
+| Workload | Round 5: 1.4.0 | This change | Round 6: 1.4.0 | This change |
+|---|---:|---:|---:|---:|
+| JSON, 20 mixed props | 14.52 | 14.41 (−0.7%) | 14.01 | 14.64 (+4.5%) |
+| Typed POCO page | 9.76 | 9.50 (−2.6%) | 10.14 | 9.53 (−6.0%) |
+| Partial reload, 2 of 20 | 6.82 | 6.63 (−2.8%) | 6.78 | 6.69 (−1.3%) |
+| Deferred group load | 5.38 | 5.40 (+0.3%) | 5.51 | 5.49 (−0.4%) |
+| HTML + Vite tags, 20 props | 15.54 | 16.18 (+4.2%) | 15.57 | 15.70 (+0.9%) |
+| Reference: STJ, no Inertia.Net code | 8.17 | 7.92 (−3.1%) | 8.01 | 7.38 (−7.9%) |
+
+The reference benchmark, which runs no Inertia.Net code, moved by up to 7.9% between processes, and every render path stayed within
+that band in both directions: render times are unchanged. Allocation, above, is the stable signal.
+
+Reproduce (from each worktree's `tests/Inertia.Net.Benchmarks`):
+
+```sh
+dotnet run -c Release --no-build -- --render-probe
+dotnet run -c Release --no-build -- --cache-probe
+dotnet run -c Release --no-build -- --ssr-probe
+dotnet run -c Release --no-build -- --filter '*RenderBenchmarks*' --memory
+```
+
 ## 1.4.0 on a 4-vCPU cloud Linux VM — 2026-10-20
 
 Measured in a cloud Linux container: a Firecracker microVM on a shared KVM host, Intel Xeon @ 2.10 GHz, 4 vCPUs (1 thread per

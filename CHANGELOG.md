@@ -7,6 +7,31 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+Cached props and the SSR response cache can now be invalidated, replaced, served stale while they refresh, and kept in a store of the
+app's choice. Nothing changes for apps that do not use the new APIs: the default store keeps props in the app's `IMemoryCache` and
+renders in a private cache bounded by `Ssr.Cache.MaxBytes`, as in 1.4.
+
+### Added
+
+- `IInertiaCache` (registered by `AddInertia()`): `RemovePropAsync(key)`, `RemoveByTagAsync(tag)`, `ClearPropsAsync()`,
+  `ClearSsrAsync()` and `SetPropAsync(key, value, duration, staleFor?, tags?)`, which caches a value as if its loader had returned it.
+- `InertiaProp.Cache(key, duration, staleFor?, tags?)`. `tags` remove a prop with `RemoveByTagAsync`. `staleFor`
+  (stale-while-revalidate) keeps serving a value once `duration` has passed: the first request that reads it gets it at once and the
+  loader runs after that response has been sent, while the request's scoped services are still alive. One refresh runs per key and
+  app instance; a failed refresh is logged and keeps the stale value.
+- `Ssr.Cache.StaleFor` and `InertiaResult.WithSsrCache(duration, staleFor)`: the same for server-rendered HTML, which renders again after
+  the response. A stale hit is recorded as `inertia.ssr.outcomes` with reason `stale`.
+- `IInertiaCacheStore`, `InertiaCacheKey`, `InertiaCacheEntryKind`, `InertiaCacheEntryOptions` and `InertiaCacheTags`: register an
+  `IInertiaCacheStore` singleton to keep props and renders elsewhere, such as a cache every app instance shares. While a page renders, a
+  store that throws is logged (at most once every 30 seconds) and counts as a miss.
+
+### Performance
+
+- Renders that do not use the new features allocate exactly what they did in 1.4.0 (JSON 2,760 B, HTML 2,824 B for the 20-prop
+  page), and a cached prop hit too (1,152 B); an SSR cache hit allocates 56 B less (1,256 B). A prop with tags costs its tag array, one
+  with `staleFor` 16 B more. Render times are unchanged: in alternating BenchmarkDotNet rounds every render path stayed within the
+  band a benchmark without Inertia.Net code moved (up to 7.9%). See `tests/Inertia.Net.Benchmarks/RESULTS.md`.
+
 ## [1.4.0] - 2026-10-20
 
 Adds cached props, an SSR response cache, Vite chunk prefetching, CSP nonces, generated TypeScript declarations, the Inertia DevTools

@@ -24,8 +24,11 @@ internal sealed class PropsPlanner : IDisposable
     /// <summary>A started loader failed without being rescued; the others were cancelled and the render fails.</summary>
     public bool Failed => _failed;
 
-    /// <summary>Plans a prop the walk will resolve, in protocol order. An instance added twice is not planned: it resolves at each path.</summary>
-    public void Add(InertiaProp prop)
+    /// <summary>
+    /// Plans a prop the walk will resolve, in protocol order. An instance added twice is not planned: it resolves at each path. A cached
+    /// prop's pending <paramref name="lookup"/> is awaited first: a hit is the task's result, and the loader does not run.
+    /// </summary>
+    public void Add(InertiaProp prop, Task<CachedProp?>? lookup = null)
     {
         if (_pending.TryGetValue(prop, out var existing))
         {
@@ -33,7 +36,7 @@ internal sealed class PropsPlanner : IDisposable
             return;
         }
 
-        var planned = new Planned(prop);
+        var planned = new Planned(prop) { Lookup = lookup };
         _pending.Add(prop, planned);
         _planned.Add(planned);
     }
@@ -52,6 +55,9 @@ internal sealed class PropsPlanner : IDisposable
             planned.Task = RunAsync(planned);
         }
     }
+
+    /// <summary>Whether <paramref name="prop"/> has a started task the walk has not taken yet.</summary>
+    public bool IsPlanned(InertiaProp prop) => _pending.ContainsKey(prop);
 
     /// <summary>The started loader of <paramref name="prop"/>, handed out once.</summary>
     public bool TryTake(InertiaProp prop, out Task<object?> task)
@@ -111,6 +117,11 @@ internal sealed class PropsPlanner : IDisposable
     private async Task<object?> RunAsync(Planned planned)
     {
         var cancellationToken = _cancellation.Token;
+        if (planned.Lookup is { } lookup && await lookup is { } hit)
+        {
+            return hit;
+        }
+
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -147,6 +158,8 @@ internal sealed class PropsPlanner : IDisposable
         public InertiaProp Prop { get; } = prop;
 
         public Task<object?>? Task { get; set; }
+
+        public Task<CachedProp?>? Lookup { get; init; }
 
         public ExceptionDispatchInfo? Failure { get; set; }
 
