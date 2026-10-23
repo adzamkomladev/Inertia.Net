@@ -1893,7 +1893,26 @@ Flash and errors travel in a cookie across the redirect, so use a client that ke
 
 Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
 
-In 1.5.0, cache invalidation, tags, stale-while-revalidate and the configurable cache store leave render and cached prop allocations unchanged, reduce an SSR cache hit by 56 bytes, and leave measured render times unchanged. Full measurements, comparison versions, workloads and raw data are in [the benchmark results](tests/Inertia.Net.Benchmarks/RESULTS.md).
+Published NuGet v1.5.1 versus v1.5.0, using identical fixtures across 32 paired rounds:
+
+| Workload | v1.5.0 median | v1.5.1 median | Paired speed improvement | Allocated bytes/op, v1.5.0 -> v1.5.1 |
+|---|---:|---:|---:|---:|
+| JSON, 20 props | 74.929 us | 75.110 us | no clear change | 2,760 -> 2,152 |
+| Partial reload | 31.758 us | 31.885 us | no clear change | 1,592 -> 984 |
+| HTML, 20 props | 79.746 us | 77.909 us | no clear change | 2,824 -> 2,216 |
+| Cache write, 1 KiB | 1.814 us | 1.034 us | 43.3% faster | 4,880 -> 1,240 |
+| Cache write, 1 MiB | 1,131.886 us | 485.719 us | 56.5% faster | 4,195,405 -> 1,048,871 |
+| Dictionary, 1,000 integer keys | 1,136.159 us | 1,025.162 us | 8.1% faster | 216,992 -> 177,008 |
+| 32 simultaneous cold-cache requests | 95.837 ms | 12.464 ms | 87.0% faster | 132,696 -> 83,784 |
+
+The cold-cache fixture uses four backend slots and 10 ms simulated I/O; v1.5.0 runs 32 loaders and v1.5.1 runs one. Ordinary JSON,
+HTML and partial rendering show no statistically clear release-to-release slowdown. Percentages summarize within-round ratios,
+so they can differ from ratios of the separate time medians. The previously reported roughly 3% cost came from an incremental
+memory experiment against an already optimized intermediate version, not the published v1.5.0 release.
+
+The separate incremental GC/RSS experiment found fewer collections and shorter total GC pauses, with no RSS reduction; its
+baseline differs from this published-release comparison. Full workloads, confidence intervals, package hashes, raw paired samples
+and baseline definitions are in [the benchmark results](tests/Inertia.Net.Benchmarks/RESULTS.md).
 
 To measure your build, run `dotnet run -c Release -- --filter '*'` from `tests/Inertia.Net.Benchmarks`. Targeted probes are available with `--render-probe`, `--ssr-probe`, `--mvc-probe`, `--payload-probe` and `--cache-probe`.
 
@@ -2162,5 +2181,3 @@ bash eng/aot-smoke.sh                    # Native AOT publish + protocol smoke t
 - Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet with the `NUGET_API_KEY` secret of the `release` environment. Give that environment required reviewers, so that a pushed tag alone cannot publish.
 
 Licensed under the [MIT license](LICENSE).
-
-Version 1.5.1 reduces temporary cache serialization allocations, coalesces concurrent cache misses, and reuses bounded prop-entry storage. Measured JSON render allocations fall 22% and partial reload allocations 38%; sustained render GC pauses fall 23%, with no RSS reduction and a roughly 3% paired latency cost on some paths. See [benchmark results](tests/Inertia.Net.Benchmarks/RESULTS.md) for workloads, ranges and limitations.

@@ -46,3 +46,13 @@ Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
 - [Props reference](https://github.com/adzamkomladev/Inertia.Net#props-reference)
 - [Native AOT](https://github.com/adzamkomladev/Inertia.Net#native-aot)
 - [Configuration reference](https://github.com/adzamkomladev/Inertia.Net#configuration-reference)
+
+## Performance
+
+Compared with published v1.5.0, v1.5.1 measured 43.3% faster 1 KiB cache writes, 56.5% faster 1 MiB cache writes, 8.1% faster
+integer-key dictionary rendering, and 87.0% faster 32-request cold-cache bursts in controlled fixtures. Ordinary JSON, HTML and
+partial rendering showed no statistically clear slowdown. JSON render allocations fell from 2,760 to 2,152 bytes; partial reload
+allocations fell from 1,592 to 984 bytes. These are fixture measurements, not production throughput guarantees.
+
+See [benchmark results and confidence intervals](https://github.com/adzamkomladev/Inertia.Net/blob/main/tests/Inertia.Net.Benchmarks/RESULTS.md)
+for package hashes, raw samples and the distinction between the published-release comparison and earlier incremental GC/RSS experiments.

@@ -1,0 +1,12 @@
+{
+  "baseline": {
+    "version": "1.5.0",
+    "source": "https://api.nuget.org/v3-flatcontainer/inertia.net/1.5.0/inertia.net.1.5.0.nupkg",
+    "dllSha256": "B8578857F2DD8655941B259329437774208A1BEB2E0D4D54046AADB7352E5BC8"
+  },
+  "current": {
+    "version": "1.5.1",
+    "source": "https://api.nuget.org/v3-flatcontainer/inertia.net/1.5.1/inertia.net.1.5.1.nupkg",
+    "dllSha256": "A7B06B6139BAD2766608B13DBA47A568BE7CF36D50BA059011D55F708996AB77"
+  }
+}

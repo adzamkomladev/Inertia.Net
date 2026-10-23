@@ -1,8 +1,35 @@
 # Inertia.Net benchmark results
 
+## Published v1.5.0 versus v1.5.1 - 2026-10-23
+
+Both core DLLs were downloaded from their published NuGet packages. Their SHA-256 hashes match the loaded libraries recorded in [paired.json](results/1.5.0-vs-1.5.1/paired.json); [sources.json](results/1.5.0-vs-1.5.1/sources.json) records the package URLs and hashes.
+Identical benchmark fixtures, .NET 10.0.13 under WSL2, pinned CPU 7, warmed libraries in separate assembly contexts, 32 alternating-order paired rounds. No builds or other benchmarks overlapped measurement.
+Baseline = v1.5.0; current = v1.5.1. Times below are microseconds. Percentages are medians of within-round ratios, so they can differ from ratios of separate time medians. Intervals are exploratory percentile-bootstrap 95% intervals with 5,000 resamples.
+
+| Workload | Before B/op | After B/op | Before us | After us | Paired time change (95% interval) |
+|---|---:|---:|---:|---:|---:|
+| Json20 | 2760 | 2152 | 74.929 | 75.110 | -0.4% (-2.1% to +1.2%) |
+| Partial2Of20 | 1592 | 984 | 31.758 | 31.885 | +1.3% (-1.6% to +2.2%) |
+| Html20 | 2824 | 2216 | 79.746 | 77.909 | -1.3% (-2.1% to +1.0%) |
+| ReferenceSerialize | 312 | 312 | 39.146 | 39.359 | +0.2% (-0.8% to +1.9%) |
+| CacheWrite1KiB | 4880 | 1240 | 1.814 | 1.034 | -43.3% (-48.1% to -36.1%) |
+| CacheWrite1MiB | 4195405 | 1048871 | 1131.886 | 485.719 | -56.5% (-59.0% to -51.4%) |
+| IntegerKeys1000 | 216992 | 177008 | 1136.159 | 1025.162 | -8.1% (-10.7% to -5.8%) |
+| ConstructProps | 4312 | 4232 | 3.339 | 3.323 | -1.2% (-3.0% to +0.4%) |
+| Nested20 | 744 | 568 | 9.205 | 9.014 | -1.6% (-3.2% to -0.3%) |
+| Nested2000 | 5496 | 568 | 603.290 | 594.951 | -0.6% (-1.6% to +1.1%) |
+| ParallelCacheHit1 | 736 | 584 | 4.522 | 4.347 | -4.3% (-7.5% to -0.4%) |
+| ParallelCacheHit32 | 3000 | 2104 | 30.961 | 31.444 | +0.2% (-1.2% to +3.5%) |
+| ColdBurst32 | 132696 | 83784 | 95836.900 | 12464.150 | -87.0% (-88.4% to -86.4%) |
+
+The cold-burst fixture runs 32 requests with four backend slots and 10 ms simulated asynchronous I/O: v1.5.0 executes 32 loaders; v1.5.1 executes one. Its bytes and times are per burst, not per individual request. Cache write and other measurements are per operation. Large-entry allocation figures contain small background/pool variation.
+
+Ordinary JSON, partial and HTML rendering show no statistically clear release-to-release regression. Cache writes, integer-key dictionaries and cold-cache bursts improve significantly. This comparison supersedes interpreting the earlier incremental memory experiment's approximately 3% cost as a release-to-release regression. That earlier baseline already included the cache optimizations and was not the published v1.5.0 binary.
+
+
 ## Process RSS, GC and retained pool measurements - 2026-10-23
 
-The previously unmeasured RSS, collection counts, GC pause time and retained prop-list storage have now been measured.
+This section compares an intermediate implementation that already included cache optimizations with the final memory changes. It is not a published v1.5.0-versus-v1.5.1 comparison. RSS, collection counts, GC pause time and retained prop-list storage were measured.
 The library implementation is unchanged from the render-allocation comparison below; this follow-up adds only a benchmark probe.
 
 Twelve independent processes: three baseline and three updated processes for each workload, 300,000 renders per process after
@@ -153,7 +180,7 @@ paired time ratios. Ratios within rounds differ from ratios of separate medians.
 | ParallelCacheHit32 | 3000 | 2104 | 28.214 | 28.770 | +2.6% (+1.6% to +7.1%) |
 | ColdBurst32 | 83832 | 83784 | 12980.275 | 12174.325 | +0.1% (-8.3% to +2.6%) |
 
-The memory reductions are repeatable; latency is a tradeoff. The final paired estimates indicate approximately 3% slower JSON,
+In this incremental experiment the memory reductions are repeatable; its timing results do not establish a release-to-release slowdown. The published-release comparison above supersedes that interpretation. The final paired estimates indicate approximately 3% slower JSON,
 HTML and 32-prop warm-cache rendering. The unchanged serialization control also shifts +2.8%, and host variation remains high,
 but that does not establish that the render cost is zero. These changes are retained for allocation reduction, not advertised as
 latency improvements. The initial Windows and Linux probes used an earlier delegate-check ordering; the final implementation
