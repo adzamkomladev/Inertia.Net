@@ -197,7 +197,7 @@ internal sealed class PropsWriter : IDisposable
     }
 
     private void Prefetch(InertiaProp prop, Task<CachedProp?>? lookup) =>
-        (_planner ??= new PropsPlanner(_owner.Options.Props.MaxConcurrency, _cancellationToken)).Add(prop, lookup);
+        (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, lookup);
 
     /// <summary>Writes sharedProps through onceProps, in protocol order, omitting empty ones.</summary>
     public void WriteMetadata(List<string>? sharedPropKeys)
@@ -359,22 +359,13 @@ internal sealed class PropsWriter : IDisposable
         var hit = _planner is not null && _planner.IsPlanned(prop) ? null : await _owner.Caching.GetPropAsync(caching, _cancellationToken);
         if (hit is null)
         {
-            var (resolved, value) = await ResolveAsync(prop);
+            var (resolved, value) = await ResolveAsync(prop, cached: true);
             if (!resolved)
             {
                 return (false, null);
             }
 
-            if (value is CachedProp planned)
-            {
-                hit = planned; // the planned task's lookup found it, so its loader did not run
-            }
-            else
-            {
-                var entry = _owner.CreateCacheEntry(prop.ValueType, value, ScrollOf(prop, value), caching, Path, out var stored);
-                await _owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, _cancellationToken);
-                hit = stored;
-            }
+            hit = (CachedProp)value!;
         }
 
         if (hit.Value.IsStale && !_owner.Caching.IsRefreshing(caching.StoreKey))
@@ -566,22 +557,30 @@ internal sealed class PropsWriter : IDisposable
         }
     }
 
-    private async ValueTask<(bool Resolved, object? Value)> ResolveAsync(InertiaProp prop)
+    private async ValueTask<(bool Resolved, object? Value)> ResolveAsync(InertiaProp prop, bool cached = false)
     {
         _cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            return (true, _planner is not null && _planner.TryTake(prop, out var started) ? await started : await prop.ResolveAsync(_cancellationToken));
+            var value = await (_planner is not null && _planner.TryTake(prop, out var started)
+                ? new ValueTask<object?>(started)
+                : cached ? _owner.LoadCachedPropAsync(prop, _cancellationToken) : prop.ResolveAsync(_cancellationToken));
+            return value is InertiaPageWriter.RescuedCachedProp rescued ? Rescue(rescued.Exception) : (true, value);
         }
-        catch (Exception ex) when (prop.ShouldRescue
+        catch (Exception ex) when (!cached && prop.ShouldRescue
             && !(ex is OperationCanceledException && (_cancellationToken.IsCancellationRequested || _planner is { Failed: true })))
         {
-            var path = new string(Path);
-            _owner.Logger.LogError(ex, "Inertia prop '{Path}' failed to resolve and was rescued.", path);
-            ((_uncommon ??= new()).Rescued ??= []).Add(path);
-            _owner.Metrics.RecordRescued();
-            return (false, null);
+            return Rescue(ex);
         }
+    }
+
+    private (bool Resolved, object? Value) Rescue(Exception exception)
+    {
+        var path = new string(Path);
+        _owner.Logger.LogError(exception, "Inertia prop '{Path}' failed to resolve and was rescued.", path);
+        ((_uncommon ??= new()).Rescued ??= []).Add(path);
+        _owner.Metrics.RecordRescued();
+        return (false, null);
     }
 
     // A parallel loader failed: the render fails, so stop walking (WritePropsAsync reports that loader's failure).

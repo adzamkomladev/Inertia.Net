@@ -184,6 +184,8 @@ public sealed class UsersPage
 [JsonSerializable(typeof(AuthInfo))]
 [JsonSerializable(typeof(UsersPage))]
 [JsonSerializable(typeof(BenchRow[]))]
+[JsonSerializable(typeof(Dictionary<int, InertiaProp>))]
+[JsonSerializable(typeof(Dictionary<string, InertiaProp>))]
 internal sealed partial class BenchJsonContext : JsonSerializerContext;
 
 internal sealed class BenchHostEnvironment(string contentRoot) : IHostEnvironment

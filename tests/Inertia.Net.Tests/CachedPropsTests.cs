@@ -27,6 +27,153 @@ public sealed class CachedPropsTests
     }
 
     [Fact]
+    public async Task Large_cached_values_own_their_bytes_after_the_serialization_buffer_is_reused()
+    {
+        var first = new string('a', 1024 * 1024) + "</script>\u2028";
+        var second = new string('b', first.Length);
+        InertiaProp Value(string key, string value) => Prop(() => value).Cache(key, TimeSpan.FromMinutes(1));
+
+        await _harness.PageAsync(new InertiaProps { ["value"] = Value("first", first) });
+        await _harness.PageAsync(new InertiaProps { ["value"] = Value("second", second) });
+        var page = await _harness.PageAsync(new InertiaProps { ["value"] = Value("first", "must not load") });
+
+        Assert.Equal(first, (string?)page["props"]!["value"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Concurrent_misses_share_one_fill_including_after_expiration(bool parallel)
+    {
+        var time = new FakeTimeProvider();
+        var harness = new Harness(timeProvider: time);
+        for (var round = 1; round <= 2; round++)
+        {
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            InertiaProp Value() => Prop(async ct =>
+            {
+                Interlocked.Increment(ref _loads);
+                await release.Task.WaitAsync(ct);
+                return round;
+            }).Cache("shared", TimeSpan.FromMinutes(1));
+            var requests = Enumerable.Range(0, 32).Select(_ =>
+            {
+                var prop = Value();
+                return harness.PageAsync(new InertiaProps { ["value"] = parallel ? prop.Parallel() : prop });
+            }).ToArray();
+            try
+            {
+                Assert.Equal(round, _loads);
+                Assert.All(requests, request => Assert.False(request.IsCompleted));
+            }
+            finally
+            {
+                release.TrySetResult();
+            }
+
+            var pages = await Task.WhenAll(requests).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.All(pages, page => Assert.Equal(round, (int?)page["props"]!["value"]));
+            Assert.Equal(round, _loads);
+            time.Advance(TimeSpan.FromMinutes(2));
+        }
+    }
+
+    [Fact]
+    public async Task Cancelling_a_waiter_does_not_cancel_the_fill()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancelled = new CancellationTokenSource();
+        InertiaProps Props() => new()
+        {
+            ["value"] = Prop(async ct =>
+            {
+                Interlocked.Increment(ref _loads);
+                await release.Task.WaitAsync(ct);
+                return 42;
+            }).Cache("shared", TimeSpan.FromMinutes(1)),
+        };
+        var first = _harness.PageAsync(Props());
+        var waiter = _harness.PageAsync(Props(), c => c.RequestAborted = cancelled.Token);
+        try
+        {
+            await cancelled.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiter);
+            Assert.False(first.IsCompleted);
+            Assert.Equal(1, _loads);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        Assert.Equal(42, (int?)(await first)["props"]!["value"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_cancelled_fill_is_retried_with_the_waiters_own_loader(bool parallel)
+    {
+        using var cancelled = new CancellationTokenSource();
+        var leader = Prop(async ct =>
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return "cancelled";
+        }).Rescue().Cache("shared", TimeSpan.FromMinutes(1));
+        if (parallel) leader.Parallel();
+        var first = _harness.PageAsync(new InertiaProps { ["value"] = leader }, c => c.RequestAborted = cancelled.Token);
+        var second = _harness.PageAsync(new InertiaProps { ["value"] = Prop(() => "retry").Cache("shared", TimeSpan.FromMinutes(1)) });
+
+        await cancelled.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+        Assert.Equal("retry", (string?)(await second.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))["props"]!["value"]);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task A_failed_fill_releases_its_claim_for_the_next_loader(bool parallel, bool rescue)
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failed = Prop<int>(async ct =>
+        {
+            await release.Task.WaitAsync(ct);
+            throw new InvalidOperationException("failed fill");
+        }).Cache("shared", TimeSpan.FromMinutes(1));
+        if (rescue) failed.Rescue();
+        if (parallel) failed.Parallel();
+        var first = _harness.PageAsync(new InertiaProps { ["value"] = failed });
+        var second = _harness.PageAsync(new InertiaProps { ["value"] = Prop(() => 42).Cache("shared", TimeSpan.FromMinutes(1)) });
+
+        release.SetResult();
+        if (rescue)
+        {
+            var rescued = await first.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            JsonAssert.Missing(rescued["props"], "value");
+            JsonAssert.Equal("""["value"]""", rescued["rescuedProps"]);
+        }
+        else
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => first.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+            Assert.Equal("failed fill", error.Message);
+        }
+        Assert.Equal(42, (int?)(await second.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))["props"]!["value"]);
+    }
+
+    [Fact]
+    public async Task Parallel_cached_props_publish_before_releasing_the_loader_slot()
+    {
+        var harness = new Harness(o => o.Props.MaxConcurrency = 1);
+        InertiaProp Value() => Prop(_ => ValueTask.FromResult(++_loads)).Parallel().Cache("shared", TimeSpan.FromMinutes(1));
+        var page = await harness.PageAsync(new InertiaProps { ["a"] = Value(), ["b"] = Value() }).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(1, _loads);
+        Assert.Equal(1, (int?)page["props"]!["a"]);
+        Assert.Equal(1, (int?)page["props"]!["b"]);
+    }
+
+    [Fact]
     public async Task Keys_are_separate_and_a_removed_key_reloads()
     {
         await _harness.PageAsync(new InertiaProps { ["a"] = Stats("a"), ["b"] = Stats("b") });
@@ -114,6 +261,29 @@ public sealed class CachedPropsTests
         var page = new InertiaProps { ["p"] = Prop(() => (object)Prop(() => 1)).Cache("nested", TimeSpan.FromMinutes(1)) };
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => _harness.PageAsync(page));
         Assert.Contains("Cache() needs a plain value", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_uncached_loader_can_still_return_a_cached_wrapper()
+    {
+        var page = await _harness.PageAsync(new InertiaProps
+        {
+            ["value"] = Prop(() => Prop(() => 42).Cache("inner", TimeSpan.FromMinutes(1)).Append()),
+        });
+        Assert.Equal(42, (int?)page["props"]!["value"]);
+        JsonAssert.Equal("""["value"]""", page["mergeProps"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cache_serialization_errors_are_not_rescued_and_release_the_claim(bool parallel)
+    {
+        var invalid = Prop(() => Task.FromResult<object>(Prop(() => 1))).Rescue().Cache("invalid", TimeSpan.FromMinutes(1));
+        if (parallel) invalid.Parallel();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _harness.PageAsync(new InertiaProps { ["value"] = invalid }));
+        var retry = await _harness.PageAsync(new InertiaProps { ["value"] = Prop(() => 42).Cache("invalid", TimeSpan.FromMinutes(1)) });
+        Assert.Equal(42, (int?)retry["props"]!["value"]);
     }
 
     [Fact]

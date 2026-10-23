@@ -2,7 +2,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.5.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.5.1** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -76,7 +76,7 @@ You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clie
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.5.0
+dotnet new install Inertia.Net.Templates::1.5.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -153,13 +153,13 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.5.0
-dotnet add package Inertia.Net.Mvc --version 1.5.0 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.5.0 # FastEndpoints only
-dotnet add package Inertia.Net.Testing --version 1.5.0 # test projects
+dotnet add package Inertia.Net --version 1.5.1
+dotnet add package Inertia.Net.Mvc --version 1.5.1 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.5.1 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.5.1 # test projects
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.5.0` for all Inertia.Net packages. Inertia.Net 1.5.0 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.5.1` for all Inertia.Net packages. Inertia.Net 1.5.1 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -710,8 +710,9 @@ return Render("Dashboard", new InertiaProps
 - **Only loading changes.** Optional, deferred, merged, once and scroll props keep their behavior; their metadata is written from the
   cache too. A parallel cached prop does not start its loader on a hit. A rescued failure is not cached.
 - **Plain values only.** The value must not contain `InertiaProp` values (a loader that returns a prop cannot be cached).
-- **Per instance.** With the default store each app instance has its own memory cache, and two requests that miss at the same moment
-  both run the loader. Entries carry a `Size` (their byte length), so an `IMemoryCache` with a `SizeLimit` works.
+- **Per instance.** With the default store each app instance has its own memory cache. Concurrent misses share one fill per key and
+  app instance; if it fails or is cancelled, a waiting request retries with its own loader. Entries carry a `Size` (their byte length),
+  so an `IMemoryCache` with a `SizeLimit` works.
 
 **Removing and replacing values.** Inject `IInertiaCache` where the data changes:
 
@@ -1497,6 +1498,9 @@ different props never reuse a stale render. Pages with per-user props make one e
 is counted as `inertia.ssr.outcomes{inertia.ssr.outcome=rendered, inertia.ssr.reason=cache}` and bypasses the render slots and circuit
 breakers. Nothing is cached while the Vite dev server renders.
 
+Concurrent misses for the same page share one fill per app instance. Waiting counts against `Ssr.Timeout`; cancelling a waiting
+request does not cancel the request filling the entry. If that fill fails or is cancelled, a waiting request can retry.
+
 With `StaleFor`, a render past its `Duration` is still served, counted with `inertia.ssr.reason=stale`, and the page is rendered again
 after that response has been sent, as for [stale props](#cached-props): one refresh per page and app instance at a time, and a failed
 one keeps the stale render. `IInertiaCache.ClearSsrAsync()` removes every render, for an SSR bundle deployed without a new asset
@@ -2158,3 +2162,5 @@ bash eng/aot-smoke.sh                    # Native AOT publish + protocol smoke t
 - Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet with the `NUGET_API_KEY` secret of the `release` environment. Give that environment required reviewers, so that a pushed tag alone cannot publish.
 
 Licensed under the [MIT license](LICENSE).
+
+Version 1.5.1 reduces temporary cache serialization allocations, coalesces concurrent cache misses, and reuses bounded prop-entry storage. Measured JSON render allocations fall 22% and partial reload allocations 38%; sustained render GC pauses fall 23%, with no RSS reduction and a roughly 3% paired latency cost on some paths. See [benchmark results](tests/Inertia.Net.Benchmarks/RESULTS.md) for workloads, ranges and limitations.

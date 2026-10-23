@@ -10,15 +10,17 @@ namespace Inertia.Net;
 internal sealed class PropsPlanner : IDisposable
 {
     private readonly CancellationTokenSource _cancellation;
+    private readonly InertiaPageWriter _owner;
     private readonly SemaphoreSlim _gate;
     private readonly List<Planned> _planned = [];
     private readonly Dictionary<InertiaProp, Planned> _pending = new(ReferenceEqualityComparer.Instance);
     private volatile bool _failed;
 
-    public PropsPlanner(int maxConcurrency, CancellationToken requestAborted)
+    public PropsPlanner(InertiaPageWriter owner, CancellationToken requestAborted)
     {
+        _owner = owner;
         _cancellation = CancellationTokenSource.CreateLinkedTokenSource(requestAborted);
-        _gate = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+        _gate = new SemaphoreSlim(owner.Options.Props.MaxConcurrency, owner.Options.Props.MaxConcurrency);
     }
 
     /// <summary>A started loader failed without being rescued; the others were cancelled and the render fails.</summary>
@@ -125,7 +127,9 @@ internal sealed class PropsPlanner : IDisposable
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            return await planned.Prop.ResolveAsync(cancellationToken);
+            return await (planned.Prop.Caching is null
+                ? planned.Prop.ResolveAsync(cancellationToken)
+                : _owner.LoadCachedPropAsync(planned.Prop, cancellationToken));
         }
         catch (Exception ex) when (!planned.Prop.ShouldRescue && !(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
         {
