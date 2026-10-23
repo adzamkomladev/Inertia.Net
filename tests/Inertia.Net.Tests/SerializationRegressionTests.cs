@@ -10,6 +10,34 @@ namespace Inertia.Net.Tests;
 
 public class SerializationRegressionTests
 {
+    [Fact]
+    public async Task Reused_prop_storage_does_not_leak_values_after_failure_or_between_concurrent_renders()
+    {
+        var harness = new Harness();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.PageAsync(new InertiaProps
+        {
+            ["secret"] = "previous request",
+            ["failure"] = Inertia.Prop<string>(() => throw new InvalidOperationException("loader failed")),
+        }));
+        var pages = await Task.WhenAll(Enumerable.Range(0, 32).Select(async index =>
+        {
+            var page = await harness.PageAsync(new InertiaProps
+            {
+                ["id"] = Inertia.Prop(async ct => { await Task.Delay(1, ct); return index; }),
+                ["nested.value"] = index,
+            });
+            Assert.Equal(index, page["props"]!["id"]!.GetValue<int>());
+            Assert.Equal(index, page["props"]!["nested"]!["value"]!.GetValue<int>());
+            JsonAssert.Missing(page["props"], "secret");
+            JsonAssert.Missing(page["props"], "failure");
+            return page;
+        }));
+        Assert.Equal(32, pages.Length);
+        var empty = await harness.PageAsync(new InertiaProps());
+        JsonAssert.Missing(empty["props"], "id");
+        JsonAssert.Missing(empty["props"], "nested");
+    }
+
     private static Harness Create(bool generated, bool defaults = false, bool bigIntegers = false) => new(
         o => o.PreserveBigIntegers = bigIntegers,
         configureServices: services => services.PostConfigure<HttpJsonOptions>(o =>
@@ -82,6 +110,39 @@ public class SerializationRegressionTests
         var options = harness.Services.GetRequiredService<IOptions<HttpJsonOptions>>().Value.SerializerOptions;
         Assert.Equal("""{"secondKind":{"name":"second","extra":null}}""",
             JsonSerializer.Serialize(new Dictionary<RowKind, Row> { [RowKind.SecondKind] = new("second", null) }, options.GetTypeInfo(typeof(Dictionary<RowKind, Row>))));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Typed_dictionary_keys_preserve_custom_converters_when_the_scratch_buffer_is_reused(bool generated)
+    {
+        var harness = new Harness(configureServices: services => services.PostConfigure<HttpJsonOptions>(o =>
+        {
+            o.SerializerOptions.TypeInfoResolver = generated ? RegressionJsonContext.Default : new DefaultJsonTypeInfoResolver();
+            o.SerializerOptions.Converters.Add(new DictionaryKeyConverter());
+        }));
+        var rows = new Dictionary<int, Row>
+        {
+            [100] = new("first", Inertia.Prop(() => 1)),
+            [2] = new("second", Inertia.Prop(() => 2)),
+            [-30] = new("third", Inertia.Prop(() => 3)),
+        };
+
+        var page = await harness.PageAsync(new InertiaProps { ["rows"] = rows });
+        JsonAssert.Equal("""{"key:100":{"name":"first","extra":1},"key:2":{"name":"second","extra":2},"key:-30":{"name":"third","extra":3}}""", page["props"]!["rows"]);
+        var partial = await harness.PageAsync(new InertiaProps { ["rows"] = rows }, c => c.AsPartial("rows.key:2.extra"));
+        JsonAssert.Equal("""{"key:2":{"extra":2}}""", partial["props"]!["rows"]);
+    }
+
+    private sealed class DictionaryKeyConverter : JsonConverter<int>
+    {
+        public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetInt32();
+
+        public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options) => writer.WriteNumberValue(value);
+
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, int value, JsonSerializerOptions options) =>
+            writer.WritePropertyName($"key:{value}");
     }
 
     [Theory]

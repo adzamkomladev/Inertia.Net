@@ -3,10 +3,15 @@ using BenchmarkDotNet.Running;
 using Inertia.Net.Benchmarks;
 
 if (args is ["--load-server"]) { await LoadProbe.ServerAsync(); return; }
+if (args is ["--process-memory", var processMode, var processOutput]) { await ProcessMemoryProbe.RunAsync(processMode, processOutput); return; }
 if (args is ["--render-probe"]) { await RenderProbe.RunAsync(); return; }
 if (args is ["--mvc-probe"]) { MvcProbe.Run(); return; }
 if (args is ["--payload-probe"]) { await PayloadProbe.RunAsync(); return; }
 if (args is ["--cache-probe"]) { await CacheProbe.RunAsync(); return; }
+if (args is ["--allocation-probe"]) { await AllocationProbe.RunAsync(); return; }
+if (args is ["--paired-latency", var variants, var pairedOutput]) { await PairedLatencyProbe.RunAsync(variants, pairedOutput); return; }
+if (args is ["--memory-comparison", var memoryDirectory, var memoryOutput]) { await PairedLatencyProbe.RunAsync(memoryDirectory, memoryOutput, memory: true); return; }
+if (args is ["--planner-cost", var plannerDirectory, var plannerOutput]) { await PairedLatencyProbe.RunPlanningCostAsync(plannerDirectory, plannerOutput); return; }
 if (args is ["--load", var output]) { await LoadProbe.RunAsync(output); return; }
 if (args is ["--ssr-probe"])
 {

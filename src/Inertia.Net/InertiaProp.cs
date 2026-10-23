@@ -141,8 +141,8 @@ public abstract class InertiaProp
     /// <paramref name="key"/> for <paramref name="duration"/>: while it is cached the loader does not run and the JSON is written as it is.
     /// Every request that uses the key gets the same value, so put the user or tenant in the key for data that depends on them
     /// (<c>$"orders:{userId}"</c>). Only the loading changes: an optional, deferred, merged or once prop keeps that behavior. The value
-    /// must be plain data, without <see cref="InertiaProp"/> values inside it. With the default store each app instance has its own cache,
-    /// and two requests that miss at the same time both run the loader. Remove or replace values with <see cref="IInertiaCache"/>.
+    /// must be plain data, without <see cref="InertiaProp"/> values inside it. Concurrent misses share one cache fill per key and app
+    /// instance; if it fails or is cancelled, a waiting request retries with its own loader. Remove or replace values with <see cref="IInertiaCache"/>.
     /// </summary>
     /// <param name="key">The cache key, unique to the value; keys live in their own space, apart from the app's cache keys.</param>
     /// <param name="duration">How long the value is reused, from when it was resolved.</param>
@@ -217,36 +217,35 @@ internal enum PropLoad
 internal sealed class InertiaProp<T> : InertiaProp
 {
     private readonly T? _value;
-    private readonly Func<T>? _syncLoader; // kept as-is: wrapping it in an async loader would allocate a closure per prop
-    private readonly Func<CancellationToken, ValueTask<T>>? _loader;
+    private readonly Delegate? _loader; // Keep either loader as-is, without allocating an adapter closure.
 
-    private InertiaProp(T? value, Func<T>? syncLoader, Func<CancellationToken, ValueTask<T>>? loader)
+    private InertiaProp(T? value, Delegate? loader)
     {
         _value = value;
-        _syncLoader = syncLoader;
         _loader = loader;
     }
 
-    internal static InertiaProp<T> FromValue(T value) => new(value, null, null);
+    internal static InertiaProp<T> FromValue(T value) => new(value, null);
 
     internal static InertiaProp<T> FromLoader(Func<CancellationToken, ValueTask<T>> loader)
     {
         ArgumentNullException.ThrowIfNull(loader);
-        return new(default, null, loader);
+        return new(default, loader);
     }
 
     internal static InertiaProp<T> FromLoader(Func<T> loader)
     {
         ArgumentNullException.ThrowIfNull(loader);
-        return new(default, loader, null);
+        return new(default, loader);
     }
 
     internal override Type ValueType => typeof(T);
 
-    internal override bool HasAsyncLoader => _loader is not null;
+    internal override bool HasAsyncLoader => _loader is Func<CancellationToken, ValueTask<T>>;
 
     internal override async ValueTask<object?> ResolveAsync(CancellationToken cancellationToken) =>
-        _loader is not null ? await _loader(cancellationToken) : _syncLoader is not null ? _syncLoader() : _value;
+        _loader is null ? _value : _loader is Func<T> syncLoader ? syncLoader()
+            : await ((Func<CancellationToken, ValueTask<T>>)_loader)(cancellationToken);
 }
 
 /// <summary>

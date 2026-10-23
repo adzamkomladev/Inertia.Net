@@ -1,5 +1,279 @@
 # Inertia.Net benchmark results
 
+## Process RSS, GC and retained pool measurements - 2026-10-23
+
+The previously unmeasured RSS, collection counts, GC pause time and retained prop-list storage have now been measured.
+The library implementation is unchanged from the render-allocation comparison below; this follow-up adds only a benchmark probe.
+
+Twelve independent processes: three baseline and three updated processes for each workload, 300,000 renders per process after
+10,000 warmup renders. Version order alternates per repeat. Ubuntu/WSL2, .NET 10.0.13, workstation GC, affinity CPUs 6 and 7
+(.NET reports two processors). The baseline already includes the preceding cache optimizations. Both versions use the same probe.
+Each JSON records the loaded core assembly hash. No builds or tests overlap measurement.
+
+`render` reuses the 20-prop fixture and HTTP context. `handler` constructs those props on every render, reusing the context.
+Both execute the adapter result into Stream.Null, not a Kestrel/network load test. RSS is observed after warmup/full GC, during the
+loop every 4,096 renders, at completion, and after a final full GC. Peak RSS is the maximum of those in-loop samples, not a kernel
+high-water mark. Natural Gen 0/1/2 counts and cumulative stop-the-world pause duration come from the runtime; the forced warmup
+and final collections are excluded from their measured deltas. Process sampling adds about 3.3 allocated bytes per render equally
+to both variants. GC heap figures after full GC include small common probe/inspection overhead.
+
+All table cells give the median followed by the observed range across the three processes. MiB = 1,048,576 bytes; KiB = 1,024 bytes.
+
+
+render - 300,000 operations per process, 3 independent processes per version
+| Metric | Baseline median [min-max] | Updated median [min-max] |
+|---|---:|---:|
+| RSS before (MiB) | 67.574 [67.508-67.812] | 67.891 [67.605-67.988] |
+| Sampled peak RSS (MiB) | 74.219 [74.180-74.223] | 74.383 [74.344-74.691] |
+| RSS after (MiB) | 74.219 [74.180-74.223] | 74.383 [74.344-74.691] |
+| RSS after full GC (MiB) | 74.402 [74.359-74.406] | 74.609 [74.562-74.910] |
+| Managed live heap before (KiB) | 326.977 [326.969-326.977] | 328.445 [328.445-328.445] |
+| Managed live heap after full GC (KiB) | 343.422 [343.391-343.422] | 345.359 [345.359-345.367] |
+| GC committed before (MiB) | 4.676 [4.676-4.676] | 4.676 [4.676-4.676] |
+| GC committed after full GC (MiB) | 4.738 [4.738-4.738] | 4.738 [4.738-4.738] |
+| Total allocated (MiB) | 790.591 [790.586-790.592] | 616.641 [616.641-616.641] |
+| Allocated bytes/render | 2763.317 [2763.298-2763.318] | 2155.315 [2155.315-2155.317] |
+| Gen 0 collections | 264.000 [264.000-264.000] | 206.000 [206.000-206.000] |
+| Gen 1 collections | 0.000 [0.000-0.000] | 0.000 [0.000-0.000] |
+| Gen 2 collections | 0.000 [0.000-0.000] | 0.000 [0.000-0.000] |
+| Total GC pause (ms) | 57.110 [56.689-61.575] | 43.917 [43.384-45.144] |
+| GC pause fraction (%) | 0.898 [0.833-0.918] | 0.730 [0.703-0.744] |
+| Elapsed (ms) | 6360.602 [6174.090-7392.541] | 6067.265 [5946.570-6244.040] |
+
+handler - 300,000 operations per process, 3 independent processes per version
+| Metric | Baseline median [min-max] | Updated median [min-max] |
+|---|---:|---:|
+| RSS before (MiB) | 67.914 [67.906-67.977] | 67.832 [67.668-68.086] |
+| Sampled peak RSS (MiB) | 74.480 [74.473-74.684] | 74.551 [74.438-74.734] |
+| RSS after (MiB) | 74.480 [74.473-74.684] | 74.551 [74.438-74.734] |
+| RSS after full GC (MiB) | 74.660 [74.656-74.867] | 74.773 [74.656-74.957] |
+| Managed live heap before (KiB) | 326.969 [326.969-326.977] | 328.453 [328.453-340.453] |
+| Managed live heap after full GC (KiB) | 343.422 [343.391-343.469] | 345.383 [345.383-345.422] |
+| GC committed before (MiB) | 4.676 [4.676-4.676] | 4.676 [4.676-4.738] |
+| GC committed after full GC (MiB) | 4.738 [4.738-4.738] | 4.738 [4.738-4.738] |
+| Total allocated (MiB) | 2024.259 [2024.259-2024.264] | 1827.426 [1827.403-1827.426] |
+| Allocated bytes/render | 7075.298 [7075.297-7075.316] | 6387.318 [6387.237-6387.318] |
+| Gen 0 collections | 676.000 [676.000-676.000] | 610.000 [610.000-610.000] |
+| Gen 1 collections | 0.000 [0.000-0.000] | 0.000 [0.000-0.000] |
+| Gen 2 collections | 0.000 [0.000-0.000] | 0.000 [0.000-0.000] |
+| Total GC pause (ms) | 148.246 [135.222-157.999] | 132.967 [117.186-135.476] |
+| GC pause fraction (%) | 1.955 [1.900-2.024] | 1.737 [1.699-1.897] |
+| Elapsed (ms) | 7582.408 [6679.336-8316.870] | 7140.681 [6748.240-7827.974] |
+
+RSS does not improve in this workload. Median sampled peak RSS increases by 0.164 MiB (0.22%) for render-only and 0.070 MiB
+(0.09%) when constructing props. GC committed memory after full GC stays at 4.738 MiB in both versions. Managed live heap after
+full GC is about 1.94 KiB larger for render-only and 1.96 KiB larger for handler construction.
+
+Gen 0 collections fall 264 -> 206 (22.0%) for render-only, and 676 -> 610 (9.8%) with prop construction. Median total natural
+GC pause time falls 57.110 -> 43.917 ms (23.1%) and 148.246 -> 132.967 ms (10.3%), respectively, per 300,000 renders. Neither
+version has natural Gen 1 or Gen 2 collections in these runs. These are total pauses, not maximum or p99 single-pause durations.
+Elapsed batch time is reported for completeness; these separate-process sustained runs do not replace the earlier paired latency
+comparison or establish a universal throughput gain.
+
+Two additional isolated retention inspections read the pool after ordinary rendering and after 32 simultaneous renders held at an
+async loader. Pool queue slots are inspected without enumerating/freezing the queue. Every list count, capacity and backing-array
+entry is checked. List/array sizes are measured through allocation counters using equivalent objects of those exact capacities;
+fixed infrastructure is sized with the same platform pool constructor and a fieldless policy. This includes the pool, policy,
+delegates, queue and its one segment. The probe verifies stable sizing, a single segment, the capacity/count bounds, and cleared
+references. It does not use a heap dump. The two-CPU run has a maximum of four retained lists.
+
+| Pool state | Baseline total bytes | Updated retained lists | List capacities | Updated list/array bytes | Fixed infrastructure bytes | Updated total bytes |
+|---|---:|---:|---|---:|---:|---:|
+| Ordinary 20-prop rendering | 0 | 1 | 23 | 608 | 1,040 | 1,648 |
+| 20 fields, 32 concurrent renders | 0 | 4 | 24, 24, 24, 24 | 2,528 | 1,040 | 3,568 |
+| 1000 fields, 32 concurrent renders | 0 | 4 | 1004, 1004, 1004, 1004 | 96,608 | 1,040 | 97,648 |
+| 2000 fields, 32 concurrent renders | 0 | 0 | none | 0 | 1,040 | 1,040 |
+
+All inspected returned lists were empty, with every backing-array entry cleared. The 2,000-field pages exceed the 1,024-entry
+retention cap: their lists are discarded, leaving just 1,040 bytes of fixed infrastructure. At the configured four-list maximum,
+the calculated cap including these object sizes is 99,568 bytes; the observed 1,000-field case retains 97,648 bytes.
+
+Raw process snapshots, counter deltas, hashes, retained capacities, reference checks, runner and analysis are saved under
+`artifacts/memory-review/process/`. The final retention records are `baseline-retention-final.json` and
+`current-retention-final.json`. Each RSS/GC run is named `<version>-<render|handler>-<0|1|2>.json`.
+
+Reproduce one process (launch a fresh process for each version/repeat):
+
+```sh
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll \
+  --process-memory render /absolute/path/to/render.json
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll \
+  --process-memory handler /absolute/path/to/handler.json
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll \
+  --process-memory retention /absolute/path/to/retention.json
+```
+
+
+## Render allocation reductions � 2026-10-23
+
+This comparison is incremental: its baseline already includes the cache-buffer, dictionary-buffer and shared-fill changes below.
+The implementation reuses the top-level prop-entry list through the platform object pool, clears references in `finally`, and
+rejects lists with capacity above 1,024. Pool count is bounded by `DefaultObjectPool` (twice the processor count). Dot-key expansion
+keeps its existing separate output list. Prop wrappers store their original sync or async delegate in one field; constants take
+a null fast path. No loader adapter, API change or dependency was added.
+
+| Workload | Before B/op | After B/op | Reduction |
+|---|---:|---:|---:|
+| JSON, 20 mixed props | 2,760 | 2,152 | 22.0% |
+| Typed POCO JSON | 2,480 | 1,968 | 20.6% |
+| Partial reload, 2 of 20 | 1,592 | 984 | 38.2% |
+| HTML, 20 mixed props | 2,824 | 2,216 | 21.5% |
+| Nested object, 2,000 fields | 5,496 | 568 | 89.7% |
+| Construct the 20-prop fixture | 4,312 | 4,232 | 1.9% |
+
+Render measurements reuse the fixture's props and context; constructing props is measured separately. They are adapter costs,
+not total ASP.NET request allocations. Three Windows render-probe rounds agreed on every allocation value. The paired probe
+also records allocations for cache hits, nested pages and concurrent misses. Pooling retains bounded empty backing arrays;
+these earlier numbers describe allocation rate; the process-memory follow-up above supplies RSS and GC measurements. Cache payload ownership is unchanged.
+
+Final validation: Release solution build passed with zero warnings/errors; the full suite passed 1,011 of 1,012 tests.
+The sole failure is the previously reproduced `SsrNodeProcessTests.Several_instances_share_the_renders_and_cover_for_each_other`
+process-failover assertion at line 435. The new failed-render/concurrent-render isolation regression passes. Linux Native AOT
+publish and every smoke check passed without trimming/AOT warnings; 120 tested source/configuration files matched the working
+copy (shell line endings normalized).
+
+Final paired measurements: .NET 10.0.13 on Ubuntu 22.04/WSL2, pinned to logical CPU 7. Identical updated fixtures load the saved
+baseline and final library in separate assembly contexts. Both variants are warmed, and their order alternates across 32 rounds;
+no builds or tests overlap measurement. Intervals below are exploratory percentile bootstrap intervals from 5,000 resamples of
+paired time ratios. Ratios within rounds differ from ratios of separate medians.
+
+| Workload | Before B/op | After B/op | Before us | After us | Paired time change (95% interval) |
+|---|---:|---:|---:|---:|---:|
+| Json20 | 2760 | 2152 | 91.361 | 86.418 | +3.0% (+0.7% to +5.6%) |
+| Partial2Of20 | 1592 | 984 | 29.935 | 29.852 | -0.2% (-1.9% to +2.4%) |
+| Html20 | 2824 | 2216 | 89.782 | 92.502 | +3.1% (+0.5% to +4.8%) |
+| ReferenceSerialize | 312 | 312 | 53.982 | 54.237 | +2.8% (-0.2% to +11.8%) |
+| CacheWrite1KiB | 1240 | 1240 | 0.912 | 0.901 | -0.2% (-4.7% to +8.1%) |
+| CacheWrite1MiB | 1048985 | 1049068 | 740.113 | 798.505 | +2.5% (-13.9% to +19.2%) |
+| IntegerKeys1000 | 177160 | 177008 | 1264.419 | 1329.450 | -0.1% (-5.5% to +11.4%) |
+| ConstructProps | 4312 | 4232 | 2.565 | 2.799 | -4.6% (-8.7% to -0.2%) |
+| Nested20 | 744 | 568 | 11.811 | 11.672 | +2.7% (-3.6% to +5.8%) |
+| Nested2000 | 5496 | 568 | 767.237 | 767.097 | +2.6% (-3.8% to +7.7%) |
+| ParallelCacheHit1 | 736 | 584 | 7.784 | 7.904 | -1.3% (-5.8% to +8.4%) |
+| ParallelCacheHit32 | 3000 | 2104 | 28.214 | 28.770 | +2.6% (+1.6% to +7.1%) |
+| ColdBurst32 | 83832 | 83784 | 12980.275 | 12174.325 | +0.1% (-8.3% to +2.6%) |
+
+The memory reductions are repeatable; latency is a tradeoff. The final paired estimates indicate approximately 3% slower JSON,
+HTML and 32-prop warm-cache rendering. The unchanged serialization control also shifts +2.8%, and host variation remains high,
+but that does not establish that the render cost is zero. These changes are retained for allocation reduction, not advertised as
+latency improvements. The initial Windows and Linux probes used an earlier delegate-check ordering; the final implementation
+checks constants before generic delegate types, avoiding unnecessary checks for constant props.
+
+Raw hashes, samples, logs, analysis and saved benchmark binaries are in `artifacts/memory-review/`. `paired-linux.json` and
+`comparison-linux.md` describe the final code; `paired.json` and `paired-linux-first.json` retain the initial diagnostics.
+For another final comparison using the saved variant binaries:
+
+```sh
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll \
+  --memory-comparison artifacts/memory-review/variants artifacts/memory-review/paired-repeat.json
+```
+
+
+## Latency measurements and planner experiments — 2026-10-23
+
+Compared `f13f602e7e3ca4564e7787a61be8cde40db6ebbd` with the current cache-buffer, dictionary-buffer and shared-fill changes.
+Ubuntu 22.04 under WSL2, Intel Core i5-8265U, SDK 10.0.402, runtime 10.0.13; measurements pinned to one logical CPU. All variants
+were built before measuring, and no builds or tests overlapped measurement. `ReviewLatencyBenchmarks` supplies identical fixtures.
+
+Separate BenchmarkDotNet runs had substantial host variation: even the unchanged reference serializer ranged from 17.4 to 140.3 µs.
+Those runs are retained as diagnostics, but are not the basis of the comparisons below. `PairedLatencyProbe` loads each library in
+its own assembly context, warms every fixture, then counterbalances variant order across 32 rounds in one process.
+
+| Workload | Original median | Current median | Reduction in median time |
+|---|---:|---:|---:|
+| Write a 1 KiB cache entry | 2.395 µs | 1.121 µs | 53.2% |
+| Write a 1 MiB cache entry | 2.434 ms | 1.385 ms | 43.1% |
+| Render 1,000 integer-keyed props | 1.587 ms | 1.283 ms | 19.2% |
+| 32 simultaneous cold-cache requests | 96.364 ms | 10.863 ms | 88.7% |
+| Ordinary JSON, 20 mixed props | 65.871 µs | 65.878 µs | no clear change |
+| Partial reload, 2 of 20 props | 13.902 µs | 13.618 µs | no clear change |
+| HTML, 20 mixed props | 28.683 µs | 28.470 µs | no clear change |
+
+The cold-cache fixture uses four backend slots and 10 ms of simulated asynchronous I/O, not a real database. The original executes
+32 loaders; the current version executes one. Its first BenchmarkDotNet comparison also measured 96.019 → 11.997 ms.
+
+For the first four rows, percentile-bootstrap 95% intervals of the paired median time ratios exclude zero improvement. Paired
+reductions are 50.1% (44.3–53.1%), 48.2% (26.3–60.5%), 10.7% (6.6–16.8%) and 88.7% (87.3–88.8%), respectively. These estimates
+use ratios within each round, so they differ from ratios of the independent medians in the table. The unchanged serialization
+reference has a paired change of +2.2%, with an interval of −0.5% to +8.1%.
+
+Both planner proposals were tested as isolated source variants:
+
+| Experiment against current code | Paired latency change, 95% interval | Allocation impact | Decision |
+|---|---:|---:|---|
+| Skip planning work for non-parallel leaf values, 2,000 nested fields | −2.6%, −9.0% to +2.6% | unchanged | no reliable gain; not applied |
+| Retain synchronous planner cache hits, one cached prop | +1.8%, −2.7% to +6.2% | 736 → 1,040 B/render | no reliable gain; not applied |
+| Retain synchronous planner cache hits, 32 cached props | −15.2%, −26.5% to −11.3% | 3,000 → 5,888 B/render | faster, but 96% more allocation; not applied globally |
+
+The leaf variant adds an early type/parallel check before constructing the path. The retained-hit variant stores hits in a
+per-render dictionary behind `PropsWriter.Uncommon`, then reuses them while writing. Neither prototype was added to production code.
+
+A second probe measures the entire planning walk on/off on the **same fixture and library instance**, alternating order for 64
+rounds. The selected pages contain no parallel loaders. Disabling the walk reduced paired times by 2.9% for mixed JSON (95% interval
+0.7–3.8%), 4.7% for 20 nested fields (3.4–6.2%) and 9.7% for 2,000 nested fields (8.6–11.1%). This establishes the potential overhead;
+turning the flag off globally is not a valid implementation because other pages need parallel loading. The tested safe leaf
+optimization did not recover a reliable gain. A different way to avoid traversal would need to retain early-start and nested-prop
+semantics; it is not included in this change.
+
+Raw logs, prototype preparation, samples and bootstrap analysis are saved in `artifacts/performance-review/`, including
+`paired-report.md`, `paired-samples.json`, `planner-cost-summary.json` and the four BenchmarkDotNet result folders. To repeat the
+paired measurements once the four variant outputs have been prepared with the same fixtures:
+
+```sh
+taskset -c 7 dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll \
+  --paired-latency /path/to/variant-root /path/to/paired-samples.json
+taskset -c 7 dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll \
+  --planner-cost /path/to/variant-root /path/to/planner-cost.json
+```
+
+These are measured fixture latencies on this machine, not predictions of production response time. The native AOT smoke result
+below still applies: this follow-up changes benchmark fixtures and reporting, not the library implementation.
+
+## Cache writes, dictionary keys and concurrent misses — 2026-10-22 (Windows)
+
+Compared the original core library at `f13f602e7e3ca4564e7787a61be8cde40db6ebbd` with this change, using the same updated benchmark
+assembly for both. The original library was built separately and substituted into a copy of the benchmark output. Both used SDK
+10.0.402 and .NET 10.0.13 on Windows. These are allocation probes, not controlled timing benchmarks: other build/test processes and
+local activity overlapped some runs, and the reported times varied too much to claim latency improvements.
+
+Three rounds of `--allocation-probe`:
+
+| Workload | Original allocated bytes/op | Updated allocated bytes/op | Reduction |
+|---|---:|---:|---:|
+| Create a cache entry for a 1 KiB string | 4,880 | 1,240–1,241 | 75% |
+| Create a cache entry for a 1 MiB string | 4,196,270–4,196,839 | 1,258,978–1,426,930 | 66–70% |
+| Render 1,000 integer-keyed props | 216,992 | 177,160–177,184 | 18% |
+| Render the equivalent string-keyed props | 96,856 | 96,856 | unchanged |
+
+Large cache writes still allocate their owned stored array. The temporary serialization buffer is pooled; pool misses/trimming
+and background allocations account for variation in the large-entry rows. Dictionary keys retain the serializer's converter path,
+but reuse a pooled buffer and JSON writer instead of allocating serialized bytes for every key.
+
+The existing `--render-probe` also ran against both versions. Every round retained the original allocations: JSON 2,760 B,
+typed POCO 2,480 B, partial reload 1,592 B, HTML 2,824 B per request. No per-render field or allocation was added to `PropsWriter`.
+
+Concurrent-miss regression tests verify that 32 requests for one prop key run one loader, including parallel loaders and expired
+entries; 16 identical SSR requests perform one renderer call, including after expiry. The original review probes observed 32 and
+16 calls respectively. Claims end after storage, failure or cancellation. Waiting requests retain their own cancellation and scoped
+loaders; SSR waits consume the existing render deadline. Tests also cover rescued loaders, serialization failures and custom key
+converters with source-generated and reflection metadata.
+
+Native AOT validation also passed on Ubuntu 22.04 (WSL2), targeting `linux-x64` with SDK 10.0.402 and runtime 10.0.13:
+`bash eng/aot-smoke.sh` published the native executable without AOT/trimming warnings, and every HTTP smoke check passed.
+The tested Linux copy matched all 112 current working files used by the smoke project; only shell line endings were normalized.
+
+The initial implementation left planner behavior unchanged. The follow-up latency section above now records measured planning
+overhead, a leaf-pruning experiment and the speed/allocation tradeoff of retaining cache hits.
+
+Reproduce from `tests/Inertia.Net.Benchmarks`:
+
+```sh
+dotnet run -c Release --no-build -- --allocation-probe
+dotnet run -c Release --no-build -- --render-probe
+dotnet run -c Release --no-build -- --cache-probe
+dotnet run -c Release -- --filter '*CacheWriteBenchmarks*' '*DictionaryPropsBenchmarks*' --memory
+```
+
 ## Cache invalidation, tags, stale-while-revalidate and the cache store — 2026-10-22
 
 Measured on the same kind of 4-vCPU cloud Linux VM as the 1.4.0 section below (Intel Xeon @ 2.10 GHz, 15 GiB, Ubuntu 24.04.5),

@@ -10,6 +10,61 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Inertia.Net.Benchmarks;
 
 [MemoryDiagnoser]
+public class CacheWriteBenchmarks
+{
+    [Params(1024, 1048576)] public int PayloadBytes { get; set; }
+    private ServiceProvider _services = null!;
+    private InertiaPageWriter _writer = null!;
+    private string _value = null!;
+    private readonly PropCaching _caching = PropCaching.Create("large", TimeSpan.FromMinutes(1), null, null);
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _services = (ServiceProvider)BenchApp.CreateServices();
+        _writer = _services.GetRequiredService<InertiaPageWriter>();
+        _value = new string('x', PayloadBytes);
+    }
+
+    [Benchmark] public byte[] CreateEntry() => _writer.CreateCacheEntry(typeof(string), _value, null, _caching, "value", out _);
+
+    [GlobalCleanup] public void Cleanup() => _services.Dispose();
+}
+
+[MemoryDiagnoser]
+public class DictionaryPropsBenchmarks
+{
+    [Params(100, 1000)] public int Count { get; set; }
+    private ServiceProvider _services = null!;
+    private DefaultHttpContext _context = null!;
+    private InertiaProps _integers = null!;
+    private InertiaProps _strings = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _services = (ServiceProvider)BenchApp.CreateServices();
+        _context = BenchApp.CreateContext(_services, "/users", (InertiaHeaders.Inertia, "true"));
+        var integers = new Dictionary<int, InertiaProp>(Count);
+        var strings = new Dictionary<string, InertiaProp>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            var prop = Prop(() => 1);
+            integers[i] = prop;
+            strings[i.ToString(System.Globalization.CultureInfo.InvariantCulture)] = prop;
+        }
+
+        _integers = new InertiaProps { ["rows"] = integers };
+        _strings = new InertiaProps { ["rows"] = strings };
+    }
+
+    [Benchmark] public Task IntegerKeys() => Render(BenchApp.Component, _integers).ExecuteAsync(_context);
+    [Benchmark(Baseline = true)] public Task StringKeys() => Render(BenchApp.Component, _strings).ExecuteAsync(_context);
+
+    [GlobalCleanup] public void Cleanup() => _services.Dispose();
+}
+
+[MemoryDiagnoser]
 public class PayloadBenchmarks
 {
     [Params(20, 200, 2000)] public int PropCount { get; set; }

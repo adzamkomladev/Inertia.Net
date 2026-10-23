@@ -12,6 +12,7 @@ using System.Text.Unicode;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.ObjectPool;
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 namespace Inertia.Net;
@@ -23,6 +24,20 @@ internal sealed class InertiaPageWriter
 
     // The errors prop when there are none (the common case). Never mutated: the props walk only reads it.
     private static readonly InertiaProp NoErrors = Inertia.Always(new InertiaProps());
+
+    private static readonly ObjectPool<List<PropEntry>> EntryLists = new DefaultObjectPool<List<PropEntry>>(new EntryListPolicy());
+
+    private sealed class EntryListPolicy : PooledObjectPolicy<List<PropEntry>>
+    {
+        public override List<PropEntry> Create() => [];
+
+        public override bool Return(List<PropEntry> entries)
+        {
+            entries.Clear();
+            // Do not retain unusually large pages in the pool.
+            return entries.Capacity <= 1024;
+        }
+    }
 
     private readonly ConcurrentDictionary<Type, bool> _containsProps = new();
     private readonly ConcurrentDictionary<(JsonPropertyInfo Property, JsonNumberHandling? Handling), JsonTypeInfo> _propertySerializers = new();
@@ -105,6 +120,7 @@ internal sealed class InertiaPageWriter
     public async ValueTask<PooledBufferWriter> WritePageAsync(HttpContext httpContext, string component, object? props, InertiaRequest request, bool htmlSafe)
     {
         var buffer = new PooledBufferWriter(InitialCapacity(component));
+        var pooledEntries = EntryLists.Get();
         try
         {
             httpContext.RequestAborted.ThrowIfCancellationRequested();
@@ -112,7 +128,7 @@ internal sealed class InertiaPageWriter
                 ? SerializerOptions.GetTypeInfo(props.GetType()) : null;
             var feature = httpContext.Features.Get<InertiaFeature>();
             var sharedPropKeys = Options.ExposeSharedPropKeys ? new List<string>(Options.SharedProps.Count + 1 + (feature?.SharedProps?.Count ?? 0)) : null;
-            var entries = BuildProps(httpContext, feature, props, request, sharedPropKeys, out var hasDotKey);
+            var entries = BuildProps(httpContext, feature, props, request, sharedPropKeys, pooledEntries, out var hasDotKey);
             if (hasDotKey)
             {
                 entries = UnpackDotProps(entries);
@@ -173,6 +189,10 @@ internal sealed class InertiaPageWriter
         {
             buffer.Dispose();
             throw;
+        }
+        finally
+        {
+            EntryLists.Return(pooledEntries);
         }
     }
 
@@ -336,7 +356,7 @@ internal sealed class InertiaPageWriter
 
     // errors (always), then option shares, then request shares, then page props; later keys override earlier ones in place.
     // Synchronous, so the Set local function captures its locals in a stack struct instead of a heap closure.
-    private List<PropEntry> BuildProps(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<string>? sharedPropKeys, out bool dotKeys)
+    private List<PropEntry> BuildProps(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<string>? sharedPropKeys, List<PropEntry> entries, out bool dotKeys)
     {
         var propCount = props switch
         {
@@ -345,7 +365,7 @@ internal sealed class InertiaPageWriter
             _ => 16,
         };
         var sharedCapacity = 1 + Options.SharedProps.Count + (feature?.SharedProps?.Count ?? 0);
-        var entries = new List<PropEntry>(sharedCapacity + propCount);
+        entries.EnsureCapacity(sharedCapacity + propCount);
 
         // Page props come from one dictionary or object, so their keys are unique: a key can only collide with an earlier
         // errors/shared entry. Measurements favor indexing only for large pages with dozens of shared keys.
@@ -608,7 +628,7 @@ internal sealed class InertiaPageWriter
             throw new InvalidOperationException($"The cached prop at '{new string(path)}' resolved to an InertiaProp. Cache() needs a plain value.");
         }
 
-        var buffer = new ArrayBufferWriter<byte>(256);
+        using var buffer = new PooledBufferWriter(256);
         var scrollLength = CacheEntry.BeginProp(buffer, scroll);
         using (var writer = new Utf8JsonWriter(buffer, _htmlWriterOptions))
         {
@@ -624,6 +644,44 @@ internal sealed class InertiaPageWriter
 
         var (freshUntil, expiresAt) = Caching.Times(caching.Duration, caching.Expiration);
         return CacheEntry.EndProp(buffer, scroll, scrollLength, freshUntil, expiresAt, out prop);
+    }
+
+    internal readonly record struct RescuedCachedProp(Exception Exception);
+
+    // The claim lasts through storage, so a parallel loader publishes its value before another request can load the same key.
+    internal async ValueTask<object?> LoadCachedPropAsync(InertiaProp prop, CancellationToken cancellationToken)
+    {
+        var caching = prop.Caching!;
+        TaskCompletionSource completion;
+        while (!Caching.TryBeginFill(caching.StoreKey, out completion))
+        {
+            await completion.Task.WaitAsync(cancellationToken);
+            if (await Caching.GetPropAsync(caching, cancellationToken) is { } hit) return hit;
+        }
+
+        try
+        {
+            // Another fill may have finished between the caller's lookup and this claim.
+            if (await Caching.GetPropAsync(caching, cancellationToken) is { } hit) return hit;
+            cancellationToken.ThrowIfCancellationRequested();
+            object? value;
+            try
+            {
+                value = await prop.ResolveAsync(cancellationToken);
+            }
+            catch (Exception ex) when (prop.ShouldRescue && !(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
+            {
+                return new RescuedCachedProp(ex);
+            }
+
+            var entry = CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, caching.Key, out var stored);
+            await Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken);
+            return stored;
+        }
+        finally
+        {
+            Caching.EndFill(caching.StoreKey, completion);
+        }
     }
 
     internal void WritePlainValue(Utf8JsonWriter writer, object? value)
@@ -712,6 +770,8 @@ internal sealed class InertiaPageWriter
         var probe = info.CreateObject?.Invoke() as IDictionary;
         var defaultValue = info.ElementType is { IsValueType: true } valueType && Nullable.GetUnderlyingType(valueType) is null
             ? _defaultValues.GetOrAdd(valueType, CreateDefaultValue) : null;
+        using var buffer = new PooledBufferWriter(256);
+        using var writer = new Utf8JsonWriter(buffer);
         foreach (DictionaryEntry entry in dictionary)
         {
             if (probe is null)
@@ -722,8 +782,12 @@ internal sealed class InertiaPageWriter
 
             probe.Clear();
             probe.Add(entry.Key, defaultValue);
+            buffer.Reset();
+            writer.Reset(buffer);
+            JsonSerializer.Serialize(writer, probe, info);
+            writer.Flush();
             // The probe is {"key":value}: the second token is the key.
-            var reader = new Utf8JsonReader(JsonSerializer.SerializeToUtf8Bytes(probe, info));
+            var reader = new Utf8JsonReader(buffer.WrittenMemory.Span);
             reader.Read();
             reader.Read();
             keys[i++] = reader.GetString() ?? "";

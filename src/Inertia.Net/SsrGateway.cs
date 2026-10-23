@@ -186,17 +186,58 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             return new SsrRender(hit.Head, hit.Body);
         }
 
-        var render = await RenderOnServersAsync(mode, context.PageJson, _endpoints, _managed, http.RequestAborted);
-        return render is null ? null : await StoreAsync(key, duration, staleFor, render, http.RequestAborted);
+        return await FillRenderAsync(mode, context, key, duration, staleFor);
+    }
+
+    private async ValueTask<SsrRender?> FillRenderAsync(SsrMode mode, InertiaRootViewContext context, InertiaCacheKey key, TimeSpan duration, TimeSpan staleFor)
+    {
+        var http = context.HttpContext;
+        var started = Stopwatch.GetTimestamp();
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
+        deadline.CancelAfter(_ssr.Timeout);
+        TaskCompletionSource completion;
+        try
+        {
+            while (!_caching.TryBeginFill(key, out completion))
+            {
+                await completion.Task.WaitAsync(deadline.Token);
+                if (await _caching.GetRenderAsync(key, deadline.Token) is { } hit) return Cached(hit);
+            }
+
+            try
+            {
+                if (await _caching.GetRenderAsync(key, deadline.Token) is { } hit) return Cached(hit);
+                deadline.Token.ThrowIfCancellationRequested();
+                var remaining = _ssr.Timeout - Stopwatch.GetElapsedTime(started);
+                var render = await RenderOnServersAsync(mode, context.PageJson, _endpoints, _managed, http.RequestAborted,
+                    remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
+                return render is null ? null : await StoreAsync(key, duration, staleFor, render, http.RequestAborted);
+            }
+            finally
+            {
+                _caching.EndFill(key, completion);
+            }
+        }
+        catch (OperationCanceledException) when (!http.RequestAborted.IsCancellationRequested)
+        {
+            return Fail(mode, SsrFailure.Timeout, "timeout", "The SSR cache fill exceeded Ssr.Timeout.", null, null);
+        }
+
+        SsrRender Cached(CachedRender hit)
+        {
+            if (hit.IsStale) ScheduleRefresh(http, key, context.PageJson, duration, staleFor);
+            _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache");
+            return new SsrRender(hit.Head, hit.Body);
+        }
     }
 
     // Selects a server, fails over once on a refused connection, and reports the outcome by the page's SSR mode.
-    private async ValueTask<SsrRender?> RenderOnServersAsync(SsrMode mode, ReadOnlyMemory<byte> pageJson, SsrEndpoint[] endpoints, bool managed, CancellationToken aborted)
+    private async ValueTask<SsrRender?> RenderOnServersAsync(SsrMode mode, ReadOnlyMemory<byte> pageJson, SsrEndpoint[] endpoints, bool managed, CancellationToken aborted, TimeSpan? timeout = null)
     {
         using var activity = InertiaDiagnostics.ActivitySource.StartActivity("inertia.ssr");
         var started = Stopwatch.GetTimestamp();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(aborted);
-        deadline.CancelAfter(_ssr.Timeout);
+        deadline.CancelAfter(timeout ?? _ssr.Timeout);
         SsrEndpoint? failed = null;
         Attempt? previous = null;
         while (true)

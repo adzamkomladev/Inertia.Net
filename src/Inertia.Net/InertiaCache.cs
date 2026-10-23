@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
@@ -190,6 +189,7 @@ internal sealed partial class InertiaCaching
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<InertiaCacheKey, byte> _refreshing = new();
+    private readonly ConcurrentDictionary<InertiaCacheKey, TaskCompletionSource> _filling = new();
     private int _refreshCount;
     private long _nextFailureLog;
     private int _suppressedFailures;
@@ -257,6 +257,20 @@ internal sealed partial class InertiaCaching
     {
         var value = await GetAsync(key, cancellationToken);
         return value is not null && CacheEntry.TryReadRender(value, Now(), out var render) ? render : null;
+    }
+
+    /// <summary>Claims a missing entry, or returns the current fill to await before checking the store again.</summary>
+    public bool TryBeginFill(InertiaCacheKey key, out TaskCompletionSource completion)
+    {
+        var candidate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        completion = _filling.GetOrAdd(key, candidate);
+        return ReferenceEquals(completion, candidate);
+    }
+
+    public void EndFill(InertiaCacheKey key, TaskCompletionSource completion)
+    {
+        _filling.TryRemove(key, out _);
+        completion.SetResult();
     }
 
     /// <summary>Stores an entry while rendering: a failing store is logged and the page is still written. Ends a refresh of the key.</summary>
@@ -355,7 +369,7 @@ internal static class CacheEntry
     private const int HeaderSize = 18, LengthSize = 4;
 
     /// <summary>Reserves the header and writes the scroll metadata of a prop entry, whose length it returns; the value's JSON goes next.</summary>
-    public static int BeginProp(ArrayBufferWriter<byte> buffer, ScrollMetadata? scroll)
+    public static int BeginProp(PooledBufferWriter buffer, ScrollMetadata? scroll)
     {
         buffer.GetSpan(HeaderSize + LengthSize);
         buffer.Advance(scroll is null ? HeaderSize : HeaderSize + LengthSize);
@@ -374,13 +388,13 @@ internal static class CacheEntry
             writer.WriteEndObject();
         }
 
-        return buffer.WrittenCount - HeaderSize - LengthSize;
+        return buffer.WrittenMemory.Length - HeaderSize - LengthSize;
     }
 
     /// <summary>The finished prop entry, and the prop as the walk writes it.</summary>
-    public static byte[] EndProp(ArrayBufferWriter<byte> buffer, ScrollMetadata? scroll, int scrollLength, long freshUntil, long expiresAt, out CachedProp prop)
+    public static byte[] EndProp(PooledBufferWriter buffer, ScrollMetadata? scroll, int scrollLength, long freshUntil, long expiresAt, out CachedProp prop)
     {
-        var entry = buffer.WrittenSpan.ToArray();
+        var entry = buffer.WrittenMemory.ToArray();
         var jsonStart = HeaderSize;
         if (scroll is not null)
         {

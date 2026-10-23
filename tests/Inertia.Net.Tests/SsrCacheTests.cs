@@ -13,11 +13,14 @@ public sealed class SsrCacheTests
     {
         public int Calls;
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public Func<int, CancellationToken, Task>? BeforeSend;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var call = Interlocked.Increment(ref Calls);
+            if (BeforeSend is { } before) await before(call, cancellationToken);
             var json = $$"""{"head":["<title>SSR {{call}}</title>"],"body":"<div id=\"app\" data-server-rendered=\"true\">render {{call}}</div>"}""";
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
         }
     }
 
@@ -52,6 +55,13 @@ public sealed class SsrCacheTests
         return Harness.ExecuteAsync(context, result);
     }
 
+    private static Task<string> RenderAsync(Harness harness, CancellationToken cancellationToken)
+    {
+        var context = harness.Context();
+        context.RequestAborted = cancellationToken;
+        return Harness.ExecuteAsync(context, Render("Home", new InertiaProps { ["value"] = 1 }));
+    }
+
     [Fact]
     public async Task Without_a_duration_every_page_is_rendered()
     {
@@ -79,6 +89,171 @@ public sealed class SsrCacheTests
 
         time.Advance(TimeSpan.FromMinutes(2));
         Assert.Contains("render 3", await RenderAsync(harness), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Concurrent_misses_render_once_per_page_including_after_expiration()
+    {
+        var time = new FakeTimeProvider();
+        var (harness, handler) = Create(c => c.Duration = TimeSpan.FromMinutes(1), time);
+        for (var round = 1; round <= 2; round++)
+        {
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            handler.BeforeSend = (_, ct) => release.Task.WaitAsync(ct);
+            var requests = Enumerable.Range(0, 16).Select(_ => RenderAsync(harness)).ToArray();
+            try
+            {
+                Assert.Equal(round, handler.Calls);
+                Assert.All(requests, request => Assert.False(request.IsCompleted));
+            }
+            finally
+            {
+                release.TrySetResult();
+            }
+
+            var pages = await Task.WhenAll(requests).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.All(pages, page => Assert.Equal(pages[0], page));
+            Assert.Contains($"render {round}", pages[0], StringComparison.Ordinal);
+            Assert.Equal(round, handler.Calls);
+            time.Advance(TimeSpan.FromMinutes(2));
+        }
+    }
+
+    [Fact]
+    public async Task Cancelling_a_waiter_does_not_cancel_the_ssr_fill()
+    {
+        var (harness, handler) = Create(c => c.Duration = TimeSpan.FromMinutes(1));
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        handler.BeforeSend = (_, ct) => release.Task.WaitAsync(ct);
+        using var cancelled = new CancellationTokenSource();
+        var first = RenderAsync(harness);
+        var waiter = RenderAsync(harness, cancelled.Token);
+        try
+        {
+            await cancelled.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiter);
+            Assert.False(first.IsCompleted);
+            Assert.Equal(1, handler.Calls);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        Assert.Contains("render 1", await first, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_cancelled_ssr_fill_releases_the_waiting_request()
+    {
+        var (harness, handler) = Create(c => c.Duration = TimeSpan.FromMinutes(1));
+        handler.BeforeSend = async (call, ct) =>
+        {
+            if (call == 1) await Task.Delay(Timeout.Infinite, ct);
+        };
+        using var cancelled = new CancellationTokenSource();
+        var first = RenderAsync(harness, cancelled.Token);
+        var second = RenderAsync(harness);
+        await cancelled.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+        Assert.Contains("render 2", await second.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal(2, handler.Calls);
+    }
+
+    [Theory]
+    [InlineData(SsrMode.Preferred)]
+    [InlineData(SsrMode.Required)]
+    public async Task A_failed_ssr_fill_releases_the_waiting_request(SsrMode mode)
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new CountingHandler
+        {
+            BeforeSend = async (call, ct) =>
+            {
+                if (call != 1) return;
+                await release.Task.WaitAsync(ct);
+                throw new HttpRequestException("renderer unavailable");
+            },
+        };
+        var harness = new Harness(o =>
+        {
+            o.Ssr.Mode = mode;
+            o.Ssr.Cache.Duration = TimeSpan.FromMinutes(1);
+        }, configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
+        var first = RenderAsync(harness);
+        var second = RenderAsync(harness);
+        release.SetResult();
+        if (mode == SsrMode.Required)
+        {
+            await Assert.ThrowsAsync<InertiaSsrException>(() => first);
+        }
+        else
+        {
+            Assert.DoesNotContain("data-server-rendered", await first, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("render 2", await second.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal(2, handler.Calls);
+    }
+
+    [Theory]
+    [InlineData(SsrMode.Preferred)]
+    [InlineData(SsrMode.Required)]
+    public async Task Waiting_for_an_ssr_fill_obeys_the_render_deadline(SsrMode mode)
+    {
+        var handler = new CountingHandler();
+        var harness = new Harness(o =>
+        {
+            o.Ssr.Mode = mode;
+            o.Ssr.Timeout = TimeSpan.FromMilliseconds(50);
+            o.Ssr.Cache.Duration = TimeSpan.FromMinutes(1);
+        }, configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
+        var cache = harness.Services.GetRequiredService<InertiaCaching>();
+        var key = InertiaCaching.SsrKey("{}"u8);
+        Assert.True(cache.TryBeginFill(key, out var completion));
+        var renderer = harness.Services.GetRequiredService<IInertiaSsrRenderer>();
+        var context = new InertiaRootViewContext(harness.Context(), "Home", "app.html", new Dictionary<string, object?>(), "{}"u8.ToArray(), "app");
+        try
+        {
+            if (mode == SsrMode.Required)
+            {
+                var error = await Assert.ThrowsAsync<InertiaSsrException>(() => renderer.RenderAsync(context).AsTask());
+                Assert.Equal("timeout", error.Type);
+            }
+            else
+            {
+                Assert.Null(await renderer.RenderAsync(context));
+            }
+
+            Assert.Equal(0, handler.Calls);
+        }
+        finally
+        {
+            cache.EndFill(key, completion);
+        }
+
+        using var retry = await renderer.RenderAsync(context);
+        Assert.NotNull(retry);
+        Assert.Equal(1, handler.Calls);
+    }
+
+    [Fact]
+    public async Task A_cached_render_timeout_still_counts_as_a_server_failure()
+    {
+        var handler = new CountingHandler { BeforeSend = (_, ct) => Task.Delay(Timeout.Infinite, ct) };
+        var harness = new Harness(o =>
+        {
+            o.Ssr.Mode = SsrMode.Preferred;
+            o.Ssr.Timeout = TimeSpan.FromMilliseconds(100);
+            o.Ssr.Cache.Duration = TimeSpan.FromMinutes(1);
+            o.Ssr.CircuitBreaker.FailureThreshold = 1;
+        }, configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
+
+        await RenderAsync(harness);
+        var gateway = harness.Services.GetRequiredService<SsrGateway>();
+        Assert.Equal(SsrCircuitState.Open, gateway.Endpoints[0].Breaker.State);
+        await RenderAsync(harness);
+        Assert.Equal(1, handler.Calls);
     }
 
     [Fact]
