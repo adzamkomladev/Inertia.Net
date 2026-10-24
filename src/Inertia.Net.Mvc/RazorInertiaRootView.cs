@@ -14,11 +14,14 @@ internal sealed class RazorInertiaRootView(IActionResultExecutor<ViewResult> exe
     private static readonly object ContextKey = new();
     private static readonly object SsrKey = new();
 
+    // Shared: the provider caches the metadata it builds, so one per render rebuilt the model's metadata on every render.
+    private static readonly EmptyModelMetadataProvider MetadataProvider = new();
+
     public async ValueTask RenderAsync(InertiaRootViewContext context)
     {
         var http = context.HttpContext;
         http.Items[ContextKey] = context;
-        var viewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) { Model = context };
+        var viewData = new ViewDataDictionary(MetadataProvider, new ModelStateDictionary()) { Model = context };
         foreach (var (key, value) in context.ViewData)
         {
             viewData[key] = value;

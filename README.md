@@ -8,6 +8,7 @@ Inertia.Net **1.5.1** is a .NET 10 server adapter for the **Inertia.js v3** prot
 
 - [How it works](#how-it-works)
 - [Start a new app](#start-a-new-app)
+- [Sample apps](#sample-apps)
 
 1. [Overview and feature matrix](#overview-and-feature-matrix)
 2. [Installation](#installation)
@@ -99,6 +100,18 @@ dotnet watch
 Open [http://localhost:5180](http://localhost:5180). Browse through ASP.NET Core; Vite supplies the frontend assets and hot reload.
 
 For a production build, run `npm run build`, then `dotnet publish -c Release`. Deploy the built frontend assets with the published app. SSR is optional and requires a Node server at runtime; ordinary client rendering does not.
+
+## Sample apps
+
+[Inertia.Net-Samples](https://github.com/adzamkomladev/Inertia.Net-Samples) has five .NET 10 apps built with Inertia.Net, from basic page rendering to a cache shared across replicas. The three main ones run as live demos:
+
+| App | What it is | Frontend | Database | Source | Live demo |
+|---|---|---|---|---|---|
+| Inkwell | Multi-user publishing platform with feeds, search, analytics and live notifications | React | SQLite | [samples/Inkwell](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/Inkwell) | [inkwell.yebi.africa](https://inkwell.yebi.africa) |
+| TechLandier | Electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | [samples/TechLandier](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/TechLandier) | [techlandier.yebi.africa](https://techlandier.yebi.africa) |
+| CarParker | Parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | [samples/CarParker](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/CarParker) | [carparker.yebi.africa](https://carparker.yebi.africa) |
+
+The other two, CarParkerReplicas and TechLandierDistributed, run CarParker and TechLandier across replicas and run locally only. Each sample's README lists its demo logins and how to run it.
 
 ## Overview and feature matrix
 
@@ -679,6 +692,7 @@ return Render("Dashboard", new InertiaProps
 - At most `InertiaOptions.Props.MaxConcurrency` loaders run at once per render (default 4): `builder.Services.AddInertia(o => o.Props.MaxConcurrency = 8);`
 - Top-level props and props inside literal objects (`InertiaProps` and other string-keyed dictionaries) start early. Elsewhere they resolve in turn.
 - Loaders of props that aren't part of the response (partial reloads, deferred or optional props on the first visit) never start.
+- Pages without parallel props skip the work of finding them. A component remembers whether its renders have parallel props. If it was first rendered without them and later gets some, that one render resolves them in turn, and every later render starts them early.
 - If a loader fails, the others are cancelled and awaited, and the render fails with the first failure in prop order. `Rescue()`d props fail alone, as usual.
 
 **DbContext and HttpContext:** a parallel loader must not use the request's `DbContext` or other non-thread-safe scoped services, and must not touch `HttpContext`. EF Core throws "A second operation was started on this context instance…". Give each loader its own context through `IDbContextFactory<T>` or its own scope:

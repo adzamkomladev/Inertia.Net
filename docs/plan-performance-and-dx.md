@@ -1,7 +1,9 @@
 # Performance and developer-experience plan (research, October 2026)
 
 Status: phases 1 to 4 are implemented in 1.4.0 (see the [changelog](../CHANGELOG.md) and [upgrade notes](migrating-to-1.4.md)); early
-hints (3.7) and the "Later" items remain open. Where the shipped design differs from this plan:
+hints (3.7) and the "Later" items remain open. [Section 3b](#3b-remaining-allocation-and-cpu-work-research-2026-10-24) adds the
+remaining allocation, CPU and parallel-props work found in a later review; items 1-7, P1 and P2 are implemented. Where the shipped design differs
+from this plan:
 
 - **TypeScript (4.3)** does not go through OpenAPI. `o.TypeScript` writes the declarations directly from the app's JSON contracts at
   startup in Development, which needs no npm generator or mapping script and also types the shared props and `InertiaConfig`.
@@ -168,6 +170,180 @@ A `103 Early Hints` response with `Link: </build/assets/app.js>; rel=moduleprelo
 (dotnet/aspnetcore#27851, open since 2020, now in the .NET 12 planning milestone; the workaround in that issue writes to the transport
 directly and does not work on IIS or HTTP.sys). Track the issue; implement `o.EarlyHints = true` when it ships.
 
+## 3b. Remaining allocation and CPU work (research, 2026-10-24)
+
+Status: items 1-7 (3b.2), P1 and P2 (3b.4) are implemented and measured in
+[RESULTS.md](../tests/Inertia.Net.Benchmarks/RESULTS.md) (2026-10-24); items 8-10, P3's BenchmarkDotNet rows and P4 remain research.
+Every item is gated on the measurements named with it, and a change that
+does not show a clear allocation drop or a paired-latency interval that excludes zero is not kept.
+
+### 3b.1 Method and starting point
+
+The checklist was EgorBo's [BlazingFastDotnet skill](https://raw.githubusercontent.com/EgorBo/BlazingFastDotnet/main/SKILL.md),
+without its runtime, GC and environment configuration sections, which are the app's choice, not a library's. The code already
+follows most of the skill's code-level items:
+
+- Ordinal comparisons everywhere, `[LoggerMessage]` logging, and `SearchValues` for the CSP nonce check.
+- `stackalloc` SHA-256, span-based header parsing and path matching, and `u8` literals for the root element markup.
+- A pooled page buffer (`PooledBufferWriter`) sized from each component's recent page size, and a pooled top-level entry list.
+- Pooled `PropEntry[]` and `char[]` path buffers, and source-generated STJ metadata passed as `JsonTypeInfo` to every `Serialize`.
+- Cached delegates, and static lambdas with state where a callback is registered.
+
+The starting point is v1.5.1 ([RESULTS.md](../tests/Inertia.Net.Benchmarks/RESULTS.md), paired Linux run):
+
+| Workload | Allocated | Time |
+|---|---:|---:|
+| JSON, 20 mixed props | 2,152 B | 75.1 µs |
+| Partial reload, 2 of 20 | 984 B | 31.9 µs |
+| HTML + Vite tags, 20 props | 2,216 B | 77.9 µs |
+| Reference: plain STJ of the same page | 312 B | 39.4 µs |
+
+What is left is a short list of per-request allocations, one measured CPU cost on pages without parallel props, and two
+experiments. Every benchmark fixture's loader completes synchronously, so the allocations of a walk that actually awaits I/O (any
+real page that queries a database) are not measured today; 3b.3 item 9 adds that fixture first.
+
+How each item is measured, from `tests/Inertia.Net.Benchmarks`:
+
+- `--render-probe`, `--cache-probe`, `--ssr-probe` and `--mvc-probe` give exact bytes per request, before and after.
+- `--paired-latency` gives timing claims, counterbalanced in one process.
+- `--check` output, diffed before and after, proves the JSON and HTML bytes are unchanged.
+- `dotnet build -warnaserror` and the full test run, as in `AGENTS.md`. The AOT smoke test is Linux only.
+
+### 3b.2 Certain allocation wins (S each)
+
+1. **Reuse the `PropsWriter` and its `Utf8JsonWriter`.** `InertiaPageWriter.WritePageAsync` (lines 137-138) creates a JSON writer
+   and a props walker for every render. The skill's ASP.NET item is exactly this: reuse the writer through `Reset(IBufferWriter)`.
+   - Pool `PropsWriter` per page-writer singleton with a `DefaultObjectPool`, like `EntryLists` (lines 28-40). It keeps its
+     `char[]` path and two lazily created writers (JSON and HTML-safe options), and calls `writer.Reset(buffer)` per render.
+   - On return, set the per-render collections (`_mergeProps`, `_deferredProps`, `_scrollProps`, `_onceProps`, `_uncommon`,
+     `_planner`) and `_request` to null so no request data is retained. `writer.Reset()` drops the buffer reference.
+   - Expected: about 200-300 B on every render. Tests: two sequential renders with different metadata produce the same JSON as
+     fresh instances, and a render that throws mid-walk leaves the next one clean (`PageWriterTests`).
+2. **Drop the `sharedPropKeys` list.** `ExposeSharedPropKeys` defaults to true, so line 130 allocates a `List<string>` on every
+   render. `BuildProps` (lines 411-418) also scans it with `Contains` and takes a substring for dotted keys.
+   - Add `bool Shared` to `PropEntry` (`PropsWriter.cs` line 13). `Set` marks shared entries, an override keeps the mark, and
+     `UnpackDotProps` carries it onto the top-level entry it creates. `WriteMetadata` then walks the entry list, which is still
+     alive at that point.
+   - Expected: the list and its growth, about 100 B. Tests pin the order and dedupe with a dotted shared key and an overridden
+     shared key.
+3. **Write the page `url` in segments.** `GetUrl` (lines 351-355) concatenates path base, path and query on every render. Write
+   the three parts with `Utf8JsonWriter.WriteStringValueSegment(ReadOnlySpan<char>, isFinalSegment)` (.NET 10), keeping the
+   `"/"` fallback and the `UrlResolver` branch. Expected: one URL-length string per render.
+4. **Stop boxing the `partial` metric tag.** `InertiaMetrics.RecordPage` (line 62) boxes a `bool` per render while the duration
+   histogram is enabled. Two cached boxes remove it.
+5. **Precompute the SSR bundle path.** `SsrGateway.RenderAsync` (line 151) runs `Path.Combine` on every server-rendered request.
+   `BundlePath` is fixed after startup, so compute the full path in the constructor.
+6. **Vite tag lookup without `string.Join`.** `ViteAssets.RenderTagsUtf8` (line 82) joins the entries for its cache key on every
+   HTML render, which allocates for two or more entries. Store the joined key on the Vite segment when the template is parsed, and
+   pass it to an internal overload. The public `RenderTags` and the MVC tag helper keep computing or caching it themselves.
+7. **MVC root view.** `RazorInertiaRootView` (line 21) builds a new `EmptyModelMetadataProvider` per render; inject
+   `IModelMetadataProvider` instead. `Utf8HtmlContent.Write` (line 25) creates a `Decoder` per write; a `[ThreadStatic]` decoder
+   with `Reset()` removes it. Measured with `--mvc-probe`.
+
+### 3b.3 Experiments (M each; keep only on a measured gain)
+
+8. **Primitive leaf fast path.** `PropsWriter.WriteValueAsync` (lines 453-477) does a type-info lookup, a `ContainsProps` lookup
+   and a `JsonSerializer.Serialize` call for every leaf value. This is most of the gap between the 75 µs render and the 39 µs
+   plain-STJ reference.
+   - Write `string`, integers, `bool`, `double`, `decimal`, `DateTime(Offset)` and `Guid` straight to the writer when the type's
+     converter is the built-in one, for example `ReferenceEquals(info.Converter, JsonMetadataServices.StringConverter)`, and no
+     number handling asks for strings. Short-circuit `ContainsProps` for those types.
+   - Output must stay byte-identical. Tests cover a custom `string` converter and `JsonNumberHandling.WriteAsString`, where the
+     fast path must step aside. The plain-STJ reference is the paired-probe control.
+9. **Pool the async state machines of a suspended walk.** When a loader really awaits, every frame from `WritePageAsync` down to
+   `InertiaProp<T>.ResolveAsync` (`InertiaProp.cs` line 246) boxes its state machine, about six objects per suspension.
+   - First add a render fixture whose deferred or lazy loader yields (`await Task.Yield()`), at the top level and two levels deep,
+     and record it. Then apply `PoolingAsyncValueTaskMethodBuilder` to the recursive `async ValueTask` methods.
+   - Keep it only if allocation drops and paired time is not worse: the pooling builder costs a little per call and retains boxes
+     per thread.
+10. **Nonce tags without new arrays.** With a CSP nonce, `TagSet.With` (`ViteAssets.cs` lines 344-367) allocates the attribute
+    string, its bytes and a result array per HTML request. The root view can write the parts and the attribute straight to the
+    response instead. The MVC tag helper keeps the byte form. Only nonce users benefit, so this one comes last.
+
+### 3b.4 Parallel props and concurrent requests
+
+`Parallel()` (`InertiaProp.cs` lines 127-137) sets a process-wide `ParallelUsed` flag. From then on, every render of every page
+runs the planning walk (`PropsWriter.cs` lines 100-175) before the real walk. The planner's limit, `MaxConcurrency` (default 4),
+applies per render. The walk's cost on pages without parallel props has been measured with no fix applied (RESULTS.md,
+"Latency measurements and planner experiments"); the two pruning attempts there did not help:
+
+| Page without parallel props | Walk cost |
+|---|---:|
+| Mixed JSON | 2.9% |
+| 20 nested fields | 4.7% |
+| 2,000 nested fields | 9.7% |
+
+- **P1. Per-component hints instead of the global flag (M).** This is the largest CPU item in this section.
+  - Replace `_sizeHints` (`InertiaPageWriter.cs` lines 47, 200-220) with a per-component record that holds both the size hint and
+    `UsesParallel`.
+  - A component with no record, or one marked as using parallel props, is planned. The mark is set by the first render (whether it
+    met a parallel prop) and only ever turns on: a walk that meets a parallel prop while unplanned sets it, and that one render resolves
+    the prop in turn, still correctly; the next render starts it early. A partial reload that filters the prop out never turns planning
+    off, so the mark cannot flip back and forth. The README's parallel section documents the one-render lag.
+  - Pages that never use `Parallel()` pay nothing after their first render. The size hint becomes a field write on the record
+    instead of a `ConcurrentDictionary` set per render, which removes the only per-render write to shared dictionary state.
+  - Tests: `ParallelPropsTests` must pass unchanged. Add a component rendered first without and then with a parallel prop, and a
+    check that the hint table stays bounded.
+- **P2. A slimmer `PropsPlanner` (S).** Each render with parallel props allocates the planner, a linked token source, a
+  `SemaphoreSlim`, a list, a dictionary, one `Planned` per prop and one `Task` per loader (`PropsPlanner.cs` lines 19-24, 41-43,
+  119).
+  - Create the semaphore only when more props are planned than `MaxConcurrency`. Two or three parallel props is the common case,
+    so the gate is usually never needed.
+  - Replace the `_pending` dictionary with a scan of the short `_planned` list, and use an unlinked token source when the request
+    token cannot be cancelled.
+  - Optionally, keep a synchronously completed result on `Planned` instead of a completed `Task`.
+  - Expected: roughly 300-500 B per parallel render, measured with the "20 tiny loaders, parallel" benchmark. Tests: more loaders
+    than `MaxConcurrency`, and fewer.
+- **P3. Record the parallel rows (S).** `ParallelPropsBenchmarks` has no row in RESULTS.md. Add it, the `--planner-cost` probe,
+  and `TinyParallel` and `SlowParallel3` to `PairedLatencyProbe.Methods`, so P1 and P2 are visible from release to release.
+- **P4. Shared-state writes under load (audit).** These are the per-request writes to shared state, the skill's contention list:
+  - `_sizeHints`: fixed by P1.
+  - `EntryLists`, plus the second pool from 3b.2 item 1: one compare-and-swap or queue operation on each get and return. This is
+    tens of nanoseconds against a 10-75 µs render.
+    - Check it with the Kestrel `--load` probe (concurrency 1, 32 and 128; requests per second and p99) on the largest machine
+      available before changing anything.
+    - If it shows, use a `[ThreadStatic]` one-item slot per pool with a lower capacity cap.
+  - SSR round robin and in-flight counters, and the slot limiter's lock: they cost little next to a render that takes
+    milliseconds.
+  - `IMemoryCache` hits update the entry's last-access time, which the store does on every hit. Note only.
+  - Everything else is a read of shared caches and scales. There is no sync-over-async on the request path.
+
+Not in this section:
+
+- Starting parallel props early when they are nested in POCOs or arrays. That is a documented feature limit, not a defect.
+- A process-wide bound on parallel loaders: today N requests × `MaxConcurrency` can reach a database at once. That is a feature
+  request.
+
+### 3b.5 Investigated and not pursued
+
+- **The partial-reload header lists** (`InertiaRequest`): `Only`, `Except` and `Reset` are public `string[]?`, so ranges over the
+  header would change the API.
+- **The SSR cache key's hex string**: `InertiaCacheKey.Value` is a public string.
+- **Boxed value-type loader results, POCO member boxing and non-generic collection walks**: they are inherent to the `object?`
+  walk. A generic rewrite is a different project.
+- **The middleware's write tracker** (48 B per Inertia request): the empty-response rule needs it.
+- **Streaming the page JSON**: rejected in 2.3.
+- **`FrozenDictionary` for the Vite manifest**: tags are pre-rendered per entry set, and the chunk dictionary is read only on a
+  miss.
+- **The boxed key per memory-store lookup** (24 B): `IMemoryCache` keys are objects. Caching a boxed key per prop only helps
+  handlers that keep their props across requests.
+
+### 3b.6 Order and sources
+
+Suggested order:
+
+1. Baseline probes on `main`.
+2. Items 1-7.
+3. P1 and P2, with the P3 rows recorded alongside.
+4. The suspending fixture, then item 9.
+5. Item 8.
+6. Item 10.
+
+Each lands with its RESULTS.md rows and the regression tests named above. Sources: the skill above; the .NET API docs for
+[`Utf8JsonWriter.WriteStringValueSegment`](https://learn.microsoft.com/dotnet/api/system.text.json.utf8jsonwriter.writestringvaluesegment),
+[`PoolingAsyncValueTaskMethodBuilder`](https://learn.microsoft.com/dotnet/api/system.runtime.compilerservices.poolingasyncvaluetaskmethodbuilder)
+and [`JsonMetadataServices`](https://learn.microsoft.com/dotnet/api/system.text.json.serialization.metadata.jsonmetadataservices).
+
 ## 4. Developer-experience work
 
 ### 4.1 CSP nonce (S)
@@ -255,6 +431,7 @@ OpenAPI document carries the extension and schema; a sample `tsc --noEmit` step 
 | 3 | 4.4 pages check, 4.3 OpenAPI types, 4.6 templates | The onboarding story. |
 | 4 | 4.2 DevTools | Largest item; worth doing once the metadata from 4.4 can feed `componentPath`. |
 | Later | 3.7 early hints, 4.4 generator, .NET 11 runtime-async, distributed caches | Blocked on the platform or on demand. |
+| Later | 3b items 8-10, P3 (BenchmarkDotNet rows) and P4 | Researched, each gated on its measurement; not yet scheduled. |
 
 Every phase keeps the rules in `AGENTS.md`: regression tests in the existing projects, `docs/protocol.md` untouched (none of this changes
 the wire format), AOT smoke green, and new benchmark rows in `tests/Inertia.Net.Benchmarks/RESULTS.md` for 3.1 to 3.4.

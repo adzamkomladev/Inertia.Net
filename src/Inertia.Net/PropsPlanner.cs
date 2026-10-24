@@ -7,20 +7,23 @@ namespace Inertia.Net;
 /// <see cref="InertiaPropsOptions.MaxConcurrency"/> at a time. The walk still writes values and collects metadata in protocol order;
 /// it takes each started task instead of calling the loader. One instance per render that has parallel props.
 /// </summary>
+/// <remarks>
+/// A render plans a handful of props, so they are found by a scan of the planned list (only parallel props are ever planned), and the
+/// concurrency gate exists only when more props are planned than may run at once.
+/// </remarks>
 internal sealed class PropsPlanner : IDisposable
 {
     private readonly CancellationTokenSource _cancellation;
     private readonly InertiaPageWriter _owner;
-    private readonly SemaphoreSlim _gate;
     private readonly List<Planned> _planned = [];
-    private readonly Dictionary<InertiaProp, Planned> _pending = new(ReferenceEqualityComparer.Instance);
+    private SemaphoreSlim? _gate;
+    private int _startable; // planned props that are not duplicates
     private volatile bool _failed;
 
     public PropsPlanner(InertiaPageWriter owner, CancellationToken requestAborted)
     {
         _owner = owner;
-        _cancellation = CancellationTokenSource.CreateLinkedTokenSource(requestAborted);
-        _gate = new SemaphoreSlim(owner.Options.Props.MaxConcurrency, owner.Options.Props.MaxConcurrency);
+        _cancellation = requestAborted.CanBeCanceled ? CancellationTokenSource.CreateLinkedTokenSource(requestAborted) : new CancellationTokenSource();
     }
 
     /// <summary>A started loader failed without being rescued; the others were cancelled and the render fails.</summary>
@@ -32,26 +35,35 @@ internal sealed class PropsPlanner : IDisposable
     /// </summary>
     public void Add(InertiaProp prop, Task<CachedProp?>? lookup = null)
     {
-        if (_pending.TryGetValue(prop, out var existing))
+        if (Find(prop) is { } existing)
         {
-            existing.Duplicate = true;
+            if (!existing.Duplicate)
+            {
+                existing.Duplicate = true;
+                _startable--;
+            }
+
             return;
         }
 
-        var planned = new Planned(prop) { Lookup = lookup };
-        _pending.Add(prop, planned);
-        _planned.Add(planned);
+        _planned.Add(new Planned(prop) { Lookup = lookup });
+        _startable++;
     }
 
     /// <summary>Starts every planned loader; the ones beyond the concurrency limit wait for a slot in order.</summary>
     public void Start()
     {
+        var max = _owner.Options.Props.MaxConcurrency;
+        if (_startable > max)
+        {
+            _gate = new SemaphoreSlim(max, max);
+        }
+
         foreach (var planned in _planned)
         {
             if (planned.Duplicate)
             {
-                _pending.Remove(planned.Prop);
-                continue;
+                continue; // resolves at each of its paths instead
             }
 
             planned.Task = RunAsync(planned);
@@ -59,19 +71,37 @@ internal sealed class PropsPlanner : IDisposable
     }
 
     /// <summary>Whether <paramref name="prop"/> has a started task the walk has not taken yet.</summary>
-    public bool IsPlanned(InertiaProp prop) => _pending.ContainsKey(prop);
+    public bool IsPlanned(InertiaProp prop) => Started(prop) is not null;
 
     /// <summary>The started loader of <paramref name="prop"/>, handed out once.</summary>
     public bool TryTake(InertiaProp prop, out Task<object?> task)
     {
-        if (_pending.Remove(prop, out var planned) && planned.Task is { } started)
+        if (Started(prop) is { } planned)
         {
-            task = started;
+            planned.Taken = true;
+            task = planned.Task!;
             return true;
         }
 
         task = null!;
         return false;
+    }
+
+    // A prop added twice resolves at each of its paths instead (its one entry is marked Duplicate and never started).
+    private Planned? Started(InertiaProp prop) =>
+        prop.IsParallel && Find(prop) is { Duplicate: false, Taken: false, Task: not null } planned ? planned : null;
+
+    private Planned? Find(InertiaProp prop)
+    {
+        foreach (var planned in _planned)
+        {
+            if (ReferenceEquals(planned.Prop, prop))
+            {
+                return planned;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -113,7 +143,7 @@ internal sealed class PropsPlanner : IDisposable
     public void Dispose()
     {
         _cancellation.Dispose();
-        _gate.Dispose();
+        _gate?.Dispose();
     }
 
     private async Task<object?> RunAsync(Planned planned)
@@ -124,7 +154,12 @@ internal sealed class PropsPlanner : IDisposable
             return hit;
         }
 
-        await _gate.WaitAsync(cancellationToken);
+        var gate = _gate;
+        if (gate is not null)
+        {
+            await gate.WaitAsync(cancellationToken);
+        }
+
         try
         {
             return await (planned.Prop.Caching is null
@@ -141,7 +176,7 @@ internal sealed class PropsPlanner : IDisposable
         }
         finally
         {
-            _gate.Release();
+            gate?.Release();
         }
     }
 
@@ -168,5 +203,7 @@ internal sealed class PropsPlanner : IDisposable
         public ExceptionDispatchInfo? Failure { get; set; }
 
         public bool Duplicate { get; set; }
+
+        public bool Taken { get; set; }
     }
 }

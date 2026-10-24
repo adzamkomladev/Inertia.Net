@@ -1,5 +1,98 @@
 # Inertia.Net benchmark results
 
+## Render allocations and parallel props after v1.5.1 - 2026-10-24
+
+This section covers [plan section 3b](../../docs/plan-performance-and-dx.md#3b-remaining-allocation-and-cpu-work-research-2026-10-24),
+items 1-7, P1 and P2. The baseline is commit `03a25e1` (v1.5.1 plus documentation); the current build is that commit with these changes.
+No public API, wire format or Native AOT annotation changed.
+
+What changed:
+
+- **Pooled props walker.** The props walker and its `Utf8JsonWriter` are pooled per page writer and reset for each render. Every
+  per-render collection, the request headers and the planner are cleared on return, and a path buffer over 1,024 characters is not kept.
+- **No `sharedProps` list.** Shared props are always the first entries of the prop list, so their keys are written from there. Dotted
+  keys are listed once by their top-level key, in the same order as before.
+- **Segmented `url`.** Path base, path and query are written as segments of one JSON string instead of being concatenated first.
+- **Smaller items.** The `inertia.partial` metric tag no longer boxes a bool. The SSR bundle path is combined once. The Vite tag cache
+  key is built once per template or tag-helper attribute. The MVC root view reuses one `EmptyModelMetadataProvider`, and its HTML
+  writer reuses one UTF-8 decoder per thread.
+- **P1: per-component parallel hints.** The page-size hint table now also records whether a component's renders have parallel props.
+  A component known to have none skips the planning walk, even after other pages in the app used `Parallel()`. The mark only ever
+  turns on, so a component that gets parallel props after a render without them resolves them in turn for one render. The README
+  documents this.
+- **P2: slimmer planner.** The concurrency semaphore is created only when more props are planned than `MaxConcurrency`. Planned props
+  are found by a scan of the planned list instead of a dictionary, and the token source is linked only when the request token can be
+  cancelled.
+
+### Allocation
+
+`--render-probe`, three repetitions per build; every repetition agreed exactly:
+
+| Workload | Before B/op | After B/op | Change |
+|---|---:|---:|---:|
+| JSON, 20 mixed props | 2,152 | 1,736 | −19.3% |
+| Typed POCO page | 1,968 | 1,552 | −21.1% |
+| Partial reload, 2 of 20 | 984 | 568 | −42.3% |
+| HTML + Vite tags, 20 props | 2,216 | 1,800 | −18.8% |
+
+`--mvc-probe`: the `<inertia />` body written through `IHtmlContent` fell from 80 B to 24 B per render (the content object alone), at
+2 KiB and 1 MiB pages alike. One 1 MiB repetition read 3 B because of counter granularity.
+
+### Paired timing
+
+The fixtures and the two builds were identical across two `--memory-comparison` runs: separate assembly contexts, warmed, 32
+alternating rounds per run. Medians of within-round ratios, with percentile-bootstrap 95% intervals from 5,000 resamples. The paired
+fixture forces `ParallelUsed` on, as an app that uses `Parallel()` anywhere would. Its JSON, partial and HTML rows use their own
+component state, so P1 applies to them. The nested and cached rows share a component with the parallel fixtures, so they keep planning.
+
+| Workload | Before B/op | After B/op | Run 1 time change | Run 2 time change |
+|---|---:|---:|---:|---:|
+| Json20 | 2,152 | 1,736 | +0.8% (−6.8% to +4.8%) | −5.7% (−10.1% to +3.0%) |
+| Partial2Of20 | 984 | 568 | −7.5% (−12.3% to −4.5%) | −9.8% (−15.2% to −5.3%) |
+| Html20 | 2,216 | 1,800 | +3.1% (−1.0% to +17.2%) | +0.1% (−8.4% to +10.6%) |
+| ReferenceSerialize (control) | 312 | 312 | +0.9% (−5.3% to +7.5%) | +1.1% (−2.7% to +4.2%) |
+| ConstructProps (control) | 4,232 | 4,232 | +0.1% (−2.5% to +3.0%) | +6.7% (+1.2% to +14.5%) |
+| Nested20 | 568 | 152 | −6.3% (−12.5% to +5.8%) | −5.8% (−11.0% to −1.3%) |
+| Nested2000 | 568 | 152 | −4.3% (−7.9% to +5.5%) | +11.0% (−3.0% to +17.9%) |
+| ParallelCacheHit1 | 584 | 168 | −0.0% (−2.0% to +2.5%) | +2.1% (−5.4% to +5.9%) |
+| ParallelCacheHit32 | 2,104 | 1,688 | +2.4% (−3.9% to +11.8%) | −1.4% (−9.6% to +10.0%) |
+| TinyParallel20 (new) | 6,496 | 3,992 | −7.1% (−9.3% to −3.6%) | −14.1% (−23.9% to −6.0%) |
+| YieldParallel3 (new) | 2,734-2,800 | 1,980-2,072 | −15.5% (−17.8% to −10.7%) | −6.2% (−17.4% to −1.6%) |
+| ColdBurst32 (per burst) | 86,136 | 74,232 | +0.6% (−0.6% to +1.7%) | +0.1% (−1.2% to +1.4%) |
+| IntegerKeys1000 | 177,008 | 176,592 | +1.5% (−3.2% to +10.0%) | −6.1% (−16.1% to +2.4%) |
+
+The cache-write rows are unchanged code and are omitted; their large-entry allocation varies with the array pool, as noted below.
+`TinyParallel20` renders 20 parallel loaders that complete at once, which measures the planner's own cost. `YieldParallel3` renders
+three parallel loaders that yield, so the walk awaits started tasks; its allocation varies a little between runs because of thread-pool
+work items.
+
+Allocation drops in every render row. Partial reloads and both parallel fixtures are faster in both runs, with intervals that exclude
+zero. JSON and HTML rendering show no clear change in either run. The ConstructProps control runs no changed code and still moved
++6.7% in run 2, and Nested2000 moved −4.3% and then +11.0%. Paired differences under about 10% are therefore not resolvable on this
+host. These results do not establish the 2.9-9.7% planner saving measured earlier on a pinned Linux CPU, and they do not rule it out.
+
+Environment: Windows 11 (10.0.26300), Intel Core i5-8265U (4 cores, 8 threads, laptop), SDK 10.0.402, .NET 10.0.13. Not pinned to a
+CPU, and not run under Linux or WSL.
+
+Tests:
+
+- The Release build passed with `-warnaserror`.
+- 1,016 of 1,017 tests passed. The one failure is `SsrNodeProcessTests.Several_instances_share_the_renders_and_cover_for_each_other`,
+  the process-failover assertion recorded below. It also failed 3 of 3 times on the unchanged baseline commit on this machine.
+- New tests cover dotted and overridden shared keys, pooled walkers carrying nothing into the next render (including after a failed
+  render), the empty and escaped `url`, and the per-component planning mark.
+- The Linux Native AOT smoke test (`eng/aot-smoke.sh`) was not run.
+
+Raw samples (`paired-1.json`, `paired-2.json`, with each run's core DLL hashes) and the probe outputs are in
+[results/2026-10-24-allocations-parallel](results/2026-10-24-allocations-parallel). Reproduce by copying each build's benchmark
+output to `<root>/baseline/...` and `<root>/current/...` under `tests/Inertia.Net.Benchmarks/bin/Release/net10.0`, then:
+
+```sh
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --memory-comparison <root> paired.json
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --render-probe
+dotnet run --project tests/Inertia.Net.Benchmarks -c Release --no-build -- --mvc-probe
+```
+
 ## Published v1.5.0 versus v1.5.1 - 2026-10-23
 
 Both core DLLs were downloaded from their published NuGet packages. Their SHA-256 hashes match the loaded libraries recorded in [paired.json](results/1.5.0-vs-1.5.1/paired.json); [sources.json](results/1.5.0-vs-1.5.1/sources.json) records the package URLs and hashes.

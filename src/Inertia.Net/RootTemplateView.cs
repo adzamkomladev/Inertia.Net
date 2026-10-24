@@ -95,7 +95,7 @@ internal sealed class RootTemplateView : IInertiaRootView
             {
                 if (segment.Kind == RootTemplate.Kind.Vite)
                 {
-                    vite![v++] = _vite.RenderTagsUtf8(http, segment.Args!);
+                    vite![v++] = _vite.RenderTagsUtf8(http, segment.Args!, segment.Key!);
                 }
             }
 
@@ -202,7 +202,8 @@ internal sealed class RootTemplate
         ViewData,
     }
 
-    internal readonly record struct Segment(Kind Kind, byte[]? Bytes = null, string[]? Args = null);
+    /// <summary>A template piece. A Vite segment's <c>Key</c> is its entries joined by <c>'\n'</c>: the tag cache key, built once.</summary>
+    internal readonly record struct Segment(Kind Kind, byte[]? Bytes = null, string[]? Args = null, string? Key = null);
 
     private RootTemplate(Segment[] segments)
     {
@@ -273,7 +274,7 @@ internal sealed class RootTemplate
                     throw new InvalidOperationException($"Invalid @{name} in '{path}' at line {Line(text, start)}: wrong number of arguments.");
                 }
 
-                Add(new Segment(vite ? Kind.Vite : Kind.ViewData, Args: args));
+                Add(new Segment(vite ? Kind.Vite : Kind.ViewData, Args: args, Key: vite ? string.Join('\n', args) : null));
             }
             else
             {
