@@ -49,6 +49,10 @@ Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
 
 ## Performance
 
+v1.5.2 allocates less per render than v1.5.1: a JSON page with 20 props drops from 2,152 to 1,736 bytes, a partial reload from 984 to
+568 bytes, and a render with 20 parallel loaders from 6,496 to 3,992 bytes. Pages without parallel props also skip the parallel
+planning walk.
+
 Compared with published v1.5.0, v1.5.1 measured 43.3% faster 1 KiB cache writes, 56.5% faster 1 MiB cache writes, 8.1% faster
 integer-key dictionary rendering, and 87.0% faster 32-request cold-cache bursts in controlled fixtures. Ordinary JSON, HTML and
 partial rendering showed no statistically clear slowdown. JSON render allocations fell from 2,760 to 2,152 bytes; partial reload
