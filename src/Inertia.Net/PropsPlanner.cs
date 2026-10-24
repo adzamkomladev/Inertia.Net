@@ -17,6 +17,7 @@ internal sealed class PropsPlanner : IDisposable
     private readonly InertiaPageWriter _owner;
     private readonly List<Planned> _planned = [];
     private SemaphoreSlim? _gate;
+    private int _startable; // planned props that are not duplicates
     private volatile bool _failed;
 
     public PropsPlanner(InertiaPageWriter owner, CancellationToken requestAborted)
@@ -36,37 +37,36 @@ internal sealed class PropsPlanner : IDisposable
     {
         if (Find(prop) is { } existing)
         {
-            existing.Duplicate = true;
+            if (!existing.Duplicate)
+            {
+                existing.Duplicate = true;
+                _startable--;
+            }
+
             return;
         }
 
         _planned.Add(new Planned(prop) { Lookup = lookup });
+        _startable++;
     }
 
     /// <summary>Starts every planned loader; the ones beyond the concurrency limit wait for a slot in order.</summary>
     public void Start()
     {
-        var count = 0;
-        foreach (var planned in _planned)
-        {
-            if (!planned.Duplicate)
-            {
-                count++;
-            }
-        }
-
         var max = _owner.Options.Props.MaxConcurrency;
-        if (count > max)
+        if (_startable > max)
         {
             _gate = new SemaphoreSlim(max, max);
         }
 
         foreach (var planned in _planned)
         {
-            if (!planned.Duplicate)
+            if (planned.Duplicate)
             {
-                planned.Task = RunAsync(planned);
+                continue; // resolves at each of its paths instead
             }
+
+            planned.Task = RunAsync(planned);
         }
     }
 

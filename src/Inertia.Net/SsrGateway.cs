@@ -102,7 +102,10 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         _logger = logger;
         _managed = _ssr.NodeProcess is not null;
         _bundles = new(static path => path, environment.IsDevelopment(), timeProvider);
-        _bundlePath = _ssr.BundlePath is { Length: > 0 } bundle ? Path.Combine(environment.ContentRootPath, bundle) : null;
+        // Relative to the content root, or absolute (then used as it is).
+        _bundlePath = _ssr.BundlePath is { Length: > 0 } bundle
+            ? Path.IsPathRooted(bundle) ? bundle : Path.Join(environment.ContentRootPath, bundle)
+            : null;
         _caching = caching;
         _endpoints = [.. EndpointUrls(_ssr).Select((url, i) => new SsrEndpoint(
             i.ToString(System.Globalization.CultureInfo.InvariantCulture), url, "/render", _managed ? i : null, _ssr, timeProvider, metrics))];

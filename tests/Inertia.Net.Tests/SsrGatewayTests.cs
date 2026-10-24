@@ -297,6 +297,14 @@ public sealed class SsrGatewayTests
         var existing = Create(handler, s => s.BundlePath = "app.html");
         await GetAsync(existing);
         Assert.Equal(2, handler.Requests.Count);
+
+        // An absolute path is used as it is, not under the content root.
+        var absolute = Create(handler, s => s.BundlePath = Path.Combine(Harness.DefaultContentRoot, "app.html"));
+        await GetAsync(absolute);
+        Assert.Equal(3, handler.Requests.Count);
+        var absoluteMissing = Create(handler, s => s.BundlePath = Path.Combine(Path.GetTempPath(), "inertia-missing-" + Guid.NewGuid().ToString("N"), "ssr.mjs"));
+        AssertClientRendered(await GetAsync(absoluteMissing));
+        Assert.Equal(3, handler.Requests.Count);
     }
 
     [Fact]
