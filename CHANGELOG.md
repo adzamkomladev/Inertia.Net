@@ -7,6 +7,11 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-10-24
+
+Less allocation on every render, and no parallel planning on pages without parallel props. No public API, wire format or stored-state
+format changes; upgrading needs no code change.
+
 ### Changed
 
 - Pages without `Parallel()` props no longer run the parallel planning walk once another page in the app has used `Parallel()`. Each
@@ -22,6 +27,11 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 - MVC: the root view reuses one metadata provider, and the `<inertia />` body reuses one UTF-8 decoder per thread (80 B to 24 B per
   render). The SSR bundle path, the Vite tag cache key and the page-duration metric tag are no longer allocated per request.
   See `tests/Inertia.Net.Benchmarks/RESULTS.md` (2026-10-24).
+
+### Documentation
+
+- The README links [Inertia.Net-Samples](https://github.com/adzamkomladev/Inertia.Net-Samples) and its three apps with live demos:
+  Inkwell (React), TechLandier (Vue) and CarParker (Svelte).
 
 ## [1.5.0] - 2026-10-22
 

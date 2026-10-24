@@ -2,7 +2,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.5.1** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.5.2** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -77,7 +77,7 @@ You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clie
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.5.1
+dotnet new install Inertia.Net.Templates::1.5.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -166,13 +166,13 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.5.1
-dotnet add package Inertia.Net.Mvc --version 1.5.1 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.5.1 # FastEndpoints only
-dotnet add package Inertia.Net.Testing --version 1.5.1 # test projects
+dotnet add package Inertia.Net --version 1.5.2
+dotnet add package Inertia.Net.Mvc --version 1.5.2 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.5.2 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.5.2 # test projects
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.5.1` for all Inertia.Net packages. Inertia.Net 1.5.1 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.5.2` for all Inertia.Net packages. Inertia.Net 1.5.2 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -1906,6 +1906,20 @@ Flash and errors travel in a cookie across the redirect, so use a client that ke
 ## Performance
 
 Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
+
+v1.5.2 allocates less per render than v1.5.1 (exact allocation probes, same fixtures):
+
+| Workload | v1.5.1 | v1.5.2 |
+|---|---:|---:|
+| JSON, 20 props | 2,152 B | 1,736 B |
+| Typed POCO page | 1,968 B | 1,552 B |
+| Partial reload | 984 B | 568 B |
+| HTML, 20 props | 2,216 B | 1,800 B |
+| 20 parallel loaders | 6,496 B | 3,992 B |
+
+In two paired runs, partial reloads and pages with parallel loaders were faster in both; ordinary JSON and HTML rendering showed no
+clear change. Those timings come from a laptop that cannot resolve differences under about 10%; see
+[the benchmark results](tests/Inertia.Net.Benchmarks/RESULTS.md) for intervals and raw samples.
 
 Published NuGet v1.5.1 versus v1.5.0, using identical fixtures across 32 paired rounds:
 
