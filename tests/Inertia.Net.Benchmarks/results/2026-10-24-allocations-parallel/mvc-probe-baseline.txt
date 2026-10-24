@@ -1,0 +1,12 @@
+run=1 2 KiB string: 6576 B/render, 2.4 us/render
+run=1 2 KiB stream: 80 B/render, 0.7 us/render
+run=2 2 KiB string: 6576 B/render, 1.2 us/render
+run=2 2 KiB stream: 80 B/render, 0.7 us/render
+run=3 2 KiB string: 6576 B/render, 1.2 us/render
+run=3 2 KiB stream: 80 B/render, 0.7 us/render
+run=1 1024 KiB string: 3146347 B/render, 934.1 us/render
+run=1 1024 KiB stream: 80 B/render, 212.4 us/render
+run=2 1024 KiB string: 3146345 B/render, 861.1 us/render
+run=2 1024 KiB stream: 80 B/render, 188.9 us/render
+run=3 1024 KiB string: 3146345 B/render, 982.7 us/render
+run=3 1024 KiB stream: 80 B/render, 205.8 us/render

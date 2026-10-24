@@ -8,6 +8,10 @@ namespace Inertia.Net.Mvc;
 /// <summary>Pre-encoded UTF-8 HTML, decoded to the view's writer in pooled chunks instead of being materialized as a string.</summary>
 internal sealed class Utf8HtmlContent(ReadOnlyMemory<byte> html) : IHtmlContent
 {
+    // Write is synchronous and does not re-enter, so one decoder per thread serves every write; it is reset before each.
+    [ThreadStatic]
+    private static Decoder? t_decoder;
+
     public void WriteTo(TextWriter writer, HtmlEncoder encoder)
     {
         ArgumentNullException.ThrowIfNull(writer);
@@ -22,7 +26,8 @@ internal sealed class Utf8HtmlContent(ReadOnlyMemory<byte> html) : IHtmlContent
         }
 
         const int ChunkBytes = 4096;
-        var decoder = Encoding.UTF8.GetDecoder();
+        var decoder = t_decoder ??= Encoding.UTF8.GetDecoder();
+        decoder.Reset();
         var chars = ArrayPool<char>.Shared.Rent(Encoding.UTF8.GetMaxCharCount(ChunkBytes));
         try
         {

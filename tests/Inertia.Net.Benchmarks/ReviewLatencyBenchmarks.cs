@@ -21,6 +21,8 @@ public class ReviewLatencyBenchmarks
     private InertiaProps _cached1 = null!;
     private InertiaProps _cached32 = null!;
     private InertiaProps _burst = null!;
+    private InertiaProps _tinyParallel = null!;
+    private InertiaProps _yieldParallel = null!;
     private int _backendCalls;
 
     public int LastBurstCalls { get; private set; }
@@ -39,6 +41,8 @@ public class ReviewLatencyBenchmarks
         _nested2000 = Nested(2000);
         _cached1 = Cached(1);
         _cached32 = Cached(32);
+        _tinyParallel = TinyParallel(20);
+        _yieldParallel = YieldParallel(3);
         await Execute(_cached1);
         await Execute(_cached32);
         _burstContexts = Enumerable.Range(0, 32)
@@ -60,6 +64,8 @@ public class ReviewLatencyBenchmarks
     [Benchmark] public Task Nested2000() => Execute(_nested2000);
     [Benchmark] public Task ParallelCacheHit1() => Execute(_cached1);
     [Benchmark] public Task ParallelCacheHit32() => Execute(_cached32);
+    [Benchmark] public Task TinyParallel20() => Execute(_tinyParallel);
+    [Benchmark] public Task YieldParallel3() => Execute(_yieldParallel);
 
     [Benchmark]
     public async Task ColdBurst32()
@@ -99,6 +105,36 @@ public class ReviewLatencyBenchmarks
             var fields = new InertiaProps();
             for (var field = 0; field < 10; field++) fields[$"field{field}"] = field;
             props[$"group{group}"] = fields;
+        }
+
+        return props;
+    }
+
+    // Parallel loaders that complete at once: the planner's own cost.
+    private static InertiaProps TinyParallel(int count)
+    {
+        var props = new InertiaProps();
+        for (var i = 0; i < count; i++)
+        {
+            var value = i;
+            props[$"tiny{i}"] = Prop(_ => ValueTask.FromResult(value)).Parallel();
+        }
+
+        return props;
+    }
+
+    // Parallel loaders that really suspend (no timer), so the walk awaits started tasks.
+    private static InertiaProps YieldParallel(int count)
+    {
+        var props = new InertiaProps();
+        for (var i = 0; i < count; i++)
+        {
+            var value = i;
+            props[$"yield{i}"] = Prop(async _ =>
+            {
+                await Task.Yield();
+                return value;
+            }).Parallel();
         }
 
         return props;

@@ -64,6 +64,13 @@ public sealed class ViteAssets
 
     internal byte[] RenderTagsUtf8(HttpContext context, string[] entries)
     {
+        ArgumentNullException.ThrowIfNull(entries);
+        return RenderTagsUtf8(context, entries, string.Join('\n', entries));
+    }
+
+    /// <summary>The tags for <paramref name="entries"/>, given their cache key: the entries joined by <c>'\n'</c>.</summary>
+    internal byte[] RenderTagsUtf8(HttpContext context, string[] entries, string key)
+    {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(entries);
         if (entries.Length == 0)
@@ -79,14 +86,13 @@ public sealed class ViteAssets
 
         var manifest = LoadManifest();
         var pathBase = context.Request.PathBase.ToUriComponent();
-        var key = (string.Join('\n', entries), pathBase);
-        if (!manifest.Rendered.TryGetValue(key, out var tags))
+        if (!manifest.Rendered.TryGetValue((key, pathBase), out var tags))
         {
             var prefix = _options.AssetBaseUrl?.TrimEnd('/') ?? $"{pathBase}/{_options.BuildDirectory.Trim('/')}";
             tags = TagSet.Create(RenderProduction(manifest, entries, prefix, _options), NonceMarker);
             if (manifest.Rendered.Count < MaxCachedTagSets)
             {
-                manifest.Rendered[key] = tags;
+                manifest.Rendered[(key, pathBase)] = tags;
             }
         }
 

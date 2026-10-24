@@ -1,0 +1,12 @@
+run=1 json: 29.690 us/request; 2152 B/request
+run=1 poco: 13.813 us/request; 1968 B/request
+run=1 partial: 9.517 us/request; 984 B/request
+run=1 html: 22.724 us/request; 2216 B/request
+run=2 json: 18.505 us/request; 2152 B/request
+run=2 poco: 10.914 us/request; 1968 B/request
+run=2 partial: 6.867 us/request; 984 B/request
+run=2 html: 15.776 us/request; 2216 B/request
+run=3 json: 14.036 us/request; 2152 B/request
+run=3 poco: 9.984 us/request; 1968 B/request
+run=3 partial: 6.798 us/request; 984 B/request
+run=3 html: 18.087 us/request; 2216 B/request

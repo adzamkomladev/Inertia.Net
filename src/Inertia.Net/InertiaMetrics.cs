@@ -54,12 +54,15 @@ internal sealed class InertiaMetrics
 
     public bool PageDurationEnabled => _pageDuration.Enabled;
 
+    // Boxed once: a bool tag value would otherwise be boxed on every recorded render.
+    private static readonly object True = true, False = false;
+
     public void RecordPage(double seconds, long bytes, bool json, bool partial)
     {
         var response = new KeyValuePair<string, object?>("inertia.response", json ? "json" : "html");
         if (_pageDuration.Enabled)
         {
-            _pageDuration.Record(seconds, response, new KeyValuePair<string, object?>("inertia.partial", partial));
+            _pageDuration.Record(seconds, response, new KeyValuePair<string, object?>("inertia.partial", partial ? True : False));
         }
 
         if (_pageSize.Enabled)

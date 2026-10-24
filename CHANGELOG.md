@@ -7,6 +7,22 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+### Changed
+
+- Pages without `Parallel()` props no longer run the parallel planning walk once another page in the app has used `Parallel()`. Each
+  component remembers whether its renders have parallel props. A component that was first rendered without them and later gets some
+  resolves them in turn for that one render; every later render starts them early.
+
+### Performance
+
+- Rendering allocates 416 B less per page: a JSON page with 20 mixed props drops from 2,152 B to 1,736 B, and a partial reload from 984 B
+  to 568 B. The props walker and its JSON writer are pooled, and neither the `sharedProps` list nor the page `url` is allocated any more.
+- Pages with parallel props allocate less: 20 parallel loaders drop from 6,496 B to 3,992 B per render. The planner skips its semaphore
+  when the concurrency limit cannot be reached and no longer keeps a dictionary.
+- MVC: the root view reuses one metadata provider, and the `<inertia />` body reuses one UTF-8 decoder per thread (80 B to 24 B per
+  render). The SSR bundle path, the Vite tag cache key and the page-duration metric tag are no longer allocated per request.
+  See `tests/Inertia.Net.Benchmarks/RESULTS.md` (2026-10-24).
+
 ## [1.5.0] - 2026-10-22
 
 Cached props and the SSR response cache can now be invalidated, replaced, served stale while they refresh, and kept in a store of the

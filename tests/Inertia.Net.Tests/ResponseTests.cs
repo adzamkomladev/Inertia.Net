@@ -445,6 +445,8 @@ public class ResponseTests
     }
 
     [Theory]
+    [InlineData("", "", "", "/")]
+    [InlineData("/base", "/a b", "?q=1", "/base/a%20b?q=1")]
     [InlineData("", "/user/123", "", "/user/123")]
     [InlineData("/sub/directory", "/user/123", "", "/sub/directory/user/123")]
     [InlineData("", "/users/", "", "/users/")]

@@ -679,6 +679,7 @@ return Render("Dashboard", new InertiaProps
 - At most `InertiaOptions.Props.MaxConcurrency` loaders run at once per render (default 4): `builder.Services.AddInertia(o => o.Props.MaxConcurrency = 8);`
 - Top-level props and props inside literal objects (`InertiaProps` and other string-keyed dictionaries) start early. Elsewhere they resolve in turn.
 - Loaders of props that aren't part of the response (partial reloads, deferred or optional props on the first visit) never start.
+- Pages without parallel props skip the work of finding them. A component remembers whether its renders have parallel props. If it was first rendered without them and later gets some, that one render resolves them in turn, and every later render starts them early.
 - If a loader fails, the others are cancelled and awaited, and the render fails with the first failure in prop order. `Rescue()`d props fail alone, as usual.
 
 **DbContext and HttpContext:** a parallel loader must not use the request's `DbContext` or other non-thread-safe scoped services, and must not touch `HttpContext`. EF Core throws "A second operation was started on this context instance…". Give each loader its own context through `IDbContextFactory<T>` or its own scope:

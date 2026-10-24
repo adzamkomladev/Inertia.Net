@@ -65,27 +65,29 @@ public sealed class ViteTagHelper(ViteAssets vite) : TagHelper
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
         output.TagName = null;
-        output.Content.SetHtmlContent(new Utf8HtmlContent(vite.RenderTagsUtf8(ViewContext.HttpContext, SplitEntries(Entry))));
+        var (entries, key) = SplitEntries(Entry);
+        output.Content.SetHtmlContent(new Utf8HtmlContent(vite.RenderTagsUtf8(ViewContext.HttpContext, entries, key)));
     }
 
     private const int MaxCachedEntryLists = 256;
-    private static readonly ConcurrentDictionary<string, string[]> EntryLists = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, (string[] Entries, string Key)> EntryLists = new(StringComparer.Ordinal);
 
-    // The entry attribute is a constant in the view, so its split is cached instead of re-split on every render.
-    private static string[] SplitEntries(string entry)
+    // The entry attribute is a constant in the view, so its split and tag cache key are cached instead of rebuilt on every render.
+    private static (string[] Entries, string Key) SplitEntries(string entry)
     {
-        if (EntryLists.TryGetValue(entry, out var entries))
+        if (EntryLists.TryGetValue(entry, out var split))
         {
-            return entries;
+            return split;
         }
 
-        entries = entry.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var entries = entry.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        split = (entries, string.Join('\n', entries));
         if (EntryLists.Count < MaxCachedEntryLists)
         {
-            EntryLists.TryAdd(entry, entries);
+            EntryLists.TryAdd(entry, split);
         }
 
-        return entries;
+        return split;
     }
 }
 

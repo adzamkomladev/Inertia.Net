@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.Tests;
@@ -110,6 +111,46 @@ public class PageWriterTests
         }).PageAsync(null);
         Assert.Equal("Demo", (string?)hidden["props"]!["appName"]);
         JsonAssert.Missing(hidden, "sharedProps");
+    }
+
+    [Fact]
+    public async Task Dotted_shared_keys_are_listed_once_by_their_top_level_key()
+    {
+        var harness = new Harness(o => o.Share("auth.user", 1).Share("appName", "Demo").Share("auth.team", 2));
+
+        var page = await harness.PageAsync(new InertiaProps { ["title"] = "Home" }, c => c.Inertia().Share("auth", 3).Share("flags.beta", true));
+
+        JsonAssert.Equal("""["errors","auth","appName","flags"]""", page["sharedProps"]);
+    }
+
+    [Fact]
+    public async Task Pooled_writers_carry_nothing_into_the_next_render()
+    {
+        var harness = new Harness();
+        InertiaProps Busy() => new()
+        {
+            ["deferred"] = Inertia.Defer(() => 1, "group"),
+            ["merged"] = Inertia.Merge(new[] { 1, 2 }),
+            ["once"] = Inertia.Once(() => "x"),
+            ["nested"] = new InertiaProps { ["deep"] = new InertiaProps { ["deeper"] = new string('p', 2000) } },
+        };
+
+        await harness.PageAsync(Busy(), c => c.AsInertia());
+        await harness.PageAsync(Busy(), c => c.AsPartial(only: "merged", except: "nested"));
+        await harness.PageAsync(Busy());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.PageAsync(new InertiaProps
+        {
+            ["first"] = Inertia.Merge(new[] { 1 }),
+            ["nested"] = new InertiaProps { ["broken"] = Inertia.Prop<int>(() => throw new InvalidOperationException("boom")) },
+        }, c => c.AsInertia()));
+
+        var plain = new InertiaProps { ["title"] = "Home" };
+        var fresh = new Harness();
+        foreach (var arrange in new Action<HttpContext>?[] { c => c.AsInertia(), null })
+        {
+            var expected = await fresh.PageAsync(plain, arrange);
+            Assert.Equal(expected.ToJsonString(), (await harness.PageAsync(plain, arrange)).ToJsonString());
+        }
     }
 
     [Fact]

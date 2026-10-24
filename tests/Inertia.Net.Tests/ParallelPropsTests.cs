@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.Tests;
 
@@ -360,7 +361,8 @@ public class ParallelPropsTests
         });
         JsonAssert.Equal("""{"errors":{},"a":1,"b":2}""", sequential["props"]);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => Page(new InertiaProps
+        // A new app: here the component's first render without parallel props would delay planning by one render.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => new Harness().PageAsync(new InertiaProps
         {
             ["a"] = Inertia.Prop(() => context.QueryAsync(1)).Parallel(),
             ["b"] = Inertia.Prop(() => context.QueryAsync(2)).Parallel(),
@@ -374,6 +376,48 @@ public class ParallelPropsTests
             ["b"] = Inertia.Prop(() => new NotThreadSafeContext().QueryAsync(2)).Parallel(),
         });
         JsonAssert.Equal("""{"errors":{},"a":1,"b":2}""", own["props"]);
+    }
+
+    [Fact]
+    public async Task A_component_skips_planning_until_it_meets_a_parallel_prop()
+    {
+        var writer = _harness.Services.GetRequiredService<InertiaPageWriter>();
+        Assert.Null(writer.UsesParallel("TestComponent"));
+
+        await Page(new InertiaProps { ["a"] = 1 });
+        Assert.False(writer.UsesParallel("TestComponent"));
+
+        // The first parallel render after that resolves in turn (same output); it marks the component, and later renders start early.
+        var running = 0;
+        var maxRunning = 0;
+        InertiaProps Props() => new()
+        {
+            ["a"] = Load(1),
+            ["b"] = Load(2),
+        };
+        InertiaProp Load(int value) => Inertia.Prop(async ct =>
+        {
+            InterlockedMax(ref maxRunning, Interlocked.Increment(ref running));
+            await Task.Delay(30, ct);
+            Interlocked.Decrement(ref running);
+            return value;
+        }).Parallel();
+
+        JsonAssert.Equal("""{"errors":{},"a":1,"b":2}""", (await Page(Props()))["props"]);
+        Assert.Equal(1, maxRunning);
+        Assert.True(writer.UsesParallel("TestComponent"));
+
+        var barrier = new Barrier(2);
+        var together = await Page(new InertiaProps
+        {
+            ["a"] = Inertia.Prop(async () => { await barrier.ArriveAsync(); return 1; }).Parallel(),
+            ["b"] = Inertia.Prop(async () => { await barrier.ArriveAsync(); return 2; }).Parallel(),
+        });
+        JsonAssert.Equal("""{"errors":{},"a":1,"b":2}""", together["props"]);
+
+        // A partial reload that filters the parallel props out does not turn planning off again.
+        await Page(new InertiaProps { ["a"] = Load(1), ["c"] = 3 }, c => c.AsPartial(only: "c"));
+        Assert.True(writer.UsesParallel("TestComponent"));
     }
 
     private static void InterlockedMax(ref int target, int value)

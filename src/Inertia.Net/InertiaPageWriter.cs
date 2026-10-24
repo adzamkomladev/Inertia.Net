@@ -43,8 +43,10 @@ internal sealed class InertiaPageWriter
     private readonly ConcurrentDictionary<(JsonPropertyInfo Property, JsonNumberHandling? Handling), JsonTypeInfo> _propertySerializers = new();
     private readonly ConcurrentDictionary<(JsonConverter? Converter, JsonNumberHandling? Handling), JsonSerializerOptions> _memberOptions = new();
     private readonly ConcurrentDictionary<Type, object> _defaultValues = new();
-    private const int MinPageCapacity = 4096, MaxPageCapacityHint = 8 * 1024 * 1024, MaxSizeHints = 1024;
-    private readonly ConcurrentDictionary<string, int> _sizeHints = new(StringComparer.Ordinal);
+    private const int MinPageCapacity = 4096, MaxPageCapacityHint = 8 * 1024 * 1024, MaxComponentHints = 1024;
+    private readonly ConcurrentDictionary<string, ComponentHints> _hints = new(StringComparer.Ordinal);
+    private int _hintCount;
+    private readonly ObjectPool<PropsWriter> _propsWriters;
     private readonly JsonWriterOptions _jsonWriterOptions;
     private readonly JsonWriterOptions _htmlWriterOptions;
 
@@ -92,6 +94,7 @@ internal sealed class InertiaPageWriter
         SerializerOptions = serializerOptions;
         _jsonWriterOptions = new JsonWriterOptions { Encoder = source.Encoder, Indented = serializerOptions.WriteIndented };
         _htmlWriterOptions = new JsonWriterOptions { Encoder = HtmlSafeEncoder };
+        _propsWriters = new DefaultObjectPool<PropsWriter>(new PropsWriterPolicy(this));
     }
 
     public InertiaOptions Options { get; }
@@ -113,29 +116,34 @@ internal sealed class InertiaPageWriter
     /// <summary>Writer options whose output is valid JSON and safe inside a <c>&lt;script&gt;</c> element.</summary>
     public JsonWriterOptions HtmlWriterOptions => _htmlWriterOptions;
 
+    /// <summary>Writer options for JSON responses (the app's encoder and indentation).</summary>
+    public JsonWriterOptions JsonWriterOptions => _jsonWriterOptions;
+
     /// <summary>
     /// Resolves the props and writes the whole page object. With <paramref name="htmlSafe"/> the JSON can be embedded
     /// in a <c>&lt;script&gt;</c> element as-is. The caller disposes the returned buffer.
     /// </summary>
     public async ValueTask<PooledBufferWriter> WritePageAsync(HttpContext httpContext, string component, object? props, InertiaRequest request, bool htmlSafe)
     {
-        var buffer = new PooledBufferWriter(InitialCapacity(component));
+        _hints.TryGetValue(component, out var hints);
+        var buffer = new PooledBufferWriter(hints?.PageCapacity ?? MinPageCapacity);
         var pooledEntries = EntryLists.Get();
+        var propsWriter = _propsWriters.Get();
         try
         {
             httpContext.RequestAborted.ThrowIfCancellationRequested();
             var rootInfo = props is not null and not IEnumerable<KeyValuePair<string, object?>>
                 ? SerializerOptions.GetTypeInfo(props.GetType()) : null;
             var feature = httpContext.Features.Get<InertiaFeature>();
-            var sharedPropKeys = Options.ExposeSharedPropKeys ? new List<string>(Options.SharedProps.Count + 1 + (feature?.SharedProps?.Count ?? 0)) : null;
-            var entries = BuildProps(httpContext, feature, props, request, sharedPropKeys, pooledEntries, out var hasDotKey);
+            var entries = BuildProps(httpContext, feature, props, request, pooledEntries, out var sharedCount, out var hasDotKey);
             if (hasDotKey)
             {
                 entries = UnpackDotProps(entries);
             }
 
-            using var writer = new Utf8JsonWriter(buffer, htmlSafe ? _htmlWriterOptions : _jsonWriterOptions);
-            using var propsWriter = new PropsWriter(this, writer, request, component, httpContext.RequestAborted);
+            // A component runs the planning walk until a render shows it has no Parallel() props, and again once a render meets one.
+            var plan = InertiaProp.ParallelUsed && hints?.UsesParallel != false;
+            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, httpContext.RequestAborted, plan);
 
             writer.WriteStartObject();
             writer.WriteString("component", component);
@@ -144,9 +152,18 @@ internal sealed class InertiaPageWriter
             propsWriter.ScheduleRefreshes(httpContext);
             rootInfo?.OnSerialized?.Invoke(props!);
             feature = httpContext.Features.Get<InertiaFeature>();
-            writer.WriteString("url", Options.UrlResolver?.Invoke(httpContext) ?? GetUrl(httpContext.Request));
+            if (Options.UrlResolver is { } resolveUrl)
+            {
+                writer.WriteString("url", resolveUrl(httpContext));
+            }
+            else
+            {
+                writer.WritePropertyName("url");
+                WriteUrl(writer, httpContext.Request);
+            }
+
             writer.WriteString("version", _versionProvider.GetVersion(httpContext));
-            propsWriter.WriteMetadata(sharedPropKeys);
+            propsWriter.WriteMetadata(pooledEntries, Options.ExposeSharedPropKeys ? sharedCount : 0);
 
             if (Options.PreserveBigIntegers)
             {
@@ -182,7 +199,7 @@ internal sealed class InertiaPageWriter
 
             writer.WriteEndObject();
             writer.Flush();
-            RecordSize(component, buffer.WrittenMemory.Length);
+            RecordHints(component, hints, buffer.WrittenMemory.Length, propsWriter.SawParallel);
             return buffer;
         }
         catch
@@ -192,30 +209,80 @@ internal sealed class InertiaPageWriter
         }
         finally
         {
+            _propsWriters.Return(propsWriter);
             EntryLists.Return(pooledEntries);
         }
     }
 
     /// <summary>The initial page buffer size for <paramref name="component"/>: the recent page size plus headroom, at least 4 KiB.</summary>
-    internal int InitialCapacity(string component) => _sizeHints.TryGetValue(component, out var hint) ? hint : MinPageCapacity;
+    internal int InitialCapacity(string component) => _hints.TryGetValue(component, out var hints) ? hints.PageCapacity : MinPageCapacity;
 
-    // Grows to a larger page at once (so a large page is not copied through every doubling of a 4 KiB buffer on each render) and
-    // shrinks back gradually, so one unusually large render does not pin a large buffer for the component. Bounded per component
-    // count and size; components are developer-chosen names.
-    private void RecordSize(string component, int written)
+    /// <summary>Whether renders of <paramref name="component"/> run the planning walk; null before its first render.</summary>
+    internal bool? UsesParallel(string component) => _hints.TryGetValue(component, out var hints) ? hints.UsesParallel : null;
+
+    // The page buffer grows to a larger page at once (so a large page is not copied through every doubling of a 4 KiB buffer on each
+    // render) and shrinks back gradually, so one unusually large render does not pin a large buffer for the component. A component that
+    // met a Parallel() prop keeps planning: a partial reload that filters the prop out does not turn it off. Bounded per component
+    // count and size; components are developer-chosen names. A race between two renders only loses one of their updates.
+    private void RecordHints(string component, ComponentHints? hints, int written, bool sawParallel)
     {
         var target = (int)Math.Clamp(written + (long)written / 8, MinPageCapacity, MaxPageCapacityHint);
-        if (_sizeHints.TryGetValue(component, out var hint))
+        if (hints is null)
         {
-            var next = target >= hint ? target : hint - (hint - target) / 4;
-            if (next != hint)
+            if (Volatile.Read(ref _hintCount) < MaxComponentHints && _hints.TryAdd(component, new ComponentHints(target, sawParallel)))
             {
-                _sizeHints[component] = next;
+                Interlocked.Increment(ref _hintCount);
             }
+
+            return;
         }
-        else if (_sizeHints.Count < MaxSizeHints)
+
+        var capacity = hints.PageCapacity;
+        var next = target >= capacity ? target : capacity - (capacity - target) / 4;
+        if (next != capacity)
         {
-            _sizeHints.TryAdd(component, target);
+            hints.PageCapacity = next;
+        }
+
+        if (sawParallel && !hints.UsesParallel)
+        {
+            hints.UsesParallel = true;
+        }
+    }
+
+    // The url as segments of one JSON string, so path base, path and query are not concatenated first.
+    private static void WriteUrl(Utf8JsonWriter writer, HttpRequest request)
+    {
+        var pathBase = request.PathBase.ToUriComponent();
+        var path = request.Path.ToUriComponent();
+        var query = request.QueryString.ToUriComponent();
+        if (pathBase.Length == 0 && path.Length == 0 && query.Length == 0)
+        {
+            writer.WriteStringValue("/");
+            return;
+        }
+
+        writer.WriteStringValueSegment(pathBase, isFinalSegment: false);
+        writer.WriteStringValueSegment(path, isFinalSegment: false);
+        writer.WriteStringValueSegment(query, isFinalSegment: true);
+    }
+
+    /// <summary>What earlier renders of a component showed: how large its page is, and whether it has Parallel() props.</summary>
+    private sealed class ComponentHints(int pageCapacity, bool usesParallel)
+    {
+        public volatile int PageCapacity = pageCapacity;
+
+        public volatile bool UsesParallel = usesParallel;
+    }
+
+    private sealed class PropsWriterPolicy(InertiaPageWriter owner) : PooledObjectPolicy<PropsWriter>
+    {
+        public override PropsWriter Create() => new(owner);
+
+        public override bool Return(PropsWriter writer)
+        {
+            writer.Clear();
+            return true;
         }
     }
 
@@ -348,15 +415,10 @@ internal sealed class InertiaPageWriter
         ArrayPool<PropEntry>.Shared.Return(entries);
     }
 
-    private static string GetUrl(HttpRequest request)
-    {
-        var url = string.Concat(request.PathBase.ToUriComponent(), request.Path.ToUriComponent(), request.QueryString.ToUriComponent());
-        return url.Length == 0 ? "/" : url;
-    }
-
-    // errors (always), then option shares, then request shares, then page props; later keys override earlier ones in place.
-    // Synchronous, so the Set local function captures its locals in a stack struct instead of a heap closure.
-    private List<PropEntry> BuildProps(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<string>? sharedPropKeys, List<PropEntry> entries, out bool dotKeys)
+    // errors (always), then option shares, then request shares, then page props; later keys override earlier ones in place, so the
+    // first sharedProps entries are the shared ones. Synchronous, so the Set local function captures its locals in a stack struct
+    // instead of a heap closure.
+    private List<PropEntry> BuildProps(HttpContext httpContext, InertiaFeature? feature, object? props, InertiaRequest request, List<PropEntry> entries, out int sharedProps, out bool dotKeys)
     {
         var propCount = props switch
         {
@@ -406,16 +468,7 @@ internal sealed class InertiaPageWriter
                 }
             }
 
-            var dot = key.IndexOf('.', StringComparison.Ordinal);
-            hasDotKey |= dot >= 0;
-            if (shared && sharedPropKeys is not null)
-            {
-                var topLevel = dot >= 0 ? key[..dot] : key;
-                if (!sharedPropKeys.Contains(topLevel))
-                {
-                    sharedPropKeys.Add(topLevel);
-                }
-            }
+            hasDotKey |= key.Contains('.', StringComparison.Ordinal);
         }
 
         Set("errors", NoErrors, typeof(object), shared: true);
@@ -486,6 +539,7 @@ internal sealed class InertiaPageWriter
                 break;
         }
 
+        sharedProps = sharedCount;
         dotKeys = hasDotKey;
         return entries;
     }

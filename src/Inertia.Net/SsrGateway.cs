@@ -63,7 +63,6 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     private readonly SsrOptions _ssr;
     private readonly ViteAssets _vite;
     private readonly IHttpClientFactory _httpClients;
-    private readonly IHostEnvironment _environment;
     private readonly SsrNodeProcess _nodeProcess;
     private readonly TimeProvider _timeProvider;
     private readonly InertiaMetrics _metrics;
@@ -78,6 +77,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     // Bundle presence is cached like the manifest: a present bundle is never stat-ed again in production, a missing one is re-checked
     // at most once per second (every second in Development), instead of a File.Exists on every server-rendered page.
     private readonly FileCache<string> _bundles;
+    private readonly string? _bundlePath; // Ssr.BundlePath under the content root, combined once
 
     // Rendered HTML by page JSON hash (bounded by Ssr.Cache.MaxBytes in the default store); only filled for responses that use the cache.
     private readonly InertiaCaching _caching;
@@ -96,13 +96,13 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         _ssr = options.Value.Ssr;
         _vite = vite;
         _httpClients = httpClients;
-        _environment = environment;
         _nodeProcess = nodeProcess;
         _timeProvider = timeProvider;
         _metrics = metrics;
         _logger = logger;
         _managed = _ssr.NodeProcess is not null;
         _bundles = new(static path => path, environment.IsDevelopment(), timeProvider);
+        _bundlePath = _ssr.BundlePath is { Length: > 0 } bundle ? Path.Combine(environment.ContentRootPath, bundle) : null;
         _caching = caching;
         _endpoints = [.. EndpointUrls(_ssr).Select((url, i) => new SsrEndpoint(
             i.ToString(System.Globalization.CultureInfo.InvariantCulture), url, "/render", _managed ? i : null, _ssr, timeProvider, metrics))];
@@ -148,7 +148,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             http.RequestAborted.ThrowIfCancellationRequested();
             var devOrigin = _vite.DevServerOrigin;
             var endpoints = devOrigin is null ? _endpoints : DevEndpoints(devOrigin);
-            if (devOrigin is null && _ssr.BundlePath is { Length: > 0 } bundle && _bundles.Get(Path.Combine(_environment.ContentRootPath, bundle)) is null)
+            if (devOrigin is null && _bundlePath is not null && _bundles.Get(_bundlePath) is null)
             {
                 return new(Skip(mode, SsrFailure.BundleMissing, "The SSR bundle does not exist.", log: false));
             }

@@ -14,15 +14,21 @@ internal readonly record struct PropEntry(string Key, object? Value, Type Type);
 
 /// <summary>
 /// Port of inertia-laravel 3.x <c>PropsResolver</c> (docs/protocol.md §4): one walk that filters, resolves,
-/// writes the props to JSON and collects the page metadata. One instance per render.
+/// writes the props to JSON and collects the page metadata. Used by one render at a time: the page writer pools instances, and
+/// <see cref="Begin"/> and <see cref="Clear"/> bracket each render.
 /// </summary>
-internal sealed class PropsWriter : IDisposable
+internal sealed class PropsWriter
 {
+    private const int MaxRetainedPath = 1024;
+
     private readonly InertiaPageWriter _owner;
-    private readonly Utf8JsonWriter _writer;
-    private readonly InertiaRequest _request;
-    private readonly bool _isPartial;
-    private readonly CancellationToken _cancellationToken;
+    private Utf8JsonWriter _writer = null!;
+    private Utf8JsonWriter? _jsonWriter;
+    private Utf8JsonWriter? _htmlWriter;
+    private InertiaRequest _request;
+    private bool _isPartial;
+    private bool _plan;
+    private CancellationToken _cancellationToken;
     private char[] _path = ArrayPool<char>.Shared.Rent(128);
     private int _pathLength;
     private int _arrayPathLength;
@@ -37,20 +43,55 @@ internal sealed class PropsWriter : IDisposable
     private Dictionary<string, (string Prop, long? ExpiresAt)>? _onceProps;
     private PropsPlanner? _planner;
 
-    public PropsWriter(InertiaPageWriter owner, Utf8JsonWriter writer, InertiaRequest request, string component, CancellationToken cancellationToken)
+    public PropsWriter(InertiaPageWriter owner) => _owner = owner;
+
+    /// <summary>Whether this render met a <see cref="InertiaProp.Parallel"/> prop (planned or not).</summary>
+    public bool SawParallel { get; private set; }
+
+    private ReadOnlySpan<char> Path => _path.AsSpan(0, _pathLength);
+
+    /// <summary>
+    /// Starts a render into <paramref name="buffer"/> and returns its JSON writer, kept for the next render with the same options. With
+    /// <paramref name="plan"/> the walk starts the <see cref="InertiaProp.Parallel"/> loaders first.
+    /// </summary>
+    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, CancellationToken cancellationToken, bool plan)
     {
-        _owner = owner;
+        var writer = htmlSafe
+            ? _htmlWriter ??= new Utf8JsonWriter(buffer, _owner.HtmlWriterOptions)
+            : _jsonWriter ??= new Utf8JsonWriter(buffer, _owner.JsonWriterOptions);
+        writer.Reset(buffer);
         _writer = writer;
         _request = request;
         _isPartial = string.Equals(request.PartialComponent, component, StringComparison.Ordinal);
         _cancellationToken = cancellationToken;
+        _plan = plan;
+        SawParallel = false;
+        _pathLength = 0;
+        _arrayPathLength = 0;
+        return writer;
     }
 
-    private ReadOnlySpan<char> Path => _path.AsSpan(0, _pathLength);
+    /// <summary>Drops everything the last render held (request headers, metadata, loaders), so a pooled instance retains no request data.</summary>
+    public void Clear()
+    {
+        _request = default;
+        _cancellationToken = default;
+        _mergeProps = _prependProps = _deepMergeProps = _matchPropsOn = null;
+        _uncommon = null;
+        _deferredProps = null;
+        _scrollProps = null;
+        _onceProps = null;
+        _planner = null;
+        if (_path.Length > MaxRetainedPath)
+        {
+            ArrayPool<char>.Shared.Return(_path);
+            _path = ArrayPool<char>.Shared.Rent(128);
+        }
+    }
 
     public async ValueTask WritePropsAsync(List<PropEntry> props)
     {
-        if (InertiaProp.ParallelUsed)
+        if (_plan)
         {
             Plan(props);
         }
@@ -122,6 +163,7 @@ internal sealed class PropsWriter : IDisposable
         {
             if (value is InertiaProp prop)
             {
+                SawParallel |= prop.IsParallel;
                 if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
                     PlanLoad(prop);
@@ -131,10 +173,14 @@ internal sealed class PropsWriter : IDisposable
             }
 
             // A lazy object's loader can start early; the dot keys below it are only known once it resolves, so they resolve in turn.
-            if (value is InertiaPageWriter.LazyDotObject { Source.IsParallel: true } lazy
-                && Decide(null, value, declaredType, parentWasResolved: false) == Inclusion.Resolved)
+            if (value is InertiaPageWriter.LazyDotObject { Source.IsParallel: true } lazy)
             {
-                Prefetch(lazy.Source, lookup: null);
+                SawParallel = true;
+                if (Decide(null, value, declaredType, parentWasResolved: false) == Inclusion.Resolved)
+                {
+                    Prefetch(lazy.Source, lookup: null);
+                }
+
                 return;
             }
 
@@ -199,10 +245,13 @@ internal sealed class PropsWriter : IDisposable
     private void Prefetch(InertiaProp prop, Task<CachedProp?>? lookup) =>
         (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, lookup);
 
-    /// <summary>Writes sharedProps through onceProps, in protocol order, omitting empty ones.</summary>
-    public void WriteMetadata(List<string>? sharedPropKeys)
+    /// <summary>
+    /// Writes sharedProps through onceProps, in protocol order, omitting empty ones. The shared keys are the first
+    /// <paramref name="sharedCount"/> of <paramref name="entries"/> (0 when they are not exposed).
+    /// </summary>
+    public void WriteMetadata(List<PropEntry> entries, int sharedCount)
     {
-        WriteList("sharedProps", sharedPropKeys);
+        WriteSharedKeys(entries, sharedCount);
         WriteList("mergeProps", _mergeProps);
         WriteList("prependProps", _prependProps);
         WriteList("deepMergeProps", _deepMergeProps);
@@ -261,13 +310,49 @@ internal sealed class PropsWriter : IDisposable
         }
     }
 
-    public void Dispose()
+    // Shared props come first in the entry list (they are set before page props, and an override keeps its position), so their keys
+    // are listed in order without collecting them. A dotted key lists its top-level key, once.
+    private void WriteSharedKeys(List<PropEntry> entries, int count)
     {
-        var path = _path;
-        _path = [];
-        if (path.Length > 0)
+        if (count == 0)
         {
-            ArrayPool<char>.Shared.Return(path);
+            return;
+        }
+
+        _writer.WriteStartArray("sharedProps");
+        var dotted = false;
+        for (var i = 0; i < count; i++)
+        {
+            var key = TopLevel(entries[i].Key, out var dot);
+            if ((dotted || dot) && IsListedBefore(entries, i, key))
+            {
+                continue;
+            }
+
+            dotted |= dot;
+            _writer.WriteStringValue(key);
+        }
+
+        _writer.WriteEndArray();
+
+        static ReadOnlySpan<char> TopLevel(string key, out bool hasDot)
+        {
+            var dot = key.IndexOf('.', StringComparison.Ordinal);
+            hasDot = dot >= 0;
+            return hasDot ? key.AsSpan(0, dot) : key;
+        }
+
+        static bool IsListedBefore(List<PropEntry> entries, int index, ReadOnlySpan<char> key)
+        {
+            for (var i = 0; i < index; i++)
+            {
+                if (TopLevel(entries[i].Key, out _).SequenceEqual(key))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 
@@ -281,6 +366,7 @@ internal sealed class PropsWriter : IDisposable
             _cancellationToken.ThrowIfCancellationRequested();
             ThrowIfPlanFailed();
             var p = prop as InertiaProp;
+            SawParallel |= p is { IsParallel: true };
             switch (Decide(p, prop, declaredType, parentWasResolved))
             {
                 case Inclusion.Filtered:
