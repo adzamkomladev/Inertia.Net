@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -37,11 +38,14 @@ public sealed class InertiaDevToolsOptions
     /// <summary>How long an entry is kept. Default 30 minutes.</summary>
     public TimeSpan MaxAge { get; set; } = TimeSpan.FromMinutes(30);
 
-    /// <summary>Request bodies larger than this are not recorded (reason <c>too-large</c>). Default 64 KiB.</summary>
+    /// <summary>
+    /// Request bodies larger than this are not recorded (reason <c>too-large</c>). Default 64 KiB. Unknown-length streams are not
+    /// buffered for recording; already seekable bodies can still be captured up to this limit.
+    /// </summary>
     public int MaxBodyBytes { get; set; } = 64 * 1024;
 
     /// <summary>
-    /// Prop, body and header names whose values are replaced with <c>[REDACTED]</c>, compared without case. Names containing
+    /// Prop, body, URL query and header names whose values are replaced with <c>[REDACTED]</c>, compared without case. Names containing
     /// <c>password</c>, <c>secret</c>, <c>token</c>, <c>authorization</c>, <c>cookie</c> or <c>api_key</c>/<c>apikey</c> are always redacted.
     /// </summary>
     public ISet<string> RedactedKeys { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -159,7 +163,8 @@ internal sealed partial class DevToolsRecorder
 
         var capture = new DevToolsCapture(Guid.CreateVersion7().ToString("N"), Stopwatch.GetTimestamp());
         httpContext.Features.Set(capture);
-        if (IsTextBody(request) && request.ContentLength is null or > 0)
+        if (!string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]) && IsTextBody(request)
+            && request.ContentLength is > 0 && request.ContentLength <= _options.MaxBodyBytes)
         {
             request.EnableBuffering(); // read back after the handler
         }
@@ -395,9 +400,14 @@ internal sealed partial class DevToolsRecorder
             return Body.Omitted(request.HasFormContentType ? "binary" : "non-textual");
         }
 
-        if (request.ContentLength > _options.MaxBodyBytes || !request.Body.CanSeek)
+        if (request.ContentLength > _options.MaxBodyBytes)
         {
-            return Body.Omitted(request.Body.CanSeek ? "too-large" : "streamed");
+            return Body.Omitted("too-large");
+        }
+
+        if (!request.Body.CanSeek)
+        {
+            return Body.Omitted("streamed");
         }
 
         request.Body.Position = 0;
@@ -423,13 +433,13 @@ internal sealed partial class DevToolsRecorder
             }
             catch (JsonException)
             {
-                return Body.Text(text);
+                return Body.Omitted("unserializable");
             }
         }
 
         // A form: decoded into an object so its fields can be redacted.
         var form = new JsonObject();
-        foreach (var (key, value) in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(text))
+        foreach (var (key, value) in QueryHelpers.ParseQuery(text))
         {
             form[key] = value.ToString();
         }
@@ -442,6 +452,10 @@ internal sealed partial class DevToolsRecorder
         var request = httpContext.Request;
         var response = httpContext.Response;
         var page = capture.PageJson is { } pageJson ? JsonNode.Parse(pageJson) as JsonObject : null;
+        if (page?["url"] is JsonValue pageUrl && pageUrl.TryGetValue<string>(out var url))
+        {
+            page["url"] = RedactUrl(url);
+        }
         var status = failed && !response.HasStarted ? StatusCodes.Status500InternalServerError : response.StatusCode;
 
         var buffer = new ArrayBufferWriter<byte>(4096);
@@ -452,7 +466,7 @@ internal sealed partial class DevToolsRecorder
             writer.WriteStartObject("__meta");
             writer.WriteString("id", capture.Id);
             writer.WriteString("method", request.Method);
-            writer.WriteString("url", string.Concat(request.PathBase.ToUriComponent(), request.Path.ToUriComponent(), request.QueryString.ToUriComponent()));
+            writer.WriteString("url", RedactUrl(string.Concat(request.PathBase.ToUriComponent(), request.Path.ToUriComponent(), request.QueryString.ToUriComponent())));
             writer.WriteNumber("status", status);
             writer.WriteString("requestType", requestType);
             WriteStringOrNull(writer, "component", capture.Component);
@@ -467,7 +481,7 @@ internal sealed partial class DevToolsRecorder
                 .FirstOrDefault(value => value.Length > 0);
             if (location is not null)
             {
-                writer.WriteString("redirectLocation", location);
+                writer.WriteString("redirectLocation", RedactUrl(location));
             }
 
             if (Header(request, "X-Inertia-Devtools-Visit") is { } visit)
@@ -619,10 +633,66 @@ internal sealed partial class DevToolsRecorder
         writer.WriteStartObject(name);
         foreach (var (header, value) in headers)
         {
-            writer.WriteString(header.ToLowerInvariant(), IsSensitive(header) ? Redacted : value.ToString());
+            var text = value.ToString();
+            var nameLower = header.ToLowerInvariant();
+            writer.WriteString(nameLower, IsSensitive(header) ? Redacted : nameLower switch
+            {
+                "referer" or "location" or "content-location" or "x-inertia-location" or "x-inertia-redirect" => RedactUrl(text),
+                "link" => RedactLinks(text),
+                "refresh" => RedactRefresh(text),
+                _ => text,
+            });
         }
 
         writer.WriteEndObject();
+    }
+
+    private string RedactLinks(string text)
+    {
+        var result = new StringBuilder();
+        var start = 0;
+        while (text.IndexOf('<', start) is var open && open >= 0)
+        {
+            var close = text.IndexOf('>', open + 1);
+            if (close < 0 || text.AsSpan(start, open - start).Contains('?')) return Redacted;
+            result.Append(text.AsSpan(start, open + 1 - start)).Append(RedactUrl(text[(open + 1)..close]));
+            start = close;
+        }
+
+        return text.AsSpan(start).Contains('?') ? Redacted : result.Append(text.AsSpan(start)).ToString();
+    }
+
+    private string RedactRefresh(string text)
+    {
+        var separator = text.IndexOf(';', StringComparison.Ordinal);
+        if (separator < 0) return text.Contains('?', StringComparison.Ordinal) ? Redacted : text;
+        var equals = text.IndexOf('=', separator + 1);
+        if (equals < 0 || !text.AsSpan(separator + 1, equals - separator - 1).Trim().Equals("url", StringComparison.OrdinalIgnoreCase)) return Redacted;
+        var target = text[(equals + 1)..].Trim();
+        if (target.Length > 0 && target[0] is '\'' or '"')
+        {
+            if (target.Length < 2 || target[^1] != target[0]) return Redacted;
+            return text[..(equals + 1)] + target[0] + RedactUrl(target[1..^1]) + target[0];
+        }
+
+        return text[..(equals + 1)] + RedactUrl(target);
+    }
+
+    private string RedactUrl(string url)
+    {
+        var queryStart = url.IndexOf('?', StringComparison.Ordinal);
+        var fragmentStart = url.IndexOf('#', StringComparison.Ordinal);
+        if (queryStart < 0 || (fragmentStart >= 0 && fragmentStart < queryStart)) return url;
+        var queryEnd = fragmentStart < 0 ? url.Length : fragmentStart;
+        var query = QueryHelpers.ParseQuery(url[queryStart..queryEnd]);
+        if (!query.Keys.Any(IsSensitive)) return url;
+
+        foreach (var key in query.Keys)
+        {
+            if (IsSensitive(key)) query[key] = Redacted;
+        }
+
+        return url[..queryStart] + QueryString.Create(query).ToUriComponent() + url[queryEnd..];
     }
 
     private void WriteBody(Utf8JsonWriter writer, string name, Body body)
@@ -637,14 +707,7 @@ internal sealed partial class DevToolsRecorder
         if (body.Status == "present")
         {
             writer.WritePropertyName("value");
-            if (body.Value is { } text)
-            {
-                writer.WriteStringValue(text);
-            }
-            else
-            {
-                WriteNode(writer, Redact(body.Node));
-            }
+            WriteNode(writer, Redact(body.Node));
         }
 
         writer.WriteEndObject();
@@ -710,13 +773,11 @@ internal sealed partial class DevToolsRecorder
 
     private sealed record Stored(string Id, string Tab, string? Component, string RequestType, DateTimeOffset At, byte[] Json);
 
-    private readonly record struct Body(string Status, string? Reason = null, string? Value = null, JsonNode? Node = null)
+    private readonly record struct Body(string Status, string? Reason = null, JsonNode? Node = null)
     {
         public static Body Empty => new("empty");
 
         public static Body Omitted(string reason) => new("omitted", reason);
-
-        public static Body Text(string text) => new("present", Value: text);
 
         public static Body Json(JsonNode? node) => new("present", Node: node);
     }

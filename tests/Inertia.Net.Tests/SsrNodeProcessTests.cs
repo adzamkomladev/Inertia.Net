@@ -413,7 +413,8 @@ public sealed class SsrNodeProcessTests
     public async Task Several_instances_share_the_renders_and_cover_for_each_other()
     {
         Assert.SkipUnless(NodeAvailable, "node is not on PATH");
-        var (harness, ssr, url) = Create(instances: 2);
+        using var barrier = new RestartBarrier();
+        var (harness, ssr, url) = Create(instances: 2, configureServices: s => s.AddLogging(b => b.AddProvider(barrier)));
         var basePort = new Uri(url).Port;
         try
         {
@@ -430,15 +431,25 @@ public sealed class SsrNodeProcessTests
 
             var first = ssr.ProcessIdOf(0);
             await CrashAsync(url);
+            Assert.True(barrier.RestartEntered.Wait(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken));
             for (var i = 0; i < 4; i++)
             {
-                Assert.Equal($"{basePort + 1}", RenderedPort(await RenderAsync(harness))); // a refused render fails over to the other instance
+                Assert.Equal($"{basePort + 1}", RenderedPort(await RenderAsync(harness)));
             }
 
+            barrier.ReleaseRestart.Set();
             await WaitUntilAsync(() => Task.FromResult(ssr.ProcessIdOf(0) is { } pid && pid != first && ssr.IsInstanceReady(0)));
+            ports.Clear();
+            for (var i = 0; i < 4; i++)
+            {
+                ports.Add(RenderedPort(await RenderAsync(harness)));
+            }
+
+            Assert.Equal(new[] { $"{basePort}", $"{basePort + 1}" }, ports.Order());
         }
         finally
         {
+            barrier.ReleaseRestart.Set();
             await ssr.StopAsync(CancellationToken.None);
         }
     }

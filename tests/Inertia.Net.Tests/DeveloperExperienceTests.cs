@@ -225,6 +225,43 @@ public sealed class DeveloperExperienceTests : IDisposable
         await production.Services.GetServices<IHostedService>().OfType<InertiaTypeScriptWriter>().Single().StartAsync(CancellationToken.None);
         Assert.False(File.Exists(Path.Combine(_root.Path, "ClientApp/types/other.d.ts")));
     }
+
+    [Fact]
+    public void Member_number_handling_overrides_type_and_global_settings()
+    {
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            TypeInfoResolver = TypeScriptJsonContext.Default,
+            NumberHandling = JsonNumberHandling.WriteAsString,
+        };
+        var ts = Generate(o => o.TypeScript.Page<TsSerializationPage>("Serialized"), json);
+        Assert.Contains("number: number | string", ts, StringComparison.Ordinal);
+        Assert.Contains("strict: number\n", ts, StringComparison.Ordinal);
+        Assert.Contains("values: (number | string)[]", ts, StringComparison.Ordinal);
+        Assert.Contains("token: unknown", ts, StringComparison.Ordinal);
+        var serialized = JsonSerializer.Serialize(new TsSerializationPage(42, 7, [1], "secret"), json);
+        Assert.Contains("\"number\":\"42\"", serialized, StringComparison.Ordinal);
+        Assert.Contains("\"strict\":7", serialized, StringComparison.Ordinal);
+        Assert.Contains("\"values\":[\"1\"]", serialized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Custom_converters_on_members_and_primitives_produce_unknown_with_a_warning()
+    {
+        var options = new InertiaOptions();
+        options.TypeScript.Page<TsSerializationPage>("Serialized");
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web) { TypeInfoResolver = TypeScriptJsonContext.Default };
+        json.Converters.Add(new MemberMaskConverter());
+        var generator = new TypeScriptGenerator(json, options);
+        var ts = generator.Generate();
+        Assert.Contains("token: unknown", ts, StringComparison.Ordinal);
+        Assert.Contains(generator.Warnings, warning => warning.Contains("custom JSON converter", StringComparison.Ordinal));
+        Assert.Equal("unknown", generator.Reference(typeof(string)));
+        var nullableJson = new JsonSerializerOptions(JsonSerializerDefaults.Web) { TypeInfoResolver = TypeScriptJsonContext.Default };
+        nullableJson.Converters.Add(new TsNullableNumberConverter());
+        var nullableGenerator = new TypeScriptGenerator(nullableJson, options);
+        Assert.Equal("unknown", nullableGenerator.Reference(typeof(int?)));
+    }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<Status>))]
@@ -272,9 +309,25 @@ public sealed record Flash(string? Success);
 
 public sealed record Unregistered(int X);
 
+[JsonNumberHandling(JsonNumberHandling.WriteAsString)]
+public sealed record TsSerializationPage(
+    int Number,
+    [property: JsonNumberHandling(JsonNumberHandling.Strict)] int Strict,
+    List<int> Values,
+    [property: JsonConverter(typeof(MemberMaskConverter))] string Token);
+
+public sealed class TsNullableNumberConverter : JsonConverter<int?>
+{
+    public override int? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => null;
+
+    public override void Write(Utf8JsonWriter writer, int? value, JsonSerializerOptions options) => writer.WriteStringValue("custom nullable number");
+}
+
 [JsonSerializable(typeof(UsersPage))]
 [JsonSerializable(typeof(OrdersPage))]
 [JsonSerializable(typeof(Flash))]
 [JsonSerializable(typeof(List<string>))]
 [JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(TsSerializationPage))]
+[JsonSerializable(typeof(int?))]
 internal sealed partial class TypeScriptJsonContext : JsonSerializerContext;

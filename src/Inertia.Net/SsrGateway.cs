@@ -198,12 +198,13 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         var started = Stopwatch.GetTimestamp();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
         deadline.CancelAfter(_ssr.Timeout);
-        TaskCompletionSource completion;
+        TaskCompletionSource<byte[]?> completion;
         try
         {
             while (!_caching.TryBeginFill(key, out completion))
             {
-                await completion.Task.WaitAsync(deadline.Token);
+                var shared = await completion.Task.WaitAsync(deadline.Token);
+                if (shared is not null && CacheEntry.TryReadRender(shared, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds(), out var filled)) return Cached(filled);
                 if (await _caching.GetRenderAsync(key, deadline.Token) is { } hit) return Cached(hit);
             }
 
@@ -211,10 +212,15 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             {
                 if (await _caching.GetRenderAsync(key, deadline.Token) is { } hit) return Cached(hit);
                 deadline.Token.ThrowIfCancellationRequested();
-                var remaining = _ssr.Timeout - Stopwatch.GetElapsedTime(started);
+                var remaining = _ssr.Timeout;
+                if (remaining != Timeout.InfiniteTimeSpan)
+                {
+                    remaining -= Stopwatch.GetElapsedTime(started);
+                    if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
+                }
                 var render = await RenderOnServersAsync(mode, context.PageJson, _endpoints, _managed, http.RequestAborted,
-                    remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
-                return render is null ? null : await StoreAsync(key, duration, staleFor, render, http.RequestAborted);
+                    remaining);
+                return render is null ? null : await StoreAsync(key, duration, staleFor, render, http.RequestAborted, completion);
             }
             finally
             {
@@ -694,7 +700,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         path ??= "/";
         foreach (var pattern in patterns)
         {
-            if (pattern.EndsWith('*') ? path.StartsWith(pattern.AsSpan(0, pattern.Length - 1), StringComparison.Ordinal) : path == pattern)
+            if (pattern.EndsWith('*') ? path.StartsWith(pattern.AsSpan(0, pattern.Length - 1), StringComparison.OrdinalIgnoreCase) : string.Equals(path, pattern, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
@@ -776,13 +782,14 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     }
 
     // Keeps a copy of the render in a cache entry of its own and hands out the copy, so the pooled array goes back at once.
-    private async ValueTask<SsrRender> StoreAsync(InertiaCacheKey key, TimeSpan duration, TimeSpan staleFor, SsrRender render, CancellationToken cancellationToken)
+    private async ValueTask<SsrRender> StoreAsync(InertiaCacheKey key, TimeSpan duration, TimeSpan staleFor, SsrRender render, CancellationToken cancellationToken, TaskCompletionSource<byte[]?>? fill = null)
     {
         var expiration = InertiaCaching.Expiration(duration, staleFor);
         var (freshUntil, expiresAt) = _caching.Times(duration, expiration);
         var entry = CacheEntry.CreateRender(render.Head.Span, render.Body.Span, freshUntil, expiresAt, out var stored);
         render.Dispose();
         await _caching.SetAsync(key, entry, expiration, InertiaCaching.SsrTags, cancellationToken);
+        fill?.SetResult(entry);
         return new SsrRender(stored.Head, stored.Body);
     }
 

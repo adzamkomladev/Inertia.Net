@@ -1,0 +1,11 @@
+Fix fixtures: loaders=8/8; renders=8/8; buffered=1048576 bytes; simulated I/O=10ms.
+Fix fixtures: loaders=1/8; renders=1/8; buffered=0 bytes; simulated I/O=10ms.
+Warming every fixture/version before measuring.
+Json20: baseline median 48.099 us; current median 48.297 us
+Partial2Of20: baseline median 23.017 us; current median 24.625 us
+Html20: baseline median 99.576 us; current median 101.228 us
+ReferenceSerialize: baseline median 51.395 us; current median 53.103 us
+FailedPropBurst8: baseline median 123176.850 us; current median 13663.150 us
+RejectedSsrBurst8: baseline median 123750.900 us; current median 13732.900 us
+IgnoredBody1MiB: baseline median 5953.325 us; current median 143.050 us
+Saved paired samples to C:\Users\adzam\Documents\Work\DotnetInertia\tests\Inertia.Net.Benchmarks\results\2026-10-26-review-fixes\paired-1.json

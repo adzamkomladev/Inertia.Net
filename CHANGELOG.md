@@ -7,6 +7,26 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-10-26
+
+### Fixed
+
+- DevTools omits malformed JSON bodies, redacts sensitive query parameters in recorded URLs and URL headers, and avoids buffering
+  bodies it will not capture. Unknown-length nonseekable request bodies are now omitted as streamed; application reads are unaffected.
+- Cache tag invalidation is synchronized with entry publication and replacement, so concurrent mutations cannot lose tag tracking.
+- Concurrent prop and SSR cache fills share successful results even when the cache store fails or rejects the entry. Failed and
+  cancelled loaders still allow waiting requests to retry.
+- Cached SSR renders preserve `Timeout.InfiniteTimeSpan`; SSR path exclusions match case-insensitively, like ASP.NET Core routes.
+- Generated TypeScript respects member/type number handling and uses `unknown` with a warning for custom converter output.
+
+### Performance
+
+- In synthetic eight-request bursts, sharing successful fills during prop-cache write failures reduces managed allocation from
+  32,696 to 22,072 bytes and latency from 122.97 to 14.03 ms; SSR cache rejection drops from 128,296 to 30,776 bytes and 123.29 to 13.95 ms.
+  Both fixtures simulate 10 ms I/O. Ordinary rendering shows unchanged allocation and no measurable timing improvement.
+- DevTools avoids spooling 1 MiB to disk for an ignored 1 MiB request body; managed allocation falls from 37,784 to 7,680 bytes.
+  See `tests/Inertia.Net.Benchmarks/RESULTS.md` for the paired measurements and limitations.
+
 ## [1.5.2] - 2026-10-24
 
 Less allocation on every render, and no parallel planning on pages without parallel props. No public API, wire format or stored-state

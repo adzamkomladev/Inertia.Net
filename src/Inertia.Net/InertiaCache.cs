@@ -189,7 +189,7 @@ internal sealed partial class InertiaCaching
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<InertiaCacheKey, byte> _refreshing = new();
-    private readonly ConcurrentDictionary<InertiaCacheKey, TaskCompletionSource> _filling = new();
+    private readonly ConcurrentDictionary<InertiaCacheKey, TaskCompletionSource<byte[]?>> _filling = new();
     private int _refreshCount;
     private long _nextFailureLog;
     private int _suppressedFailures;
@@ -259,18 +259,18 @@ internal sealed partial class InertiaCaching
         return value is not null && CacheEntry.TryReadRender(value, Now(), out var render) ? render : null;
     }
 
-    /// <summary>Claims a missing entry, or returns the current fill to await before checking the store again.</summary>
-    public bool TryBeginFill(InertiaCacheKey key, out TaskCompletionSource completion)
+    /// <summary>Claims a missing entry, or returns the current fill whose successful bytes are shared even if storage fails.</summary>
+    public bool TryBeginFill(InertiaCacheKey key, out TaskCompletionSource<byte[]?> completion)
     {
-        var candidate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var candidate = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
         completion = _filling.GetOrAdd(key, candidate);
         return ReferenceEquals(completion, candidate);
     }
 
-    public void EndFill(InertiaCacheKey key, TaskCompletionSource completion)
+    public void EndFill(InertiaCacheKey key, TaskCompletionSource<byte[]?> completion)
     {
         _filling.TryRemove(key, out _);
-        completion.SetResult();
+        completion.TrySetResult(null);
     }
 
     /// <summary>Stores an entry while rendering: a failing store is logged and the page is still written. Ends a refresh of the key.</summary>

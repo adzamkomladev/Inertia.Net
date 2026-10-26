@@ -1,0 +1,200 @@
+{
+  "rows": [
+    {
+      "run": 1,
+      "method": "Json20",
+      "baselineMs": 0.0480994140625,
+      "baselineBytes": 1736.0,
+      "currentMs": 0.048297265625,
+      "currentBytes": 1736.0,
+      "latencyChangePercent": -0.4781932132545408,
+      "latency95PercentInterval": [
+        -3.875079908246526,
+        3.618919537877563
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "Partial2Of20",
+      "baselineMs": 0.02301748046875,
+      "baselineBytes": 568.0,
+      "currentMs": 0.024625390625,
+      "currentBytes": 568.0,
+      "latencyChangePercent": -2.9145791010261712,
+      "latency95PercentInterval": [
+        -10.056909824914694,
+        4.199710710114013
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "Html20",
+      "baselineMs": 0.09957578125,
+      "baselineBytes": 1800.0,
+      "currentMs": 0.1012283203125,
+      "currentBytes": 1800.0,
+      "latencyChangePercent": -5.094370473988491,
+      "latency95PercentInterval": [
+        -15.280947294311865,
+        4.371830556364886
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "ReferenceSerialize",
+      "baselineMs": 0.05139453125,
+      "baselineBytes": 312.0,
+      "currentMs": 0.0531033203125,
+      "currentBytes": 312.0,
+      "latencyChangePercent": 10.521414181257626,
+      "latency95PercentInterval": [
+        -2.957903804812373,
+        34.451190907019445
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "FailedPropBurst8",
+      "baselineMs": 123.17685,
+      "baselineBytes": 32696.0,
+      "currentMs": 13.66315,
+      "currentBytes": 22072.0,
+      "latencyChangePercent": -88.88926697919496,
+      "latency95PercentInterval": [
+        -88.98116451624217,
+        -88.5657458563536
+      ],
+      "allocationChangeBytes": -10624.0
+    },
+    {
+      "run": 1,
+      "method": "RejectedSsrBurst8",
+      "baselineMs": 123.7509,
+      "baselineBytes": 128296.0,
+      "currentMs": 13.7329,
+      "currentBytes": 30776.0,
+      "latencyChangePercent": -88.96666312305882,
+      "latency95PercentInterval": [
+        -89.26315735066078,
+        -88.62282882519042
+      ],
+      "allocationChangeBytes": -97520.0
+    },
+    {
+      "run": 1,
+      "method": "IgnoredBody1MiB",
+      "baselineMs": 5.953325,
+      "baselineBytes": 37808.0,
+      "currentMs": 0.14305,
+      "currentBytes": 7680.0,
+      "latencyChangePercent": -97.54092748231648,
+      "latency95PercentInterval": [
+        -97.74738728276787,
+        -97.23493182492977
+      ],
+      "allocationChangeBytes": -30128.0
+    },
+    {
+      "run": 2,
+      "method": "Json20",
+      "baselineMs": 0.0582376953125,
+      "baselineBytes": 1736.0,
+      "currentMs": 0.05711337890625,
+      "currentBytes": 1736.0,
+      "latencyChangePercent": 0.30192202588046335,
+      "latency95PercentInterval": [
+        -5.0660711684307635,
+        4.369273462383061
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "Partial2Of20",
+      "baselineMs": 0.027352099609375,
+      "baselineBytes": 568.0,
+      "currentMs": 0.02829677734375,
+      "currentBytes": 568.0,
+      "latencyChangePercent": -1.3988772365686353,
+      "latency95PercentInterval": [
+        -4.963356871338187,
+        4.207126557042784
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "Html20",
+      "baselineMs": 0.082585546875,
+      "baselineBytes": 1800.0,
+      "currentMs": 0.08466171875,
+      "currentBytes": 1800.0,
+      "latencyChangePercent": 2.3302355777352624,
+      "latency95PercentInterval": [
+        -2.905785809099493,
+        8.01135659307305
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "ReferenceSerialize",
+      "baselineMs": 0.031169140625,
+      "baselineBytes": 312.0,
+      "currentMs": 0.0303919921875,
+      "currentBytes": 312.0,
+      "latencyChangePercent": -1.8720981231978628,
+      "latency95PercentInterval": [
+        -13.8278839422304,
+        20.535206191596366
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "FailedPropBurst8",
+      "baselineMs": 122.96625,
+      "baselineBytes": 32696.0,
+      "currentMs": 14.0268,
+      "currentBytes": 22072.0,
+      "latencyChangePercent": -88.65876028044786,
+      "latency95PercentInterval": [
+        -88.90884170252065,
+        -88.51589266260135
+      ],
+      "allocationChangeBytes": -10624.0
+    },
+    {
+      "run": 2,
+      "method": "RejectedSsrBurst8",
+      "baselineMs": 123.28525,
+      "baselineBytes": 128296.0,
+      "currentMs": 13.9516,
+      "currentBytes": 30776.0,
+      "latencyChangePercent": -88.64859071649987,
+      "latency95PercentInterval": [
+        -88.86865852650958,
+        -88.40313980536203
+      ],
+      "allocationChangeBytes": -97520.0
+    },
+    {
+      "run": 2,
+      "method": "IgnoredBody1MiB",
+      "baselineMs": 4.620575,
+      "baselineBytes": 37784.0,
+      "currentMs": 0.128825,
+      "currentBytes": 7680.0,
+      "latencyChangePercent": -97.2056878471601,
+      "latency95PercentInterval": [
+        -97.71876318254246,
+        -96.84127973607087
+      ],
+      "allocationChangeBytes": -30104.0
+    }
+  ]
+}

@@ -267,6 +267,8 @@ public sealed class SsrGatewayTests
 
         AssertClientRendered(await GetAsync(harness, "/login"));
         AssertClientRendered(await GetAsync(harness, "/admin/users/1"));
+        AssertClientRendered(await GetAsync(harness, "/LOGIN"));
+        AssertClientRendered(await GetAsync(harness, "/ADMIN/users/1"));
         Assert.Empty(handler.Requests);
 
         await GetAsync(harness, "/login/other");

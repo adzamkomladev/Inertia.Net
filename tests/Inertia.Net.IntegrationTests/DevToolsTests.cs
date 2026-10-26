@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -121,16 +122,22 @@ public sealed class DevToolsTests
         Assert.Equal("non-inertia-response", (string?)http["http"]!["responseBody"]!["reason"]);
     }
 
-    [Fact]
-    public async Task Request_bodies_and_headers_are_recorded_with_secrets_redacted()
+    [Theory]
+    [InlineData("application/json", "{\"name\":\"Ann\",\"password\":\"hunter2\"}")]
+    [InlineData("application/x-www-form-urlencoded", "name=Ann&password=hunter2")]
+    public async Task Request_bodies_and_headers_are_recorded_with_secrets_redacted(string contentType, string body)
     {
         await using var app = await StartAsync();
         var client = app.CreateClient();
-        var response = await client.InertiaAsync(HttpMethod.Post, "/save", new { name = "Ann", password = "hunter2" }, r =>
+        using var message = new HttpRequestMessage(HttpMethod.Post, "/save")
         {
-            r.WithHeader("Authorization", "Bearer abc");
-            r.WithHeader("X-Custom", "visible");
-        });
+            Content = new StringContent(body, Encoding.UTF8, contentType),
+        };
+        message.Content.Headers.ContentLength = Encoding.UTF8.GetByteCount(body);
+        message.WithHeader(InertiaHeaders.Inertia, "true");
+        message.WithHeader("Authorization", "Bearer abc");
+        message.WithHeader("X-Custom", "visible");
+        var response = await client.SendAsync(message, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
         Assert.Equal("Ann", await client.GetStringAsync("/last", TestContext.Current.CancellationToken)); // the handler still read the body
 
@@ -169,6 +176,166 @@ public sealed class DevToolsTests
     }
 
     [Fact]
+    public async Task Malformed_json_is_omitted_without_changing_the_handlers_input()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        const string body = "{\"password\":\"malformed-body-secret\",";
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/capture")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add(InertiaHeaders.Inertia, "true");
+        request.Content.Headers.ContentLength = Encoding.UTF8.GetByteCount(body);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(body, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var entry = await EntryAsync(client, response);
+        Assert.Equal("omitted", (string?)entry["http"]!["requestBody"]!["status"]);
+        Assert.Equal("unserializable", (string?)entry["http"]!["requestBody"]!["reason"]);
+        Assert.DoesNotContain("malformed-body-secret", entry.ToJsonString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("malformed-body-secret", await client.GetStringAsync("/_inertia/devtools/entries", TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sensitive_queries_are_redacted_from_metadata_page_copies_and_url_headers()
+    {
+        await using var app = await StartAsync(o => o.RedactedKeys.Add("credential"));
+        var client = app.CreateClient();
+        const string query = "?ToKeN=query-secret&%74oken=duplicate-secret&credential=custom-secret&ok=visible";
+        var response = await client.InertiaGetAsync("/dashboard" + query, r =>
+            r.WithHeader("Referer", "https://example.test/source?api_key=referer-secret&ok=visible#kept"));
+        var actual = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!;
+        var actualUrl = (string?)actual["url"];
+        Assert.Contains("query-secret", actualUrl, StringComparison.Ordinal);
+        Assert.Contains("duplicate-secret", actualUrl, StringComparison.Ordinal);
+        Assert.Contains("custom-secret", actualUrl, StringComparison.Ordinal);
+        Assert.Contains("ok=visible", actualUrl, StringComparison.Ordinal);
+
+        var entry = await EntryAsync(client, response);
+        foreach (var secret in new[] { "query-secret", "duplicate-secret", "custom-secret", "referer-secret" })
+        {
+            Assert.DoesNotContain(secret, entry.ToJsonString(), StringComparison.Ordinal);
+        }
+        Assert.Contains("ok=visible", (string?)entry["__meta"]!["url"], StringComparison.Ordinal);
+        Assert.Equal((string?)entry["__meta"]!["url"], (string?)entry["http"]!["responseBody"]!["value"]!["url"]);
+        Assert.EndsWith("#kept", (string?)entry["http"]!["requestHeaders"]!["referer"], StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("location", "location")]
+    [InlineData("external", "x-inertia-location")]
+    [InlineData("fragment", "x-inertia-redirect")]
+    public async Task Redirect_queries_are_redacted_only_in_recorded_copies(string kind, string header)
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        var response = await client.InertiaGetAsync("/redirect-secret/" + kind);
+        var actual = response.Header(header)!;
+        Assert.Contains("redirect-secret", actual, StringComparison.Ordinal);
+        var entry = await EntryAsync(client, response);
+        // The route itself contains redirect-secret; inspect the URL-valued fields rather than the request path.
+        var location = (string?)entry["__meta"]!["redirectLocation"];
+        Assert.DoesNotContain("=redirect-secret", location, StringComparison.Ordinal);
+        Assert.Contains("ok=visible", location, StringComparison.Ordinal);
+        Assert.Equal(location, (string?)entry["http"]!["responseHeaders"]![header]);
+        Assert.DoesNotContain("=redirect-secret", (string?)entry["http"]!["responseHeaders"]!["content-location"], StringComparison.Ordinal);
+        Assert.Contains("refresh-secret", response.Header("Refresh"), StringComparison.Ordinal);
+        Assert.Contains("link-secret", response.Header("Link"), StringComparison.Ordinal);
+        Assert.DoesNotContain("refresh-secret", entry.ToJsonString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("link-secret", entry.ToJsonString(), StringComparison.Ordinal);
+        Assert.EndsWith("#kept\"", (string?)entry["http"]!["responseHeaders"]!["refresh"], StringComparison.Ordinal);
+        Assert.Contains("</safe?ok=visible>", (string?)entry["http"]!["responseHeaders"]!["link"], StringComparison.Ordinal);
+        Assert.Contains("rel=preload", (string?)entry["http"]!["responseHeaders"]!["link"], StringComparison.Ordinal);
+        if (kind != "location") Assert.EndsWith("#kept", location, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Ineligible_bodies_are_not_buffered_and_the_handler_can_read_them(bool inertia, bool unknownLength)
+    {
+        await using var app = await StartAsync();
+        var recorder = app.App.Services.GetRequiredService<DevToolsRecorder>();
+        var http = new DefaultHttpContext();
+        await using var body = new NonSeekableStream(new byte[128 * 1024]);
+        http.Request.Body = body;
+        http.Request.ContentType = "application/json";
+        if (unknownLength) http.Request.Headers.TransferEncoding = "chunked";
+        else http.Request.ContentLength = body.Length;
+        if (inertia) http.Request.Headers[InertiaHeaders.Inertia] = "true";
+        var capture = recorder.Begin(http)!;
+        Assert.Same(body, http.Request.Body);
+        using var received = new MemoryStream();
+        await http.Request.Body.CopyToAsync(received, TestContext.Current.CancellationToken);
+        Assert.Equal(body.Length, received.Length);
+        await recorder.CompleteAsync(http, capture, failed: false);
+        var entry = JsonNode.Parse(await app.CreateClient().GetStringAsync("/_inertia/devtools/entries/" + capture.Id, TestContext.Current.CancellationToken))!;
+        Assert.Equal("omitted", (string?)entry["http"]!["requestBody"]!["status"]);
+        Assert.Equal(!inertia ? "non-inertia-request" : unknownLength ? "streamed" : "too-large", (string?)entry["http"]!["requestBody"]!["reason"]);
+    }
+
+    private sealed class NonSeekableStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public override bool CanSeek => false;
+    }
+
+    [Theory]
+    [InlineData("?%74oken=encoded-secret&ok=visible")]
+    [InlineData("?%63redential=encoded-secret&ok=visible")]
+    public async Task Encoded_query_names_and_custom_absolute_page_urls_are_redacted(string query)
+    {
+        await using var app = await StartAsync(o => o.RedactedKeys.Add("credential"));
+        var recorder = app.App.Services.GetRequiredService<DevToolsRecorder>();
+        var http = new DefaultHttpContext();
+        http.Request.PathBase = "/base";
+        http.Request.Path = "/dashboard";
+        http.Request.QueryString = new QueryString(query);
+        var capture = recorder.Begin(http)!;
+        var original = new JsonObject
+        {
+            ["component"] = "Dashboard",
+            ["props"] = new JsonObject(),
+            ["url"] = "https://example.test/base/dashboard" + query + "#kept",
+        }.ToJsonString();
+        capture.PageJson = Encoding.UTF8.GetBytes(original);
+        await recorder.CompleteAsync(http, capture, failed: false);
+        var entry = JsonNode.Parse(await app.CreateClient().GetStringAsync("/_inertia/devtools/entries/" + capture.Id, TestContext.Current.CancellationToken))!;
+        Assert.DoesNotContain("encoded-secret", entry.ToJsonString(), StringComparison.Ordinal);
+        Assert.StartsWith("/base/dashboard?", (string?)entry["__meta"]!["url"], StringComparison.Ordinal);
+        var recordedUrl = (string?)entry["http"]!["responseBody"]!["value"]!["url"];
+        Assert.StartsWith("https://example.test/base/dashboard?", recordedUrl, StringComparison.Ordinal);
+        Assert.Contains("ok=visible", recordedUrl, StringComparison.Ordinal);
+        Assert.EndsWith("#kept", recordedUrl, StringComparison.Ordinal);
+        Assert.Equal(original, Encoding.UTF8.GetString(capture.PageJson));
+    }
+
+    [Theory]
+    [InlineData("Link", "</asset?token=header-secret", true)]
+    [InlineData("Link", "/asset?token=header-secret", true)]
+    [InlineData("Link", "</safe>; rel=next, /asset?token=header-secret", true)]
+    [InlineData("Link", "</safe?ok=visible>; rel=next", false)]
+    [InlineData("Refresh", "0; url='/asset?token=header-secret'", true)]
+    [InlineData("Refresh", "0; URL = /asset?token=header-secret", true)]
+    [InlineData("Refresh", "0; url=\"/asset?token=header-secret", true)]
+    [InlineData("Refresh", "0; /asset?token=header-secret", true)]
+    [InlineData("Refresh", "5", false)]
+    public async Task Url_header_variants_do_not_retain_secrets(string header, string value, bool redacted)
+    {
+        await using var app = await StartAsync();
+        var recorder = app.App.Services.GetRequiredService<DevToolsRecorder>();
+        var http = new DefaultHttpContext();
+        http.Response.Headers[header] = value;
+        var capture = recorder.Begin(http)!;
+        await recorder.CompleteAsync(http, capture, failed: false);
+        var entry = JsonNode.Parse(await app.CreateClient().GetStringAsync("/_inertia/devtools/entries/" + capture.Id, TestContext.Current.CancellationToken))!;
+        Assert.DoesNotContain("header-secret", entry.ToJsonString(), StringComparison.Ordinal);
+        var recorded = (string?)entry["http"]!["responseHeaders"]![header.ToLowerInvariant()];
+        if (!redacted) Assert.Equal(value, recorded);
+        Assert.Equal(value, http.Response.Headers[header].ToString());
+    }
+
+    [Fact]
     public async Task The_read_api_is_closed_without_authorization_and_nothing_is_recorded_when_off()
     {
         await using var closed = await StartAsync(o => o.Authorize = _ => false);
@@ -204,10 +371,23 @@ public sealed class DevToolsTests
                 ["plans"] = Once(() => "free"),
             }));
             app.MapGet("/plain", () => Results.Text("plain"));
+            app.MapPost("/capture", async (HttpContext http) =>
+            {
+                using var reader = new StreamReader(http.Request.Body, Encoding.UTF8, leaveOpen: true);
+                return Results.Text(await reader.ReadToEndAsync(http.RequestAborted));
+            });
+            app.MapGet("/redirect-secret/{kind}", (HttpContext http, string kind) =>
+            {
+                var target = (kind == "external" ? "https://example.test" : "") + "/dashboard?token=redirect-secret&ok=visible" + (kind == "location" ? "" : "#kept");
+                http.Response.Headers.ContentLocation = target;
+                http.Response.Headers["Refresh"] = "0; url=\"/dashboard?token=refresh-secret&ok=visible#kept\"";
+                http.Response.Headers["Link"] = "</safe?ok=visible>; rel=next, </asset?token=link-secret>; rel=preload, <https://example.test/other?api_key=link-secret#kept>; rel=next";
+                return Results.Redirect(target);
+            });
             app.MapPost("/save", async (HttpContext http) =>
             {
-                var body = await http.Request.ReadFromJsonAsync<JsonObject>();
-                _last = (string?)body?["name"];
+                _last = http.Request.HasFormContentType ? (string?)(await http.Request.ReadFormAsync())["name"]
+                    : (string?)(await http.Request.ReadFromJsonAsync<JsonObject>())?["name"];
                 return Results.Redirect("/dashboard");
             });
             app.MapGet("/last", () => _last ?? "");

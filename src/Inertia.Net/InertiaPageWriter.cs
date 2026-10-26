@@ -706,10 +706,11 @@ internal sealed class InertiaPageWriter
     internal async ValueTask<object?> LoadCachedPropAsync(InertiaProp prop, CancellationToken cancellationToken)
     {
         var caching = prop.Caching!;
-        TaskCompletionSource completion;
+        TaskCompletionSource<byte[]?> completion;
         while (!Caching.TryBeginFill(caching.StoreKey, out completion))
         {
-            await completion.Task.WaitAsync(cancellationToken);
+            var shared = await completion.Task.WaitAsync(cancellationToken);
+            if (shared is not null && CacheEntry.TryReadProp(shared, TimeProvider.GetUtcNow().ToUnixTimeMilliseconds(), out var filled)) return filled;
             if (await Caching.GetPropAsync(caching, cancellationToken) is { } hit) return hit;
         }
 
@@ -730,6 +731,7 @@ internal sealed class InertiaPageWriter
 
             var entry = CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, caching.Key, out var stored);
             await Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken);
+            completion.SetResult(entry);
             return stored;
         }
         finally

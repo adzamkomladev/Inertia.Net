@@ -15,8 +15,11 @@ internal static class PairedLatencyProbe
         "ConstructProps", "Nested20", "Nested2000", "ParallelCacheHit1", "ParallelCacheHit32", "TinyParallel20", "YieldParallel3", "ColdBurst32",
     ];
 
-    internal static async Task RunAsync(string directory, string output, bool memory = false)
+    private static readonly string[] FixMethods = ["Json20", "Partial2Of20", "Html20", "ReferenceSerialize", "FailedPropBurst8", "RejectedSsrBurst8", "IgnoredBody1MiB"];
+
+    internal static async Task RunAsync(string directory, string output, bool memory = false, bool fixes = false)
     {
+        var methods = fixes ? FixMethods : Methods;
         string[] names = memory ? ["baseline", "current"] : ["original", "current", "prune", "remember"];
         var variants = new List<Variant>();
         var rows = new List<Sample>();
@@ -25,13 +28,13 @@ internal static class PairedLatencyProbe
             foreach (var name in names)
             {
                 var path = Path.Combine(directory, name, "tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll");
-                var variant = new Variant(name, path);
+                var variant = new Variant(name, path, fixes);
                 variants.Add(variant);
                 await variant.SetupAsync();
             }
 
             Console.WriteLine("Warming every fixture/version before measuring.");
-            foreach (var method in Methods)
+            foreach (var method in methods)
             {
                 foreach (var variant in variants)
                 {
@@ -41,7 +44,7 @@ internal static class PairedLatencyProbe
                 }
             }
 
-            foreach (var method in Methods)
+            foreach (var method in methods)
             {
                 var count = variants.Min(variant => Calibrate(variant.Actions[method]));
                 for (var round = 0; round < 32; round++)
@@ -74,6 +77,8 @@ internal static class PairedLatencyProbe
                 runtime = Environment.Version.ToString(),
                 os = Environment.OSVersion.ToString(),
                 rounds = 32,
+                processorCount = Environment.ProcessorCount,
+                processAffinity = OperatingSystem.IsWindows() ? Process.GetCurrentProcess().ProcessorAffinity.ToInt64() : (long?)null,
                 hashes = variants.ToDictionary(variant => variant.Name, variant => variant.Hash),
                 rows,
             }, new JsonSerializerOptions { WriteIndented = true }));
@@ -143,17 +148,17 @@ internal static class PairedLatencyProbe
         private readonly MethodInfo _setup;
         private readonly MethodInfo _cleanup;
 
-        public Variant(string name, string path)
+        public Variant(string name, string path, bool fixes = false)
         {
             Name = name;
             Hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(path)!, "Inertia.Net.dll"))));
             _context = new LibraryContext(name, path);
             var assembly = _context.LoadFromAssemblyPath(Path.GetFullPath(path));
-            var type = assembly.GetType("Inertia.Net.Benchmarks.ReviewLatencyBenchmarks", throwOnError: true)!;
+            var type = assembly.GetType(fixes ? "Inertia.Net.Benchmarks.FixPerformanceBenchmarks" : "Inertia.Net.Benchmarks.ReviewLatencyBenchmarks", throwOnError: true)!;
             _fixture = Activator.CreateInstance(type)!;
             _setup = type.GetMethod("Setup")!;
             _cleanup = type.GetMethod("Cleanup")!;
-            Actions = Methods.ToDictionary(method => method, method => ActionFor(type.GetMethod(method)!));
+            Actions = (fixes ? FixMethods : Methods).ToDictionary(method => method, method => ActionFor(type.GetMethod(method)!));
         }
 
         public string Name { get; }
