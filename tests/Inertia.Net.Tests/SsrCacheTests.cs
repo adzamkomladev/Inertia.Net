@@ -143,6 +143,53 @@ public sealed class SsrCacheTests
         Assert.Contains("render 1", await first, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Concurrent_misses_share_renders_even_when_the_store_cannot_keep_them(bool reject)
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new CountingHandler { BeforeSend = (_, ct) => release.Task.WaitAsync(ct) };
+        var harness = new Harness(o =>
+        {
+            o.Ssr.Mode = SsrMode.Required;
+            o.Ssr.Cache.Duration = TimeSpan.FromMinutes(1);
+            if (reject) o.Ssr.Cache.MaxBytes = 1;
+        }, configureServices: s =>
+        {
+            if (!reject) s.AddSingleton<IInertiaCacheStore>(new CachedPropsTests.RecordingStore { FailWrites = true });
+            s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler);
+        });
+        var requests = Enumerable.Range(0, 16).Select(_ => RenderAsync(harness)).ToArray();
+        release.SetResult();
+        var pages = await Task.WhenAll(requests).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.All(pages, page => Assert.Contains("render 1", page, StringComparison.Ordinal));
+        Assert.Equal(1, handler.Calls);
+        Assert.Contains("render 2", await RenderAsync(harness), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(SsrMode.Preferred)]
+    [InlineData(SsrMode.Required)]
+    public async Task An_infinite_timeout_allows_a_cold_cached_render_and_its_waiter(SsrMode mode)
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new CountingHandler { BeforeSend = (_, ct) => release.Task.WaitAsync(ct) };
+        var harness = new Harness(o =>
+        {
+            o.Ssr.Mode = mode;
+            o.Ssr.Timeout = Timeout.InfiniteTimeSpan;
+            o.Ssr.Cache.Duration = TimeSpan.FromMinutes(1);
+        }, configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
+        var first = RenderAsync(harness);
+        var waiter = RenderAsync(harness);
+        await Task.Delay(20, TestContext.Current.CancellationToken);
+        release.SetResult();
+        var pages = await Task.WhenAll(first, waiter).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.All(pages, page => Assert.Contains("render 1", page, StringComparison.Ordinal));
+        Assert.Equal(1, handler.Calls);
+    }
+
     [Fact]
     public async Task A_cancelled_ssr_fill_releases_the_waiting_request()
     {

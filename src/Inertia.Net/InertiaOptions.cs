@@ -187,7 +187,7 @@ public sealed class SsrOptions
 
     /// <summary>
     /// Request paths (<c>Request.Path</c>, without PathBase) that are never server-side rendered, unless the response sets its own mode with
-    /// <see cref="InertiaResult.WithSsr"/>. Exact match, or a trailing <c>*</c> for a prefix match, e.g. <c>/admin/*</c>.
+    /// <see cref="InertiaResult.WithSsr"/>. Case-insensitive exact match, or a trailing <c>*</c> for a prefix match, e.g. <c>/admin/*</c>.
     /// </summary>
     public IList<string> ExcludePaths { get; } = [];
 

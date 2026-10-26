@@ -7,7 +7,7 @@
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Inertia.Net" Version="1.5.2" />
+    <PackageReference Include="Inertia.Net" Version="1.5.3" />
   </ItemGroup>
   <!-- The client is built with npm (npm run build writes wwwroot/build); dotnet build never needs Node. -->
   <ItemGroup>

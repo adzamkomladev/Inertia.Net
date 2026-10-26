@@ -11,6 +11,7 @@ if (args is ["--cache-probe"]) { await CacheProbe.RunAsync(); return; }
 if (args is ["--allocation-probe"]) { await AllocationProbe.RunAsync(); return; }
 if (args is ["--paired-latency", var variants, var pairedOutput]) { await PairedLatencyProbe.RunAsync(variants, pairedOutput); return; }
 if (args is ["--memory-comparison", var memoryDirectory, var memoryOutput]) { await PairedLatencyProbe.RunAsync(memoryDirectory, memoryOutput, memory: true); return; }
+if (args is ["--fix-comparison", var fixDirectory, var fixOutput]) { await PairedLatencyProbe.RunAsync(fixDirectory, fixOutput, memory: true, fixes: true); return; }
 if (args is ["--planner-cost", var plannerDirectory, var plannerOutput]) { await PairedLatencyProbe.RunPlanningCostAsync(plannerDirectory, plannerOutput); return; }
 if (args is ["--load", var output]) { await LoadProbe.RunAsync(output); return; }
 if (args is ["--ssr-probe"])

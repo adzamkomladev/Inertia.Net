@@ -110,6 +110,39 @@ public sealed class CachedPropsTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Concurrent_misses_share_success_even_when_the_store_cannot_keep_it(bool reject, bool parallel)
+    {
+        var harness = new Harness(configureServices: s =>
+        {
+            if (reject) s.AddMemoryCache(o => o.SizeLimit = 1);
+            else s.AddSingleton<IInertiaCacheStore>(new RecordingStore { FailWrites = true });
+        });
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        InertiaProp Value() => Prop(async ct =>
+        {
+            Interlocked.Increment(ref _loads);
+            await release.Task.WaitAsync(ct);
+            return 42;
+        }).Cache("shared", TimeSpan.FromMinutes(1));
+        var requests = Enumerable.Range(0, 16).Select(_ =>
+        {
+            var prop = Value();
+            return harness.PageAsync(new InertiaProps { ["value"] = parallel ? prop.Parallel() : prop });
+        }).ToArray();
+        release.SetResult();
+
+        var pages = await Task.WhenAll(requests).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.All(pages, page => Assert.Equal(42, (int?)page["props"]!["value"]));
+        Assert.Equal(1, _loads);
+        await harness.PageAsync(new InertiaProps { ["value"] = Value() });
+        Assert.Equal(2, _loads);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task A_cancelled_fill_is_retried_with_the_waiters_own_loader(bool parallel)
@@ -530,6 +563,57 @@ public sealed class CachedPropsTests
 
     private static InertiaCacheKey PropKey(string key) => new(InertiaCacheEntryKind.Prop, key);
 
+    [Fact]
+    public async Task Tag_invalidation_waits_for_entry_publication()
+    {
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var invalidating = new ManualResetEventSlim();
+        using var memory = new MemoryCache(new MemoryCacheOptions());
+        using var intercepted = new PublicationCache(memory, () =>
+        {
+            entered.Set();
+            Assert.True(release.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        });
+        using var store = new MemoryInertiaCacheStore(intercepted, Options.Create(new InertiaOptions()), TimeProvider.System);
+        var key = PropKey("publishing");
+        var writer = Task.Run(async () => await store.SetAsync(key, [1], new InertiaCacheEntryOptions(TimeSpan.FromMinutes(1), ["tag"]), default), TestContext.Current.CancellationToken);
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        var invalidation = Task.Run(async () =>
+        {
+            invalidating.Set();
+            await store.RemoveByTagAsync("tag", default);
+        }, TestContext.Current.CancellationToken);
+        try
+        {
+            Assert.True(invalidating.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+            await Task.WhenAny(invalidation, Task.Delay(100, TestContext.Current.CancellationToken));
+            Assert.False(invalidation.IsCompleted);
+        }
+        finally
+        {
+            release.Set();
+            await Task.WhenAll(writer, invalidation).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+
+        Assert.Null(await store.GetAsync(key, TestContext.Current.CancellationToken));
+    }
+
+    private sealed class PublicationCache(IMemoryCache inner, Action beforeCreate) : IMemoryCache
+    {
+        public ICacheEntry CreateEntry(object key)
+        {
+            beforeCreate();
+            return inner.CreateEntry(key);
+        }
+
+        public bool TryGetValue(object key, out object? value) => inner.TryGetValue(key, out value);
+
+        public void Remove(object key) => inner.Remove(key);
+
+        public void Dispose() { }
+    }
+
     private static async Task<(System.Text.Json.Nodes.JsonObject Page, CompletingResponseFeature Completion)> RenderAsync(Harness harness, InertiaProps props)
     {
         var context = harness.Context();
@@ -547,6 +631,8 @@ public sealed class CachedPropsTests
 
         public bool Fail { get; init; }
 
+        public bool FailWrites { get; init; }
+
         public bool Yield { get; init; }
 
         public async ValueTask<byte[]?> GetAsync(InertiaCacheKey key, CancellationToken cancellationToken)
@@ -558,6 +644,7 @@ public sealed class CachedPropsTests
         public async ValueTask SetAsync(InertiaCacheKey key, byte[] value, InertiaCacheEntryOptions options, CancellationToken cancellationToken)
         {
             await Pause();
+            if (FailWrites) throw new InvalidOperationException("store write failed");
             Values[key] = value;
             Sets.Add((key, options));
         }

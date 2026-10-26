@@ -130,7 +130,6 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
     private readonly HashSet<string> _usedNames = new(StringComparer.Ordinal) { "InertiaPages", "SharedProps", "FlashData" };
     private readonly Queue<Type> _pending = new();
     private readonly StringBuilder _declarations = new();
-    private readonly bool _numbersAsStrings = (serializerOptions.NumberHandling & JsonNumberHandling.WriteAsString) != 0;
 
     public List<string> Warnings { get; } = [];
 
@@ -237,16 +236,35 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
     }
 
     /// <summary>The TypeScript type of a value of <paramref name="type"/>; named types are queued for declaration.</summary>
-    internal string Reference(Type type)
+    internal string Reference(Type type, JsonNumberHandling? handling = null)
     {
-        if (Nullable.GetUnderlyingType(type) is { } underlying)
-        {
-            return Union(Reference(underlying), "null");
-        }
-
         if (typeof(InertiaProp).IsAssignableFrom(type) || type == typeof(object) || type == typeof(JsonElement) || type == typeof(JsonNode) || type == typeof(JsonValue))
         {
             return "unknown";
+        }
+
+        JsonTypeInfo info;
+        try
+        {
+            info = serializerOptions.GetTypeInfo(type);
+        }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException)
+        {
+            Warnings.Add($"'{type}' has no JSON metadata (register it in the app's JsonSerializerContext); it is typed as unknown.");
+            return "unknown";
+        }
+
+        var converter = info.Converter.GetType();
+        if (converter.Assembly != typeof(JsonSerializer).Assembly && converter.DeclaringType != typeof(BigIntegerConverters))
+        {
+            return UnknownConverter(type);
+        }
+
+        handling ??= info.NumberHandling ?? serializerOptions.NumberHandling;
+
+        if (Nullable.GetUnderlyingType(type) is { } underlying)
+        {
+            return Union(Reference(underlying, handling), "null");
         }
 
         if (type == typeof(JsonObject))
@@ -274,12 +292,12 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
         if (type == typeof(long) || type == typeof(ulong) || type == typeof(Int128) || type == typeof(UInt128) || type == typeof(BigInteger))
         {
             // Beyond 2^53 the client revives these as BigInt (PreserveBigIntegers).
-            return Number(options.PreserveBigIntegers ? "number | bigint" : "number");
+            return Number(options.PreserveBigIntegers ? "number | bigint" : "number", handling.Value);
         }
 
         if (type.IsPrimitive || type == typeof(decimal) || type == typeof(Half))
         {
-            return Number("number");
+            return Number("number", handling.Value);
         }
 
         if (type.IsEnum)
@@ -287,27 +305,22 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
             return Named(type);
         }
 
-        JsonTypeInfo info;
-        try
-        {
-            info = serializerOptions.GetTypeInfo(type);
-        }
-        catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException)
-        {
-            Warnings.Add($"'{type}' has no JSON metadata (register it in the app's JsonSerializerContext); it is typed as unknown.");
-            return "unknown";
-        }
-
         return info.Kind switch
         {
-            JsonTypeInfoKind.Enumerable => Array(Reference(info.ElementType ?? typeof(object))),
-            JsonTypeInfoKind.Dictionary => $"Record<string, {Reference(info.ElementType ?? typeof(object))}>",
+            JsonTypeInfoKind.Enumerable => Array(Reference(info.ElementType ?? typeof(object), handling)),
+            JsonTypeInfoKind.Dictionary => $"Record<string, {Reference(info.ElementType ?? typeof(object), handling)}>",
             JsonTypeInfoKind.Object => Named(type),
             _ => "unknown", // a custom converter: its output shape is unknown
         };
     }
 
-    private string Number(string type) => _numbersAsStrings ? Union(type, "string") : type;
+    private static string Number(string type, JsonNumberHandling handling) => (handling & JsonNumberHandling.WriteAsString) != 0 ? Union(type, "string") : type;
+
+    private string UnknownConverter(Type type)
+    {
+        Warnings.Add($"'{type}' uses a custom JSON converter whose output shape is unknown; it is typed as unknown.");
+        return "unknown";
+    }
 
     private string Named(Type type)
     {
@@ -393,7 +406,9 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
 
             var declared = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
             var nullable = property.IsGetNullable && !typeof(InertiaProp).IsAssignableFrom(declared);
-            var type = typeof(InertiaProp).IsAssignableFrom(declared) && PropValueType(property) is { } valueType ? Reference(valueType) : Reference(declared);
+            var type = property.CustomConverter is not null ? UnknownConverter(declared)
+                : typeof(InertiaProp).IsAssignableFrom(declared) && PropValueType(property) is { } valueType ? Reference(valueType)
+                : Reference(property.PropertyType, property.NumberHandling ?? info.NumberHandling);
             // A prop member can be left out (optional, deferred, rescued); so can members that a condition skips.
             var optional = typeof(InertiaProp).IsAssignableFrom(declared)
                 || property.ShouldSerialize is not null

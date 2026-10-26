@@ -40,7 +40,7 @@ internal sealed class MemoryInertiaCacheStore : IInertiaCacheStore, IDisposable
             return RemoveAsync(key, cancellationToken);
         }
 
-        // Indexed first: a tag removed while the entry is added still finds it.
+        // Publish the entry and its tags together; invalidation must not consume an index before publication.
         var tags = options.Tags;
         lock (_lock)
         {
@@ -53,29 +53,33 @@ internal sealed class MemoryInertiaCacheStore : IInertiaCacheStore, IDisposable
 
                 entries[key] = value;
             }
+
+            using var entry = Cache(key).CreateEntry(CacheKey(key));
+            entry.Value = value;
+            entry.Size = value.Length;
+            if (options.Expiration < MaxExpiration)
+            {
+                entry.AbsoluteExpirationRelativeToNow = options.Expiration;
+            }
+
+            entry.RegisterPostEvictionCallback(_evicted, tags);
         }
 
-        using var entry = Cache(key).CreateEntry(CacheKey(key));
-        entry.Value = value;
-        entry.Size = value.Length;
-        if (options.Expiration < MaxExpiration)
-        {
-            entry.AbsoluteExpirationRelativeToNow = options.Expiration;
-        }
-
-        entry.RegisterPostEvictionCallback(_evicted, tags);
         return default;
     }
 
     public ValueTask RemoveAsync(InertiaCacheKey key, CancellationToken cancellationToken)
     {
-        Cache(key).Remove(CacheKey(key));
+        lock (_lock)
+        {
+            Cache(key).Remove(CacheKey(key));
+        }
+
         return default;
     }
 
     public ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken)
     {
-        KeyValuePair<InertiaCacheKey, byte[]>[] entries;
         lock (_lock)
         {
             if (!_tags.Remove(tag, out var tagged))
@@ -83,17 +87,15 @@ internal sealed class MemoryInertiaCacheStore : IInertiaCacheStore, IDisposable
                 return default;
             }
 
-            entries = [.. tagged];
-        }
-
-        foreach (var (key, value) in entries)
-        {
-            // Only the entry stored with the tag: a later value under the same key may not carry it.
-            var cache = Cache(key);
-            var cacheKey = CacheKey(key);
-            if (cache.TryGetValue(cacheKey, out byte[]? current) && ReferenceEquals(current, value))
+            foreach (var (key, value) in tagged)
             {
-                cache.Remove(cacheKey);
+                // Only the entry stored with the tag: a later value under the same key may not carry it.
+                var cache = Cache(key);
+                var cacheKey = CacheKey(key);
+                if (cache.TryGetValue(cacheKey, out byte[]? current) && ReferenceEquals(current, value))
+                {
+                    cache.Remove(cacheKey);
+                }
             }
         }
 

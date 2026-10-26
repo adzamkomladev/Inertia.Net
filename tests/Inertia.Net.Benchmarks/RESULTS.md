@@ -1,5 +1,70 @@
 # Inertia.Net benchmark results
 
+## Security, cache resilience and diagnostics fixes — 2026-10-26
+
+Baseline is commit `34e9e2781acc40a3aab043d8d89acce602783ca0` (before these fixes); current is that working tree with the fixes.
+Both variants use identical benchmark source, including the new `FixPerformanceBenchmarks` fixture. Two independent processes each
+run 32 alternating-order paired rounds after warmup. No builds, tests or other benchmarks ran during measurement.
+
+The gains are in the cache failure and diagnostic buffering paths. Ordinary JSON, partial and HTML rendering allocate the same bytes
+as the baseline and show no clear timing change in either run. These fixes do not establish a general rendering speed-up.
+
+### Allocation and latency
+
+Representative absolute medians from run 2; the last columns show the median within-round latency changes in each run. An operation
+is **one eight-request burst** for the two cache cases, and **one request** for the other cases. Allocations include all eight requests
+in a burst. Relative changes are paired ratios, so they need not equal the ratio of the displayed absolute medians.
+
+| Workload | Before B/op | After B/op | Bytes saved | Before ms/op | After ms/op | Run 1 latency change | Run 2 latency change |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Prop cache writes fail, 8-request burst | 32,696 | 22,072 | 10,624 (32.5%) | 122.966 | 14.027 | −88.9% | −88.7% |
+| SSR cache rejects entries, 8-request burst | 128,296 | 30,776 | 97,520 (76.0%) | 123.285 | 13.952 | −89.0% | −88.6% |
+| DevTools, ignored 1 MiB text body | 37,784 | 7,680 | 30,104 (79.7%) | 4.621 | 0.129 | −97.5% | −97.2% |
+| JSON, 20 mixed props | 1,736 | 1,736 | 0 | 0.0582 | 0.0571 | −0.5% | +0.3% |
+| Partial reload, 2 of 20 | 568 | 568 | 0 | 0.0274 | 0.0283 | −2.9% | −1.4% |
+| HTML + Vite tags, 20 props | 1,800 | 1,800 | 0 | 0.0826 | 0.0847 | −5.1% | +2.3% |
+| Plain STJ serialization control | 312 | 312 | 0 | 0.0312 | 0.0304 | +10.5% | −1.9% |
+
+Exploratory percentile-bootstrap 95% intervals for the run 2 paired latency changes: prop outage −88.9% to −88.5%; SSR rejection
+−88.9% to −88.4%; ignored body −97.7% to −96.8%. Every ordinary-render/control interval includes zero in both runs; see `summary.json`.
+Run 1 allocations agree exactly for the cache bursts and controls. The ignored-body baseline varies by 24 B (37,808 vs 37,784 B).
+
+### What the fixtures prove
+
+- **Prop outage:** eight concurrent requests use one key; the loader succeeds after 10 ms simulated asynchronous I/O, while store
+  writes throw. The baseline runs eight successful loaders serially; current shares one successful serialized result with the waiters.
+- **SSR rejection:** eight concurrent initial visits have identical page JSON. A fake HTTP renderer takes 10 ms and returns about
+  8 KiB of HTML; the cache's one-byte capacity rejects the entry. Calls fall from eight to one per burst. Existing tests separately
+  cover retry after loader/render failure and cancellation.
+- **Diagnostic buffering:** a handler drains a nonseekable 1 MiB JSON body on a non-Inertia request with DevTools enabled. Both versions
+  deliver all 1,048,576 bytes to the handler and omit its diagnostic body. The baseline additionally spools 1,048,576 bytes to a temporary
+  file; current spools zero. The B/op column is **managed allocation**, not payload size or disk bytes. This uses a memory-backed input
+  and counting sink to isolate recorder overhead; it is not a network upload latency benchmark.
+- **Controls:** ordinary responses write to `Stream.Null`; the plain STJ row runs no changed code. Its variability and the between-run
+  movement in absolute timings are reasons not to infer a small normal-rendering improvement from these data.
+
+These are synthetic, in-process measurements, not production request latency or Kestrel throughput. Windows timer scheduling affects
+the nominal 10 ms delays. No byte/millisecond improvement is claimed for the security redaction, type generation, path exclusion or
+infinite-timeout correctness fixes.
+
+Environment: Windows 11 (10.0.26300), Intel Core i5-8265U (4 cores/8 logical processors), SDK 10.0.403, .NET 10.0.14, workstation GC.
+Both processes inherit affinity mask 128 (logical CPU 7); .NET reports one available processor. CPU frequency and background OS activity
+are not fixed. Allocation uses process-wide `GC.GetTotalAllocatedBytes(true)`; async/cache cleanup can contribute small variation.
+
+Raw paired samples, fixture observations, core DLL hashes and the deterministic summary script are in
+[results/2026-10-26-review-fixes](results/2026-10-26-review-fixes). Reproduce with two builds containing identical benchmark sources under
+`<root>/baseline/tests/Inertia.Net.Benchmarks/bin/Release/net10.0` and `<root>/current/tests/Inertia.Net.Benchmarks/bin/Release/net10.0`:
+
+```powershell
+(Get-Process -Id $PID).ProcessorAffinity = [intptr]128 # use an available logical CPU on the measurement host
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --fix-comparison <root> paired-1.json
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --fix-comparison <root> paired-2.json
+python tests/Inertia.Net.Benchmarks/results/2026-10-26-review-fixes/summarize.py
+```
+
+The JSON files must be placed beside `summarize.py` before summarizing. Its bootstrap uses 5,000 resamples and seed 20261026. Each
+fixture checks its setup, and the body fixture asserts that the handler consumes the complete body on every invocation.
+
 ## Render allocations and parallel props after v1.5.1 - 2026-10-24
 
 This section covers [plan section 3b](../../docs/plan-performance-and-dx.md#3b-remaining-allocation-and-cpu-work-research-2026-10-24),
@@ -224,7 +289,7 @@ dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.d
 ```
 
 
-## Render allocation reductions � 2026-10-23
+## Render allocation reductions — 2026-10-23
 
 This comparison is incremental: its baseline already includes the cache-buffer, dictionary-buffer and shared-fill changes below.
 The implementation reuses the top-level prop-entry list through the platform object pool, clears references in `finally`, and
