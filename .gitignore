@@ -497,6 +497,3 @@ artifacts/
 samples/*/ssr/
 samples/*/wwwroot/hot
 samples/*/wwwroot/build/
-docs/Inertia.Net.Docs/wwwroot/hot
-docs/Inertia.Net.Docs/wwwroot/build/
-docs/Inertia.Net.Docs/ssr/

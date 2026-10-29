@@ -70,11 +70,11 @@ Set `INERTIA_SSR=0` to disable SSR at build time and runtime; the build then rem
 
 ## Deploy on Coolify
 
-The repository includes a production [`Dockerfile`](../../Dockerfile) that builds the client and SSR bundle with Bun, publishes the ASP.NET Core app, and ships Bun in the runtime image.
+The docs app includes a production [`Dockerfile`](Dockerfile) that builds the client and SSR bundle with Bun, publishes the ASP.NET Core app, and ships Bun in the runtime image. The container build restores Inertia.Net from NuGet, so it only needs this directory as its build context.
 
 1. Create a new resource in Coolify and connect this repository.
 2. Choose **Dockerfile** as the build pack.
-3. Set **Base Directory** to `/` and **Dockerfile Location** to `/Dockerfile`.
+3. Set **Base Directory** to `/docs/Inertia.Net.Docs` and **Dockerfile Location** to `/Dockerfile`.
 4. Set the exposed port to `8080`.
 5. Set the health check path to `/health`.
 6. Add the domain and enable HTTPS in Coolify.
@@ -99,7 +99,8 @@ If you run more than one replica, share the ASP.NET Core Data Protection key rin
 To build and run the same image locally:
 
 ```sh
-docker build -f Dockerfile -t inertia-net-docs .
+cd docs/Inertia.Net.Docs
+docker build -t inertia-net-docs .
 docker run --rm -p 8080:8080 inertia-net-docs
 # client-only, without restarting the Bun renderer
 docker run --rm -p 8080:8080 -e INERTIA_SSR=0 inertia-net-docs

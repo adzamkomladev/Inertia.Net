@@ -1,0 +1,14 @@
+<Project>
+  <!-- Used when the docs folder is built on its own (the Docker build context). -->
+  <PropertyGroup>
+    <InertiaDocsParentProps>$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..'))</InertiaDocsParentProps>
+  </PropertyGroup>
+  <Import Project="$(InertiaDocsParentProps)" Condition="'$(InertiaDocsParentProps)' != ''" />
+  <PropertyGroup>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
+    <LangVersion Condition="'$(LangVersion)' == ''">latest</LangVersion>
+    <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
+    <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
+    <TreatWarningsAsErrors Condition="'$(TreatWarningsAsErrors)' == ''">true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
