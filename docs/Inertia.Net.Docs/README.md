@@ -29,12 +29,12 @@ Pages live in [`content/docs`](content/docs) as MDX with frontmatter:
 ---
 title: Props
 description: Lazy, optional, deferred, merged and cached page data.
-section: Core Concepts
+section: Essentials
 order: 2
 ---
 ```
 
-`section` must be one of the sections in `scripts/generate-docs.mjs`; `order` controls the position inside the section. The prebuild script writes the navigation manifest and the lazy search index, so adding a page only requires the MDX file.
+`section` must be one of the sections in `scripts/generate-docs.mjs` (`Get started`, `Essentials`, `Loading data`, `Production`, `Reference`, `Tutorial`); `order` controls the position inside the section. The prebuild script writes the navigation manifest, the lazy search index, and `wwwroot/llms.txt` and `wwwroot/llms-full.txt` for coding agents, so adding a page only requires the MDX file. Commit the regenerated files with the content change.
 
 MDX components available in content:
 
