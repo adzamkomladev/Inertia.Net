@@ -1,9 +1,9 @@
 [
   {
     "id": "once-props",
-    "title": "Once Props",
+    "title": "Once props",
     "description": "Remember expensive values on the client and skip them on later visits.",
-    "section": "Core Concepts",
+    "section": "Loading data",
     "url": "/docs/once-props",
     "headings": [
       "Behavior",
@@ -16,9 +16,9 @@
   },
   {
     "id": "forget-me-not",
-    "title": "ForgetMeNot",
+    "title": "Build a todo app",
     "description": "Build a complete Inertia.Net todo app with session login, public lists, paginated loading, reminders and SSR.",
-    "section": "Samples",
+    "section": "Tutorial",
     "url": "/docs/forget-me-not",
     "headings": [
       "What you are building",
@@ -40,9 +40,9 @@
   },
   {
     "id": "quick-start",
-    "title": "Quick Start",
+    "title": "Quick start",
     "description": "Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.",
-    "section": "Getting Started",
+    "section": "Get started",
     "url": "/docs/quick-start",
     "headings": [
       "1. Register the services",
@@ -55,9 +55,9 @@
   },
   {
     "id": "client-setup",
-    "title": "Client Setup",
+    "title": "Client setup",
     "description": "Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.",
-    "section": "Getting Started",
+    "section": "Get started",
     "url": "/docs/client-setup",
     "headings": [
       "Install the client",
@@ -70,8 +70,22 @@
     "body": "Inertia.Net speaks the Inertia.js v3 protocol. Install a v3 client package; v2 clients are not supported. Install the client Run the npm commands from the ASP.NET Core project directory (the one containing your .csproj ). The starter templates use ClientApp/pages . The manual examples below use resources/js/Pages . Keep the resolver, file paths and Vite entry consistent with the layout you choose. Vite configuration The same Vite config works for every client; only the framework plugin changes. Add these fields to package.json : The manifest key of the entry ( resources/js/app.tsx ) is what you pass to @vite(\"...\") . Client entry The optional @inertiajs/vite plugin resolves pages and mounts the app for you. With it, the entry is just: Without the plugin, provide the resolver and setup yourself. Pages A page file receives the props from Render(...) as normal component props. Inertia.Net can write TypeScript declarations for your page props, shared props and flash data. See TypeScript types. Development workflow Open the ASP.NET Core URL, not the Vite URL. In Development the app reads wwwroot/hot and renders the Vite tags; in production it reads the manifest. For production: Node is needed to build the assets and only needed at runtime when SSR is enabled. Using @inertiajs/vite The plugin also contributes the SSR dev endpoint and page resolution. Add it before the hot-file plugin: Keep the SSR listener on loopback: the renderer trusts its output and has no authentication. The SSR guide covers the full setup."
   },
   {
+    "id": "ai-agents",
+    "title": "AI agents",
+    "description": "Give coding agents the context and conventions they need to build Inertia.Net pages correctly.",
+    "section": "Get started",
+    "url": "/docs/ai-agents",
+    "headings": [
+      "Point the agent at the docs",
+      "Add an AGENTS.md section",
+      "Asking for a feature",
+      "Let the agent check its own work"
+    ],
+    "body": "An Inertia.Net app is a good fit for coding agents. The backend and the frontend live in one project, a feature follows one request path (endpoint, props, page component), and there is no API contract or client router for the agent to keep in sync. The main thing an agent needs is to know the conventions. This page gives you that context in a form you can paste into your project. Point the agent at the docs The documentation is published as plain text for language models: URL Contents --- --- /llms.txt An index of every page with a one-line summary, following the llms.txt format. /llms-full.txt The whole documentation in one Markdown file. Agents that can fetch URLs can read these directly. For agents that cannot, download llms-full.txt into your repository (for example as docs/inertia-net.md ) and reference it from your agent instructions. Add an AGENTS.md section Most coding agents read a project instruction file: AGENTS.md for Codex and many others, CLAUDE.md for Claude Code, .github/copilot-instructions.md for GitHub Copilot and .cursor/rules for Cursor. Copy this section into yours and adjust the paths and framework to match your app. If you use Vue or Svelte, change the component path and extension. Asking for a feature Agents do better with a request that names both ends of the feature. For example: Add a /projects page. The endpoint returns Projects/Index with a paginated projects prop using Merge and the InfiniteScroll component, and a deferred stats prop. Add a create form that posts to /projects , validates CreateProjectInput with .WithInertiaValidation() , and redirects back with a toast flash message. Add a test with Inertia.Net.Testing for the page component and props. A request like this tells the agent which props to use, how validation is wired, and how to check the result with testing helpers. Let the agent check its own work Agents are most reliable when they can verify a change. Inertia.Net gives them a few cheap checks: - Compile-time types. With generated TypeScript types, a prop renamed in C breaks the client build, so npm run build catches mismatches. - Response tests. Inertia.Net.Testing asserts the component name and props without a browser. Ask the agent to add one test per page. - Missing components. In Development, DevTools checks report a Render call whose page component does not exist. dotnet new inertia -n MyApp --framework react creates an app with pages, a validated form, flash messages, CSRF and Vite already set up. Starting an agent from the template gives it working examples of every convention above."
+  },
+  {
     "id": "devtools",
-    "title": "DevTools & Development Checks",
+    "title": "DevTools",
     "description": "Record visits for the Inertia DevTools extension and catch missing page components during development.",
     "section": "Reference",
     "url": "/docs/devtools",
@@ -85,9 +99,9 @@
   },
   {
     "id": "vite-integration",
-    "title": "Vite Integration",
+    "title": "Vite",
     "description": "Manifest tags, the dev-server hot file, asset base URLs, prefetching and CSP nonces.",
-    "section": "Advanced",
+    "section": "Production",
     "url": "/docs/vite-integration",
     "headings": [
       "Production",
@@ -102,7 +116,7 @@
     "id": "props",
     "title": "Props",
     "description": "Lazy, optional, deferred, merged, once, cached and rescued page data.",
-    "section": "Core Concepts",
+    "section": "Essentials",
     "url": "/docs/props",
     "headings": [
       "The prop factories",
@@ -121,9 +135,9 @@
   },
   {
     "id": "merging-props",
-    "title": "Merging Props",
+    "title": "Merging props",
     "description": "Append, prepend, deep merge and match items instead of replacing the client's value.",
-    "section": "Core Concepts",
+    "section": "Loading data",
     "url": "/docs/merging-props",
     "headings": [
       "Nested paths",
@@ -135,9 +149,9 @@
   },
   {
     "id": "redirects-and-history",
-    "title": "Redirects and History",
+    "title": "Redirects and history",
     "description": "Redirects, Back, Location, history encryption, clearing and URL fragments.",
-    "section": "Navigation & State",
+    "section": "Essentials",
     "url": "/docs/redirects-and-history",
     "headings": [
       "Redirect helpers",
@@ -152,9 +166,9 @@
   },
   {
     "id": "deferred-props",
-    "title": "Deferred Props",
+    "title": "Deferred props",
     "description": "Load slow page sections after the first render, in groups.",
-    "section": "Core Concepts",
+    "section": "Loading data",
     "url": "/docs/deferred-props",
     "headings": [
       "The client",
@@ -183,9 +197,9 @@
   },
   {
     "id": "pages-and-responses",
-    "title": "Pages and Responses",
+    "title": "Pages and responses",
     "description": "Render components, use MapInertia, and understand the root template and response status codes.",
-    "section": "Core Concepts",
+    "section": "Essentials",
     "url": "/docs/pages-and-responses",
     "headings": [
       "Rendering a page",
@@ -202,7 +216,7 @@
     "id": "installation",
     "title": "Installation",
     "description": "Install Inertia.Net, the optional MVC or FastEndpoints package, and the testing helpers.",
-    "section": "Getting Started",
+    "section": "Get started",
     "url": "/docs/installation",
     "headings": [
       "Requirements",
@@ -214,7 +228,7 @@
   },
   {
     "id": "typescript",
-    "title": "TypeScript Types",
+    "title": "TypeScript types",
     "description": "Generate declarations for page props, shared props and flash data from your .NET contracts.",
     "section": "Reference",
     "url": "/docs/typescript",
@@ -243,9 +257,9 @@
   },
   {
     "id": "csrf-and-antiforgery",
-    "title": "CSRF & Antiforgery",
+    "title": "CSRF protection",
     "description": "Protect forms with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.",
-    "section": "Advanced",
+    "section": "Production",
     "url": "/docs/csrf-and-antiforgery",
     "headings": [
       "What it does",
@@ -259,9 +273,9 @@
   },
   {
     "id": "server-side-rendering",
-    "title": "Server-side Rendering",
+    "title": "Server-side rendering",
     "description": "Render the first visit on Bun or Node, supervise the process from .NET, and fall back safely.",
-    "section": "Advanced",
+    "section": "Production",
     "url": "/docs/server-side-rendering",
     "headings": [
       "1. Build the SSR bundle",
@@ -278,9 +292,9 @@
   },
   {
     "id": "validation-and-errors",
-    "title": "Validation & Error Bags",
+    "title": "Validation",
     "description": "Redirect back with validation errors for Minimal APIs, MVC and FastEndpoints, and add Precognition.",
-    "section": "Forms & Validation",
+    "section": "Essentials",
     "url": "/docs/validation-and-errors",
     "headings": [
       "Minimal API",
@@ -297,7 +311,7 @@
     "id": "native-aot",
     "title": "Native AOT",
     "description": "Publish a Native AOT Inertia.Net app with source-generated JSON metadata.",
-    "section": "Advanced",
+    "section": "Production",
     "url": "/docs/native-aot",
     "headings": [
       "1. Register a JSON context",
@@ -313,9 +327,9 @@
   },
   {
     "id": "troubleshooting",
-    "title": "Troubleshooting & FAQ",
+    "title": "Troubleshooting",
     "description": "Common errors, their causes, and how to fix them.",
-    "section": "Help",
+    "section": "Reference",
     "url": "/docs/troubleshooting",
     "headings": [
       "Inertia.Render(...) does not compile",
@@ -343,9 +357,9 @@
   },
   {
     "id": "infinite-scroll",
-    "title": "Infinite Scroll",
+    "title": "Infinite scroll",
     "description": "Merge pages of items and report paging metadata to the InfiniteScroll client component.",
-    "section": "Core Concepts",
+    "section": "Loading data",
     "url": "/docs/infinite-scroll",
     "headings": [
       "The client",
@@ -356,9 +370,9 @@
   },
   {
     "id": "partial-reloads",
-    "title": "Partial Reloads",
+    "title": "Partial reloads",
     "description": "Reload only the props a page needs with only and except filters.",
-    "section": "Core Concepts",
+    "section": "Loading data",
     "url": "/docs/partial-reloads",
     "headings": [
       "From the client",
@@ -373,7 +387,7 @@
     "id": "introduction",
     "title": "Introduction",
     "description": "Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.",
-    "section": "Getting Started",
+    "section": "Get started",
     "url": "/docs/introduction",
     "headings": [
       "How it works",
@@ -387,9 +401,9 @@
   },
   {
     "id": "deploying",
-    "title": "Deploying Behind a Proxy",
+    "title": "Deploying behind a proxy",
     "description": "Forwarded headers, secure cookies, compression, asset caching and multi-instance state.",
-    "section": "Advanced",
+    "section": "Production",
     "url": "/docs/deploying",
     "headings": [
       "Forwarded headers",
@@ -404,9 +418,9 @@
   },
   {
     "id": "flash-data",
-    "title": "Flash Data",
+    "title": "Flash data",
     "description": "Carry a one-time message, toast or typed value across a redirect.",
-    "section": "Forms & Validation",
+    "section": "Essentials",
     "url": "/docs/flash-data",
     "headings": [
       "Where state is kept",
@@ -421,9 +435,9 @@
   },
   {
     "id": "shared-data",
-    "title": "Shared Data",
+    "title": "Shared data",
     "description": "Share props with every page, statically or per request, and control the shared prop key list.",
-    "section": "Core Concepts",
+    "section": "Essentials",
     "url": "/docs/shared-data",
     "headings": [
       "Register shared values",
@@ -435,9 +449,9 @@
   },
   {
     "id": "migrating",
-    "title": "Migrating from Other Adapters",
+    "title": "Migrating from other adapters",
     "description": "Map an InertiaCore-style API to Inertia.Net and check the behavior differences.",
-    "section": "Help",
+    "section": "Reference",
     "url": "/docs/migrating",
     "headings": [
       "Behavior differences to check",
@@ -449,7 +463,7 @@
     "id": "performance",
     "title": "Performance",
     "description": "Memory and hosting guidance, payload limits and the design choices behind the adapter.",
-    "section": "Reference",
+    "section": "Production",
     "url": "/docs/performance",
     "headings": [
       "Memory and hosting",
@@ -460,9 +474,9 @@
   },
   {
     "id": "asset-versioning",
-    "title": "Asset Versioning",
+    "title": "Asset versioning",
     "description": "Tell the client when its JavaScript and CSS are stale, and reload once when they are.",
-    "section": "Advanced",
+    "section": "Production",
     "url": "/docs/asset-versioning",
     "headings": [
       "How the client checks it",

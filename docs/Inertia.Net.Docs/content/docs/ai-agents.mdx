@@ -1,0 +1,69 @@
+---
+title: AI agents
+description: Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
+section: Get started
+order: 5
+---
+
+An Inertia.Net app is a good fit for coding agents. The backend and the frontend live in one project, a feature follows one request path (endpoint, props, page component), and there is no API contract or client router for the agent to keep in sync. The main thing an agent needs is to know the conventions. This page gives you that context in a form you can paste into your project.
+
+## Point the agent at the docs
+
+The documentation is published as plain text for language models:
+
+| URL | Contents |
+|---|---|
+| [`/llms.txt`](/llms.txt) | An index of every page with a one-line summary, following the [llms.txt](https://llmstxt.org) format. |
+| [`/llms-full.txt`](/llms-full.txt) | The whole documentation in one Markdown file. |
+
+Agents that can fetch URLs can read these directly. For agents that cannot, download `llms-full.txt` into your repository (for example as `docs/inertia-net.md`) and reference it from your agent instructions.
+
+## Add an AGENTS.md section
+
+Most coding agents read a project instruction file: `AGENTS.md` for Codex and many others, `CLAUDE.md` for Claude Code, `.github/copilot-instructions.md` for GitHub Copilot and `.cursor/rules` for Cursor. Copy this section into yours and adjust the paths and framework to match your app.
+
+````md
+## Inertia.Net
+
+This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inertia-dotnet.yebi.africa/llms.txt
+
+- Pages are rendered from the server. An endpoint returns `Render("Users/Index", props)`;
+  the component lives in `ClientApp/pages/Users/Index.tsx`. Names must match exactly, including case.
+- Do not add JSON API endpoints or fetch calls for page data. Pass data as props instead.
+  Use Inertia `<Link>`, `router` and `useForm` for navigation and forms, not a client-side router.
+- `Render`, `Back`, `Location`, `Defer`, `Optional`, `Always`, `Merge` and `Once` are global usings
+  from `Inertia.Net.Inertia`. Write them unqualified.
+- Props: use `Defer(ct => ...)` for slow data, `Optional(() => ...)` for data loaded only on
+  partial reloads, `Merge(...)` for paginated lists and `Once(...)` for data the client can keep.
+- Forms: POST/PUT/PATCH/DELETE endpoints validate with `.WithInertiaValidation()` (Minimal API),
+  the MVC filter or `c.UseInertia()` (FastEndpoints), then redirect. On success return a redirect
+  or `Back()`. Report custom errors with `Back().WithErrors(...)`. Use `Back().WithFlash(...)` for messages.
+- Keep antiforgery on: `app.UseInertiaAntiforgery()` is required for unsafe requests.
+- Use typed page props (a record per page) for new pages and register them with
+  `o.TypeScript.Page<T>("Component")` so the TypeScript types stay generated, not hand written.
+- Test pages with `Inertia.Net.Testing`: `client.InertiaGetAsync(url)` then
+  `response.AssertInertiaAsync(page => page.Component(...).Has(...))`.
+- Before finishing: `dotnet build`, `dotnet test`, and `npm run build` (type-checks the client).
+````
+
+If you use Vue or Svelte, change the component path and extension.
+
+## Asking for a feature
+
+Agents do better with a request that names both ends of the feature. For example:
+
+> Add a `/projects` page. The endpoint returns `Projects/Index` with a paginated `projects` prop using `Merge` and the `InfiniteScroll` component, and a deferred `stats` prop. Add a create form that posts to `/projects`, validates `CreateProjectInput` with `.WithInertiaValidation()`, and redirects back with a `toast` flash message. Add a test with `Inertia.Net.Testing` for the page component and props.
+
+A request like this tells the agent which [props](/docs/props) to use, how [validation](/docs/validation-and-errors) is wired, and how to check the result with [testing helpers](/docs/testing).
+
+## Let the agent check its own work
+
+Agents are most reliable when they can verify a change. Inertia.Net gives them a few cheap checks:
+
+- **Compile-time types.** With [generated TypeScript types](/docs/typescript), a prop renamed in C# breaks the client build, so `npm run build` catches mismatches.
+- **Response tests.** `Inertia.Net.Testing` asserts the component name and props without a browser. Ask the agent to add one test per page.
+- **Missing components.** In Development, [DevTools checks](/docs/devtools) report a `Render` call whose page component does not exist.
+
+<Callout type="tip" title="Starter template">
+`dotnet new inertia -n MyApp --framework react` creates an app with pages, a validated form, flash messages, CSRF and Vite already set up. Starting an agent from the template gives it working examples of every convention above.
+</Callout>

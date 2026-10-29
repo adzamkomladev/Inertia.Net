@@ -11,7 +11,8 @@ import { Steps, Step } from './Steps'
 import { Tabs, Tab } from './Tabs'
 
 function MdxLink({ href = '', children }: AnchorHTMLAttributes<HTMLAnchorElement>) {
-  if (href.startsWith('/')) {
+  // Only docs pages are Inertia routes; files like /llms.txt need a normal navigation.
+  if (href.startsWith('/docs/') || href === '/') {
     return <Link href={href}>{children}</Link>
   }
 

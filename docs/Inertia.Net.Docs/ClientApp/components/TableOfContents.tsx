@@ -29,7 +29,7 @@ export function TableOfContents({ headings }: { headings: Heading[] }) {
   return (
     <aside className="hidden w-56 shrink-0 xl:block">
       <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto pt-8">
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">On this page</p>
+        <p className="mb-3 text-sm font-medium">On this page</p>
         <ul className="space-y-1 border-l border-border">
           {headings.map((heading) => (
             <li key={heading.id}>

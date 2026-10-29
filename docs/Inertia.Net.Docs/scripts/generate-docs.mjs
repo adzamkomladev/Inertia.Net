@@ -10,14 +10,12 @@ const docsRoot = path.join(root, 'content', 'docs')
 const output = path.join(root, 'ClientApp', 'lib')
 
 const sectionOrder = [
-  'Getting Started',
-  'Core Concepts',
-  'Forms & Validation',
-  'Navigation & State',
-  'Advanced',
+  'Get started',
+  'Essentials',
+  'Loading data',
+  'Production',
   'Reference',
-  'Help',
-  'Samples',
+  'Tutorial',
 ]
 
 const stripMarkdown = (value) =>
@@ -79,6 +77,7 @@ async function walk(directory) {
 const files = await walk(docsRoot)
 const pages = []
 const search = []
+const sourceBySlug = new Map()
 
 for (const file of files) {
   const source = await fs.readFile(file, 'utf8')
@@ -97,12 +96,12 @@ for (const file of files) {
     title: frontmatter.title,
     description: frontmatter.description ?? '',
     section: frontmatter.section,
-    group: frontmatter.group ?? '',
     order: frontmatter.order,
     headings,
   }
 
   pages.push(page)
+  sourceBySlug.set(slug, source.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim())
   search.push({
     id: slug,
     title: page.title,
@@ -122,4 +121,33 @@ pages.sort((a, b) => {
 await fs.mkdir(output, { recursive: true })
 await fs.writeFile(path.join(output, 'generated-nav.json'), `${JSON.stringify({ pages }, null, 2)}\n`)
 await fs.writeFile(path.join(output, 'generated-search.json'), `${JSON.stringify(search, null, 2)}\n`)
+
+// llms.txt (https://llmstxt.org) and the full plain-text docs for coding agents.
+const siteUrl = 'https://inertia-dotnet.yebi.africa'
+const summary = 'Inertia.Net is a .NET 10 server adapter for Inertia.js v3. ASP.NET Core endpoints (Minimal APIs, MVC or FastEndpoints) return a page component name and props; React, Vue or Svelte renders them. There is no separate JSON API or client-side router.'
+const llmsIndex = [
+  '# Inertia.Net',
+  '',
+  `> ${summary}`,
+  '',
+  `Full documentation as one file: ${siteUrl}/llms-full.txt. Agent conventions: ${siteUrl}/docs/ai-agents.`,
+  '',
+  ...sectionOrder.flatMap((section) => {
+    const inSection = pages.filter((page) => page.section === section)
+    if (inSection.length === 0) return []
+    return [`## ${section}`, '', ...inSection.map((page) => `- [${page.title}](${siteUrl}/docs/${page.slug}): ${page.description}`), '']
+  }),
+].join('\n')
+const llmsFull = [
+  '# Inertia.Net documentation',
+  '',
+  `> ${summary}`,
+  '',
+  ...pages.flatMap((page) => ['---', '', `# ${page.title}`, '', `URL: ${siteUrl}/docs/${page.slug}`, '', page.description ? `> ${page.description}\n` : '', sourceBySlug.get(page.slug), '']),
+].join('\n')
+const publicRoot = path.join(root, 'wwwroot')
+await fs.mkdir(publicRoot, { recursive: true })
+await fs.writeFile(path.join(publicRoot, 'llms.txt'), `${llmsIndex.trimEnd()}\n`)
+await fs.writeFile(path.join(publicRoot, 'llms-full.txt'), `${llmsFull.trimEnd()}\n`)
+
 console.log(`docs: ${pages.length} pages`)

@@ -27,9 +27,7 @@ export function Card({ title, href, icon, children }: { title: string; href?: st
     <>
       <div className="flex items-start gap-3">
         {Icon && (
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-muted/60 text-primary">
-            <Icon className="size-[18px]" />
-          </span>
+          <Icon className="mt-0.5 size-[18px] shrink-0 text-muted-foreground" />
         )}
         <div className="min-w-0 flex-1">
           <p className="font-semibold leading-6 tracking-tight">{title}</p>
@@ -40,7 +38,7 @@ export function Card({ title, href, icon, children }: { title: string; href?: st
     </>
   )
 
-  const className = 'group rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/35 hover:bg-accent/40'
+  const className = 'group rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/30'
 
   if (href?.startsWith('/')) {
     return (

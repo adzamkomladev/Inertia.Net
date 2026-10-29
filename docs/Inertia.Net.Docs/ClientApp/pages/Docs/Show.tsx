@@ -43,12 +43,6 @@ export default function Show({ slug }: { slug: string }) {
           </Link>
           <ChevronRight className="size-3" />
           <span>{page.section}</span>
-          {page.group && (
-            <>
-              <ChevronRight className="size-3" />
-              <span>{page.group}</span>
-            </>
-          )}
         </nav>
 
         <header className="mb-9 border-b border-border pb-8">

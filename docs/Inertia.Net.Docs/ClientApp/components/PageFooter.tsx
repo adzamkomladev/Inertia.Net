@@ -21,7 +21,7 @@ export function PageFooter({ page }: { page: DocPage }) {
         {previous ? (
           <Link
             href={previous.url}
-            className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/35 hover:bg-accent/40"
+            className="group flex flex-col rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/30"
           >
             <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               <ArrowLeft className="size-3 transition-transform group-hover:-translate-x-0.5" /> Previous

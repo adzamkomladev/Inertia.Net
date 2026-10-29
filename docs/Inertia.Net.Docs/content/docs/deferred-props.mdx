@@ -1,8 +1,8 @@
 ---
-title: Deferred Props
+title: Deferred props
 description: Load slow page sections after the first render, in groups.
-section: Core Concepts
-order: 5
+section: Loading data
+order: 2
 ---
 
 `Defer` leaves a prop out of the first response and lists it under `deferredProps`. The client requests each group with a partial reload as soon as the page is mounted. The page becomes interactive without waiting for the slow data.
