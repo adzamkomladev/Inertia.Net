@@ -124,6 +124,14 @@
     scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent;
   }
 
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .animate-in {
     animation: fade-in 180ms ease-out;
   }
@@ -153,6 +161,14 @@
 }
 
 /* Shiki dual themes */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  font-style: var(--shiki-light-font-style);
+  font-weight: var(--shiki-light-font-weight);
+  text-decoration: var(--shiki-light-text-decoration);
+}
+
 html.dark .shiki,
 html.dark .shiki span {
   color: var(--shiki-dark) !important;

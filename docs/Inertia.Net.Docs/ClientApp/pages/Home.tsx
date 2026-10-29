@@ -1,12 +1,14 @@
 import { Link } from '@inertiajs/react'
 import { ArrowRight } from 'lucide-react'
-import { useState, type ComponentType, type SVGProps } from 'react'
+import { useState, type ComponentProps, type ComponentType, type SVGProps } from 'react'
 import { ReactLogo, SvelteLogo, VueLogo } from '../components/icons/FrameworkLogos'
 import { GithubIcon } from '../components/icons/GithubIcon'
 import { InstallCommand } from '../components/InstallCommand'
 import { Seo } from '../components/Seo'
 import { SiteHeader } from '../components/SiteHeader'
 import { cn } from '../lib/utils'
+import ClientSnippet from '../snippets/home-client.mdx'
+import ServerSnippet from '../snippets/home-server.mdx'
 
 const frameworks: { name: string; package: string; Logo: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { name: 'React', package: '@inertiajs/react', Logo: ReactLogo },
@@ -59,18 +61,13 @@ const included = [
   ['Native AOT and test helpers', '/docs/native-aot'],
 ] as const
 
-const code = {
-  server: `app.MapGet("/", () => Render("Home", new InertiaProps
-{
-    ["greeting"] = "Hello from .NET",
-}));`,
-  client: `export default function Home({ greeting }: { greeting: string }) {
-  return <h1>{greeting}</h1>
-}`,
-}
+// Highlighted at build time by the same Shiki setup as the docs pages.
+const code = { server: ServerSnippet, client: ClientSnippet }
+const snippetComponents = { pre: (props: ComponentProps<'pre'>) => <pre {...props} className={cn(props.className, 'm-0 min-h-[150px] overflow-visible py-4 text-[12px]!')} /> }
 
 function CodePreview() {
   const [tab, setTab] = useState<keyof typeof code>('server')
+  const Snippet = code[tab]
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -89,9 +86,9 @@ function CodePreview() {
           </button>
         ))}
       </div>
-      <pre className="min-h-[150px] overflow-x-auto p-5 font-mono text-[13px] leading-6">
-        <code>{code[tab]}</code>
-      </pre>
+      <div className="no-scrollbar overflow-x-auto overflow-y-hidden">
+        <Snippet components={snippetComponents} />
+      </div>
     </div>
   )
 }

@@ -23,6 +23,8 @@ COPY --from=web /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 COPY --from=api /app ./
 COPY --from=web /src/wwwroot/build ./wwwroot/build
+# .dockerignore drops wwwroot, so take the generated llms.txt files from the frontend build.
+COPY --from=web /src/wwwroot/llms.txt /src/wwwroot/llms-full.txt ./wwwroot/
 COPY --from=web /src/ssr ./ssr
 
 ENV ASPNETCORE_ENVIRONMENT=Production \
