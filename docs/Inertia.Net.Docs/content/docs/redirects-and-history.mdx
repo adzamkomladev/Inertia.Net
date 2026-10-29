@@ -1,0 +1,85 @@
+---
+title: Redirects and History
+description: Redirects, Back, Location, history encryption, clearing and URL fragments.
+section: Navigation & State
+order: 1
+---
+
+Inertia requests follow redirects with XHR, which is not always what the browser would do. Inertia.Net adjusts redirect responses so the client behaves correctly.
+
+## Redirect helpers
+
+```csharp
+return Results.Redirect("/users");                 // standard redirect
+return Back();                                     // Referer, else "~/" (app root, PathBase included)
+return Back("/users");                             // Referer, else "/users"
+return Location("https://billing.example.com");    // leave the SPA
+```
+
+`Back()` only follows a `Referer` that is an http(s) URL with the request's own host and port. This prevents an open redirect. The scheme is not compared, so it works behind a TLS-terminating proxy; on HTTPS an `http` Referer is upgraded to `https`.
+
+## What the middleware changes
+
+| Situation | Result |
+|---|---|
+| 302 for PUT, PATCH or DELETE | Changed to **303 See Other**, so the browser follows with a GET |
+| Redirect to another origin, non-prefetch | `409` with `X-Inertia-Location`: the client makes a full visit instead of an XHR the browser would block |
+| Redirect whose `Location` contains `#`, non-prefetch | `409` with `X-Inertia-Redirect`: the client performs a full visit that keeps the fragment |
+| `Location(url)` | `409` + `X-Inertia-Location` for Inertia requests, a plain `302` otherwise |
+| Empty `200` response | Redirect back (302, or 303 for PUT/PATCH/DELETE), falling back to the app root |
+| `Vary` | `Vary: X-Inertia` is added to every response through the middleware |
+
+Turn off external redirect conversion with `o.ConvertExternalRedirects = false` if the app intentionally redirects to another origin.
+
+## Pages without a handler
+
+```csharp
+app.MapInertia("/about", "About", props);
+```
+
+Maps GET and HEAD to `Render("About", props)`, like Laravel's `Route::inertia`.
+
+In MVC, `return this.InertiaView(props);` renders the action's own component, `{Controller}/{Action}` by default. `AddInertiaMvc(o => o.ComponentResolver = ctx => ...)` changes the rule.
+
+## History encryption
+
+```csharp
+builder.Services.AddInertia(o => o.EncryptHistory = true);   // every page
+
+context.Inertia().EncryptHistory();                          // this response
+context.Inertia().EncryptHistory(false);                     // opt out for this response
+```
+
+`encryptHistory` is written as `true` only when set and is not carried across redirects. The Inertia client encrypts its history state with the page's key.
+
+## Clearing history
+
+```csharp
+app.MapPost("/logout", (HttpContext context) =>
+{
+    context.Inertia().ClearHistory();
+    return Results.Redirect("/login");
+});
+```
+
+`clearHistory` goes through the state store, applies to the next page rendered after the redirect(s), then is consumed. It is typically used before a redirect after logout.
+
+## Preserving a fragment
+
+```csharp
+context.Inertia().PreserveFragment();
+```
+
+By default a redirect loses the URL fragment. `PreserveFragment()` keeps it across the next redirect. The client receives `preserveFragment: true` on the next page.
+
+## Page URL
+
+The page object's `url` is PathBase, Path and QueryString. Behind a proxy that rewrites paths, set `o.UrlResolver` to return the URL the browser sees:
+
+```csharp
+o.UrlResolver = ctx => ctx.Request.GetEncodedUrl();
+```
+
+<Callout type="tip" title="History state is in the cookie">
+Flash data, errors, `clearHistory` and `preserveFragment` share the state store. By default that is an encrypted cookie; see [Flash data](/docs/flash-data#where-state-is-kept).
+</Callout>

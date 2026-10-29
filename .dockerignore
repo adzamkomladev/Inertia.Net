@@ -1,0 +1,14 @@
+.git
+.github
+.vs
+.idea
+.vscode
+
+**/bin
+**/obj
+**/node_modules
+**/wwwroot
+**/ssr
+artifacts
+tests/e2e/playwright-report
+tests/e2e/test-results

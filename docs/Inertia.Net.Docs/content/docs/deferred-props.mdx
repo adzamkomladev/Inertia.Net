@@ -1,0 +1,79 @@
+---
+title: Deferred Props
+description: Load slow page sections after the first render, in groups.
+section: Core Concepts
+order: 5
+---
+
+`Defer` leaves a prop out of the first response and lists it under `deferredProps`. The client requests each group with a partial reload as soon as the page is mounted. The page becomes interactive without waiting for the slow data.
+
+```csharp
+return Render("Dashboard", new InertiaProps
+{
+    ["user"] = user,
+    ["stats"] = Defer(ct => reports.StatsAsync(ct)),
+    ["chart"] = Defer(ct => reports.ChartAsync(ct), group: "charts"),
+    ["activity"] = Defer(ct => reports.ActivityAsync(ct), group: "charts"),
+});
+```
+
+```json
+{
+  "props": { "errors": {}, "user": { "name": "Ada" } },
+  "deferredProps": {
+    "default": ["stats"],
+    "charts": ["chart", "activity"]
+  }
+}
+```
+
+Props in the same group load in one request. Different groups load in parallel requests. `deferredProps` is only produced on non-partial renders.
+
+## The client
+
+```tsx
+import { Deferred } from '@inertiajs/react'
+
+<Deferred data="stats" fallback={<Spinner />}>
+  <Stats />
+</Deferred>
+```
+
+Vue uses `<Deferred data="stats">` from `@inertiajs/vue3`; Svelte uses the matching component from `@inertiajs/svelte`.
+
+## Combining with other props
+
+A deferred prop can also be merged, once or rescued:
+
+```csharp
+["posts"] = Defer(ct => db.Posts.Page(1).ToListAsync(ct)).Merge(),
+["plans"] = Defer(ct => plans.AllAsync(ct)).Once(),
+["recommendations"] = Defer(ct => recs.GetAsync(ct)).Rescue(),
+```
+
+The metadata combines: `deferredProps` lists the group, `mergeProps` lists the path, and `onceProps` records the key.
+
+## Deferred scroll props
+
+A deferred `Scroll(...)` prop reports `"posts.data"` just like a resolved one. This is a deliberate fix of an inertia-laravel quirk:
+
+```csharp
+["posts"] = Scroll(page, wrapper: "data").Defer(),
+```
+
+## Testing
+
+```csharp
+var page = await (await client.InertiaGetAsync("/dashboard")).GetInertiaPageAsync();
+
+new AssertableInertia(page).HasDeferred("sidebar", "stats").Missing("stats");
+
+var loaded = await page.LoadDeferredPropsAsync(client, "sidebar");
+new AssertableInertia(loaded).Has("stats");
+```
+
+See [Testing](/docs/testing) for the full assertion API.
+
+<Callout type="tip" title="Use deferred props for below-the-fold data">
+Deferred props are for data the page can render without. If the page cannot be meaningful until the data arrives, a normal prop is simpler.
+</Callout>

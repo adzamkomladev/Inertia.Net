@@ -12,7 +12,7 @@
   <!-- The client is built with npm (npm run build writes wwwroot/build); dotnet build never needs Node. -->
   <ItemGroup>
     <Content Remove="node_modules\**;ClientApp\**;package*.json;tsconfig*.json" />
-    <None Remove="node_modules\**;ClientApp\**" />
-    <Content Update="app.html" CopyToPublishDirectory="PreserveNewest" />
+    <None Remove="node_modules\**;ClientApp\**;app.html" />
+    <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // The app's source-generated JSON context: Inertia.Net serializes prop values through these options (Native AOT friendly).
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
-builder.Services.AddFastEndpoints(DiscoveredTypes.All);
+builder.Services.AddFastEndpoints(new[] { DiscoveredTypes.All });
 // CSRF: the Inertia client sends the XSRF-TOKEN cookie back as X-XSRF-TOKEN; UseInertiaAntiforgery() issues and validates it.
 builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddInertia(o =>

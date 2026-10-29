@@ -1,0 +1,96 @@
+---
+title: Deploying Behind a Proxy
+description: Forwarded headers, secure cookies, compression, asset caching and multi-instance state.
+section: Advanced
+order: 5
+---
+
+Behind a load balancer or reverse proxy that terminates TLS, Kestrel sees plain HTTP unless the scheme is forwarded. Without it, the state and `XSRF-TOKEN` cookies are not marked `Secure`, and the version-mismatch `409` sends an `http://` `X-Inertia-Location`.
+
+## Forwarded headers
+
+```csharp
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // o.KnownProxies / o.KnownNetworks: list your proxy, or headers from anyone else are ignored
+});
+
+app.UseForwardedHeaders();               // first
+app.UseInertia();
+```
+
+When the scheme cannot be forwarded, force the cookies:
+
+```csharp
+builder.Services.AddInertia(o => o.State.CookieSecurePolicy = CookieSecurePolicy.Always);
+app.UseInertiaAntiforgery(o => o.SecurePolicy = CookieSecurePolicy.Always);
+```
+
+## Multi-instance state
+
+On several instances, share the Data Protection key ring so the state cookie and antiforgery tokens can be read by every instance:
+
+```csharp
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/var/keys"))
+    .SetApplicationName("MyApp");
+```
+
+Using the session store? Sessions must be shared too (for example Redis). The default cookie store only needs shared Data Protection keys.
+
+Keep the SSR server on loopback on each instance. See [Server-side rendering](/docs/server-side-rendering).
+
+## Compression
+
+Page JSON and HTML compress five to ten times. Compress at the proxy, or in the app:
+
+```csharp
+builder.Services.AddResponseCompression();
+app.UseResponseCompression();                // before UseStaticFiles and UseInertia
+```
+
+Over HTTPS the middleware compresses only with `o.EnableForHttps = true`. Review BREACH for your pages first: Inertia.Net keeps the antiforgery token in a cookie, not in the body, but a page that reflects request input next to a secret is still exposed.
+
+## Asset caching
+
+Vite puts a content hash in every built file name, so files under `build/assets` can be cached for good:
+
+```csharp
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = c =>
+    {
+        if (c.Context.Request.Path.StartsWithSegments("/build/assets"))
+        {
+            c.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        }
+    },
+});
+```
+
+`app.MapStaticAssets()` does the same with build-time Brotli when the client is built before `dotnet publish`, so the files are in `wwwroot` when the static web assets manifest is generated.
+
+## Path base
+
+Use `app.UsePathBase("/app")` before `UseInertia()`. The page `url`, Vite URLs and `Back()` include the path base. If a proxy rewrites paths, set `o.UrlResolver` to return the browser-visible URL.
+
+## Health and readiness
+
+```csharp
+builder.Services.AddHealthChecks().AddInertiaSsr();
+app.MapHealthChecks("/health");
+```
+
+The SSR health check is covered in [Server-side rendering](/docs/server-side-rendering#7-health-check).
+
+## Deployment checklist
+
+- [ ] `npm run build` runs before `dotnet publish`, or `wwwroot/build` is copied into the publish output.
+- [ ] `app.html` is copied to the publish output.
+- [ ] Forwarded headers are configured, or cookies are forced secure.
+- [ ] Data Protection keys are shared between instances.
+- [ ] Static assets under `/build/assets` are cached as immutable.
+- [ ] Response compression is enabled at the proxy or in the app.
+- [ ] SSR listens on loopback and its bundle is deployed when SSR is enabled.
+- [ ] The client build and server build are the same version, so `X-Inertia-Version` converges.

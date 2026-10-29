@@ -1,0 +1,70 @@
+---
+title: Once Props
+description: Remember expensive values on the client and skip them on later visits.
+section: Core Concepts
+order: 7
+---
+
+Once props are expensive values that rarely change. The client remembers them across visits and tells the server which keys it holds with `X-Inertia-Except-Once-Props`.
+
+```csharp
+["countries"] = Once(ct => db.CountriesAsync(ct)),                                  // key = the prop path
+["plans"]     = Once(ct => db.PlansAsync(ct)).As("billing-plans"),                   // custom key
+["rates"]     = Once(ct => fx.RatesAsync(ct)).Until(TimeSpan.FromMinutes(10)),       // client expires it
+["tax"]       = Once(ct => db.TaxAsync(ct)).Fresh(),                                 // always re-send
+["flags"]     = Prop(ct => db.FlagsAsync(ct)).Once(key: "flags", until: TimeSpan.FromHours(1)),
+```
+
+```json
+{
+  "props": { "errors": {}, "countries": [ { "code": "US" } ] },
+  "onceProps": {
+    "countries": { "prop": "countries", "expiresAt": null },
+    "billing-plans": { "prop": "plans", "expiresAt": 1760000000000 }
+  }
+}
+```
+
+## Behavior
+
+- The value is left out on later visits, but the `onceProps` entry stays so the client keeps its copy.
+- `.Fresh()` sends the value even when the client has it.
+- Partial reloads always resolve once props that the reload asks for.
+- Expiry is computed from the registered `TimeProvider`, so tests can use `FakeTimeProvider`.
+- `.As(key)` and `.Until(ttl)` imply once.
+- Sharing a key between pages lets the client reuse one value across them.
+
+## Keys
+
+The default key is the prop path. Use `.As("billing-plans")` when the same value is exposed under different names, or when you want a stable key across page changes.
+
+```csharp
+["plans"] = Once(ct => plans.AllAsync(ct)).As("billing-plans"),
+```
+
+<Callout type="warning" title="A key is a value identity">
+Two props that share a key are treated as the same client value. Only share a key when the values are actually the same. When in doubt, use the default prop path.
+</Callout>
+
+## Expiry
+
+`.Until(TimeSpan)` sets `expiresAt` in milliseconds since the Unix epoch. The client stops treating the key as loaded after that time and requests the value again. The server leaves the value out only when the client lists the key in `X-Inertia-Except-Once-Props`.
+
+## Shared once props
+
+```csharp
+o.Share("plans", Once(() => plans.All()));
+```
+
+This is the equivalent of Laravel's `shareOnce`: the client keeps the value across visits.
+
+## Testing
+
+`InertiaPage.OnceProps` exposes the metadata:
+
+```csharp
+var page = await (await client.InertiaGetAsync("/billing")).GetInertiaPageAsync();
+Assert.True(page.OnceProps.ContainsKey("billing-plans"));
+```
+
+Revisit the page with the same client and assert that the prop is missing while `onceProps` remains.

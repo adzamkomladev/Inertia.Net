@@ -1,0 +1,1129 @@
+{
+  "pages": [
+    {
+      "slug": "introduction",
+      "url": "/docs/introduction",
+      "title": "Introduction",
+      "description": "Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.",
+      "section": "Getting Started",
+      "order": 1,
+      "headings": [
+        {
+          "id": "how-it-works",
+          "text": "How it works",
+          "depth": 2
+        },
+        {
+          "id": "what-you-get",
+          "text": "What you get",
+          "depth": 2
+        },
+        {
+          "id": "feature-matrix",
+          "text": "Feature matrix",
+          "depth": 2
+        },
+        {
+          "id": "this-documentation-site",
+          "text": "This documentation site",
+          "depth": 2
+        },
+        {
+          "id": "requirements",
+          "text": "Requirements",
+          "depth": 2
+        },
+        {
+          "id": "next-steps",
+          "text": "Next steps",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "installation",
+      "url": "/docs/installation",
+      "title": "Installation",
+      "description": "Install Inertia.Net, the optional MVC or FastEndpoints package, and the testing helpers.",
+      "section": "Getting Started",
+      "order": 2,
+      "headings": [
+        {
+          "id": "requirements",
+          "text": "Requirements",
+          "depth": 2
+        },
+        {
+          "id": "start-from-the-template",
+          "text": "Start from the template",
+          "depth": 2
+        },
+        {
+          "id": "namespace-and-global-usings",
+          "text": "Namespace and global usings",
+          "depth": 2
+        },
+        {
+          "id": "next-steps",
+          "text": "Next steps",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "quick-start",
+      "url": "/docs/quick-start",
+      "title": "Quick Start",
+      "description": "Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.",
+      "section": "Getting Started",
+      "order": 3,
+      "headings": [
+        {
+          "id": "1-register-the-services",
+          "text": "1. Register the services",
+          "depth": 2
+        },
+        {
+          "id": "2-add-the-root-template",
+          "text": "2. Add the root template",
+          "depth": 2
+        },
+        {
+          "id": "3-create-the-page-component",
+          "text": "3. Create the page component",
+          "depth": 2
+        },
+        {
+          "id": "4-run-it",
+          "text": "4. Run it",
+          "depth": 2
+        },
+        {
+          "id": "where-to-go-next",
+          "text": "Where to go next",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "client-setup",
+      "url": "/docs/client-setup",
+      "title": "Client Setup",
+      "description": "Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.",
+      "section": "Getting Started",
+      "order": 4,
+      "headings": [
+        {
+          "id": "install-the-client",
+          "text": "Install the client",
+          "depth": 2
+        },
+        {
+          "id": "vite-configuration",
+          "text": "Vite configuration",
+          "depth": 2
+        },
+        {
+          "id": "client-entry",
+          "text": "Client entry",
+          "depth": 2
+        },
+        {
+          "id": "pages",
+          "text": "Pages",
+          "depth": 2
+        },
+        {
+          "id": "development-workflow",
+          "text": "Development workflow",
+          "depth": 2
+        },
+        {
+          "id": "using-inertiajsvite",
+          "text": "Using @inertiajs/vite",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "pages-and-responses",
+      "url": "/docs/pages-and-responses",
+      "title": "Pages and Responses",
+      "description": "Render components, use MapInertia, and understand the root template and response status codes.",
+      "section": "Core Concepts",
+      "order": 1,
+      "headings": [
+        {
+          "id": "rendering-a-page",
+          "text": "Rendering a page",
+          "depth": 2
+        },
+        {
+          "id": "per-response-options",
+          "text": "Per-response options",
+          "depth": 2
+        },
+        {
+          "id": "pages-without-a-handler",
+          "text": "Pages without a handler",
+          "depth": 2
+        },
+        {
+          "id": "the-root-template",
+          "text": "The root template",
+          "depth": 2
+        },
+        {
+          "id": "razor-root-view-mvc",
+          "text": "Razor root view (MVC)",
+          "depth": 3
+        },
+        {
+          "id": "a-custom-root-view",
+          "text": "A custom root view",
+          "depth": 3
+        },
+        {
+          "id": "page-url-and-path-base",
+          "text": "Page URL and path base",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "props",
+      "url": "/docs/props",
+      "title": "Props",
+      "description": "Lazy, optional, deferred, merged, once, cached and rescued page data.",
+      "section": "Core Concepts",
+      "order": 2,
+      "headings": [
+        {
+          "id": "the-prop-factories",
+          "text": "The prop factories",
+          "depth": 2
+        },
+        {
+          "id": "resolution-order",
+          "text": "Resolution order",
+          "depth": 2
+        },
+        {
+          "id": "parallel-props",
+          "text": "Parallel props",
+          "depth": 3
+        },
+        {
+          "id": "deferred-props",
+          "text": "Deferred props",
+          "depth": 2
+        },
+        {
+          "id": "merge-props",
+          "text": "Merge props",
+          "depth": 2
+        },
+        {
+          "id": "once-props",
+          "text": "Once props",
+          "depth": 2
+        },
+        {
+          "id": "cached-props",
+          "text": "Cached props",
+          "depth": 2
+        },
+        {
+          "id": "typed-page-props",
+          "text": "Typed page props",
+          "depth": 2
+        },
+        {
+          "id": "dot-keys",
+          "text": "Dot keys",
+          "depth": 2
+        },
+        {
+          "id": "biginteger-safety",
+          "text": "BigInteger safety",
+          "depth": 2
+        },
+        {
+          "id": "rescue",
+          "text": "Rescue",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "shared-data",
+      "url": "/docs/shared-data",
+      "title": "Shared Data",
+      "description": "Share props with every page, statically or per request, and control the shared prop key list.",
+      "section": "Core Concepts",
+      "order": 3,
+      "headings": [
+        {
+          "id": "register-shared-values",
+          "text": "Register shared values",
+          "depth": 2
+        },
+        {
+          "id": "the-shared-prop-key-list",
+          "text": "The shared prop key list",
+          "depth": 2
+        },
+        {
+          "id": "when-to-use-shared-props",
+          "text": "When to use shared props",
+          "depth": 2
+        },
+        {
+          "id": "typescript",
+          "text": "TypeScript",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "partial-reloads",
+      "url": "/docs/partial-reloads",
+      "title": "Partial Reloads",
+      "description": "Reload only the props a page needs with only and except filters.",
+      "section": "Core Concepts",
+      "order": 4,
+      "headings": [
+        {
+          "id": "from-the-client",
+          "text": "From the client",
+          "depth": 2
+        },
+        {
+          "id": "server-behavior",
+          "text": "Server behavior",
+          "depth": 2
+        },
+        {
+          "id": "what-the-client-keeps",
+          "text": "What the client keeps",
+          "depth": 2
+        },
+        {
+          "id": "deferred-and-once-props",
+          "text": "Deferred and once props",
+          "depth": 2
+        },
+        {
+          "id": "testing-partial-reloads",
+          "text": "Testing partial reloads",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "deferred-props",
+      "url": "/docs/deferred-props",
+      "title": "Deferred Props",
+      "description": "Load slow page sections after the first render, in groups.",
+      "section": "Core Concepts",
+      "order": 5,
+      "headings": [
+        {
+          "id": "the-client",
+          "text": "The client",
+          "depth": 2
+        },
+        {
+          "id": "combining-with-other-props",
+          "text": "Combining with other props",
+          "depth": 2
+        },
+        {
+          "id": "deferred-scroll-props",
+          "text": "Deferred scroll props",
+          "depth": 2
+        },
+        {
+          "id": "testing",
+          "text": "Testing",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "merging-props",
+      "url": "/docs/merging-props",
+      "title": "Merging Props",
+      "description": "Append, prepend, deep merge and match items instead of replacing the client's value.",
+      "section": "Core Concepts",
+      "order": 6,
+      "headings": [
+        {
+          "id": "nested-paths",
+          "text": "Nested paths",
+          "depth": 2
+        },
+        {
+          "id": "resetting-a-merge",
+          "text": "Resetting a merge",
+          "depth": 2
+        },
+        {
+          "id": "match-on-a-stable-key",
+          "text": "Match on a stable key",
+          "depth": 2
+        },
+        {
+          "id": "deep-merge",
+          "text": "Deep merge",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "once-props",
+      "url": "/docs/once-props",
+      "title": "Once Props",
+      "description": "Remember expensive values on the client and skip them on later visits.",
+      "section": "Core Concepts",
+      "order": 7,
+      "headings": [
+        {
+          "id": "behavior",
+          "text": "Behavior",
+          "depth": 2
+        },
+        {
+          "id": "keys",
+          "text": "Keys",
+          "depth": 2
+        },
+        {
+          "id": "expiry",
+          "text": "Expiry",
+          "depth": 2
+        },
+        {
+          "id": "shared-once-props",
+          "text": "Shared once props",
+          "depth": 2
+        },
+        {
+          "id": "testing",
+          "text": "Testing",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "infinite-scroll",
+      "url": "/docs/infinite-scroll",
+      "title": "Infinite Scroll",
+      "description": "Merge pages of items and report paging metadata to the InfiniteScroll client component.",
+      "section": "Core Concepts",
+      "order": 8,
+      "headings": [
+        {
+          "id": "the-client",
+          "text": "The client",
+          "depth": 2
+        },
+        {
+          "id": "metadata",
+          "text": "Metadata",
+          "depth": 2
+        },
+        {
+          "id": "combining-with-other-props",
+          "text": "Combining with other props",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "validation-and-errors",
+      "url": "/docs/validation-and-errors",
+      "title": "Validation & Error Bags",
+      "description": "Redirect back with validation errors for Minimal APIs, MVC and FastEndpoints, and add Precognition.",
+      "section": "Forms & Validation",
+      "order": 1,
+      "headings": [
+        {
+          "id": "minimal-api",
+          "text": "Minimal API",
+          "depth": 2
+        },
+        {
+          "id": "mvc",
+          "text": "MVC",
+          "depth": 2
+        },
+        {
+          "id": "fastendpoints",
+          "text": "FastEndpoints",
+          "depth": 2
+        },
+        {
+          "id": "precognition-live-validation",
+          "text": "Precognition (live validation)",
+          "depth": 2
+        },
+        {
+          "id": "error-bags-in-the-client",
+          "text": "Error bags in the client",
+          "depth": 2
+        },
+        {
+          "id": "all-errors-for-a-field",
+          "text": "All errors for a field",
+          "depth": 2
+        },
+        {
+          "id": "state-and-redirects",
+          "text": "State and redirects",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "flash-data",
+      "url": "/docs/flash-data",
+      "title": "Flash Data",
+      "description": "Carry a one-time message, toast or typed value across a redirect.",
+      "section": "Forms & Validation",
+      "order": 2,
+      "headings": [
+        {
+          "id": "where-state-is-kept",
+          "text": "Where state is kept",
+          "depth": 2
+        },
+        {
+          "id": "encrypted-cookie-default",
+          "text": "Encrypted cookie (default)",
+          "depth": 3
+        },
+        {
+          "id": "session-store",
+          "text": "Session store",
+          "depth": 3
+        },
+        {
+          "id": "mvc-tempdata-store",
+          "text": "MVC TempData store",
+          "depth": 3
+        },
+        {
+          "id": "your-own-store",
+          "text": "Your own store",
+          "depth": 3
+        },
+        {
+          "id": "choosing-a-store",
+          "text": "Choosing a store",
+          "depth": 2
+        },
+        {
+          "id": "history-flags",
+          "text": "History flags",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "redirects-and-history",
+      "url": "/docs/redirects-and-history",
+      "title": "Redirects and History",
+      "description": "Redirects, Back, Location, history encryption, clearing and URL fragments.",
+      "section": "Navigation & State",
+      "order": 1,
+      "headings": [
+        {
+          "id": "redirect-helpers",
+          "text": "Redirect helpers",
+          "depth": 2
+        },
+        {
+          "id": "what-the-middleware-changes",
+          "text": "What the middleware changes",
+          "depth": 2
+        },
+        {
+          "id": "pages-without-a-handler",
+          "text": "Pages without a handler",
+          "depth": 2
+        },
+        {
+          "id": "history-encryption",
+          "text": "History encryption",
+          "depth": 2
+        },
+        {
+          "id": "clearing-history",
+          "text": "Clearing history",
+          "depth": 2
+        },
+        {
+          "id": "preserving-a-fragment",
+          "text": "Preserving a fragment",
+          "depth": 2
+        },
+        {
+          "id": "page-url",
+          "text": "Page URL",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "asset-versioning",
+      "url": "/docs/asset-versioning",
+      "title": "Asset Versioning",
+      "description": "Tell the client when its JavaScript and CSS are stale, and reload once when they are.",
+      "section": "Advanced",
+      "order": 1,
+      "headings": [
+        {
+          "id": "how-the-client-checks-it",
+          "text": "How the client checks it",
+          "depth": 2
+        },
+        {
+          "id": "choosing-a-version",
+          "text": "Choosing a version",
+          "depth": 2
+        },
+        {
+          "id": "path-base",
+          "text": "Path base",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "server-side-rendering",
+      "url": "/docs/server-side-rendering",
+      "title": "Server-side Rendering",
+      "description": "Render the first visit on Bun or Node, supervise the process from .NET, and fall back safely.",
+      "section": "Advanced",
+      "order": 2,
+      "headings": [
+        {
+          "id": "1-build-the-ssr-bundle",
+          "text": "1. Build the SSR bundle",
+          "depth": 2
+        },
+        {
+          "id": "2-enable-it",
+          "text": "2. Enable it",
+          "depth": 2
+        },
+        {
+          "id": "3-let-the-app-run-bun-or-node",
+          "text": "3. Let the app run Bun or Node",
+          "depth": 2
+        },
+        {
+          "id": "4-development",
+          "text": "4. Development",
+          "depth": 2
+        },
+        {
+          "id": "5-failures-and-fallbacks",
+          "text": "5. Failures and fallbacks",
+          "depth": 2
+        },
+        {
+          "id": "6-several-servers",
+          "text": "6. Several servers",
+          "depth": 2
+        },
+        {
+          "id": "7-health-check",
+          "text": "7. Health check",
+          "depth": 2
+        },
+        {
+          "id": "8-observability",
+          "text": "8. Observability",
+          "depth": 2
+        },
+        {
+          "id": "9-response-cache",
+          "text": "9. Response cache",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "vite-integration",
+      "url": "/docs/vite-integration",
+      "title": "Vite Integration",
+      "description": "Manifest tags, the dev-server hot file, asset base URLs, prefetching and CSP nonces.",
+      "section": "Advanced",
+      "order": 3,
+      "headings": [
+        {
+          "id": "production",
+          "text": "Production",
+          "depth": 2
+        },
+        {
+          "id": "development",
+          "text": "Development",
+          "depth": 2
+        },
+        {
+          "id": "options",
+          "text": "Options",
+          "depth": 2
+        },
+        {
+          "id": "prefetching",
+          "text": "Prefetching",
+          "depth": 2
+        },
+        {
+          "id": "content-security-policy",
+          "text": "Content Security Policy",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "csrf-and-antiforgery",
+      "url": "/docs/csrf-and-antiforgery",
+      "title": "CSRF & Antiforgery",
+      "description": "Protect forms with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.",
+      "section": "Advanced",
+      "order": 4,
+      "headings": [
+        {
+          "id": "what-it-does",
+          "text": "What it does",
+          "depth": 2
+        },
+        {
+          "id": "options",
+          "text": "Options",
+          "depth": 2
+        },
+        {
+          "id": "lazy-refresh",
+          "text": "Lazy refresh",
+          "depth": 2
+        },
+        {
+          "id": "mvc-and-fastendpoints",
+          "text": "MVC and FastEndpoints",
+          "depth": 2
+        },
+        {
+          "id": "issue-only",
+          "text": "Issue only",
+          "depth": 2
+        },
+        {
+          "id": "troubleshooting-419",
+          "text": "Troubleshooting 419",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "deploying",
+      "url": "/docs/deploying",
+      "title": "Deploying Behind a Proxy",
+      "description": "Forwarded headers, secure cookies, compression, asset caching and multi-instance state.",
+      "section": "Advanced",
+      "order": 5,
+      "headings": [
+        {
+          "id": "forwarded-headers",
+          "text": "Forwarded headers",
+          "depth": 2
+        },
+        {
+          "id": "multi-instance-state",
+          "text": "Multi-instance state",
+          "depth": 2
+        },
+        {
+          "id": "compression",
+          "text": "Compression",
+          "depth": 2
+        },
+        {
+          "id": "asset-caching",
+          "text": "Asset caching",
+          "depth": 2
+        },
+        {
+          "id": "path-base",
+          "text": "Path base",
+          "depth": 2
+        },
+        {
+          "id": "health-and-readiness",
+          "text": "Health and readiness",
+          "depth": 2
+        },
+        {
+          "id": "deployment-checklist",
+          "text": "Deployment checklist",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "native-aot",
+      "url": "/docs/native-aot",
+      "title": "Native AOT",
+      "description": "Publish a Native AOT Inertia.Net app with source-generated JSON metadata.",
+      "section": "Advanced",
+      "order": 6,
+      "headings": [
+        {
+          "id": "1-register-a-json-context",
+          "text": "1. Register a JSON context",
+          "depth": 2
+        },
+        {
+          "id": "2-make-validation-models-public",
+          "text": "2. Make validation models public",
+          "depth": 2
+        },
+        {
+          "id": "3-add-problemdetails",
+          "text": "3. Add ProblemDetails",
+          "depth": 2
+        },
+        {
+          "id": "4-avoid-anonymous-types",
+          "text": "4. Avoid anonymous types",
+          "depth": 2
+        },
+        {
+          "id": "5-copy-content-files",
+          "text": "5. Copy content files",
+          "depth": 2
+        },
+        {
+          "id": "6-use-minimal-apis-or-fastendpoints",
+          "text": "6. Use Minimal APIs or FastEndpoints",
+          "depth": 2
+        },
+        {
+          "id": "7-fastendpoints-source-generation",
+          "text": "7. FastEndpoints source generation",
+          "depth": 2
+        },
+        {
+          "id": "8-trim-http3",
+          "text": "8. Trim HTTP/3",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "typescript",
+      "url": "/docs/typescript",
+      "title": "TypeScript Types",
+      "description": "Generate declarations for page props, shared props and flash data from your .NET contracts.",
+      "section": "Reference",
+      "order": 1,
+      "headings": [
+        {
+          "id": "configure-generation",
+          "text": "Configure generation",
+          "depth": 2
+        },
+        {
+          "id": "shared-props",
+          "text": "Shared props",
+          "depth": 2
+        },
+        {
+          "id": "prop-members",
+          "text": "Prop members",
+          "depth": 2
+        },
+        {
+          "id": "mapping",
+          "text": "Mapping",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "testing",
+      "url": "/docs/testing",
+      "title": "Testing",
+      "description": "Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.",
+      "section": "Reference",
+      "order": 2,
+      "headings": [
+        {
+          "id": "request-helpers",
+          "text": "Request helpers",
+          "depth": 2
+        },
+        {
+          "id": "page-assertions",
+          "text": "Page assertions",
+          "depth": 2
+        },
+        {
+          "id": "prop-assertions",
+          "text": "Prop assertions",
+          "depth": 2
+        },
+        {
+          "id": "partial-reloads-and-deferred-props",
+          "text": "Partial reloads and deferred props",
+          "depth": 2
+        },
+        {
+          "id": "inertiapage-members",
+          "text": "InertiaPage members",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "devtools",
+      "url": "/docs/devtools",
+      "title": "DevTools & Development Checks",
+      "description": "Record visits for the Inertia DevTools extension and catch missing page components during development.",
+      "section": "Reference",
+      "order": 3,
+      "headings": [
+        {
+          "id": "enable-devtools",
+          "text": "Enable DevTools",
+          "depth": 2
+        },
+        {
+          "id": "page-component-check",
+          "text": "Page component check",
+          "depth": 2
+        },
+        {
+          "id": "generated-typescript",
+          "text": "Generated TypeScript",
+          "depth": 2
+        },
+        {
+          "id": "what-to-check-before-deploying",
+          "text": "What to check before deploying",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "performance",
+      "url": "/docs/performance",
+      "title": "Performance",
+      "description": "Render costs, payload guidance and the design choices behind the adapter.",
+      "section": "Reference",
+      "order": 4,
+      "headings": [
+        {
+          "id": "render-allocations",
+          "text": "Render allocations",
+          "depth": 2
+        },
+        {
+          "id": "payload-size",
+          "text": "Payload size",
+          "depth": 2
+        },
+        {
+          "id": "design-notes",
+          "text": "Design notes",
+          "depth": 2
+        },
+        {
+          "id": "benchmark-locally",
+          "text": "Benchmark locally",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "configuration",
+      "url": "/docs/configuration",
+      "title": "Configuration",
+      "description": "InertiaOptions, Vite, SSR, props, state and the middleware and result API.",
+      "section": "Reference",
+      "order": 5,
+      "headings": [
+        {
+          "id": "addinertiao---inertiaoptions",
+          "text": "AddInertia(o => ...): InertiaOptions",
+          "depth": 2
+        },
+        {
+          "id": "ovite-viteoptions",
+          "text": "o.Vite: ViteOptions",
+          "depth": 2
+        },
+        {
+          "id": "ossr-ssroptions",
+          "text": "o.Ssr: SsrOptions",
+          "depth": 2
+        },
+        {
+          "id": "oprops-inertiapropsoptions",
+          "text": "o.Props: InertiaPropsOptions",
+          "depth": 2
+        },
+        {
+          "id": "ostate-inertiastateoptions",
+          "text": "o.State: InertiaStateOptions",
+          "depth": 2
+        },
+        {
+          "id": "middleware-and-endpoint-api",
+          "text": "Middleware and endpoint API",
+          "depth": 2
+        },
+        {
+          "id": "extension-points",
+          "text": "Extension points",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "migrating",
+      "url": "/docs/migrating",
+      "title": "Migrating from Other Adapters",
+      "description": "Map an InertiaCore-style API to Inertia.Net and check the behavior differences.",
+      "section": "Help",
+      "order": 1,
+      "headings": [
+        {
+          "id": "behavior-differences-to-check",
+          "text": "Behavior differences to check",
+          "depth": 2
+        },
+        {
+          "id": "upgrading-inertianet",
+          "text": "Upgrading Inertia.Net",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "troubleshooting",
+      "url": "/docs/troubleshooting",
+      "title": "Troubleshooting & FAQ",
+      "description": "Common errors, their causes, and how to fix them.",
+      "section": "Help",
+      "order": 2,
+      "headings": [
+        {
+          "id": "inertiarender-does-not-compile",
+          "text": "Inertia.Render(...) does not compile",
+          "depth": 2
+        },
+        {
+          "id": "form-submissions-fail-with-419",
+          "text": "Form submissions fail with 419",
+          "depth": 2
+        },
+        {
+          "id": "the-inertia-page-component-was-not-found",
+          "text": "The Inertia page component was not found",
+          "depth": 2
+        },
+        {
+          "id": "a-redirect-to-another-site-turns-into-a-409",
+          "text": "A redirect to another site turns into a 409",
+          "depth": 2
+        },
+        {
+          "id": "the-root-view-resolves-outside-the-content-root",
+          "text": "The root view resolves outside the content root",
+          "depth": 2
+        },
+        {
+          "id": "the-page-keeps-reloading-or-a-request-loops-with-409",
+          "text": "The page keeps reloading, or a request loops with 409",
+          "depth": 2
+        },
+        {
+          "id": "the-dev-server-tags-do-not-appear",
+          "text": "The dev server tags do not appear",
+          "depth": 2
+        },
+        {
+          "id": "the-root-template-was-not-found-or-inertia-is-missing",
+          "text": "The root template was not found, or @inertia is missing",
+          "depth": 2
+        },
+        {
+          "id": "flash-data-or-errors-disappear",
+          "text": "Flash data or errors disappear",
+          "depth": 2
+        },
+        {
+          "id": "validation-errors-do-not-show-up-minimal-api",
+          "text": "Validation errors do not show up (Minimal API)",
+          "depth": 2
+        },
+        {
+          "id": "validation-keys-do-not-match-my-field-names",
+          "text": "Validation keys do not match my field names",
+          "depth": 2
+        },
+        {
+          "id": "inertiaprop-values-can-only-be-serialized-by-inertianet",
+          "text": "InertiaProp values can only be serialized by Inertia.Net",
+          "depth": 2
+        },
+        {
+          "id": "native-aot-jsontypeinfo-metadata-was-not-provided",
+          "text": "Native AOT: JsonTypeInfo metadata was not provided",
+          "depth": 2
+        },
+        {
+          "id": "ssr-does-not-run-and-there-is-no-error",
+          "text": "SSR does not run and there is no error",
+          "depth": 2
+        },
+        {
+          "id": "ssr-skipped-circuit-open-or-overloaded",
+          "text": "SSR skipped (circuit-open) or (overloaded)",
+          "depth": 2
+        },
+        {
+          "id": "several-managed-instances-never-become-healthy",
+          "text": "Several managed instances never become healthy",
+          "depth": 2
+        },
+        {
+          "id": "the-ssr-output-is-not-hydrated",
+          "text": "The SSR output is not hydrated",
+          "depth": 2
+        },
+        {
+          "id": "does-it-work-behind-a-path-base",
+          "text": "Does it work behind a path base?",
+          "depth": 2
+        },
+        {
+          "id": "can-i-use-newtonsoftjson",
+          "text": "Can I use Newtonsoft.Json?",
+          "depth": 2
+        },
+        {
+          "id": "can-i-mix-razor-pages-or-views-with-inertia-pages",
+          "text": "Can I mix Razor Pages or views with Inertia pages?",
+          "depth": 2
+        }
+      ]
+    }
+  ]
+}

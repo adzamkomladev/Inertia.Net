@@ -1,0 +1,48 @@
+---
+title: Asset Versioning
+description: Tell the client when its JavaScript and CSS are stale, and reload once when they are.
+section: Advanced
+order: 1
+---
+
+The asset version tells the client when its assets are stale. The server resolves it in this order:
+
+1. `InertiaOptions.VersionResolver(HttpContext)`, when it returns non-null;
+2. else `InertiaOptions.Version`;
+3. else a hash of the Vite manifest (the first 16 bytes of its SHA-256, in hex), computed once and recomputed in Development when the file changes;
+4. else `""`.
+
+```csharp
+o.Version = typeof(Program).Assembly.GetName().Version!.ToString();       // or a build id
+o.VersionResolver = ctx => ctx.Request.Headers["X-Tenant"].ToString();   // per request
+```
+
+## How the client checks it
+
+When an Inertia **GET** carries a different `X-Inertia-Version`, the server answers `409` with `X-Inertia-Location` (the absolute request URL) and `X-Inertia-Version`, and the client performs a full page reload.
+
+The check runs **before your handler**, so no work is wasted rendering a page that will be thrown away. Other methods never get this `409`.
+
+```text
+GET /users
+X-Inertia: true
+X-Inertia-Version: old
+
+409 Conflict
+X-Inertia-Location: https://example.com/users
+X-Inertia-Version: new
+```
+
+## Choosing a version
+
+- **Vite manifest hash (default).** Nothing to configure. A new build changes the manifest and the version.
+- **Assembly version or build id.** Good when the client build is not tied to the manifest, or when several apps share assets.
+- **Per-request version.** Useful for multi-tenant apps with different frontend builds per tenant.
+
+<Callout type="danger" title="Never generate a new version on every request">
+A `VersionResolver` that returns a random value on every call makes the client reload forever. Different instances behind a load balancer must serve the same build, or the client will bounce between versions.
+</Callout>
+
+## Path base
+
+The version check and `X-Inertia-Location` use the request URL. Behind a path base or reverse proxy, configure forwarded headers so the scheme and host match the browser's URL. See [Deploying](/docs/deploying).

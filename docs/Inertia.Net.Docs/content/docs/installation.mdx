@@ -1,0 +1,70 @@
+---
+title: Installation
+description: Install Inertia.Net, the optional MVC or FastEndpoints package, and the testing helpers.
+section: Getting Started
+order: 2
+---
+
+Inertia.Net is split into small packages. Install the core package and one optional backend integration.
+
+| Package | Install when |
+|---|---|
+| `Inertia.Net` | always. The core adapter, Minimal API support, Vite, SSR, state store and antiforgery |
+| `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` filter, Razor root view and tag helpers |
+| `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
+| `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
+| `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
+
+```sh
+dotnet add package Inertia.Net --version 1.5.3
+dotnet add package Inertia.Net.Mvc --version 1.5.3            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.5.3  # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.5.3        # test projects
+```
+
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.5.3 implements Inertia.js v3.
+
+## Requirements
+
+- .NET 10 SDK and an `Microsoft.NET.Sdk.Web` project.
+- Node.js and npm for the frontend. Node is only needed at runtime when SSR is enabled.
+- An Inertia.js v3 client: `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte`.
+
+## Start from the template
+
+```sh
+dotnet new install Inertia.Net.Templates::1.5.3
+dotnet new inertia -n MyApp --framework react
+cd MyApp
+npm install
+```
+
+Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+
+## Namespace and global usings
+
+The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the namespace, so `Inertia.Render(...)` does not compile outside the `Inertia.Net` namespace.
+
+The package's `buildTransitive` props file adds both global usings when `<ImplicitUsings>enable</ImplicitUsings>` is set, which is the default in new projects:
+
+```csharp
+global using Inertia.Net;
+global using static Inertia.Net.Inertia;
+```
+
+Write `Render(...)`, `Defer(...)`, `Once(...)`, `Back()` and `Location(...)` unqualified.
+
+<Callout type="warning" title="Opting out">
+Set `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` and add `using static Inertia.Net.Inertia;` yourself, or call `Inertia.Net.Inertia.Render(...)`. `HttpContext.Inertia()` is an extension method and works as written.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card title="Quick start" icon="rocket" href="/docs/quick-start">
+    Add the four pieces every Inertia app needs: services, middleware, a root template and a client.
+  </Card>
+  <Card title="Client setup" icon="code" href="/docs/client-setup">
+    Install React, Vue or Svelte and configure Vite for development and production.
+  </Card>
+</Cards>

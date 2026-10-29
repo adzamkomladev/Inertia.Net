@@ -1,0 +1,79 @@
+---
+title: TypeScript Types
+description: Generate declarations for page props, shared props and flash data from your .NET contracts.
+section: Reference
+order: 1
+---
+
+Inertia.Net can write TypeScript declarations for typed page props, shared props and flash data. They follow the app's JSON contracts (the HTTP JSON options and their source-generated contexts), so names, nullability and enum values match the page JSON.
+
+## Configure generation
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";   // written in Development, only when it changed
+    o.TypeScript.Page<UsersPage>("Users/Index").Page<HomePage>("Home");
+    o.TypeScript.FlashData<Flash>();                             // optional; SharedProps<T>() too
+});
+
+public sealed record UsersPage(
+    List<User> Users,
+    [property: InertiaPropType(typeof(UserStats))] InertiaProp Stats);
+```
+
+The file is written when the app starts in Development, and only when its content changed. Commit it so `tsc` passes in CI without running the app.
+
+```ts
+// ClientApp/types/inertia.d.ts (excerpt)
+export interface InertiaPages {
+  'Users/Index': UsersPage
+  Home: HomePage
+}
+export interface UsersPage {
+  users: User[]
+  stats?: UserStats
+}
+declare module '@inertiajs/core' {
+  export interface InertiaConfig {
+    sharedPageProps: SharedProps
+    flashDataType: FlashData
+    errorValueType: string
+  }
+}
+```
+
+```tsx
+import type { InertiaPages } from '../../types/inertia'
+
+export default function Index({ users, stats }: InertiaPages['Users/Index']) {
+  // ...
+}
+```
+
+## Shared props
+
+Shared props are inferred from the values passed to `o.Share(...)`; dot keys nest. Factories and per-request shares are typed as `unknown`. `o.TypeScript.SharedProps<T>()` replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+
+## Prop members
+
+An `InertiaProp` member is optional (it can be deferred, optional or rescued) and `unknown`, unless `[InertiaPropType(typeof(T))]` names its value type.
+
+## Mapping
+
+| .NET | TypeScript |
+|---|---|
+| `int`, `long`, `double`, `decimal`, `float` | `number` (`number \| bigint` for 64-bit and larger with `PreserveBigIntegers`) |
+| `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid`, `byte[]` | `string` |
+| enum | union of JSON values (string names with a string enum converter) |
+| dictionary | `Record<string, T>` |
+| polymorphic type | union tagged with its discriminator |
+| nullable member | `T \| null` |
+
+Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.
+
+Number handling follows member settings, then type settings, then the global JSON options. Custom converter output is typed as `unknown` with a warning when its shape cannot be inferred.
+
+<Callout type="warning" title="Keep the HTTP and MVC naming policies aligned">
+Props are written with the HTTP `JsonOptions`. MVC error keys use the MVC `JsonOptions`. If the two naming policies differ, generated prop names and validation error keys will not match.
+</Callout>

@@ -1,0 +1,262 @@
+---
+title: Client Setup
+description: Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
+section: Getting Started
+order: 4
+---
+
+Inertia.Net speaks the Inertia.js v3 protocol. Install a v3 client package; v2 clients are not supported.
+
+## Install the client
+
+Run the npm commands from the ASP.NET Core project directory (the one containing your `.csproj`).
+
+<Tabs>
+  <Tab label="React">
+
+```sh
+npm install react react-dom @vitejs/plugin-react @inertiajs/react@^3
+npm install -D vite typescript
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```sh
+npm install vue @vitejs/plugin-vue @inertiajs/vue3@^3
+npm install -D vite typescript
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```sh
+npm install svelte @sveltejs/vite-plugin-svelte @inertiajs/svelte@^3
+npm install -D vite typescript
+```
+
+  </Tab>
+</Tabs>
+
+The starter templates use `ClientApp/pages`. The manual examples below use `resources/js/Pages`. Keep the resolver, file paths and Vite entry consistent with the layout you choose.
+
+## Vite configuration
+
+The same Vite config works for every client; only the framework plugin changes.
+
+```ts
+// vite.config.ts
+import { defineConfig, type Plugin } from 'vite'
+import react from '@vitejs/plugin-react'            // Vue: @vitejs/plugin-vue, Svelte: @sveltejs/vite-plugin-svelte
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+
+// Writes the dev server URL to wwwroot/hot. Inertia.Net reads it in Development
+// and renders the dev-server tags instead of the manifest tags.
+function hotFile(): Plugin {
+  const file = 'wwwroot/hot'
+  return {
+    name: 'inertia-net-hot-file',
+    apply: 'serve',
+    configureServer(server) {
+      server.httpServer?.once('listening', () => {
+        const address = server.httpServer!.address()
+        if (address && typeof address === 'object') {
+          mkdirSync('wwwroot', { recursive: true })
+          writeFileSync(file, `http://localhost:${address.port}`)
+        }
+      })
+      const clean = () => rmSync(file, { force: true })
+      process.on('exit', clean)
+      process.on('SIGINT', () => process.exit())
+      process.on('SIGTERM', () => process.exit())
+    },
+  }
+}
+
+export default defineConfig(({ command }) => ({
+  plugins: [react(), hotFile()],
+  // Built assets live at /build/. The dev server serves from the root because
+  // Inertia.Net emits {origin}/@vite/client and {origin}/{entry}.
+  base: command === 'build' ? '/build/' : '/',
+  server: { port: 5173, strictPort: true, origin: 'http://localhost:5173' },
+  build: {
+    outDir: 'wwwroot/build',
+    emptyOutDir: true,
+    manifest: true,
+    rollupOptions: { input: 'resources/js/app.tsx' },
+  },
+}))
+```
+
+Add these fields to `package.json`:
+
+```json
+{ "type": "module", "scripts": { "dev": "vite", "build": "vite build" } }
+```
+
+The manifest key of the entry (`resources/js/app.tsx`) is what you pass to `@vite("...")`.
+
+## Client entry
+
+The optional `@inertiajs/vite` plugin resolves pages and mounts the app for you. With it, the entry is just:
+
+```ts
+import { createInertiaApp } from '@inertiajs/react'   // or @inertiajs/vue3, @inertiajs/svelte
+
+createInertiaApp()
+```
+
+Without the plugin, provide the resolver and setup yourself.
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+// resources/js/app.tsx
+import { createInertiaApp } from '@inertiajs/react'
+import { createRoot } from 'react-dom/client'
+
+createInertiaApp({
+  resolve: (name) => {
+    const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true })
+    return pages[`./Pages/${name}.tsx`]
+  },
+  setup({ el, App, props }) {
+    createRoot(el).render(<App {...props} />)
+  },
+})
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+// resources/js/app.ts
+import { createApp, h } from 'vue'
+import { createInertiaApp } from '@inertiajs/vue3'
+
+createInertiaApp({
+  resolve: (name) => {
+    const pages = import.meta.glob('./Pages/**/*.vue', { eager: true })
+    return pages[`./Pages/${name}.vue`]
+  },
+  setup({ el, App, props, plugin }) {
+    createApp({ render: () => h(App, props) }).use(plugin).mount(el)
+  },
+})
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+// resources/js/app.ts
+import { mount } from 'svelte'
+import { createInertiaApp } from '@inertiajs/svelte'
+
+createInertiaApp({
+  resolve: (name) => {
+    const pages = import.meta.glob('./Pages/**/*.svelte', { eager: true })
+    return pages[`./Pages/${name}.svelte`]
+  },
+  setup({ el, App, props }) {
+    mount(App, { target: el, props })
+  },
+})
+```
+
+  </Tab>
+</Tabs>
+
+## Pages
+
+A page file receives the props from `Render(...)` as normal component props.
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+// resources/js/Pages/Users/Index.tsx
+import { Link } from '@inertiajs/react'
+
+export default function Index({ users }: { users: { id: number; name: string }[] }) {
+  return (
+    <ul>
+      {users.map((u) => (
+        <li key={u.id}><Link href={`/users/${u.id}`}>{u.name}</Link></li>
+      ))}
+    </ul>
+  )
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- resources/js/Pages/Users/Index.vue -->
+<script setup lang="ts">
+import { Link } from '@inertiajs/vue3'
+defineProps<{ users: { id: number; name: string }[] }>()
+</script>
+
+<template>
+  <ul><li v-for="u in users" :key="u.id"><Link :href="`/users/${u.id}`">{{ u.name }}</Link></li></ul>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- resources/js/Pages/Users/Index.svelte -->
+<script lang="ts">
+  import { Link } from '@inertiajs/svelte'
+  let { users }: { users: { id: number; name: string }[] } = $props()
+</script>
+
+<ul>{#each users as u (u.id)}<li><Link href={`/users/${u.id}`}>{u.name}</Link></li>{/each}</ul>
+```
+
+  </Tab>
+</Tabs>
+
+<Callout type="tip" title="Use the generated types">
+Inertia.Net can write TypeScript declarations for your page props, shared props and flash data. See [TypeScript types](/docs/typescript).
+</Callout>
+
+## Development workflow
+
+```sh
+npm run dev          # terminal 1: Vite on :5173, writes wwwroot/hot
+dotnet watch         # terminal 2: the app, ASPNETCORE_ENVIRONMENT=Development
+```
+
+Open the ASP.NET Core URL, not the Vite URL. In Development the app reads `wwwroot/hot` and renders the Vite tags; in production it reads the manifest.
+
+For production:
+
+```sh
+npm run build
+dotnet publish -c Release
+```
+
+Node is needed to build the assets and only needed at runtime when SSR is enabled.
+
+## Using @inertiajs/vite
+
+The plugin also contributes the SSR dev endpoint and page resolution. Add it before the hot-file plugin:
+
+```ts
+import inertia from '@inertiajs/vite'
+
+export default defineConfig({
+  plugins: [
+    react(),
+    inertia({ ssr: { entry: 'resources/js/ssr.tsx', host: '127.0.0.1', port: 13714 } }),
+    hotFile(),
+  ],
+})
+```
+
+Keep the SSR listener on loopback: the renderer trusts its output and has no authentication. The [SSR guide](/docs/server-side-rendering) covers the full setup.

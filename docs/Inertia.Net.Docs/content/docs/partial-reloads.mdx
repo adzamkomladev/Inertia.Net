@@ -1,0 +1,70 @@
+---
+title: Partial Reloads
+description: Reload only the props a page needs with only and except filters.
+section: Core Concepts
+order: 4
+---
+
+The Inertia client can reload the current page and ask for a subset of its props. This is how deferred props, polling and infinite scroll work, and you can use it directly for dashboard refresh buttons and filters.
+
+## From the client
+
+```tsx
+import { router } from '@inertiajs/react'
+
+router.reload({ only: ['users'] })
+router.reload({ except: ['permissions'] })
+```
+
+`router.visit('/users', { only: ['users'] })` works for a new page too. The client sends:
+
+| Header | Meaning |
+|---|---|
+| `X-Inertia-Partial-Component` | The component being rendered |
+| `X-Inertia-Partial-Data` | The `only` list |
+| `X-Inertia-Partial-Except` | The `except` list |
+
+Filtering applies only when the partial component equals the component being rendered.
+
+## Server behavior
+
+```csharp
+["users"] = Prop(ct => db.Users.ToListAsync(ct)),    // runs on the partial reload above
+["roles"] = Prop(ct => db.Roles.ToListAsync(ct)),    // does not run
+```
+
+- Paths are dot paths and match on a `.` boundary. `only: ["user"]` includes `user.name`; `only: ["user.name"]` includes `user.name` and keeps `user` as a container.
+- `except` beats `only`. `Always(...)` ignores both.
+- The children of a value produced by a loader are not filtered. Nested literal `InertiaProps` are.
+- Loaders of excluded props never run.
+- Selecting an array descendant (`rows.1.extra`) reloads the complete array, including sibling fields and nested loaders. A descendant `except` excludes the entire array; `Always` still wins.
+- Omitted or rescued direct array elements retain their positions as `null`.
+- A missing or empty list header means “no filter”, which differs from an empty list.
+
+<Callout type="warning" title="Always wins">
+`Always(...)` is sent even when a partial reload does not ask for it. Use it for props the page cannot render without; do not use it for expensive data.
+</Callout>
+
+## What the client keeps
+
+A reloaded prop replaces the client's value by default. A prop resolved from a loader is sent in full. To combine values instead, use [merge props](/docs/merging-props).
+
+## Deferred and once props
+
+Deferred props are loaded through partial reloads. `X-Inertia-Partial-Data` asks for the deferred group, and the server records which deferred props it has sent.
+
+Once props that the reload asks for always resolve. The client sends `X-Inertia-Except-Once-Props` with the keys it already holds, so the server can skip them while keeping the `onceProps` metadata.
+
+## Testing partial reloads
+
+`Inertia.Net.Testing` replays the request with the right headers:
+
+```csharp
+var page = await (await client.InertiaGetAsync("/dashboard")).GetInertiaPageAsync();
+
+var only = await page.ReloadOnlyAsync(client, "users");
+var except = await page.ReloadExceptAsync(client, "permissions");
+var deferred = await page.LoadDeferredPropsAsync(client, "sidebar");
+```
+
+`ReloadOnlyAsync` asserts that the requested prop is present; `ReloadExceptAsync` asserts that it is missing.

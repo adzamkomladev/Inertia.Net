@@ -1,0 +1,89 @@
+---
+title: Introduction
+description: Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
+section: Getting Started
+order: 1
+---
+
+Inertia.Net connects ASP.NET Core to the Inertia.js v3 client. Your endpoints return pages and props; the client renders them as React, Vue or Svelte components. The first visit is a normal HTML response, and later visits are Inertia requests that update the page without a full reload.
+
+It is an adapter, not a framework. Routing, authentication, authorization, validation and persistence stay in ASP.NET Core. There is no separate JSON API to design and no client-side router to keep in sync.
+
+## How it works
+
+<Steps>
+  <Step title="An endpoint chooses a page and its props">
+
+```csharp
+app.MapGet("/", () => Render("Home", new InertiaProps
+{
+    ["greeting"] = "Hello from .NET",
+}));
+```
+
+  </Step>
+  <Step title="Inertia connects it to a client component">
+
+```tsx
+export default function Home({ greeting }: { greeting: string }) {
+  return <h1>{greeting}</h1>
+}
+```
+
+  </Step>
+  <Step title="The client updates the page">
+    The first request returns HTML with the page object embedded. Inertia links and form submissions request the next page in the background and swap the component while the browser keeps its state.
+  </Step>
+</Steps>
+
+Your .NET app still owns the request. The adapter adds the protocol middleware, prop resolution, redirect semantics, flash data and asset tags.
+
+## What you get
+
+<Cards>
+  <Card title="Three backend styles" icon="server" href="/docs/quick-start">
+    Minimal APIs, MVC controllers and FastEndpoints share the same core package and protocol behavior.
+  </Card>
+  <Card title="The full v3 prop model" icon="blocks" href="/docs/props">
+    Lazy, optional, deferred, merged, once, cached, rescued and infinite-scroll props.
+  </Card>
+  <Card title="Production concerns included" icon="shield" href="/docs/csrf-and-antiforgery">
+    CSRF cookies, encrypted state, asset versioning, proxy support and SSR supervision.
+  </Card>
+  <Card title="AOT-friendly by design" icon="rocket" href="/docs/native-aot">
+    Props are written through System.Text.Json metadata. No reflection over your page objects.
+  </Card>
+</Cards>
+
+## Feature matrix
+
+| | Minimal API | MVC controllers | FastEndpoints |
+|---|:---:|:---:|:---:|
+| Package | `Inertia.Net` | `Inertia.Net` + `Inertia.Net.Mvc` | `Inertia.Net` + `Inertia.Net.FastEndpoints` |
+| Render / Back / Location | `Render(...)` returns `IResult` | same, return `IResult` from an action | `Send.InertiaAsync(...)` or return the result |
+| Validation redirect with errors | `.WithInertiaValidation()` | `ModelState` filter (global) | `c.UseInertia()` pre-processor |
+| Precognition | `.WithInertiaPrecognition()` | not available | `c.UseInertia()` |
+| Razor root view | no (`app.html` template) | optional (tag helpers) | no (`app.html` template) |
+| Native AOT | yes | no (MVC itself is not AOT) | yes (with the FastEndpoints source generator) |
+
+The client packages are `@inertiajs/react`, `@inertiajs/vue3` and `@inertiajs/svelte`, all version 3. Inertia.Net does not support v2 clients.
+
+## This documentation site
+
+This site is an Inertia.Net app. The sidebar, search, docs pages and theme switcher are React components rendered by an ASP.NET Core Minimal API. Navigation uses Inertia links, and the source is in `docs/Inertia.Net.Docs` so it doubles as a real example.
+
+## Requirements
+
+- .NET 10 SDK
+- Node.js and npm to build the frontend (at runtime only when SSR is enabled)
+- An Inertia.js v3 client package for React, Vue or Svelte
+
+<Callout type="tip" title="Starting from scratch?">
+Use the starter template: `dotnet new install Inertia.Net.Templates`, then `dotnet new inertia -n MyApp --framework react`. It includes working pages, a form with validation, flash messages, CSRF and Vite configuration.
+</Callout>
+
+## Next steps
+
+- [Install the packages](/docs/installation) in an existing app.
+- [Follow the quick start](/docs/quick-start) for a minimal end-to-end setup.
+- [Read the props reference](/docs/props) when you are ready to model page data.

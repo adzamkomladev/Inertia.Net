@@ -1,0 +1,56 @@
+---
+title: Performance
+description: Render costs, payload guidance and the design choices behind the adapter.
+section: Reference
+order: 4
+---
+
+Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
+
+## Render allocations
+
+v1.5.2 allocates less per render than v1.5.1 (exact allocation probes, same fixtures):
+
+| Workload | v1.5.1 | v1.5.2 |
+|---|---:|---:|
+| JSON, 20 props | 2,152 B | 1,736 B |
+| Typed POCO page | 1,968 B | 1,552 B |
+| Partial reload | 984 B | 568 B |
+| HTML, 20 props | 2,216 B | 1,800 B |
+| 20 parallel loaders | 6,496 B | 3,992 B |
+
+In two paired runs, partial reloads and pages with parallel loaders were faster in both; ordinary JSON and HTML rendering showed no clear change. Those timings come from a laptop that cannot resolve differences under about 10%. See `tests/Inertia.Net.Benchmarks/RESULTS.md` for intervals and raw samples.
+
+## Payload size
+
+The page JSON is fully buffered before the first byte is sent, so a failing loader never produces a half-written `200`. Each concurrent request therefore holds its whole page in memory (pooled, and sized from the component's recent pages).
+
+Keep pages well under a megabyte:
+
+- paginate with [`Scroll`](/docs/infinite-scroll)
+- defer slow data with [`Defer`](/docs/deferred-props)
+- load on demand with [`Optional`](/docs/props#the-prop-factories)
+- use a [partial reload](/docs/partial-reloads) for refresh buttons and filters
+
+`Ssr.MaxPageBytes` keeps larger pages off the SSR server and `Ssr.MaxResponseBytes` bounds its answer; neither limits the props.
+
+## Design notes
+
+- **Single pass.** One recursive walk filters props, runs loaders, writes JSON to a `Utf8JsonWriter` and collects the metadata. There is no intermediate object tree.
+- **Pooled buffers.** The page is written to a pooled `IBufferWriter<byte>`, and the path tracker is a pooled `char[]`. A path becomes a string only when metadata needs it.
+- **Version check before the handler.** A stale client costs one header comparison and a `409`.
+- **No per-request mutable singletons.** Per-request state lives in an `InertiaFeature` on `HttpContext.Features`, so concurrent requests cannot leak history or flash settings into one another.
+- **Plain DTOs take the fast path.** A POCO, list or typed dictionary is walked only when its type can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements; cached per type). Everything else is one `Serialize` call.
+- **UTF-8 throughout.** SSR output and the MVC tag helpers write UTF-8 bytes; nothing large is materialized as a .NET string.
+- **Cached assets.** The Vite manifest is parsed once, the root template is parsed once into pre-encoded UTF-8 segments, and the production tags are pre-rendered per entry set and path base. The version is a precomputed string compared ordinally. A missing manifest, template or SSR bundle is re-checked at most once per second.
+- **Sync loaders stay sync.** `Func<T>` loaders are not wrapped in closures.
+
+Most per-request allocation in a real handler is the props you build, not the render.
+
+## Benchmark locally
+
+```sh
+dotnet run -c Release --project tests/Inertia.Net.Benchmarks -- --filter '*'
+```
+
+Targeted probes: `--render-probe`, `--ssr-probe`, `--mvc-probe`, `--payload-probe` and `--cache-probe`.

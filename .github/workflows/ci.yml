@@ -94,6 +94,20 @@ jobs:
             tests/e2e/test-results
           retention-days: 7
 
+  # The documentation app is an Inertia.Net app; build its client so MDX and the search index cannot break.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.4
+      - name: Build the documentation client and SSR bundle
+        working-directory: docs/Inertia.Net.Docs
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
   # dotnet new templates: create an app per framework, build it against the packages of this commit, then build its client.
   templates:
     runs-on: ubuntu-latest

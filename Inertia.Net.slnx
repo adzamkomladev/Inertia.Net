@@ -11,6 +11,9 @@
     <Project Path="samples/Mvc.Vue/Mvc.Vue.csproj" />
     <Project Path="samples/FastEndpoints.Svelte/FastEndpoints.Svelte.csproj" />
   </Folder>
+  <Folder Name="/docs/">
+    <Project Path="docs/Inertia.Net.Docs/Inertia.Net.Docs.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Inertia.Net.AotSmoke/Inertia.Net.AotSmoke.csproj" />
     <Project Path="tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj" />

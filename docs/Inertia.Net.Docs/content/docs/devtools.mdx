@@ -1,0 +1,59 @@
+---
+title: DevTools & Development Checks
+description: Record visits for the Inertia DevTools extension and catch missing page components during development.
+section: Reference
+order: 3
+---
+
+The [Inertia DevTools](https://inertiajs.com/docs/v3/advanced/devtools) browser extension shows every visit, its props, headers and page state. Inertia.Net implements the server protocol.
+
+## Enable DevTools
+
+```csharp
+builder.Services.AddInertiaDevTools();   // records in Development only
+app.UseInertia();
+app.MapInertiaDevTools();                // GET /_inertia/devtools/entries/{id} and /entries
+```
+
+Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry in memory (per browser tab, at most `MaxEntriesPerTab` and `MaxEntries`, for `MaxAge`): request type, timings, headers, bodies, the page object and its props metadata.
+
+The first page carries the discovery tag the extension reads. Values of names containing `password`, `secret`, `token`, `authorization`, `cookie` or `api_key` are replaced with `[REDACTED]` in props, bodies and headers. Add names with `RedactedKeys`. Nothing leaves the app.
+
+Sensitive query parameters are also redacted in recorded request/page URLs, redirects and URL headers; actual application URLs are unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered; unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk.
+
+Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize` accepts (`404` otherwise). With `Pages.Directory` set, entries link the component to its file.
+
+## Page component check
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Pages.Directory = "ClientApp/pages";   // Development only
+    o.Pages.Extensions = [".tsx", ".vue"];   // optional
+});
+```
+
+In Development, `Render` throws when the component has no page file, naming the closest one:
+
+```text
+'Users/Indx' was not found in 'ClientApp/pages' ... Did you mean 'Users/Index'?
+```
+
+Names match exactly, as the client resolver does, even on case-insensitive file systems. Outside Development there is no check and no file access.
+
+`Pages.Extensions` lists the file types: `.tsx`, `.jsx`, `.ts`, `.js`, `.vue` and `.svelte` by default.
+
+## Generated TypeScript
+
+The development startup also writes TypeScript declarations when `o.TypeScript.OutputPath` is set. It only writes the file when the content changed. See [TypeScript types](/docs/typescript).
+
+## What to check before deploying
+
+- `Pages.Directory` can stay configured; it is inactive outside Development.
+- DevTools recording is off unless explicitly enabled.
+- The generated TypeScript file is committed if the client build type-checks in CI.
+- Production logs do not contain the DevTools read API.
+
+<Callout type="tip" title="Pair with the browser extension">
+Install the Inertia DevTools extension, open your app in Development, and use the extension's panel. The server entries are correlated by the `X-Inertia-Devtools-Id` header.
+</Callout>

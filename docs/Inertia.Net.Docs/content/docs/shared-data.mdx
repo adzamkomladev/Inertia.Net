@@ -1,0 +1,73 @@
+---
+title: Shared Data
+description: Share props with every page, statically or per request, and control the shared prop key list.
+section: Core Concepts
+order: 3
+---
+
+Shared props are merged into every page. A page prop with the same key wins.
+
+## Register shared values
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Share("appName", "Demo");                                      // static value
+    o.Share("auth", ctx => new AuthInfo(ctx.User.Identity?.Name));   // per request
+});
+```
+
+Share values from anywhere with an `HttpContext`, such as middleware or a handler:
+
+```csharp
+app.Use((context, next) =>
+{
+    context.Inertia().Share("locale", CultureInfo.CurrentUICulture.Name);
+    return next(context);
+});
+```
+
+The value can be any prop, including another factory:
+
+```csharp
+o.Share("permissions", ctx => Once(() => LoadPermissions(ctx)));
+o.Share("plans", Once(() => plans.All()));   // like Laravel's shareOnce
+```
+
+`plans` is resolved once and kept by the client across visits.
+
+## The shared prop key list
+
+The top-level shared keys are listed in the page object so the client can keep them across navigations:
+
+```json
+{
+  "props": { "errors": {}, "appName": "Demo", "auth": { "name": "Ada" } },
+  "sharedProps": ["errors", "appName", "auth"]
+}
+```
+
+`errors` is always shared, so the list always contains at least `"errors"`. Turn the list off with:
+
+```csharp
+builder.Services.AddInertia(o => o.ExposeSharedPropKeys = false);
+```
+
+## When to use shared props
+
+Use shared props for values that every page needs and that are cheap to compute:
+
+- the signed-in user or tenant name
+- the application name and locale
+- feature flags
+- a once-per-client value such as a plan catalogue
+
+Keep large or page-specific data in page props. Shared props are considered on every page response, including partial reloads, so keep them cheap or wrap an expensive value in `Once`.
+
+<Callout type="tip" title="Share once">
+Wrapping a shared value in `Once` is the equivalent of Laravel's `shareOnce`. The client keeps the value across visits and sends `X-Inertia-Except-Once-Props`; the loader does not run again until the value expires.
+</Callout>
+
+## TypeScript
+
+The generated declarations infer shared props from the values passed to `o.Share(...)`. Factories and per-request shares are typed as `unknown`; use `o.TypeScript.SharedProps<T>()` when you want an explicit shape. See [TypeScript types](/docs/typescript).

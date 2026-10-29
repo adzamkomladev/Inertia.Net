@@ -1,0 +1,77 @@
+---
+title: Merging Props
+description: Append, prepend, deep merge and match items instead of replacing the client's value.
+section: Core Concepts
+order: 6
+---
+
+By default a reloaded prop replaces the client's value. Merge props tell the client to combine them. This is how pagination, chat messages and incremental lists work.
+
+| C\# | Metadata | Client behavior |
+|---|---|---|
+| `Merge(v)` | `mergeProps: ["key"]` | Append to the existing array |
+| `Prop(...).Prepend()` | `prependProps: ["key"]` | Prepend |
+| `Merge(v).Append("path")` | `mergeProps: ["key.path"]` | Append at a nested path |
+| `Prop(...).Prepend("path")` | `prependProps: ["key.path"]` | Prepend at a nested path |
+| `DeepMerge(v)` | `deepMergeProps: ["key"]` | Deep merge objects and arrays |
+| `.MatchOn("id")` | `matchPropsOn: ["key.id"]` | Replace items with the same `id` instead of duplicating them |
+| `.Append("path", matchOn: "id")` | `matchPropsOn: ["key.path.id"]` | The match key is relative to the nested path |
+
+```csharp
+["posts"] = Merge(ct => db.Posts.Page(page).ToListAsync(ct)).MatchOn("id"),
+```
+
+```json
+{
+  "mergeProps": ["posts"],
+  "matchPropsOn": ["posts.id"]
+}
+```
+
+## Nested paths
+
+```csharp
+["chat"] = Merge(chat).Append("messages", matchOn: "id"),
+["notifications"] = Prop(() => next).Prepend("items"),
+["settings"] = DeepMerge(settings),
+```
+
+```json
+{
+  "mergeProps": ["chat.messages", "notifications.items"],
+  "deepMergeProps": ["settings"],
+  "matchPropsOn": ["chat.messages.id"]
+}
+```
+
+The path before the wrapper stays on the client; only the value below the path is merged.
+
+## Resetting a merge
+
+The client can ask for a fresh value instead of a merge by listing the path in `X-Inertia-Reset`:
+
+```tsx
+router.reload({ only: ['posts'], reset: ['posts'] })
+```
+
+Metadata is skipped for paths in the reset list, and on partial reloads for paths the reload did not ask for.
+
+## Match on a stable key
+
+`.MatchOn("id")` replaces an item with the same key instead of appending a duplicate. Use a stable, unique key from your data. Without it, incremental updates append every item again.
+
+```csharp
+["messages"] = Merge(page.Items).MatchOn("id"),
+```
+
+## Deep merge
+
+`DeepMerge` recursively combines objects. Arrays are merged by index; use `MatchOn` when you need item identity.
+
+```csharp
+["filters"] = DeepMerge(new { search, tags }),
+```
+
+<Callout type="info" title="Merge metadata and partial reloads">
+On a partial reload, merge metadata is only emitted for paths the reload asked for. `Always` still applies independently.
+</Callout>

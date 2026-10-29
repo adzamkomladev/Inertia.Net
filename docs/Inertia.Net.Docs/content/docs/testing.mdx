@@ -1,0 +1,85 @@
+---
+title: Testing
+description: Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
+section: Reference
+order: 2
+---
+
+`Inertia.Net.Testing` has Laravel-style fluent assertions over Inertia responses and `HttpClient` helpers. It parses both JSON responses (`X-Inertia: true`) and the first-visit HTML `<script data-page>`, and decodes `$bigint` values. Failures throw `InertiaAssertionException` with a readable message, so it works with any test framework.
+
+```csharp
+using Inertia.Net.Testing;
+using Microsoft.AspNetCore.Mvc.Testing;
+
+public class UsersTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+{
+    // Keeps cookies (flash, errors) and does not follow redirects, so a test can assert the 303 itself.
+    private readonly HttpClient _client = factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+        AllowAutoRedirect = false,
+    });
+
+    [Fact]
+    public async Task Index_lists_users()
+    {
+        using var response = await _client.InertiaGetAsync("/users");   // sends X-Inertia, X-Requested-With
+
+        await response.AssertInertiaAsync(page => page
+            .Component("Users/Index")
+            .Url("/users")
+            .Has("users", 3, first => first.Where("name", "Ann").WhereType("id", "integer").Etc())
+            .Where("filters.search", "")
+            .Missing("secret")
+            .HasFlash("toast", "Welcome"));
+    }
+}
+```
+
+Add `public partial class Program;` to your app when it uses top-level statements.
+
+## Request helpers
+
+| Helper | Purpose |
+|---|---|
+| `InertiaGetAsync(url, version?, configure?)` | Sends an Inertia GET |
+| `InertiaRequestAsync(method, url, content?, version?, configure?)` | Sends an Inertia request with any method |
+| `GetInertiaPageAsync()` | Parses the response into an `InertiaPage` |
+| `AssertInertiaAsync(assert)` | Parses, runs the assertions and returns the page |
+
+## Page assertions
+
+`Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)` and `HasDeferred(group, path)`.
+
+## Prop assertions
+
+On props and nested scopes (dot paths and array indexes allowed):
+
+`Has(key)`, `Has(key, count)`, `Has(key, scope)`, `Has(key, count, firstItemScope)`, `HasAll`, `HasAny`, `Missing`, `MissingAll`, `Where(key, value)`, `Where(key, predicate)`, `WhereNot`, `WhereNull`, `WhereNotNull`, `WhereType(key, "string|null")`, `WhereAllType`, `WhereContains(key, ...)`, `Count`, `CountBetween`, `Each(scope)`, `First(scope)` and `Dump()`.
+
+**Strict interaction tracking.** Like Laravel, a nested scope fails when it contains properties you did not assert, unless you end it with `Etc()`. The root scope is not checked automatically: call `.Interacted()` at the end to enforce that every top-level prop was asserted.
+
+## Partial reloads and deferred props
+
+`InertiaPage` replays the request with the right headers:
+
+```csharp
+var page = await (await _client.InertiaGetAsync("/dashboard")).GetInertiaPageAsync();
+
+new AssertableInertia(page).HasDeferred("sidebar", "stats").Missing("stats");
+
+var loaded = await page.LoadDeferredPropsAsync(_client, "sidebar");     // all groups when none are named
+new AssertableInertia(loaded).Has("stats");
+
+var only = await page.ReloadOnlyAsync(_client, "users");
+var except = await page.ReloadExceptAsync(_client, "users");
+```
+
+`ReloadOnlyAsync` asserts that `"users"` is in the result; `ReloadExceptAsync` asserts that it is missing.
+
+## InertiaPage members
+
+`Props`, `Raw`, `Prop(path)`, `HasProp(path)`, `PropBigInteger(path)`, `DeferredProps`, `MergeProps`, `PrependProps`, `DeepMergeProps`, `MatchPropsOn`, `RescuedProps`, `SharedProps`, `ScrollProps`, `OnceProps`, `Flash`, `EncryptHistory`, `ClearHistory`, `PreserveFragment`, `PreserveBigIntegers`.
+
+<Callout type="tip" title="Cookies and redirects">
+Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies. Disable `AllowAutoRedirect` to assert the redirect itself, then follow it with a second `InertiaGetAsync` to read the flash or errors.
+</Callout>

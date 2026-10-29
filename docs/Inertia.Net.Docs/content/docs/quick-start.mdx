@@ -1,0 +1,210 @@
+---
+title: Quick Start
+description: Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
+section: Getting Started
+order: 3
+---
+
+Already using the starter template? Its services, middleware, root template and frontend are configured for you. These steps are for adding Inertia to an existing app or building one manually.
+
+Every app needs the same four things:
+
+<Steps>
+  <Step title="Register Inertia and the protocol middleware" />
+  <Step title="Add a root template with the Inertia tokens" />
+  <Step title="Render a page from an endpoint" />
+  <Step title="Connect a client and run Vite" />
+</Steps>
+
+## 1. Register the services
+
+Choose one backend style. All three use the same protocol middleware and the same `Render(...)` result.
+
+<Tabs>
+  <Tab label="Minimal API">
+
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddValidation();                    // .NET 10 source-generated validation
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+builder.Services.AddInertia(o =>
+{
+    o.Share("appName", "Demo");
+});
+
+var app = builder.Build();
+
+app.UseStaticFiles();                                // serves wwwroot/build (Vite output)
+app.UseInertia();                                    // before the endpoints
+app.UseInertiaAntiforgery();                         // XSRF-TOKEN cookie; 419 for unsafe requests without it
+
+app.MapGet("/", () => Render("Home", new InertiaProps
+{
+    ["greeting"] = "Hello from .NET",
+}));
+
+app.Run();
+```
+
+  </Tab>
+  <Tab label="MVC">
+
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddInertia();
+builder.Services.AddControllersWithViews().AddInertiaMvc();   // add .UseRazorRootView() here if you want Razor
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+
+var app = builder.Build();
+
+app.UseStaticFiles();
+app.UseInertia();
+app.UseInertiaAntiforgery();
+app.MapControllers();
+app.Run();
+```
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+public sealed class HomeController : Controller
+{
+    [HttpGet("/")]
+    public IResult Index() => Render("Home", new InertiaProps
+    {
+        ["greeting"] = "Hello from .NET",
+    });
+}
+```
+
+  </Tab>
+  <Tab label="FastEndpoints">
+
+```csharp
+// Program.cs
+using FastEndpoints;
+using Inertia.Net.FastEndpoints;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddInertia();
+builder.Services.AddFastEndpoints();
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+
+var app = builder.Build();
+
+app.UseStaticFiles();
+app.UseInertia();
+app.UseInertiaAntiforgery();
+app.UseFastEndpoints(c => c.UseInertia());           // validation redirect + Precognition
+app.Run();
+```
+
+```csharp
+using FastEndpoints;
+using Inertia.Net.FastEndpoints;
+
+public sealed class HomeEndpoint : EndpointWithoutRequest<InertiaResult>
+{
+    public override void Configure() => Get("/");
+
+    public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) =>
+        Task.FromResult(Render("Home", new InertiaProps { ["greeting"] = "Hello from .NET" }));
+}
+```
+
+  </Tab>
+</Tabs>
+
+<Callout type="tip" title="Why AddValidation and antiforgery up front?">
+`AddValidation()` enables the Minimal API integration used by `.WithInertiaValidation()`. `UseInertiaAntiforgery()` issues the `XSRF-TOKEN` cookie and validates every unsafe request, so forms work from the first commit.
+</Callout>
+
+## 2. Add the root template
+
+The root template is an HTML file in the content root. The default name is `app.html`.
+
+```html
+<!-- app.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My app</title>
+  @viteReactRefresh
+  @vite("ClientApp/app.tsx")
+  @inertiaHead
+</head>
+<body>
+  @inertia
+</body>
+</html>
+```
+
+Remove `@viteReactRefresh` for Vue and Svelte. `@inertia` is required. The other tokens are described in [Pages and responses](/docs/pages-and-responses#the-root-template).
+
+Make sure `app.html` is copied to the output and publish directory:
+
+```xml
+<ItemGroup>
+  <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
+## 3. Create the page component
+
+The page name passed to `Render` must match the client resolver. With `@inertiajs/vite` the resolver maps `ClientApp/pages/**` automatically.
+
+```tsx
+// ClientApp/pages/Home.tsx
+export default function Home({ greeting }: { greeting: string }) {
+  return <h1>{greeting}</h1>
+}
+```
+
+The client entry only needs to start Inertia:
+
+```tsx
+// ClientApp/app.tsx
+import { createInertiaApp } from '@inertiajs/react'
+
+createInertiaApp()
+```
+
+<Callout type="info" title="Not using @inertiajs/vite?">
+Pass your own `resolve` and `setup` functions to `createInertiaApp`. The [client setup](/docs/client-setup) page shows both forms for React, Vue and Svelte.
+</Callout>
+
+## 4. Run it
+
+Start Vite and ASP.NET Core in two terminals, from the project directory:
+
+```sh
+npm run dev      # terminal 1: Vite, writes wwwroot/hot
+dotnet watch     # terminal 2: ASP.NET Core, Development environment
+```
+
+Open the URL printed by `dotnet watch` (not the Vite URL). The first visit to `/` should display “Hello from .NET”.
+
+For production, build the client and publish the app:
+
+```sh
+npm run build
+dotnet publish -c Release
+```
+
+Deploy `wwwroot/build` and `app.html` with the published app.
+
+## Where to go next
+
+<Cards>
+  <Card title="Client setup" icon="code" href="/docs/client-setup">Vite configuration and the React, Vue and Svelte entries.</Card>
+  <Card title="Props" icon="blocks" href="/docs/props">Lazy, deferred, merged and cached page data.</Card>
+  <Card title="Validation" icon="shield" href="/docs/validation-and-errors">Redirects, error bags and Precognition.</Card>
+  <Card title="Server-side rendering" icon="rocket" href="/docs/server-side-rendering">Render the first visit on Node.</Card>
+</Cards>

@@ -15,7 +15,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
 });
 builder.Services.AddValidation();
-builder.Services.AddFastEndpoints(DiscoveredTypes.All);
+builder.Services.AddFastEndpoints(new[] { DiscoveredTypes.All });
 // Registers the ProblemDetails JSON metadata: without it (reflection off) the 400 for non-Inertia clients cannot be serialized.
 builder.Services.AddProblemDetails();
 builder.Services.AddInertia(o =>

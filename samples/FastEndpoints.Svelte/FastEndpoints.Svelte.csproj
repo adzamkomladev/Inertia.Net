@@ -14,7 +14,7 @@
   <!-- The frontend is built separately (npm run build); dotnet build never needs Node. -->
   <ItemGroup>
     <Content Remove="node_modules\**;ClientApp\**;package*.json;tsconfig*.json" />
-    <None Remove="node_modules\**;ClientApp\**" />
-    <Content Update="app.html" CopyToPublishDirectory="PreserveNewest" />
+    <None Remove="node_modules\**;ClientApp\**;app.html" />
+    <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

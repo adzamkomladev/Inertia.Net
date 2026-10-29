@@ -1,0 +1,251 @@
+---
+title: Server-side Rendering
+description: Render the first visit on Bun or Node, supervise the process from .NET, and fall back safely.
+section: Advanced
+order: 2
+---
+
+SSR renders the first visit on a JavaScript server using your client bundle, so crawlers and slow devices get HTML. Inertia XHR requests are never rendered on the server.
+
+## 1. Build the SSR bundle
+
+<Tabs>
+  <Tab label="@inertiajs/vite">
+
+```tsx
+// ClientApp/ssr.tsx
+import { createInertiaApp } from '@inertiajs/react'
+
+createInertiaApp()
+```
+
+```ts
+// vite.config.ts
+import inertia from '@inertiajs/vite'
+
+export default defineConfig({
+  plugins: [
+    react(),
+    inertia({
+      ssr: { entry: 'ClientApp/ssr.tsx', host: '127.0.0.1', port: 13714 },
+    }),
+  ],
+})
+```
+
+Build both bundles:
+
+```json
+{ "scripts": { "build": "vite build && vite build --ssr" } }
+```
+
+  </Tab>
+  <Tab label="Manual entry">
+
+```tsx
+// resources/js/ssr.tsx
+import { createInertiaApp } from '@inertiajs/react'
+import createServer from '@inertiajs/react/server'
+import ReactDOMServer from 'react-dom/server'
+
+createServer((page) =>
+  createInertiaApp({
+    page,
+    render: ReactDOMServer.renderToString,
+    resolve: (name) => {
+      const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true })
+      return pages[`./Pages/${name}.tsx`]
+    },
+    setup: ({ App, props }) => <App {...props} />,
+  }),
+  { host: '127.0.0.1', port: Number(process.env.INERTIA_SSR_PORT ?? 13714) },
+)
+```
+
+The client entry hydrates when the server rendered:
+
+```tsx
+import { createRoot, hydrateRoot } from 'react-dom/client'
+
+setup({ el, App, props }) {
+  if (el.dataset.serverRendered === 'true') hydrateRoot(el, <App {...props} />)
+  else createRoot(el).render(<App {...props} />)
+}
+```
+
+  </Tab>
+</Tabs>
+
+Run the bundle with Bun or Node, or let the app start it:
+
+```sh
+bun ssr/ssr.js        # listens on http://127.0.0.1:13714
+# or
+node ssr/ssr.js
+```
+
+Build and run from a directory with `node_modules` installed. The SSR build leaves `node_modules` imports external.
+
+## 2. Enable it
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Ssr.Mode = SsrMode.Preferred;                  // Disabled (default), Preferred or Required
+    o.Ssr.Urls.Add("http://127.0.0.1:13714");       // default when empty; add more servers to spread renders
+    o.Ssr.Timeout = TimeSpan.FromSeconds(5);         // total deadline per render
+    o.Ssr.MaxPageBytes = 2 * 1024 * 1024;            // larger pages render on the client without a call
+    o.Ssr.MaxResponseBytes = 16L * 1024 * 1024;      // success and error responses
+    o.Ssr.BundlePath = "ssr/ssr.js";                 // skip SSR while this file does not exist
+    o.Ssr.ExcludePaths.Add("/admin/*");              // exact, or a trailing * for a prefix
+});
+```
+
+A response can choose its own mode:
+
+```csharp
+return Render("Checkout").WithoutSsr();
+return Render("Landing").WithSsr(SsrMode.Required);
+return Render("Admin/Home").WithSsr(SsrMode.Preferred);
+```
+
+The global mode decides first: `Disabled` is a kill switch no response can override. Otherwise the response's mode wins, then `ExcludePaths`, then the global mode.
+
+SSR runs only for first visits (the HTML response). The page JSON is posted to `{url}/render`, and `{ "head": [...], "body": "..." }` is written into the root view. `@inertiaHead` outputs the head tags; `@inertia` outputs the body.
+
+## 3. Let the app run Bun or Node
+
+```csharp
+o.Ssr.UseNodeProcess();          // also sets Mode = Preferred when it is Disabled
+o.Ssr.UseNodeProcess(n =>
+{
+    n.BundlePath = "ssr/ssr.js";
+    n.Executable = "node";
+    n.Arguments.Add("--enable-source-maps");
+    n.WorkingDirectory = null;                   // default: content root
+    n.StartupTimeout = TimeSpan.FromSeconds(10);
+    n.RestartOnExit = true;
+    n.Instances = 1;                             // instance i listens on BasePort + i
+    n.BasePort = 13714;
+    n.LivenessInterval = TimeSpan.FromSeconds(5);
+    n.LivenessFailureThreshold = 3;
+    n.AllowNetworkExposure = false;
+});
+```
+
+A hosted service runs `{Executable} {bundle}` (`node` by default; Bun works too) once per instance, logs stdout as Information and stderr as Warning under `Inertia.Net.Ssr`, and waits for every instance's `GET /health`. Occupied ports are refused before anything is spawned. `Ssr.Urls` is not used in managed mode.
+
+<Callout type="tip" title="Bun works too">
+The executable is configurable. This documentation site builds a self-contained SSR bundle and runs it with Bun: `o.Ssr.UseNodeProcess(n => n.Executable = "bun")`. The default is `node`; the bundle accepts either runtime.
+</Callout>
+
+- An instance that exits is restarted after 1 second, doubling to 30 seconds.
+- An instance that stops answering its liveness check is killed and restarted the same way.
+- Shutdown stops the owned process trees without requesting `/shutdown`.
+- Nothing is spawned while the Vite dev server runs.
+- For external or remote servers, set `Mode` and `Urls` without `UseNodeProcess()`.
+
+<Callout type="danger" title="Keep the SSR server on loopback">
+The SSR server has no authentication. Anyone who can reach it can `POST /render` (CPU) or `POST /shutdown`, and its `head` and `body` are written into your pages verbatim. Listen on `127.0.0.1`. Before an instance takes renders, Inertia.Net tries the machine's non-loopback addresses on its port. If the instance answers there, it is stopped and an error is logged. `AllowNetworkExposure = true` keeps it running with a warning.
+</Callout>
+
+<Callout type="warning" title="Orphans">
+A graceful shutdown stops the SSR process. If the .NET process is killed outright, the OS does not take the runtime with it. Use a process manager or container for hard-crash cleanup.
+</Callout>
+
+## 4. Development
+
+With the Vite hot file present (Development only), or `o.Vite.DevServerUrl` set, Inertia.Net posts to `{viteDevUrl}/__inertia_ssr`. The endpoint is served by `@inertiajs/vite`, so you need no built bundle and no separate SSR server.
+
+```ts
+import inertia from '@inertiajs/vite'
+
+inertia({ ssr: { entry: 'resources/js/ssr.tsx', host: '127.0.0.1', port: 13714 } })
+```
+
+`BundlePath` is ignored while the dev server runs.
+
+## 5. Failures and fallbacks
+
+In `Preferred` mode every failure logs a warning and the page renders on the client. In `Required` mode it throws `InertiaSsrException` before the first byte is written, so the app's exception handler can still answer.
+
+| Type | Cause | Opens the circuit |
+|---|---|---|
+| `connection` | Connection refused or reset. A refused connection is retried on another server. | yes |
+| `timeout` | `Ssr.Timeout` elapsed | yes |
+| `http` | Non-2xx answer without a structured error | yes |
+| `response` | Empty or malformed answer | yes |
+| `render` | The component threw (structured error from the renderer) | no |
+| `response-too-large` | Answer over `MaxResponseBytes` | no |
+| `overloaded` | No render slot within `Concurrency.QueueTimeout`, or the queue is full | no |
+| `circuit-open`, `not-ready`, `page-too-large`, `bundle-missing` | Skipped without a call | no |
+
+**Circuit breaker.** After `CircuitBreaker.FailureThreshold` (default 5) consecutive failures that open the circuit, a server is skipped for `BreakDuration` (default 10 s). Then one render probes it: success closes the circuit, failure starts another break. A page that fails because of its own code never pauses the server.
+
+**Render slots.** Each server takes at most `Concurrency.MaxActive` renders at once (default 8, `0` for no limit) from this app instance, with up to `MaxQueued` (default 32) waiting at most `QueueTimeout` (default 250 ms). Renders that find no slot fall back immediately.
+
+## 6. Several servers
+
+```csharp
+o.Ssr.Urls.Add("http://ssr-1:13714");
+o.Ssr.Urls.Add("http://ssr-2:13714");
+```
+
+Each render goes to the server with the fewest renders in flight among those whose circuit is closed (ties rotate). Every server has its own slots, queue and circuit. Only a refused connection is retried on another server within the same deadline.
+
+Page props travel to the renderer, and its HTML goes into your pages unescaped, so it must be trusted. A plain `http://` URL that is not loopback logs a warning at startup. Use HTTPS or a private network.
+
+## 7. Health check
+
+```csharp
+builder.Services.AddHealthChecks().AddInertiaSsr();
+app.MapHealthChecks("/health");
+```
+
+The check reports what the renders have already shown, without calling the SSR servers: healthy while SSR is disabled, goes through the Vite dev server, or every server can take renders; degraded while some circuits are open or some managed instances are not ready; the registration's failure status (default unhealthy) when none can. Its data lists each server's state.
+
+## 8. Observability
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(m => m.AddMeter(InertiaDiagnostics.MeterName))
+    .WithTracing(t => t.AddSource(InertiaDiagnostics.ActivitySourceName));
+```
+
+| Instrument | Type | Tags |
+|---|---|---|
+| `inertia.page.duration` (s) | histogram | `inertia.response`, `inertia.partial` |
+| `inertia.page.size` (By) | histogram | `inertia.response` |
+| `inertia.ssr.duration` (s) | histogram | `inertia.ssr.outcome` |
+| `inertia.ssr.queue.duration` (s) | histogram | |
+| `inertia.ssr.active` | up-down counter | |
+| `inertia.ssr.outcomes` | counter | `inertia.ssr.outcome`, `inertia.ssr.reason` |
+| `inertia.ssr.response.size` (By) | histogram | |
+| `inertia.ssr.circuit.state` | gauge | `inertia.ssr.endpoint` |
+| `inertia.ssr.circuit.transitions` | counter | `inertia.ssr.endpoint`, `to` |
+| `inertia.ssr.process.restarts` | counter | `cause` |
+| `inertia.props.rescued` | counter | |
+
+Tag values are bounded: no URLs, component names or user data. The `inertia.render` activity carries `inertia.component`; the `inertia.ssr` activity carries `inertia.ssr.endpoint`, `inertia.ssr.outcome` and `inertia.ssr.reason`. Nothing is recorded unless a listener is attached.
+
+## 9. Response cache
+
+A render depends only on the page JSON, so a page that many visitors see byte for byte the same can reuse its HTML:
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Ssr.Cache.Duration = TimeSpan.FromMinutes(5);
+    o.Ssr.Cache.StaleFor = TimeSpan.FromMinutes(30);
+    o.Ssr.Cache.MaxBytes = 64 * 1024 * 1024;
+});
+
+return Render("Pricing", props).WithSsrCache(TimeSpan.FromHours(1));
+return Render("Pricing", props).WithSsrCache(TimeSpan.FromHours(1), staleFor: TimeSpan.FromDays(1));
+```
+
+The key is the SHA-256 of the page JSON (component, props, url, version and the rest), so a new deploy or different props never reuse a stale render. Pages with per-user props make one entry per user; cache the pages that are shared. A hit is counted as `inertia.ssr.outcomes{inertia.ssr.outcome=rendered, inertia.ssr.reason=cache}` and bypasses the render slots and circuit breakers. Nothing is cached while the Vite dev server renders.
+
+Concurrent misses for the same page share one fill per app instance. Waiting counts against `Ssr.Timeout`; cancelling a waiting request does not cancel the request filling the entry.
+
+With `StaleFor`, a render past its `Duration` is still served and rendered again after the response, like stale props. `IInertiaCache.ClearSsrAsync()` removes every render.

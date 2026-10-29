@@ -1,0 +1,235 @@
+---
+title: Props
+description: Lazy, optional, deferred, merged, once, cached and rescued page data.
+section: Core Concepts
+order: 2
+---
+
+Props are the data a page receives. `Render(component, props)` takes an `InertiaProps`, a string-keyed dictionary, or a typed object. Nested `InertiaProps` and dictionaries are walked, so props can be nested at any depth.
+
+Every page has an `errors` prop. Its key order is `errors`, shared props, then page props.
+
+## The prop factories
+
+| C\# | Behavior |
+|---|---|
+| `["title"] = "Hi"` | A plain value. Sent on every response that includes the key. |
+| `Prop(() => ...)` | Lazy: the loader runs only when the prop is part of the response. |
+| `Always(value)` or `Always(() => ...)` | Sent even when a partial reload does not ask for it. |
+| `Optional(() => ...)` | Never sent on the first visit, only when a partial reload asks for it. |
+| `Defer(() => ..., group: "name")` | Left out of the first response. The client loads it right away with its group. |
+| `Merge(value)` | The client appends the new value to its current one. |
+| `DeepMerge(value)` | The client deep merges the value. |
+| `Once(() => ...)` | Resolved once and remembered by the client. |
+| `Scroll(page, wrapper: "data", metadata)` | An infinite-scroll prop with paging metadata. |
+
+Every lazy factory (`Prop`, `Always`, `Optional`, `Defer`, `Merge`, `DeepMerge`, `Once`, `Scroll`) accepts five loader shapes:
+
+```csharp
+Prop(() => value)                                  // Func<T>
+Prop(() => repo.GetAsync())                        // Func<Task<T>>
+Prop(() => repo.GetValueTaskAsync())               // Func<ValueTask<T>>
+Prop(ct => repo.GetAsync(ct))                      // Func<CancellationToken, Task<T>>
+Prop(ct => repo.GetValueTaskAsync(ct))             // Func<CancellationToken, ValueTask<T>>
+```
+
+The token is `HttpContext.RequestAborted`. An `async` lambda always binds to the awaiting overload, never to “a prop whose value is a Task”.
+
+Fluent methods mutate and return the same instance: `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)` and `.Cache(key, duration, staleFor?, tags?)`.
+
+## Resolution order
+
+Loaders run sequentially by default, in prop order, and only when their prop is included in the response. That makes a scoped EF Core `DbContext` safe to use in several loaders.
+
+```csharp
+return Render("Users/Index", new InertiaProps
+{
+    ["title"] = "Users",
+    ["users"] = Prop(ct => db.Users.ToListAsync(ct)),
+    ["filters"] = Always(new { search = "ann" }),
+});
+```
+
+```json
+{
+  "component": "Users/Index",
+  "props": { "errors": {}, "title": "Users", "users": [ { "id": 1, "name": "Ann" } ], "filters": { "search": "ann" } },
+  "url": "/users?search=ann",
+  "version": "3f9a1c0d5b7e2a64c8d1e0f9b3a57c21",
+  "sharedProps": ["errors"]
+}
+```
+
+The page is buffered before it is sent, so a loader that throws never produces a half-written `200`.
+
+### Parallel props
+
+Mark independent async loaders with `.Parallel()` to start them together:
+
+```csharp
+return Render("Dashboard", new InertiaProps
+{
+    ["stats"] = Prop(ct => statsService.GetAsync(ct)).Parallel(),
+    ["activity"] = Defer(ct => activityService.RecentAsync(ct)).Parallel(),
+    ["user"] = currentUser, // values and sync loaders resolve in turn
+});
+```
+
+- Only `Task` and `ValueTask` loaders can be parallel. `Parallel()` throws for values and synchronous loaders.
+- At most `InertiaOptions.Props.MaxConcurrency` loaders run at once per render (default 4).
+- Top-level props and props inside literal objects (`InertiaProps` and other string-keyed dictionaries) start early. Elsewhere they resolve in turn.
+- Loaders of props that are not part of the response never start.
+- If a loader fails, the others are cancelled and awaited, and the render fails with the first failure in prop order. A `Rescue()`d prop fails alone.
+
+<Callout type="warning" title="DbContext and HttpContext">
+A parallel loader must not use the request's `DbContext` or other non-thread-safe scoped services, and must not touch `HttpContext`. Give each loader its own context through `IDbContextFactory<T>` or its own scope.
+</Callout>
+
+```csharp
+["orders"] = Prop(async ct =>
+{
+    await using var db = await dbFactory.CreateDbContextAsync(ct);
+    return await db.Orders.CountAsync(ct);
+}).Parallel(),
+```
+
+## Deferred props
+
+`Defer` leaves the prop out of the first response and lists it under `deferredProps`. The client asks for each group as soon as the page is mounted.
+
+```csharp
+["stats"] = Defer(ct => stats.GetAsync(ct)),                 // group "default"
+["feed"]  = Defer(ct => feed.GetAsync(ct), group: "sidebar"),
+```
+
+```json
+{ "props": { "errors": {} }, "deferredProps": { "default": ["stats"], "sidebar": ["feed"] } }
+```
+
+See [Deferred props](/docs/deferred-props) for the client component and the request rules.
+
+## Merge props
+
+```csharp
+["posts"]    = Merge(posts),                                  // append
+["messages"] = Prop(() => messages).Prepend(),                // prepend
+["settings"] = DeepMerge(settings),
+["rows"]     = Merge(rows).MatchOn("id"),                     // replace items with the same id
+["chat"]     = Merge(chat).Append("messages", matchOn: "id"), // append at a nested path
+```
+
+```json
+{
+  "mergeProps": ["posts", "chat.messages"],
+  "prependProps": ["messages"],
+  "deepMergeProps": ["settings"],
+  "matchPropsOn": ["rows.id", "chat.messages.id"]
+}
+```
+
+The full behavior is in [Merging props](/docs/merging-props).
+
+## Once props
+
+```csharp
+["plans"] = Once(ct => plans.AllAsync(ct)).Until(TimeSpan.FromHours(1)).As("billing-plans"),
+```
+
+```json
+{
+  "props": { "errors": {}, "plans": [ { "id": "pro" } ] },
+  "onceProps": { "billing-plans": { "prop": "plans", "expiresAt": 1760000000000 } }
+}
+```
+
+When the client already holds the key it sends `X-Inertia-Except-Once-Props`; the value is left out while the `onceProps` entry stays. See [Once props](/docs/once-props).
+
+## Cached props
+
+`.Cache(key, duration)` keeps a prop's value as JSON in the cache (the app's `IMemoryCache` by default). A hit costs neither the query nor serialization.
+
+```csharp
+return Render("Dashboard", new InertiaProps
+{
+    ["stats"] = Prop(ct => stats.ComputeAsync(ct)).Cache("dashboard-stats", TimeSpan.FromMinutes(5)),
+    ["orders"] = Defer(ct => orders.RecentAsync(userId, ct)).Cache($"orders:{userId}", TimeSpan.FromMinutes(1), tags: [$"user:{userId}"]),
+    ["catalog"] = Optional(() => catalog.All()).Cache("catalog", TimeSpan.FromHours(1), staleFor: TimeSpan.FromHours(23)),
+});
+```
+
+<Callout type="important" title="The key is the value's identity">
+Every request that uses a key gets the same value. Put the user, tenant or anything else the value depends on in the key. Keys live in their own cache space and cannot collide with the app's own entries.
+</Callout>
+
+Only loading changes: optional, deferred, merged, once and scroll props keep their behavior, and their metadata is written from the cache too. A parallel cached prop does not start its loader on a hit. A rescued failure is not cached.
+
+**Removing and replacing values.** Inject `IInertiaCache` where the data changes:
+
+```csharp
+app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, CancellationToken ct) =>
+{
+    var order = await orders.CreateAsync(input, ct);
+    await cache.RemoveByTagAsync($"user:{order.UserId}", ct);
+    await cache.RemovePropAsync("dashboard-stats", ct);
+    await cache.SetPropAsync("catalog", await catalog.AllAsync(ct), TimeSpan.FromHours(1), cancellationToken: ct);
+    return Back();
+});
+```
+
+`ClearPropsAsync()` removes every cached prop and `ClearSsrAsync()` every cached render. `SetPropAsync` serializes the value as a prop of its type would, and takes the same `staleFor` and `tags`.
+
+**Stale-while-revalidate.** `staleFor` keeps serving a value after its duration. The first request that reads a stale value gets it at once, and the loader runs after the response has been sent. Past `duration + staleFor` the loader runs during the request again.
+
+- The refresh runs in the response's completion callbacks, before the request's services are disposed, so it can keep using the request's scoped services. It must not touch `HttpContext`.
+- One refresh runs per key and app instance at a time. A refresh that finds the value fresh again skips its loader.
+- A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
+
+**Another store.** Props and SSR renders live in an `IInertiaCacheStore`. Register your own singleton before or after `AddInertia()`:
+
+```csharp
+builder.Services.AddSingleton<IInertiaCacheStore, MyRedisInertiaCacheStore>();
+```
+
+The store gets and sets byte arrays by `InertiaCacheKey`, removes by key and by tag, and reads unknown formats as a miss. While a page renders, a store that throws is logged (at most once every 30 seconds) and counts as a miss; `IInertiaCache` lets the exception through.
+
+## Typed page props
+
+A typed object is AOT-friendly: it is walked through its `JsonTypeInfo`, and members of type `InertiaProp` are resolved by Inertia.Net while the rest is serialized normally.
+
+```csharp
+public sealed class UsersPage
+{
+    public required IReadOnlyList<UserDto> Users { get; init; }
+    public required InertiaProp Stats { get; init; }        // resolved by Inertia.Net
+}
+
+app.MapGet("/users", (AppDb db) => Render("Users/Index", new UsersPage
+{
+    Users = db.Users.Select(u => new UserDto(u.Id, u.Name)).ToList(),
+    Stats = Defer(ct => db.StatsAsync(ct)),
+}));
+```
+
+Register `UsersPage` and its value types in your `JsonSerializerContext` under Native AOT. Anonymous types work only when reflection-based serialization is enabled, so not under AOT.
+
+## Dot keys
+
+A top-level key containing dots is unpacked. `["user.name"] = "Ann"` becomes `"user": { "name": "Ann" }`.
+
+## BigInteger safety
+
+With `o.PreserveBigIntegers = true`, integers beyond ±(2^53 − 1) are written as `{"$bigint":"9007199254740993"}` and the page gets `"preserveBigIntegers": true`.
+
+```csharp
+builder.Services.AddInertia(o => o.PreserveBigIntegers = true);
+```
+
+## Rescue
+
+`.Rescue()` keeps a page alive when one prop fails:
+
+```csharp
+["recommendations"] = Defer(ct => recs.GetAsync(ct)).Rescue(),
+```
+
+If the loader throws, the exception is logged, the prop is left out of `props`, and its path goes to `"rescuedProps": ["recommendations"]`. Without `.Rescue()` the exception propagates normally. Cancellation of the request is never rescued.

@@ -1,0 +1,164 @@
+---
+title: Pages and Responses
+description: Render components, use MapInertia, and understand the root template and response status codes.
+section: Core Concepts
+order: 1
+---
+
+An Inertia page is a component name plus a set of props. The server writes the page object into the response; the client resolves the component and renders it.
+
+## Rendering a page
+
+`Render(component, props)` returns an `InertiaResult`. The component name must match your client-side page resolver exactly, including case.
+
+```csharp
+app.MapGet("/users", () => Render("Users/Index", new InertiaProps
+{
+    ["users"] = db.Users.ToList(),
+}));
+```
+
+`Render` accepts an `InertiaProps` (an ordered string-keyed dictionary), any `IDictionary<string, object?>`, or a typed object whose properties are the props. Nested `InertiaProps` and dictionaries are walked at any depth.
+
+```csharp
+public sealed record UsersPage(List<User> Users, string Title);
+
+app.MapGet("/users", () => Render("Users/Index", new UsersPage(users, "Users")));
+```
+
+Every page has an `errors` prop (an empty object when there are no errors). Key order is `errors`, shared props, then page props.
+
+## Per-response options
+
+`InertiaResult` builds on the response without changing the component:
+
+```csharp
+return Render("Admin/Home")
+    .WithRootView("admin.html")
+    .WithViewData("title", "Admin");
+
+return Render("Errors/NotFound").WithStatusCode(404);
+```
+
+| Method | Effect |
+|---|---|
+| `.WithStatusCode(int)` | Sets the HTTP status of the page response |
+| `.WithRootView(string)` | Uses another root template for this response |
+| `.WithViewData(key, value)` | Makes a value available to `@viewData("key")` |
+| `.WithSsr(SsrMode)` / `.WithoutSsr()` | Overrides the SSR mode for this response |
+| `.WithSsrCache(duration, staleFor?)` | Reuses a server-rendered response for the same page JSON |
+
+## Pages without a handler
+
+`MapInertia` maps GET and HEAD to a rendered page, like Laravel's `Route::inertia`:
+
+```csharp
+app.MapInertia("/about", "About", new InertiaProps
+{
+    ["team"] = team,
+});
+```
+
+## The root template
+
+On the first visit the response is an HTML document. Inertia.Net reads `app.html` from the content root (configurable with `RootView`), parses it once, and replaces these tokens:
+
+| Token | Output |
+|---|---|
+| `@inertia` | Without SSR: the page JSON script and the root element. With SSR: the server-rendered body. **Required.** |
+| `@inertiaHead` | The SSR `head` tags joined with newlines. Empty without SSR. |
+| `@vite("resources/js/app.tsx")` | Vite tags for one or more comma-separated entries. |
+| `@viteReactRefresh` | The React Fast Refresh preamble while the dev server runs. Put it before `@vite`. |
+| `@viewData("title")` | An HTML-encoded value passed with `WithViewData`. |
+| `@@` | A literal `@`. |
+
+Other `@` characters, such as CSS at-rules and e-mail addresses, are left alone. Arguments accept single or double quotes.
+
+The page JSON is escaped with `\uXXXX` sequences, so a prop containing `</script>` cannot break out of the script element.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My app</title>
+  @inertiaHead
+  @viteReactRefresh
+  @vite("ClientApp/app.tsx")
+</head>
+<body>
+  @inertia
+</body>
+</html>
+```
+
+`RootElementId` (default `app`) changes both the root element id and the `data-page` value. The client finds the page script by that id.
+
+<Callout type="warning" title="Copy the template">
+`app.html` is read from disk at runtime. Add `CopyToOutputDirectory` and `CopyToPublishDirectory` so it is present after `dotnet publish`.
+</Callout>
+
+### Razor root view (MVC)
+
+With `Inertia.Net.Mvc`, the first-visit HTML can be a Razor view:
+
+```csharp
+builder.Services.AddControllersWithViews().AddInertiaMvc(o => o.UseRazorRootView("App"));
+```
+
+`"App"` finds `Views/Shared/App.cshtml`. The view receives an `InertiaRootViewContext` model and uses tag helpers:
+
+```cshtml
+@model InertiaRootViewContext
+<!DOCTYPE html>
+<html>
+<head>
+    <title>@ViewData["title"]</title>
+    <vite-react-refresh />
+    <vite entry="resources/js/app.tsx" />
+    <inertia-head />
+</head>
+<body>
+    <inertia />
+</body>
+</html>
+```
+
+```cshtml
+@* Views/_ViewImports.cshtml *@
+@addTagHelper *, Inertia.Net.Mvc
+```
+
+`<vite entry="a.ts, b.css" />` takes comma-separated entries. SSR runs at most once per request and is shared by `<inertia-head />` and `<inertia />`. `WithRootView("Other")` takes Razor view names when the Razor root view is enabled.
+
+### A custom root view
+
+Implement `IInertiaRootView` and register it before `AddInertia`:
+
+```csharp
+builder.Services.AddSingleton<IInertiaRootView, MyRootView>();
+builder.Services.AddInertia();
+
+public sealed class MyRootView : IInertiaRootView
+{
+    public async ValueTask RenderAsync(InertiaRootViewContext context)
+    {
+        var writer = context.HttpContext.Response.BodyWriter;
+        writer.Write("<!DOCTYPE html><html><body>"u8);
+        context.WriteBody(writer);                   // or context.GetBodyHtml()
+        writer.Write("</body></html>"u8);
+        await writer.FlushAsync(context.HttpContext.RequestAborted);
+    }
+}
+```
+
+## Page URL and path base
+
+The page object's `url` is the request PathBase, Path and QueryString. Behind a proxy that rewrites paths, set `o.UrlResolver` to return the URL the browser sees:
+
+```csharp
+builder.Services.AddInertia(o => o.UrlResolver = ctx => ctx.Request.GetEncodedUrl());
+```
+
+`Back()` and the Vite asset URLs also respect the path base.

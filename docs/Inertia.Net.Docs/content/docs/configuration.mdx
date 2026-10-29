@@ -1,0 +1,104 @@
+---
+title: Configuration
+description: InertiaOptions, Vite, SSR, props, state and the middleware and result API.
+section: Reference
+order: 5
+---
+
+All configuration is passed to `AddInertia`. Options marked “Development only” do nothing in other environments.
+
+## `AddInertia(o => ...)`: `InertiaOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `RootView` | `"app.html"` | Root template relative to the content root (a Razor view name with `UseRazorRootView`). Paths outside the content root are refused. |
+| `RootElementId` | `"app"` | Id of the root element and the `data-page` script. |
+| `Version` | `null` | Asset version. `null` means the Vite manifest hash, or `""` without one. |
+| `VersionResolver` | `null` | `Func<HttpContext, string?>` per-request version; wins over `Version` when non-null. |
+| `EncryptHistory` | `false` | Encrypt browser history state of every page. |
+| `WithAllErrors` | `false` | Send every validation message per field instead of the first. |
+| `PreserveBigIntegers` | `false` | Emit integers beyond ±(2^53−1) as `{"$bigint":"..."}`. |
+| `ExposeSharedPropKeys` | `true` | List top-level shared keys in `sharedProps`. |
+| `CspNonce` | `null` | `Func<HttpContext, string?>`: the request's CSP nonce. |
+| `ConvertExternalRedirects` | `true` | Turn an Inertia redirect to another origin into `409` + `X-Inertia-Location`. |
+| `UrlResolver` | `null` | `Func<HttpContext, string>`: the page `url`. |
+| `Pages.Directory` / `Pages.Extensions` | `null` / `.tsx .jsx .ts .js .vue .svelte` | Development check that a rendered component has a page file. |
+| `TypeScript.OutputPath`, `.Page<T>(component)`, `.SharedProps<T>()`, `.FlashData<T>()` | `null` | TypeScript declarations, written in Development. |
+| `Share(key, value)` / `Share(key, Func<HttpContext, object?>)` | none | Shared props. |
+
+## `o.Vite`: `ViteOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `PublicDirectory` | `"wwwroot"` | Web root containing the build directory and hot file. |
+| `BuildDirectory` | `"build"` | Vite output directory under `PublicDirectory`; also the URL prefix. |
+| `ManifestPath` | `null` | Manifest path relative to the content root. `null` = `{PublicDirectory}/{BuildDirectory}/.vite/manifest.json`, then `manifest.json`. |
+| `HotFilePath` | `null` | Hot file relative to the content root. `null` = `{PublicDirectory}/hot`. Read in Development only. |
+| `DevServerUrl` | `null` | Dev server origin, e.g. `http://localhost:5173`. When set, dev tags always render. |
+| `AssetBaseUrl` | `null` | Replaces `{PathBase}/{BuildDirectory}` as the URL prefix of built assets. |
+| `Prefetch` | `None` | `Waterfall` or `Aggressive`: prefetch code-split chunks after load. |
+| `PrefetchConcurrency` | `3` | Chunks `Waterfall` downloads at a time. |
+
+## `o.Ssr`: `SsrOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `Mode` | `Disabled` | `Disabled`, `Preferred` or `Required`. `Disabled` cannot be overridden per response. |
+| `Urls` | empty (`http://127.0.0.1:13714`) | SSR server base URLs. Not used with `UseNodeProcess()`. |
+| `Timeout` | `5 s` | Total deadline per render. `Timeout.InfiniteTimeSpan` disables it. |
+| `MaxResponseBytes` | `16 MiB` | Limit on actual response bytes, including errors and chunked responses. |
+| `MaxPageBytes` | `2 MiB` | Pages whose JSON is larger render on the client without a call. |
+| `BundlePath` | `null` | Skip SSR while this file is missing, unless the Vite dev server runs. |
+| `ExcludePaths` | empty | Request paths never rendered on the server (exact, or a trailing `*` for a prefix). |
+| `Concurrency.MaxActive` | `8` | Renders in flight per server from this app instance; `0` for no limit. |
+| `Concurrency.MaxQueued` | `32` | Renders waiting for a slot per server. |
+| `Concurrency.QueueTimeout` | `250 ms` | How long a render waits for a slot. |
+| `CircuitBreaker.Enabled` | `true` | Pause servers that keep failing. |
+| `CircuitBreaker.FailureThreshold` | `5` | Consecutive failures that open a server's circuit. |
+| `CircuitBreaker.BreakDuration` | `10 s` | How long an open circuit skips the server before one probe. |
+| `Cache.Duration` | `Zero` (off) | Reuse a render for this long when the page JSON is the same. |
+| `Cache.StaleFor` | `Zero` | Serve stale while re-rendering. |
+| `Cache.MaxBytes` | `64 MiB` | Size of the default store's render cache. |
+| `UseNodeProcess(configure?)` | off | Start and supervise Node SSR processes (sets `Mode = Preferred` when `Disabled`). |
+
+Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`. The full SSR options are in [Server-side rendering](/docs/server-side-rendering).
+
+## `o.Props`: `InertiaPropsOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `MaxConcurrency` | `4` | Loaders marked `.Parallel()` that run at once per render. Must be positive. |
+
+## `o.State`: `InertiaStateOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
+| `CookieSecurePolicy` | `SameAsRequest` | When the state cookie is `Secure`. |
+| `UseSession()` | off | Use `ISession` instead of the encrypted cookie. |
+| `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData. Inertia.Net.Mvc package. |
+
+## Middleware and endpoint API
+
+| API | Description |
+|---|---|
+| `services.AddInertia(configure?)` | Registers services and options. |
+| `app.UseInertia()` | The protocol middleware. Before the endpoints; after `UseSession()` when used. |
+| `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates unsafe requests (`419` on failure). |
+| `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |
+| `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder and read API. |
+| `app.UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` | Only writes the token cookie; validation is up to you. |
+| `endpoint.WithInertiaValidation()` | Minimal API: validation failures redirect back with errors. |
+| `endpoint.WithInertiaPrecognition()` | Minimal API: `WithInertiaValidation()` plus Precognition. |
+| `healthChecks.AddInertiaSsr(...)` | SSR health check from the gateway's state. |
+| `mvc.AddInertiaMvc(o => o.UseRazorRootView("App"))` | MVC filter, optional Razor root view and component resolver. |
+| `config.UseInertia(configure?)` | FastEndpoints: validation redirect and Precognition. |
+| `Render(component, props?)` | `InertiaResult`: `.WithStatusCode`, `.WithRootView`, `.WithViewData`, `.WithSsr`, `.WithoutSsr`, `.WithSsrCache`. |
+| `Location(url)` | `InertiaLocationResult`. |
+| `Back(fallback = "~/")` | `InertiaBackResult`: `.WithErrors`, `.WithFlash`. |
+| `httpContext.Inertia()` | `InertiaFeature`: `Share`, `Flash`, `WithErrors`, `ClearHistory`, `EncryptHistory`, `PreserveFragment`. |
+| `Send.InertiaAsync(...)`, `Send.InertiaLocationAsync(...)`, `Send.InertiaBackAsync(...)` | FastEndpoints `Send` extensions. |
+
+## Extension points
+
+`IInertiaRootView`, `IInertiaStateStore`, `ViteAssets`, `InertiaRequest` (parsed headers), `InertiaHeaders` (header name constants), `InertiaSsrException`, `InertiaSsr.HttpClientName` (the SSR HTTP client) and `InertiaDiagnostics` (meter and activity source names).

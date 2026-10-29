@@ -1,0 +1,109 @@
+---
+title: Flash Data
+description: Carry a one-time message, toast or typed value across a redirect.
+section: Forms & Validation
+order: 2
+---
+
+Flash data is carried across the redirect (and any further redirects) and consumed by the next response that is not a redirect. It appears as `page.flash`, only when there is some.
+
+```csharp
+app.MapPost("/users", (CreateUserInput input, HttpContext context) =>
+{
+    context.Inertia().Flash("toast", new { type = "success", message = "Saved" });
+    return Results.Redirect("/users");
+});
+
+// or on Back():
+return Back().WithFlash("toast", "Saved");
+```
+
+```json
+{
+  "component": "Users/Index",
+  "props": { "errors": {} },
+  "flash": { "toast": { "type": "success", "message": "Saved" } }
+}
+```
+
+Read it with `usePage().flash` or the `onFlash` visit callback:
+
+```tsx
+const { flash } = usePage()
+
+{flash.toast && <Toast {...flash.toast} />}
+```
+
+<Callout type="info" title="Typed flash data">
+The TypeScript generator can write a `Flash` type for you. Call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript).
+</Callout>
+
+## Where state is kept
+
+Flash data, errors, `clearHistory` and `preserveFragment` set during a request that ends in a redirect (or a `Location()` / fragment `409`) are saved in an `IInertiaStateStore` and loaded at the start of the next request. If that request redirects again, the state is carried on, so `Back()` to a URL that itself redirects still shows the flash. Otherwise its response consumes it. The state is also kept when the response is the version-mismatch `409`.
+
+### Encrypted cookie (default)
+
+The default store is an encrypted cookie named `.Inertia.State`. It is protected with ASP.NET Core Data Protection, `HttpOnly`, `SameSite=Lax`, and works without sessions and under Native AOT. Tampered or undecryptable cookies are ignored and deleted. It logs a warning above about 4 KB because browsers drop larger cookies.
+
+### Session store
+
+```csharp
+builder.Services.AddSession();
+builder.Services.AddInertia(o => o.State.UseSession());
+
+app.UseSession();       // before UseInertia
+app.UseInertia();
+```
+
+Use the session store when flash data can be large or must not reach the browser, and you already run sessions.
+
+### MVC TempData store
+
+```csharp
+builder.Services.AddInertiaMvc(o => o.UseTempDataStateStore());
+```
+
+This keeps the state in MVC TempData, so it follows your TempData provider: the default cookie provider, or `AddSessionStateTempDataProvider()` with `AddSession()` and `app.UseSession()` before `app.UseInertia()`. It works for Minimal API endpoints too, because the store saves TempData itself. Not Native AOT compatible.
+
+### Your own store
+
+Implement `IInertiaStateStore` and register it before `AddInertia`:
+
+```csharp
+public interface IInertiaStateStore
+{
+    ValueTask<byte[]?> LoadAsync(HttpContext httpContext);
+    ValueTask SaveAsync(HttpContext httpContext, byte[] state);
+    ValueTask ClearAsync(HttpContext httpContext);
+}
+```
+
+The methods move opaque bytes; the format is Inertia.Net's.
+
+## Choosing a store
+
+| Store | Use when |
+|---|---|
+| Encrypted cookie | Default. Stateless, AOT safe, about 4 KB limit. |
+| Session | Flash data can be large or must not reach the browser, and sessions already exist. |
+| TempData | The app standardizes on MVC TempData, or you want to switch providers without changing code. |
+| Custom | You need a shared store across instances or a different transport. |
+
+<Callout type="warning" title="Multiple instances">
+In a multi-instance deployment, configure Data Protection with a shared key ring. Otherwise the cookie written by one instance cannot be read by another.
+</Callout>
+
+## History flags
+
+`encryptHistory` is written only when set and is not carried across redirects. `clearHistory` and `preserveFragment` go through the state store and apply to the next page rendered after the redirects, then are consumed.
+
+```csharp
+app.MapPost("/logout", (HttpContext context) =>
+{
+    context.Inertia().ClearHistory();
+    return Results.Redirect("/login");
+});
+```
+
+See [Redirects and history](/docs/redirects-and-history).

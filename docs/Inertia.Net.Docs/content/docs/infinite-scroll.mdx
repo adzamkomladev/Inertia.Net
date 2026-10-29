@@ -1,0 +1,73 @@
+---
+title: Infinite Scroll
+description: Merge pages of items and report paging metadata to the InfiniteScroll client component.
+section: Core Concepts
+order: 8
+---
+
+`Scroll(...)` merges the items inside a value (the *wrapper*, `"data"` by default) and reports paging metadata to the `<InfiniteScroll>` client component.
+
+```csharp
+public sealed record FeedPage(IReadOnlyList<PostDto> Data, int Page, bool HasMore) : IProvidesScrollMetadata
+{
+    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);   // pageName defaults to "page"
+}
+
+app.MapGet("/feed", async (int? page, AppDb db, CancellationToken ct) =>
+{
+    var p = page ?? 1;
+    var items = await db.Posts.OrderByDescending(x => x.Id).Skip((p - 1) * 20).Take(21).ToListAsync(ct);
+    return Render("Feed", new InertiaProps
+    {
+        ["posts"] = Scroll(new FeedPage(items.Take(20).ToList(), p, items.Count > 20)),
+    });
+});
+```
+
+```json
+{
+  "props": { "errors": {}, "posts": { "data": [ { "id": 21 } ] } },
+  "mergeProps": ["posts.data"],
+  "scrollProps": {
+    "posts": { "pageName": "page", "previousPage": 1, "nextPage": 3, "currentPage": 2, "reset": false }
+  }
+}
+```
+
+## The client
+
+```tsx
+import { InfiniteScroll } from '@inertiajs/react'
+
+<InfiniteScroll data="posts">
+  {posts.data.map((post) => <Post key={post.id} post={post} />)}
+</InfiniteScroll>
+```
+
+## Metadata
+
+`ScrollMetadata(PageName, PreviousPage, NextPage, CurrentPage)` is a record. Page values can be `int`, `long`, `string` or `null` (cursor paging uses strings).
+
+Metadata comes from the `metadata:` argument, or from the value if it implements `IProvidesScrollMetadata`. Without either, the render throws with a message naming the prop.
+
+```csharp
+["posts"] = Scroll(page, wrapper: "data", metadata: ScrollMetadata.FromPage(2, hasMore: true)),
+```
+
+The client sends `X-Inertia-Infinite-Scroll-Merge-Intent: prepend` when scrolling up. The wrapper is then reported under `prependProps` instead of `mergeProps`.
+
+`scrollProps[path].reset` is true when the request lists the path in `X-Inertia-Reset`.
+
+## Combining with other props
+
+`Scroll(...)` accepts the five loader shapes, and `.Defer()`, `.Once()` and `.Rescue()` combine with it:
+
+```csharp
+["posts"] = Scroll(ct => feed.PageAsync(1, ct)).Defer(),
+```
+
+A deferred scroll prop reports `"posts.data"` just like a resolved one. This is a deliberate fix of an inertia-laravel quirk.
+
+<Callout type="tip" title="Keep pages small">
+Infinite scroll is also a payload-size tool. Load 10 to 20 items per page instead of sending an unbounded list on the first request.
+</Callout>

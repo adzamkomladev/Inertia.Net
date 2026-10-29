@@ -1,0 +1,47 @@
+---
+title: Migrating from Other Adapters
+description: Map an InertiaCore-style API to Inertia.Net and check the behavior differences.
+section: Help
+order: 1
+---
+
+The API is close to the Laravel adapter's names. The table maps the typical InertiaCore-style API (kapi2289/InertiaCore and its forks). Check names against the version you use.
+
+| Other adapters | Inertia.Net |
+|---|---|
+| `Inertia.Render("Users/Index", new { users })` | `Render("Users/Index", new InertiaProps { ["users"] = users })`, or a typed props object |
+| `return Inertia.Render(...)` in a controller (`Task<IActionResult>`) | `return Render(...)` as `IResult` (MVC executes it) |
+| `Inertia.Lazy(() => ...)` / `LazyProp` | `Optional(() => ...)` (never on first load) or `Prop(() => ...)` (lazy, included by default) |
+| `Inertia.Defer(...)` / `Inertia.Defer(..., "group")` | `Defer(..., group: "group")` |
+| `Inertia.Always(...)` | `Always(...)` |
+| `Inertia.Merge(...)` / `DeepMerge` | `Merge(...)`, `DeepMerge(...)`, plus `.Prepend()`, `.MatchOn()` |
+| (not supported) | `Once(...)`, `Scroll(...)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)` |
+| `Inertia.Share("key", value)` | `o.Share("key", value)`, `o.Share("key", ctx => ...)`, or `ctx.Inertia().Share(...)` |
+| `Inertia.Location(url)` | `Location(url)` |
+| `Inertia.Back()` | `Back()` / `Back(fallback)` |
+| `Inertia.ClearHistory()`, `Inertia.EncryptHistory()` | `ctx.Inertia().ClearHistory()`, `ctx.Inertia().EncryptHistory()` (per request, no shared state) |
+| `Inertia.Html(...)` / `Inertia.Head` in `_Layout.cshtml` | `app.html` with `@inertia`, `@inertiaHead`, `@vite(...)`, or the Razor tag helpers |
+| Flash via `TempData` or session | `ctx.Inertia().Flash(...)`, `Back().WithFlash(...)` (encrypted cookie by default) |
+| `ModelState` errors in session | MVC: `AddInertiaMvc()`; Minimal API: `.WithInertiaValidation()`; FastEndpoints: `c.UseInertia()` |
+| `Version` option or manifest hashing per request | `o.Version`, `o.VersionResolver`, or the cached manifest hash |
+| SSR options (`UseSsr`, `SsrUrl`) | `o.Ssr.Mode`, `o.Ssr.Urls`, `o.Ssr.ExcludePaths`, `Render(...).WithSsr(...)` |
+
+## Behavior differences to check
+
+- **v3 only.** There is no v2 client support. Upgrade the client packages to v3. The first page is the `<script data-page="app">` element, not a `data-page` attribute on the root div.
+- **Props are resolved without reflection.** Anonymous types need reflection-enabled serialization, and AOT apps register a `JsonSerializerContext`.
+- **HTTP JSON options.** Props serialize with the HTTP JSON options (camelCase by default), not Newtonsoft.
+- **Version check before the handler.** A stale client gets a `409` before your endpoint runs.
+- **State is an encrypted cookie by default.** Flash, errors and history flags use it unless you opt into the session store.
+
+## Upgrading Inertia.Net
+
+Package upgrade notes live in the repository:
+
+- [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md)
+- [1.3 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.3.md)
+- [1.1 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.1.md)
+
+<Callout type="tip" title="Use the same version">
+Update all Inertia.Net packages together. Mixing 1.5 with 1.4 packages can compile but produce different protocol output.
+</Callout>

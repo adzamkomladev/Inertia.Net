@@ -1,0 +1,135 @@
+---
+title: Validation & Error Bags
+description: Redirect back with validation errors for Minimal APIs, MVC and FastEndpoints, and add Precognition.
+section: Forms & Validation
+order: 1
+---
+
+Inertia forms post, expect a redirect, and read validation errors from `props.errors` on the next page. Inertia.Net performs the redirect and carries the errors across it.
+
+- A field maps to its **first** message. With `o.WithAllErrors = true` it maps to an array of all messages (the client's `form.withAllErrors()` expects that).
+- Error keys are the JSON names of the model members, one naming-policy conversion per segment: `Address.Street` becomes `address.street`.
+- **Error bags.** The client sends `X-Inertia-Error-Bag: createUser` when the form has `errorBag="createUser"`. Errors arrive as `errors: { createUser: { email: "..." } }`. Without the header, `errors` is the flat object `{ email: "..." }`. A bag stored under a name other than `default` is always nested by bag name.
+
+```ts
+router.post('/users', data, { errorBag: 'createUser' })
+```
+
+## Minimal API
+
+`WithInertiaValidation()` for a route or a route group. It requires `services.AddValidation()` for attribute validation.
+
+```csharp
+builder.Services.AddValidation();
+
+app.MapPost("/users", (CreateUserInput input, AppDb db) =>
+{
+    db.Add(input);
+    return Results.Redirect("/users");
+}).WithInertiaValidation();
+
+app.MapGroup("/admin").WithInertiaValidation()
+   .MapPost("/roles", (RoleInput input) => Results.Redirect("/admin/roles"));
+```
+
+For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
+
+<Callout type="warning" title="Why not rely on AddValidation alone?">
+The built-in .NET 10 validation filter is added automatically and always runs outermost: it writes the 400 itself before any filter you add can see it. `WithInertiaValidation()` disables it on the endpoint and runs the same source-generated validation itself. Do not combine it with your own `.DisableValidation()`.
+</Callout>
+
+To report errors yourself, without attribute validation:
+
+```csharp
+app.MapPost("/login", (LoginInput input, SignInService auth) =>
+    auth.TryLogin(input)
+        ? Results.Redirect("/")
+        : Back().WithErrors(new Dictionary<string, string>
+        {
+            ["email"] = "These credentials do not match.",
+        }));
+```
+
+`Back().WithErrors(IDictionary<string, string[]> errors, string bag = "default")` also takes arrays of messages.
+
+## MVC
+
+`AddInertiaMvc()` registers a global filter. An Inertia non-GET request with an invalid `ModelState` is redirected back with the errors before the action runs, in the bag from `X-Inertia-Error-Bag` (default `default`). `[ApiController]` controllers work too: their automatic 400 is replaced by the same redirect for Inertia requests.
+
+```csharp
+[HttpPost("/users")]
+public IActionResult Store([FromBody] CreateUserInput input)
+{
+    if (!ModelState.IsValid) return ValidationProblem(ModelState);   // non-Inertia clients only
+    db.Add(input);
+    return Redirect("/users");
+}
+```
+
+Binding failures get the generic message `The value is invalid.`, because their exception messages can expose internals.
+
+## FastEndpoints
+
+`c.UseInertia()` adds a global pre-processor. A validation failure of an Inertia non-GET request becomes a redirect back with the errors; other requests keep FastEndpoints' 400 JSON. FluentValidation validators work as usual.
+
+```csharp
+public sealed class CreateUserValidator : Validator<CreateUserRequest>
+{
+    public CreateUserValidator() => RuleFor(x => x.Email).NotEmpty().EmailAddress();
+}
+
+app.UseFastEndpoints(c => c.UseInertia(ep => ep.AllowAnonymous()));
+```
+
+`c.UseInertia()` sets `c.Endpoints.Configurator`. Pass your own configuration as its argument instead of setting the configurator separately. The pre-processor runs after an endpoint's own pre-processors, so one that already answered (a 403, say) wins.
+
+## Precognition (live validation)
+
+Precognition validates a form as the user types, without running the handler. A request with `Precognition: true` is validated and answered with:
+
+- `204` and `Precognition-Success: true` when valid;
+- `422` and `{ "message": "...", "errors": { "field": ["..."] } }` when not, limited to the fields in `Precognition-Validate-Only`;
+- `Precognition: true` and `Vary: Precognition` on every response.
+
+```csharp
+// Minimal API: use it instead of WithInertiaValidation(), not in addition.
+app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users"))
+   .WithInertiaPrecognition();
+
+// FastEndpoints: c.UseInertia() already answers Precognition requests.
+```
+
+`WithInertiaPrecognition()` is a superset of `WithInertiaValidation()`: normal Inertia validation redirects keep working. Any endpoint filter you add after it does not run for a precognitive request. In MVC, Precognition is not available.
+
+Client (Inertia v3 has it built in):
+
+```tsx
+const form = useForm({ name: '', email: '' }).withPrecognition('post', '/users')
+// <input onBlur={() => form.validate('email')} />
+```
+
+## Error bags in the client
+
+```tsx
+const form = useForm({ name: '', email: '' })
+
+<form onSubmit={(event) => {
+  event.preventDefault()
+  form.post('/users', { errorBag: 'createUser' })
+}}>
+  <input value={form.data.email} onChange={(event) => form.setData('email', event.target.value)} />
+  <p>{form.errors.email}</p>
+</form>
+```
+
+## All errors for a field
+
+```csharp
+builder.Services.AddInertia(o => o.WithAllErrors = true);
+```
+
+With the option on, `errors.email` is an array of every message instead of the first.
+
+## State and redirects
+
+Validation errors travel in the state store across the redirect. By default that is an encrypted cookie; it can be a session or MVC TempData instead. See [Flash data](/docs/flash-data) for the store choices and size limits.

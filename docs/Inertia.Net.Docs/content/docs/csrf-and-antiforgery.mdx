@@ -1,0 +1,67 @@
+---
+title: CSRF & Antiforgery
+description: Protect forms with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.
+section: Advanced
+order: 4
+---
+
+The Inertia client reads the `XSRF-TOKEN` cookie and sends its value as the `X-XSRF-TOKEN` header on every request. `UseInertiaAntiforgery()` issues that cookie and validates it, so one call protects every form.
+
+```csharp
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);   // "X-XSRF-TOKEN"
+
+app.UseAuthentication();                 // if the app signs users in: the token is bound to the signed-in user
+app.UseInertia();
+app.UseInertiaAntiforgery();
+```
+
+## What it does
+
+- **Issue.** Page loads (GET/HEAD requests that are Inertia requests or accept `text/html`) get the request token in a script-readable, essential cookie (`HttpOnly` off, `SameSite=Lax`, `Path=/`, `Secure` per `SecurePolicy`). Essential means a cookie-consent policy does not withhold it.
+- **Validate.** Every unsafe request (anything but GET, HEAD, OPTIONS and TRACE), with a JSON or a form body, Inertia or not, is checked with `IAntiforgery.ValidateRequestAsync`. A plain cross-site HTML form post is rejected as well as a forged XHR. It also sets the antiforgery feature, so form-binding endpoints work without `app.UseAntiforgery()`.
+- **Reject.** A missing or wrong token gets **`419`** (page expired, as in Laravel); the handler does not run.
+- **Opt out** per endpoint with `.DisableAntiforgery()` (webhooks, test hooks), or for whole areas with `ShouldValidate`.
+
+## Options
+
+```csharp
+app.UseInertiaAntiforgery(o =>
+{
+    o.CookieName = "XSRF-TOKEN";                                  // default
+    o.SecurePolicy = CookieSecurePolicy.Always;                   // default SameAsRequest
+    o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/api");
+    o.OnRejected = (ctx, error) => Back().WithFlash("error", "The page expired, please try again.");
+});
+```
+
+`OnRejected` runs after `UseInertia()`; returning `Back()` gives the tab a fresh token and a message instead of the client's error dialog.
+
+## Lazy refresh
+
+By default every page load issues a fresh token, and antiforgery marks that response `Cache-Control: no-cache, no-store` (which also keeps the page out of the browser's back/forward cache).
+
+`o.CookieRefresh = XsrfCookieRefresh.Lazy` keeps a token that still validates. Such responses get no `Set-Cookie` and stay cacheable, and a token issued before a sign-in or sign-out is replaced on the next page load.
+
+Validating costs about what issuing does, so the gain is in the responses, not in CPU. Set your own `Cache-Control` on pages with private data.
+
+<Callout type="info" title="Session changes">
+A session that expires or a sign-in that changes the user invalidates the token in an open tab; the next page load issues a new one. Returning `Back()` from `OnRejected` gives that tab a fresh token and a message.
+</Callout>
+
+## MVC and FastEndpoints
+
+`UseInertiaAntiforgery()` covers controllers too. `[AutoValidateAntiforgeryToken]` as a global filter still works, but is not needed. FastEndpoints is covered by the middleware; FastEndpoints' own `EnableAntiforgery()` is not needed for Inertia forms.
+
+## Issue only
+
+`UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` (the 1.0 API) only writes the cookie. You then validate with `app.UseAntiforgery()` (form bodies only) and your own check for JSON bodies (`await antiforgery.ValidateRequestAsync(context)`). Prefer `UseInertiaAntiforgery()`.
+
+## Troubleshooting 419
+
+- Was the page loaded through the middleware? It sets the cookie.
+- Does the cookie reach the browser? `Secure` cookies are dropped on plain HTTP; behind a TLS-terminating proxy, configure forwarded headers or set `CookieSecurePolicy.Always`.
+- Do all instances share the Data Protection key ring?
+- Does `UseAuthentication()` run before the antiforgery middleware?
+- Did a sign-in or sign-out change the token? Reload the page, or use `OnRejected`.
+
+See [Deploying](/docs/deploying) for proxy and multi-instance settings.
