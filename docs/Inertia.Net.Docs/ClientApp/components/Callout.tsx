@@ -43,7 +43,7 @@ export function Callout({
   const Icon = config.icon
 
   return (
-    <div className={cn('not-prose my-6 flex gap-3 rounded-xl border p-4 text-sm', config.className)}>
+    <div className={cn('not-prose my-6 flex gap-3 rounded-xl border p-4 text-sm [&_ul]:my-2 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5', config.className)}>
       <Icon className="mt-0.5 size-[18px] shrink-0" />
       <div className="min-w-0 flex-1 [&>p]:m-0 [&>p+p]:mt-3 [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-4 [&_code]:rounded-md [&_code]:border [&_code]:border-current/10 [&_code]:bg-current/5 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em]">
         <p className="mb-1 font-semibold">{title ?? config.label}</p>

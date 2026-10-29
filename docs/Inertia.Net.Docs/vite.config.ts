@@ -72,7 +72,7 @@ export default defineConfig(({ command, isSsrBuild }) => ({
         emptyOutDir: true,
         manifest: true,
         // The docs bundle intentionally includes every MDX page so Inertia navigation is instant.
-        chunkSizeWarningLimit: 1200,
+        chunkSizeWarningLimit: 1400,
         rolldownOptions: { input: 'ClientApp/app.tsx' },
       },
 }))

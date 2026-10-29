@@ -11,13 +11,13 @@ const output = path.join(root, 'ClientApp', 'lib')
 
 const sectionOrder = [
   'Getting Started',
-  'Guides',
   'Core Concepts',
   'Forms & Validation',
   'Navigation & State',
   'Advanced',
   'Reference',
   'Help',
+  'Samples',
 ]
 
 const stripMarkdown = (value) =>
@@ -97,6 +97,7 @@ for (const file of files) {
     title: frontmatter.title,
     description: frontmatter.description ?? '',
     section: frontmatter.section,
+    group: frontmatter.group ?? '',
     order: frontmatter.order,
     headings,
   }

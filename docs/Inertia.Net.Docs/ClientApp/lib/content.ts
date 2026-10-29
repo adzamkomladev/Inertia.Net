@@ -4,6 +4,7 @@ export interface DocFrontmatter {
   title: string
   description?: string
   section: string
+  group?: string
   order: number
 }
 
@@ -26,13 +27,13 @@ export interface Heading {
 
 const sectionOrder = [
   'Getting Started',
-  'Guides',
   'Core Concepts',
   'Forms & Validation',
   'Navigation & State',
   'Advanced',
   'Reference',
   'Help',
+  'Samples',
 ]
 
 export const pages: DocPage[] = navData.pages as DocPage[]

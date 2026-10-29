@@ -6,6 +6,7 @@
       "title": "Introduction",
       "description": "Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.",
       "section": "Getting Started",
+      "group": "",
       "order": 1,
       "headings": [
         {
@@ -46,6 +47,7 @@
       "title": "Installation",
       "description": "Install Inertia.Net, the optional MVC or FastEndpoints package, and the testing helpers.",
       "section": "Getting Started",
+      "group": "",
       "order": 2,
       "headings": [
         {
@@ -76,6 +78,7 @@
       "title": "Quick Start",
       "description": "Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.",
       "section": "Getting Started",
+      "group": "",
       "order": 3,
       "headings": [
         {
@@ -111,6 +114,7 @@
       "title": "Client Setup",
       "description": "Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.",
       "section": "Getting Started",
+      "group": "",
       "order": 4,
       "headings": [
         {
@@ -146,91 +150,12 @@
       ]
     },
     {
-      "slug": "forget-me-not",
-      "url": "/docs/forget-me-not",
-      "title": "Build ForgetMeNot",
-      "description": "A complete Inertia.Net todo app with login, public lists, paginated loading, reminders and SSR.",
-      "section": "Guides",
-      "order": 1,
-      "headings": [
-        {
-          "id": "what-forgetmenot-does",
-          "text": "What ForgetMeNot does",
-          "depth": 2
-        },
-        {
-          "id": "1-create-the-app",
-          "text": "1. Create the app",
-          "depth": 2
-        },
-        {
-          "id": "2-model-the-domain",
-          "text": "2. Model the domain",
-          "depth": 2
-        },
-        {
-          "id": "3-wire-authentication-and-inertia",
-          "text": "3. Wire authentication and Inertia",
-          "depth": 2
-        },
-        {
-          "id": "4-register-and-sign-in",
-          "text": "4. Register and sign in",
-          "depth": 2
-        },
-        {
-          "id": "5-list-the-private-dashboard",
-          "text": "5. List the private dashboard",
-          "depth": 2
-        },
-        {
-          "id": "6-load-todo-items-in-pages",
-          "text": "6. Load todo items in pages",
-          "depth": 2
-        },
-        {
-          "id": "7-add-and-complete-items",
-          "text": "7. Add and complete items",
-          "depth": 2
-        },
-        {
-          "id": "8-share-a-list-publicly",
-          "text": "8. Share a list publicly",
-          "depth": 2
-        },
-        {
-          "id": "9-send-reminders-once",
-          "text": "9. Send reminders once",
-          "depth": 2
-        },
-        {
-          "id": "10-add-the-root-template-and-client-entry",
-          "text": "10. Add the root template and client entry",
-          "depth": 2
-        },
-        {
-          "id": "11-test-the-interesting-paths",
-          "text": "11. Test the interesting paths",
-          "depth": 2
-        },
-        {
-          "id": "12-run-it-in-production",
-          "text": "12. Run it in production",
-          "depth": 2
-        },
-        {
-          "id": "what-the-samples-add",
-          "text": "What the samples add",
-          "depth": 2
-        }
-      ]
-    },
-    {
       "slug": "pages-and-responses",
       "url": "/docs/pages-and-responses",
       "title": "Pages and Responses",
       "description": "Render components, use MapInertia, and understand the root template and response status codes.",
       "section": "Core Concepts",
+      "group": "",
       "order": 1,
       "headings": [
         {
@@ -276,6 +201,7 @@
       "title": "Props",
       "description": "Lazy, optional, deferred, merged, once, cached and rescued page data.",
       "section": "Core Concepts",
+      "group": "",
       "order": 2,
       "headings": [
         {
@@ -341,6 +267,7 @@
       "title": "Shared Data",
       "description": "Share props with every page, statically or per request, and control the shared prop key list.",
       "section": "Core Concepts",
+      "group": "",
       "order": 3,
       "headings": [
         {
@@ -371,6 +298,7 @@
       "title": "Partial Reloads",
       "description": "Reload only the props a page needs with only and except filters.",
       "section": "Core Concepts",
+      "group": "",
       "order": 4,
       "headings": [
         {
@@ -406,6 +334,7 @@
       "title": "Deferred Props",
       "description": "Load slow page sections after the first render, in groups.",
       "section": "Core Concepts",
+      "group": "",
       "order": 5,
       "headings": [
         {
@@ -436,6 +365,7 @@
       "title": "Merging Props",
       "description": "Append, prepend, deep merge and match items instead of replacing the client's value.",
       "section": "Core Concepts",
+      "group": "",
       "order": 6,
       "headings": [
         {
@@ -466,6 +396,7 @@
       "title": "Once Props",
       "description": "Remember expensive values on the client and skip them on later visits.",
       "section": "Core Concepts",
+      "group": "",
       "order": 7,
       "headings": [
         {
@@ -501,6 +432,7 @@
       "title": "Infinite Scroll",
       "description": "Merge pages of items and report paging metadata to the InfiniteScroll client component.",
       "section": "Core Concepts",
+      "group": "",
       "order": 8,
       "headings": [
         {
@@ -526,6 +458,7 @@
       "title": "Validation & Error Bags",
       "description": "Redirect back with validation errors for Minimal APIs, MVC and FastEndpoints, and add Precognition.",
       "section": "Forms & Validation",
+      "group": "",
       "order": 1,
       "headings": [
         {
@@ -571,6 +504,7 @@
       "title": "Flash Data",
       "description": "Carry a one-time message, toast or typed value across a redirect.",
       "section": "Forms & Validation",
+      "group": "",
       "order": 2,
       "headings": [
         {
@@ -616,6 +550,7 @@
       "title": "Redirects and History",
       "description": "Redirects, Back, Location, history encryption, clearing and URL fragments.",
       "section": "Navigation & State",
+      "group": "",
       "order": 1,
       "headings": [
         {
@@ -661,6 +596,7 @@
       "title": "Asset Versioning",
       "description": "Tell the client when its JavaScript and CSS are stale, and reload once when they are.",
       "section": "Advanced",
+      "group": "",
       "order": 1,
       "headings": [
         {
@@ -686,6 +622,7 @@
       "title": "Server-side Rendering",
       "description": "Render the first visit on Bun or Node, supervise the process from .NET, and fall back safely.",
       "section": "Advanced",
+      "group": "",
       "order": 2,
       "headings": [
         {
@@ -741,6 +678,7 @@
       "title": "Vite Integration",
       "description": "Manifest tags, the dev-server hot file, asset base URLs, prefetching and CSP nonces.",
       "section": "Advanced",
+      "group": "",
       "order": 3,
       "headings": [
         {
@@ -776,6 +714,7 @@
       "title": "CSRF & Antiforgery",
       "description": "Protect forms with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.",
       "section": "Advanced",
+      "group": "",
       "order": 4,
       "headings": [
         {
@@ -816,6 +755,7 @@
       "title": "Deploying Behind a Proxy",
       "description": "Forwarded headers, secure cookies, compression, asset caching and multi-instance state.",
       "section": "Advanced",
+      "group": "",
       "order": 5,
       "headings": [
         {
@@ -861,6 +801,7 @@
       "title": "Native AOT",
       "description": "Publish a Native AOT Inertia.Net app with source-generated JSON metadata.",
       "section": "Advanced",
+      "group": "",
       "order": 6,
       "headings": [
         {
@@ -911,6 +852,7 @@
       "title": "TypeScript Types",
       "description": "Generate declarations for page props, shared props and flash data from your .NET contracts.",
       "section": "Reference",
+      "group": "",
       "order": 1,
       "headings": [
         {
@@ -941,6 +883,7 @@
       "title": "Testing",
       "description": "Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.",
       "section": "Reference",
+      "group": "",
       "order": 2,
       "headings": [
         {
@@ -976,6 +919,7 @@
       "title": "DevTools & Development Checks",
       "description": "Record visits for the Inertia DevTools extension and catch missing page components during development.",
       "section": "Reference",
+      "group": "",
       "order": 3,
       "headings": [
         {
@@ -1006,6 +950,7 @@
       "title": "Performance",
       "description": "Memory and hosting guidance, payload limits and the design choices behind the adapter.",
       "section": "Reference",
+      "group": "",
       "order": 4,
       "headings": [
         {
@@ -1031,6 +976,7 @@
       "title": "Configuration",
       "description": "InertiaOptions, Vite, SSR, props, state and the middleware and result API.",
       "section": "Reference",
+      "group": "",
       "order": 5,
       "headings": [
         {
@@ -1076,6 +1022,7 @@
       "title": "Migrating from Other Adapters",
       "description": "Map an InertiaCore-style API to Inertia.Net and check the behavior differences.",
       "section": "Help",
+      "group": "",
       "order": 1,
       "headings": [
         {
@@ -1096,6 +1043,7 @@
       "title": "Troubleshooting & FAQ",
       "description": "Common errors, their causes, and how to fix them.",
       "section": "Help",
+      "group": "",
       "order": 2,
       "headings": [
         {
@@ -1196,6 +1144,87 @@
         {
           "id": "can-i-mix-razor-pages-or-views-with-inertia-pages",
           "text": "Can I mix Razor Pages or views with Inertia pages?",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "forget-me-not",
+      "url": "/docs/forget-me-not",
+      "title": "ForgetMeNot",
+      "description": "Build a complete Inertia.Net todo app with session login, public lists, paginated loading, reminders and SSR.",
+      "section": "Samples",
+      "group": "Guides",
+      "order": 1,
+      "headings": [
+        {
+          "id": "what-you-are-building",
+          "text": "What you are building",
+          "depth": 2
+        },
+        {
+          "id": "1-start-from-the-template",
+          "text": "1. Start from the template",
+          "depth": 2
+        },
+        {
+          "id": "2-make-it-look-good-with-shadcnui",
+          "text": "2. Make it look good with shadcn/ui",
+          "depth": 2
+        },
+        {
+          "id": "3-give-the-app-a-clean-structure",
+          "text": "3. Give the app a clean structure",
+          "depth": 2
+        },
+        {
+          "id": "4-model-the-data",
+          "text": "4. Model the data",
+          "depth": 2
+        },
+        {
+          "id": "5-use-sessions-for-sign-in",
+          "text": "5. Use sessions for sign-in",
+          "depth": 2
+        },
+        {
+          "id": "6-hide-the-inertia-setup",
+          "text": "6. Hide the Inertia setup",
+          "depth": 2
+        },
+        {
+          "id": "7-register-sign-in-and-sign-out",
+          "text": "7. Register, sign in and sign out",
+          "depth": 2
+        },
+        {
+          "id": "8-build-the-dashboard",
+          "text": "8. Build the dashboard",
+          "depth": 2
+        },
+        {
+          "id": "9-load-items-in-pages",
+          "text": "9. Load items in pages",
+          "depth": 2
+        },
+        {
+          "id": "10-share-a-list-publicly",
+          "text": "10. Share a list publicly",
+          "depth": 2
+        },
+        {
+          "id": "11-send-reminders-once",
+          "text": "11. Send reminders once",
+          "depth": 2
+        },
+        {
+          "id": "12-test-the-important-paths",
+          "text": "12. Test the important paths",
+          "depth": 2
+        },
+        {
+          "id": "13-run-it-in-production",
+          "text": "13. Run it in production",
           "depth": 2
         }
       ]
