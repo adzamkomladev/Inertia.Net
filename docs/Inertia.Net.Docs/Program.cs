@@ -64,6 +64,7 @@ if (development)
 }
 
 app.MapGet("/", () => Render("Home"));
+app.MapGet("/health", () => Results.Ok("ok"));
 app.MapMethods("/docs", ["GET", "HEAD"], () => Results.Redirect("/docs/introduction"));
 app.MapGet("/docs/{**slug}", (string slug, IWebHostEnvironment environment) =>
     DocsCatalog.Exists(environment, slug)

@@ -76,7 +76,7 @@ The repository includes a production [`Dockerfile`](Dockerfile) that builds the 
 2. Choose **Dockerfile** as the build pack.
 3. Set **Base Directory** to `/` and **Dockerfile Location** to `/docs/Inertia.Net.Docs/Dockerfile`.
 4. Set the exposed port to `8080`.
-5. Set the health check path to `/docs/introduction` (or `/`).
+5. Set the health check path to `/health`.
 6. Add the domain and enable HTTPS in Coolify.
 7. Deploy. No database, volumes or build-time environment variables are required.
 
@@ -89,7 +89,7 @@ Environment variables:
 | `INERTIA_SSR` | `1` | Set to `0` to disable the managed Bun SSR server |
 | `INERTIA_SSR_PORT` | `13715` | Internal Bun SSR port |
 
-The image runs as the non-root `app` user. The site has no persistent data; docs content and built assets are baked into the image, so a redeploy is enough to publish content changes.
+The image exposes `/health` and runs as the non-root `app` user. The site has no persistent data; docs content and built assets are baked into the image, so a redeploy is enough to publish content changes.
 
 > **Keep the container port private.**
 > The app trusts forwarded headers from its proxy so HTTPS cookies and Inertia redirects use the public scheme. Do not expose port `8080` directly to the internet; let Coolify's Traefik proxy be the only route to it.
