@@ -1,9 +1,10 @@
-import { Head, Link } from '@inertiajs/react'
+import { Link } from '@inertiajs/react'
 import { ChevronRight } from 'lucide-react'
 import { useMemo } from 'react'
 import { DocsLayout } from '../../components/DocsLayout'
 import { mdxComponents } from '../../components/Mdx'
 import { PageFooter } from '../../components/PageFooter'
+import { Seo } from '../../components/Seo'
 import { getHeadings, getPage } from '../../lib/content'
 import { getDocModule } from '../../lib/page-content'
 
@@ -29,9 +30,12 @@ export default function Show({ slug }: { slug: string }) {
 
   return (
     <>
-      <Head title={`${page.title} — Inertia.Net Docs`}>
-        <meta name="description" head-key="description" content={page.description ?? `Inertia.Net documentation: ${page.title}`} />
-      </Head>
+      <Seo
+        title={`${page.title} — Inertia.Net Docs`}
+        description={page.description ?? `Inertia.Net documentation: ${page.title}`}
+        type="article"
+        section={page.section}
+      />
       <DocsLayout page={page} headings={headings}>
         <nav className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="Breadcrumb">
           <Link href="/docs/introduction" className="transition-colors hover:text-foreground">

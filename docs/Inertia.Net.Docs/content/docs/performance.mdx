@@ -1,25 +1,40 @@
 ---
 title: Performance
-description: Render costs, payload guidance and the design choices behind the adapter.
+description: Memory and hosting guidance, payload limits and the design choices behind the adapter.
 section: Reference
 order: 4
 ---
 
 Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
 
-## Render allocations
+## Memory and hosting
 
-v1.5.2 allocates less per render than v1.5.1 (exact allocation probes, same fixtures):
+The useful planning number is not a microbenchmark; it is how much memory the whole process needs at rest and under load. These are reference points measured on Linux x64 after the first request, not guarantees:
 
-| Workload | v1.5.1 | v1.5.2 |
+| App shape | RSS at rest | Plan for |
 |---|---:|---:|
-| JSON, 20 props | 2,152 B | 1,736 B |
-| Typed POCO page | 1,968 B | 1,552 B |
-| Partial reload | 984 B | 568 B |
-| HTML, 20 props | 2,216 B | 1,800 B |
-| 20 parallel loaders | 6,496 B | 3,992 B |
+| Inertia.Net JIT app, no database (`samples/MinimalApi.React`) | about 90 MB | 256–512 MB |
+| Inertia.Net Native AOT app (`tests/Inertia.Net.AotSmoke`) | about 42 MB | 128–256 MB |
+| Small JIT todo: Minimal API + EF Core + SQLite + cookie auth | roughly 120–180 MB | 256–512 MB |
+| Small Native AOT todo: source-generated JSON + SQLite | roughly 45–70 MB | 128–256 MB |
+| Add managed Bun SSR | +30–60 MB for the Bun process | add 128 MB headroom |
 
-In two paired runs, partial reloads and pages with parallel loaders were faster in both; ordinary JSON and HTML rendering showed no clear change. Those timings come from a laptop that cannot resolve differences under about 10%. See `tests/Inertia.Net.Benchmarks/RESULTS.md` for intervals and raw samples.
+The two Inertia.Net baseline rows were measured from this repository on Linux x64; the todo rows are planning ranges, not benchmark claims. The JIT todo range includes the runtime, EF Core, SQLite, authentication and a small working set. PostgreSQL or MongoDB, image processing and a large cache move it upward; measure your own app under realistic concurrency. Native AOT removes most JIT and reflection overhead, but it does not make EF Core or a database free.
+
+For containers:
+
+- Set a memory limit rather than relying on the host.
+- Leave headroom for the GC, the OS page cache and request bursts.
+- Expect SSR to add a second process. If the Bun renderer is optional, `SsrMode.Preferred` lets the app fall back to client rendering when it is unavailable.
+- Profile with real page sizes. A dashboard with deferred props and a paginated feed behaves very differently from a page that serializes every row.
+
+The benchmark project still has the throughput and allocation probes:
+
+```sh
+dotnet run -c Release --project tests/Inertia.Net.Benchmarks -- --filter '*'
+```
+
+Targeted probes: `--render-probe`, `--ssr-probe`, `--mvc-probe`, `--payload-probe` and `--cache-probe`.
 
 ## Payload size
 
@@ -47,10 +62,3 @@ Keep pages well under a megabyte:
 
 Most per-request allocation in a real handler is the props you build, not the render.
 
-## Benchmark locally
-
-```sh
-dotnet run -c Release --project tests/Inertia.Net.Benchmarks -- --filter '*'
-```
-
-Targeted probes: `--render-probe`, `--ssr-probe`, `--mvc-probe`, `--payload-probe` and `--cache-probe`.

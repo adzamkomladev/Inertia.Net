@@ -146,6 +146,86 @@
       ]
     },
     {
+      "slug": "forget-me-not",
+      "url": "/docs/forget-me-not",
+      "title": "Build ForgetMeNot",
+      "description": "A complete Inertia.Net todo app with login, public lists, paginated loading, reminders and SSR.",
+      "section": "Guides",
+      "order": 1,
+      "headings": [
+        {
+          "id": "what-forgetmenot-does",
+          "text": "What ForgetMeNot does",
+          "depth": 2
+        },
+        {
+          "id": "1-create-the-app",
+          "text": "1. Create the app",
+          "depth": 2
+        },
+        {
+          "id": "2-model-the-domain",
+          "text": "2. Model the domain",
+          "depth": 2
+        },
+        {
+          "id": "3-wire-authentication-and-inertia",
+          "text": "3. Wire authentication and Inertia",
+          "depth": 2
+        },
+        {
+          "id": "4-register-and-sign-in",
+          "text": "4. Register and sign in",
+          "depth": 2
+        },
+        {
+          "id": "5-list-the-private-dashboard",
+          "text": "5. List the private dashboard",
+          "depth": 2
+        },
+        {
+          "id": "6-load-todo-items-in-pages",
+          "text": "6. Load todo items in pages",
+          "depth": 2
+        },
+        {
+          "id": "7-add-and-complete-items",
+          "text": "7. Add and complete items",
+          "depth": 2
+        },
+        {
+          "id": "8-share-a-list-publicly",
+          "text": "8. Share a list publicly",
+          "depth": 2
+        },
+        {
+          "id": "9-send-reminders-once",
+          "text": "9. Send reminders once",
+          "depth": 2
+        },
+        {
+          "id": "10-add-the-root-template-and-client-entry",
+          "text": "10. Add the root template and client entry",
+          "depth": 2
+        },
+        {
+          "id": "11-test-the-interesting-paths",
+          "text": "11. Test the interesting paths",
+          "depth": 2
+        },
+        {
+          "id": "12-run-it-in-production",
+          "text": "12. Run it in production",
+          "depth": 2
+        },
+        {
+          "id": "what-the-samples-add",
+          "text": "What the samples add",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "pages-and-responses",
       "url": "/docs/pages-and-responses",
       "title": "Pages and Responses",
@@ -924,13 +1004,13 @@
       "slug": "performance",
       "url": "/docs/performance",
       "title": "Performance",
-      "description": "Render costs, payload guidance and the design choices behind the adapter.",
+      "description": "Memory and hosting guidance, payload limits and the design choices behind the adapter.",
       "section": "Reference",
       "order": 4,
       "headings": [
         {
-          "id": "render-allocations",
-          "text": "Render allocations",
+          "id": "memory-and-hosting",
+          "text": "Memory and hosting",
           "depth": 2
         },
         {
@@ -941,11 +1021,6 @@
         {
           "id": "design-notes",
           "text": "Design notes",
-          "depth": 2
-        },
-        {
-          "id": "benchmark-locally",
-          "text": "Benchmark locally",
           "depth": 2
         }
       ]

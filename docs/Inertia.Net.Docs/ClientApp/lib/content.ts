@@ -26,6 +26,7 @@ export interface Heading {
 
 const sectionOrder = [
   'Getting Started',
+  'Guides',
   'Core Concepts',
   'Forms & Validation',
   'Navigation & State',

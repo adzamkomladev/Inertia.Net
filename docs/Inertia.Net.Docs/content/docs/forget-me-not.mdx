@@ -1,0 +1,806 @@
+---
+title: Build ForgetMeNot
+description: A complete Inertia.Net todo app with login, public lists, paginated loading, reminders and SSR.
+section: Guides
+order: 1
+---
+
+ForgetMeNot is a small but realistic todo application. People sign in, keep private lists, share selected lists publicly, and get reminders when something is due. The interesting parts are the boundaries: authentication, public pages without an account, paginated lists that load as you scroll, and a background worker that must not block a request.
+
+This guide builds it with Minimal APIs, EF Core, React and Inertia.Net. The code is trimmed for readability; put each section in its own file when you build the real thing.
+
+<Callout type="info" title="Based on the published samples">
+The authentication, public-page, cache and Bun SSR patterns here follow [Inkwell](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/Inkwell), [CarParker](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/CarParker) and [TechLandierDistributed](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/TechLandierDistributed). Use them when you want a complete, runnable version of each pattern.
+</Callout>
+
+## What ForgetMeNot does
+
+- Email and password registration and login with a cookie
+- Private todo lists, with completed items kept out of the way
+- Public read-only lists at an unguessable URL
+- Todo items loaded in pages and merged by Inertia's `InfiniteScroll`
+- Due dates and one-time reminder delivery
+- Deferred dashboard stats and reminders so the page renders immediately
+- SSR and Bun in the production container
+
+<Cards>
+  <Card title="Props" icon="blocks" href="/docs/props">Deferred, cached and scroll props used below.</Card>
+  <Card title="Infinite scroll" icon="code" href="/docs/infinite-scroll">How `Scroll` and `InfiniteScroll` fit together.</Card>
+  <Card title="Validation" icon="shield" href="/docs/validation-and-errors">Forms, error bags and redirects.</Card>
+  <Card title="Bun SSR" icon="rocket" href="/docs/server-side-rendering">The production renderer.</Card>
+</Cards>
+
+## 1. Create the app
+
+```sh
+dotnet new web -n ForgetMeNot
+cd ForgetMeNot
+dotnet add package Inertia.Net --version 1.5.3
+dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version 10.0.12
+dotnet add package Microsoft.AspNetCore.Cryptography.KeyDerivation
+```
+
+The frontend uses React and the Inertia v3 client. Bun is assumed here; npm works the same way.
+
+```sh
+bun init -y
+bun add react react-dom @inertiajs/react@^3 @vitejs/plugin-react
+bun add -d vite typescript @types/react @types/react-dom
+```
+
+The project layout:
+
+```text
+ForgetMeNot/
+  Program.cs
+  app.html
+  ClientApp/
+    app.tsx
+    pages/
+      Home.tsx
+      Auth/Login.tsx
+      Todos/Index.tsx
+      Todos/Show.tsx
+      Public/Show.tsx
+  Data/
+    AppDbContext.cs
+    Entities.cs
+  Features/
+    Auth.cs
+    Todos.cs
+    Reminders.cs
+```
+
+## 2. Model the domain
+
+Keep the public shape separate from the database entity. A todo list owns a stable, random public slug, and a reminder is just a time on the item plus the time it was last sent.
+
+```csharp
+// Data/Entities.cs
+public sealed class AppUser
+{
+    public int Id { get; set; }
+    public required string Email { get; set; }
+    public required string DisplayName { get; set; }
+    public required string PasswordHash { get; set; }
+    public List<TodoList> Lists { get; } = [];
+}
+
+public sealed class TodoList
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public AppUser User { get; set; } = null!;
+    public required string Title { get; set; }
+    public required string PublicSlug { get; set; }
+    public bool IsPublic { get; set; }
+    public List<TodoItem> Items { get; } = [];
+}
+
+public sealed class TodoItem
+{
+    public int Id { get; set; }
+    public int TodoListId { get; set; }
+    public TodoList List { get; set; } = null!;
+    public required string Title { get; set; }
+    public bool IsDone { get; set; }
+    public DateTimeOffset? DueAt { get; set; }
+    public DateTimeOffset? RemindAt { get; set; }
+    public DateTimeOffset? RemindedAt { get; set; }
+}
+```
+
+`RemindAt` is when the reminder becomes due. `RemindedAt` makes delivery idempotent: a retry, a restart, or two workers will not send the same reminder forever.
+
+```csharp
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+{
+    public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<TodoList> Lists => Set<TodoList>();
+    public DbSet<TodoItem> Items => Set<TodoItem>();
+
+    protected override void OnModelCreating(ModelBuilder model)
+    {
+        model.Entity<TodoList>().HasIndex(l => l.PublicSlug).IsUnique();
+        model.Entity<TodoItem>()
+            .HasIndex(i => new { i.TodoListId, i.RemindAt, i.RemindedAt });
+        model.Entity<TodoItem>()
+            .HasIndex(i => new { i.TodoListId, i.IsDone, i.DueAt, i.Id });
+    }
+}
+```
+
+For a production app, use EF migrations. For this guide, `db.Database.EnsureCreated()` is enough to get moving.
+
+The page props use small records instead of exposing entities:
+
+```csharp
+public sealed record TodoListDto(
+    int Id, string Title, string PublicSlug, bool IsPublic, int Total, int Open);
+
+public sealed record TodoItemDto(int Id, string Title, bool IsDone, DateTimeOffset? DueAt);
+
+public sealed record TodoListHeader(int Id, string Title, string PublicSlug, bool IsPublic);
+
+public sealed record ReminderDto(int Id, string Title, DateTimeOffset RemindAt);
+
+public sealed record TodoStats(int Open, int Done, int DueToday);
+
+public sealed record PublicListHeader(
+    int Id, string Title, string Owner, int OpenCount);
+
+public sealed record PublicTodoDto(int Id, string Title, DateTimeOffset? DueAt);
+
+public sealed record CreateListForm
+{
+    [Required, MaxLength(120)]
+    public string? Title { get; set; }
+
+    public bool IsPublic { get; set; }
+}
+```
+
+## 3. Wire authentication and Inertia
+
+The cookie is the session. Inertia never sees a token, and antiforgery still protects the forms.
+
+```csharp
+// Program.cs
+using System.Security.Claims;
+using ForgetMeNot.Data;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<AppDbContext>(o =>
+    o.UseSqlite("Data Source=forgetmenot.db"));
+builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
+
+builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/login";
+        o.AccessDeniedPath = "/login";
+        o.Cookie.Name = ".fmn.auth";
+        o.Cookie.HttpOnly = true;
+        o.Cookie.SameSite = SameSiteMode.Lax;
+        o.SlidingExpiration = true;
+
+        // The cookie handler answers XHR with a bare 401; an Inertia visit should follow the login redirect instead.
+        var redirectToLogin = o.Events.OnRedirectToLogin;
+        o.Events.OnRedirectToLogin = async ctx =>
+        {
+            if (ctx.Request.Headers.ContainsKey(InertiaHeaders.Inertia)) ctx.Response.Redirect(ctx.RedirectUri);
+            else await redirectToLogin(ctx);
+        };
+    });
+builder.Services.AddAuthorization();
+
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+builder.Services.AddValidation();
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.ForwardLimit = 1;
+    o.KnownIPNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+builder.Services.AddInertia(o =>
+{
+    o.Share("appName", Once(() => "ForgetMeNot"));
+    o.Share("auth", ctx => ctx.User.Identity?.IsAuthenticated == true
+        ? new AuthUser(
+            int.Parse(ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
+            ctx.User.Identity.Name!)
+        : null);
+    o.Share("baseUrl", ctx =>
+        $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}");
+
+    o.Pages.Directory = "ClientApp/pages";
+    o.Vite.Prefetch = VitePrefetch.Waterfall;
+    o.Ssr.BundlePath = "ssr/ssr.js";
+    o.Ssr.Mode = SsrMode.Preferred;
+    o.Ssr.UseNodeProcess(n => n.Executable = "bun");
+});
+
+var app = builder.Build();
+
+app.UseForwardedHeaders();
+app.UseStaticFiles();
+app.UseAuthentication();
+app.UseInertia();
+app.UseInertiaAntiforgery();
+app.UseAuthorization();
+
+app.MapGet("/", () => Render("Home"));
+app.MapGet("/login", () => Render("Auth/Login"));
+app.MapGet("/register", () => Render("Auth/Register"));
+app.MapGet("/health", () => Results.Ok("ok"));
+
+app.Run();
+
+public sealed record AuthUser(int Id, string Name);
+```
+
+`UseAuthentication()` must run before `UseInertiaAntiforgery()` if the token is bound to the signed-in user. Behind Coolify or another TLS-terminating proxy, configure forwarded headers so the `Secure` cookie and absolute URLs use `https`.
+
+<Callout type="tip" title="One shared auth prop">
+`auth` is a shared prop, so every page receives the signed-in user without repeating a query in every endpoint. The client can render the header from `usePage().props.auth`.
+</Callout>
+
+## 4. Register and sign in
+
+The forms post to Minimal API endpoints. `WithInertiaValidation()` turns attribute failures into a redirect back with `errors`, which is what `useForm()` expects.
+
+```csharp
+public sealed class RegisterForm
+{
+    [Required, EmailAddress]
+    public string? Email { get; set; }
+
+    [Required, MinLength(8)]
+    public string? Password { get; set; }
+
+    [Required, MaxLength(80)]
+    public string? DisplayName { get; set; }
+}
+
+public sealed class LoginForm
+{
+    [Required, EmailAddress]
+    public string? Email { get; set; }
+
+    [Required]
+    public string? Password { get; set; }
+}
+
+app.MapPost("/register", async (
+    RegisterForm form,
+    AppDbContext db,
+    IPasswordHasher<AppUser> hasher,
+    HttpContext http) =>
+{
+    var email = form.Email!.Trim().ToLowerInvariant();
+    if (await db.Users.AnyAsync(u => u.Email == email))
+    {
+        return Back().WithErrors(new Dictionary<string, string>
+        {
+            ["email"] = "An account with this email already exists.",
+        });
+    }
+
+    var user = new AppUser
+    {
+        Email = email,
+        DisplayName = form.DisplayName!.Trim(),
+        PasswordHash = "",
+    };
+    user.PasswordHash = hasher.HashPassword(user, form.Password!);
+    db.Users.Add(user);
+    await db.SaveChangesAsync();
+
+    http.Inertia().Flash("success", "Account created. Sign in to continue.");
+    return Results.Redirect("/login");
+}).WithInertiaValidation();
+
+app.MapPost("/login", async (
+    LoginForm form,
+    AppDbContext db,
+    IPasswordHasher<AppUser> hasher,
+    HttpContext http) =>
+{
+    var email = form.Email!.Trim().ToLowerInvariant();
+    var user = await db.Users.SingleOrDefaultAsync(u => u.Email == email);
+
+    if (user is null || hasher.VerifyHashedPassword(user, user.PasswordHash, form.Password!)
+        == PasswordVerificationResult.Failed)
+    {
+        return Back().WithErrors(new Dictionary<string, string>
+        {
+            ["email"] = "These credentials do not match our records.",
+        });
+    }
+
+    await http.SignInAsync(
+        CookieAuthenticationDefaults.AuthenticationScheme,
+        Principal(user),
+        new AuthenticationProperties { IsPersistent = true });
+
+    return Results.Redirect("/todos");
+}).WithInertiaValidation();
+
+app.MapPost("/logout", async (HttpContext http) =>
+{
+    await http.SignOutAsync();
+    http.Inertia().ClearHistory();
+    return Results.Redirect("/");
+});
+
+static ClaimsPrincipal Principal(AppUser user) =>
+    new(new ClaimsIdentity(
+    [
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new Claim(ClaimTypes.Name, user.DisplayName),
+    ], CookieAuthenticationDefaults.AuthenticationScheme));
+```
+
+The login page only needs `useForm`:
+
+```tsx
+// ClientApp/pages/Auth/Login.tsx
+import { Link, useForm } from '@inertiajs/react'
+import type { FormEvent } from 'react'
+
+export default function Login() {
+  const form = useForm({ email: '', password: '' })
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    form.post('/login', { onFinish: () => form.reset('password') })
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <input value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} />
+      {form.errors.email && <p>{form.errors.email}</p>}
+      <input type="password" value={form.data.password} onChange={(e) => form.setData('password', e.target.value)} />
+      <button disabled={form.processing}>Sign in</button>
+      <Link href="/register">Create an account</Link>
+    </form>
+  )
+}
+```
+
+## 5. List the private dashboard
+
+The index is intentionally cheap: it counts items, then loads the reminder panel and the stats after the page is visible.
+
+```csharp
+app.MapGet("/todos", async (ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
+{
+    var userId = user.UserId();
+
+    var lists = await db.Lists
+        .AsNoTracking()
+        .Where(l => l.UserId == userId)
+        .OrderBy(l => l.Title)
+        .Select(l => new TodoListDto(
+            l.Id, l.Title, l.PublicSlug, l.IsPublic,
+            l.Items.Count, l.Items.Count(i => !i.IsDone)))
+        .ToListAsync(ct);
+
+    return Render("Todos/Index", new InertiaProps
+    {
+        ["lists"] = lists,
+        ["reminders"] = Defer(ct => LoadReminders(db, userId, ct), group: "sidebar"),
+        ["stats"] = Defer(ct => LoadStats(db, userId, ct), group: "sidebar")
+            .Cache($"todo-stats:{userId}", TimeSpan.FromMinutes(2), tags: [$"user:{userId}"])
+            .Parallel(),
+    });
+}).RequireAuthorization();
+```
+
+```csharp
+static async Task<List<ReminderDto>> LoadReminders(AppDbContext db, int userId, CancellationToken ct) =>
+    await db.Items
+        .AsNoTracking()
+        .Where(i => i.List.UserId == userId && i.RemindAt != null && i.RemindedAt == null)
+        .OrderBy(i => i.RemindAt)
+        .Take(10)
+        .Select(i => new ReminderDto(i.Id, i.Title, i.RemindAt!.Value))
+        .ToListAsync(ct);
+
+static async Task<TodoStats> LoadStats(AppDbContext db, int userId, CancellationToken ct)
+{
+    var today = DateTimeOffset.UtcNow.Date;
+    return new TodoStats(
+        await db.Items.CountAsync(i => i.List.UserId == userId && !i.IsDone, ct),
+        await db.Items.CountAsync(i => i.List.UserId == userId && i.IsDone, ct),
+        await db.Items.CountAsync(i => i.List.UserId == userId && !i.IsDone
+            && i.DueAt != null && i.DueAt < today.AddDays(1), ct));
+}
+```
+
+On the client, `<Deferred>` keeps the page interactive while the sidebar loads:
+
+```tsx
+import { Deferred, Link, usePage } from '@inertiajs/react'
+
+const { props } = usePage()
+
+<Deferred data="reminders" fallback={<p>Loading reminders...</p>}>
+  <ul>
+    {props.reminders?.map((reminder) => (
+      <li key={reminder.id}>{reminder.title} — {new Date(reminder.remindAt).toLocaleString()}</li>
+    ))}
+  </ul>
+</Deferred>
+```
+
+## 6. Load todo items in pages
+
+A list can contain thousands of items. Send one page, merge the next page into the client value, and let `<InfiniteScroll>` ask for more as the user reaches the bottom.
+
+```csharp
+app.MapGet("/todos/{id:int}", async (
+    int id, int? page, ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
+{
+    var userId = user.UserId();
+    var list = await db.Lists
+        .AsNoTracking()
+        .Where(l => l.Id == id && l.UserId == userId)
+        .Select(l => new TodoListHeader(l.Id, l.Title, l.PublicSlug, l.IsPublic))
+        .FirstOrDefaultAsync(ct);
+
+    if (list is null) return Results.NotFound();
+
+    const int pageSize = 40;
+    var currentPage = Math.Max(1, page ?? 1);
+
+    var rows = await db.Items
+        .AsNoTracking()
+        .Where(i => i.TodoListId == id)
+        .OrderBy(i => i.IsDone)
+        .ThenBy(i => i.DueAt)
+        .ThenBy(i => i.Id)
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize + 1)
+        .Select(i => new TodoItemDto(i.Id, i.Title, i.IsDone, i.DueAt))
+        .ToListAsync(ct);
+
+    var pageData = new TodoItemsPage(rows.Take(pageSize).ToList());
+
+    return Render("Todos/Show", new InertiaProps
+    {
+        ["list"] = list,
+        ["items"] = Scroll(
+            pageData,
+            metadata: ScrollMetadata.FromPage(currentPage, rows.Count > pageSize)),
+    });
+}).RequireAuthorization();
+
+public sealed record TodoItemsPage(List<TodoItemDto> Data);
+```
+
+`Scroll` merges the `data` array inside `items` and adds the paging metadata. The React page does not need to know the page number:
+
+```tsx
+// ClientApp/pages/Todos/Show.tsx
+import { InfiniteScroll } from '@inertiajs/react'
+
+export default function Show({ list, items }: {
+  list: { title: string }
+  items: { data: { id: number; title: string; isDone: boolean; dueAt: string | null }[] }
+}) {
+  return (
+    <>
+      <h1>{list.title}</h1>
+      <InfiniteScroll data="items">
+        {items.data.map((item) => (
+          <article key={item.id} data-done={item.isDone}>
+            <h2>{item.title}</h2>
+            {item.dueAt && <time dateTime={item.dueAt}>{new Date(item.dueAt).toLocaleDateString()}</time>}
+          </article>
+        ))}
+      </InfiniteScroll>
+    </>
+  )
+}
+```
+
+This is the virtual loading model: the browser only DOM-renders the pages it has requested, and Inertia requests the next page when the sentinel approaches the viewport. If a page has thousands of loaded items, add windowing on top, but keep the scroll trigger outside the virtualized window. Most todo lists do not need that extra layer.
+
+Before the list page, create lists from the dashboard:
+
+```csharp
+app.MapPost("/lists", async (
+    CreateListForm form, ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
+{
+    var list = new TodoList
+    {
+        UserId = user.UserId(),
+        Title = form.Title!.Trim(),
+        IsPublic = form.IsPublic,
+        PublicSlug = NewPublicSlug(),
+    };
+    db.Lists.Add(list);
+    await db.SaveChangesAsync(ct);
+
+    return Results.Redirect($"/todos/{list.Id}");
+}).WithInertiaValidation().RequireAuthorization();
+```
+
+## 7. Add and complete items
+
+Writes use the same validation and flash conventions as the login form.
+
+```csharp
+public sealed class CreateTodoForm
+{
+    [Required, MaxLength(200)]
+    public string? Title { get; set; }
+
+    public DateTimeOffset? DueAt { get; set; }
+    public DateTimeOffset? RemindAt { get; set; }
+}
+
+app.MapPost("/todos/{id:int}/items", async (
+    int id, CreateTodoForm form, ClaimsPrincipal user, AppDbContext db,
+    IInertiaCache cache, CancellationToken ct) =>
+{
+    var userId = user.UserId();
+    if (!await db.Lists.AnyAsync(l => l.Id == id && l.UserId == userId, ct))
+        return Results.NotFound();
+
+    db.Items.Add(new TodoItem
+    {
+        TodoListId = id,
+        Title = form.Title!.Trim(),
+        DueAt = form.DueAt,
+        RemindAt = form.RemindAt,
+    });
+    await db.SaveChangesAsync(ct);
+    await cache.RemoveByTagAsync($"user:{userId}", ct);
+
+    return Back().WithFlash("success", "Todo added");
+}).WithInertiaValidation().RequireAuthorization();
+
+app.MapPatch("/items/{id:int}", async (
+    int id, ClaimsPrincipal user, AppDbContext db, IInertiaCache cache, CancellationToken ct) =>
+{
+    var item = await db.Items
+        .Include(i => i.List)
+        .FirstOrDefaultAsync(i => i.Id == id && i.List.UserId == user.UserId(), ct);
+    if (item is null) return Results.NotFound();
+
+    item.IsDone = !item.IsDone;
+    await db.SaveChangesAsync(ct);
+    await cache.RemoveByTagAsync($"user:{item.List.UserId}", ct);
+
+    return Back();
+}).RequireAuthorization();
+```
+
+The tag invalidation is why the dashboard stats were cached with `user:{userId}`. A completed item changes the counts, so the cached stats must disappear.
+
+## 8. Share a list publicly
+
+Add a public route that does not require a login. Use a random slug instead of the numeric id, and never expose `RemindAt` or anything else private.
+
+```csharp
+app.MapGet("/p/{slug}", async (
+    string slug, int? page, AppDbContext db, CancellationToken ct) =>
+{
+    var list = await db.Lists
+        .AsNoTracking()
+        .Where(l => l.PublicSlug == slug && l.IsPublic)
+        .Select(l => new PublicListHeader(
+            l.Id, l.Title, l.User.DisplayName,
+            l.Items.Count(i => !i.IsDone)))
+        .FirstOrDefaultAsync(ct);
+
+    if (list is null) return Render("NotFound").WithStatusCode(404);
+
+    const int pageSize = 25;
+    var currentPage = Math.Max(1, page ?? 1);
+
+    var rows = await db.Items
+        .AsNoTracking()
+        .Where(i => i.TodoListId == list.Id && !i.IsDone)
+        .OrderBy(i => i.DueAt)
+        .ThenBy(i => i.Id)
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize + 1)
+        .Select(i => new PublicTodoDto(i.Id, i.Title, i.DueAt))
+        .ToListAsync(ct);
+
+    return Render("Public/Show", new InertiaProps
+    {
+        ["list"] = list,
+        ["items"] = Scroll(
+            new PublicTodoPage(rows.Take(pageSize).ToList()),
+            metadata: ScrollMetadata.FromPage(currentPage, rows.Count > pageSize)),
+    });
+});
+
+public sealed record PublicTodoPage(List<PublicTodoDto> Data);
+```
+
+Generate the slug once when the list is created:
+
+```csharp
+static string NewPublicSlug() =>
+    Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant();
+```
+
+The public page is a quiet read-only view:
+
+```tsx
+import { InfiniteScroll } from '@inertiajs/react'
+
+export default function PublicList({ list, items }) {
+  return (
+    <main>
+      <p>Shared by {list.owner}</p>
+      <h1>{list.title}</h1>
+      <p>{list.openCount} open items</p>
+      <InfiniteScroll data="items">
+        {items.data.map((item) => <article key={item.id}>{item.title}</article>)}
+      </InfiniteScroll>
+    </main>
+  )
+}
+```
+
+A public list should not reveal the owner's email, private lists or reminder settings. Keep the public DTO explicit; do not return the entity.
+
+## 9. Send reminders once
+
+A hosted service polls for due items and marks them after delivery. This is deliberately simple: one instance, one sweep per minute.
+
+```csharp
+public interface IEmailSender
+{
+    Task SendAsync(string to, string subject, string body, CancellationToken ct = default);
+}
+
+public sealed class ReminderWorker(
+    IServiceScopeFactory scopes,
+    ILogger<ReminderWorker> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            using var scope = scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var mail = scope.ServiceProvider.GetRequiredService<IEmailSender>();
+            var now = DateTimeOffset.UtcNow;
+
+            var due = await db.Items
+                .Include(i => i.List).ThenInclude(l => l.User)
+                .Where(i => i.RemindAt != null && i.RemindAt <= now && i.RemindedAt == null)
+                .OrderBy(i => i.RemindAt)
+                .Take(100)
+                .ToListAsync(stoppingToken);
+
+            foreach (var item in due)
+            {
+                await mail.SendAsync(
+                    item.List.User.Email,
+                    $"Reminder: {item.Title}",
+                    $"Your todo \"{item.Title}\" is due.",
+                    stoppingToken);
+
+                item.RemindedAt = now;
+            }
+
+            if (due.Count > 0)
+            {
+                await db.SaveChangesAsync(stoppingToken);
+                logger.LogInformation("Sent {Count} reminders", due.Count);
+            }
+        }
+    }
+}
+```
+
+```csharp
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>(); // your implementation
+builder.Services.AddHostedService<ReminderWorker>();
+```
+
+<Callout type="warning" title="One worker is not a distributed queue">
+For several app replicas, use a durable queue with leases (TickerQ, Hangfire, a database outbox) and claim each due item atomically. `RemindedAt` still prevents duplicates, but the sweep itself must not run on every replica without coordination.
+</Callout>
+
+When a todo is saved with `RemindAt` in the future, the next sweep picks it up. The dashboard's deferred list shows the reminders that have not fired yet.
+
+## 10. Add the root template and client entry
+
+The root template is the same one used by every Inertia.Net app:
+
+```html
+<!-- app.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ForgetMeNot</title>
+  @viteReactRefresh
+  @vite("ClientApp/app.tsx")
+  @inertiaHead
+</head>
+<body>
+  @inertia
+</body>
+</html>
+```
+
+```tsx
+// ClientApp/app.tsx
+import { createInertiaApp } from '@inertiajs/react'
+import { createRoot } from 'react-dom/client'
+import './app.css'
+
+createInertiaApp({
+  resolve: (name) => {
+    const pages = import.meta.glob('./pages/**/*.tsx', { eager: true })
+    return pages[`./pages/${name}.tsx`]
+  },
+  setup({ el, App, props }) {
+    createRoot(el).render(<App {...props} />)
+  },
+})
+```
+
+`@inertiajs/vite` can generate the resolver for you; then `createInertiaApp()` is enough. See [Client setup](/docs/client-setup).
+
+## 11. Test the interesting paths
+
+Use `Inertia.Net.Testing` for page assertions and deferred props. The public route is the one most likely to leak private data, so test its exact props.
+
+```csharp
+var page = await client.GetInertiaPageAsync("/todos");
+
+new AssertableInertia(page)
+    .Component("Todos/Index")
+    .Has("lists")
+    .Missing("reminders");
+
+var loaded = await page.LoadDeferredPropsAsync(client, "sidebar");
+new AssertableInertia(loaded).Has("reminders");
+```
+
+For the public list, sign out first and assert that the owner's email and reminder fields are absent. The test is as valuable as the endpoint.
+
+## 12. Run it in production
+
+Build both the client and the SSR bundle with Bun:
+
+```sh
+bun run build
+dotnet publish -c Release
+```
+
+The app reads `ssr/ssr.js` and starts it with Bun. The production container from the docs site shows the same pattern: ASP.NET Core runtime, the Bun binary, the published app, `wwwroot/build` and `ssr/` baked into the image.
+
+For deployment details, see [Server-side rendering](/docs/server-side-rendering) and [Deploying behind a proxy](/docs/deploying). ForgetMeNot itself only needs a persistent SQLite file and a shared Data Protection key ring if you ever run more than one instance; the public route does not need a session.
+
+## What the samples add
+
+The published samples are deliberately more complete than this guide:
+
+- **Inkwell** keeps shared auth and notifications behind `Once` and `Cache`, wraps only public post pages in a custom `IInertiaRootView`, and runs Bun SSR inside the app image.
+- **CarParker** uses Mongo transactions for bookings, tags its cached props for invalidation, and serves public pages with the same `Scroll`/`InfiniteScroll` shape as ForgetMeNot.
+- **TechLandierDistributed** separates the web, worker, realtime and SSR roles, points `Inertia:SsrUrls` at a Bun SSR pool, and exposes `/health` and `/alive` for the proxy.
+- All three build the client and SSR bundle with Bun, ship only the Bun binary in the runtime image, and use the same `/health` container check.
+
+Browse the [sample source](https://github.com/adzamkomladev/Inertia.Net-Samples) for the complete implementations.

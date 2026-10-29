@@ -11,6 +11,7 @@ const output = path.join(root, 'ClientApp', 'lib')
 
 const sectionOrder = [
   'Getting Started',
+  'Guides',
   'Core Concepts',
   'Forms & Validation',
   'Navigation & State',

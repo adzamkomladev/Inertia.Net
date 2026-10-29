@@ -11,6 +11,7 @@ export interface DocsShowPage {
 export interface SharedProps {
   appName: string
   version: string
+  baseUrl: string
 }
 
 export interface FlashData extends Flash {}

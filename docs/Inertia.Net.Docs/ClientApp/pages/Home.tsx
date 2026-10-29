@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react'
+import { Link } from '@inertiajs/react'
 import {
   ArrowRight,
   Boxes,
@@ -17,6 +17,7 @@ import {
 import { useState } from 'react'
 import { GithubIcon } from '../components/icons/GithubIcon'
 import { InstallCommand } from '../components/InstallCommand'
+import { Seo } from '../components/Seo'
 import { SiteHeader } from '../components/SiteHeader'
 import { Badge } from '../components/ui/badge'
 import { cn } from '../lib/utils'
@@ -187,13 +188,11 @@ function Footer() {
 export default function Home() {
   return (
     <div className="min-h-screen">
-      <Head title="Inertia.Net — Inertia.js for ASP.NET Core">
-        <meta
-          name="description"
-          head-key="description"
-          content="Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps with ASP.NET Core, without a separate frontend API."
-        />
-      </Head>
+      <Seo
+        title="Inertia.Net — Inertia.js for ASP.NET Core"
+        description="Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps with ASP.NET Core, without a separate frontend API."
+        type="website"
+      />
       <SiteHeader />
 
       <main>

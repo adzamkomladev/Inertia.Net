@@ -1,13 +1,16 @@
-import { Head, Link } from '@inertiajs/react'
+import { Link } from '@inertiajs/react'
 import { ArrowLeft } from 'lucide-react'
+import { Seo } from '../components/Seo'
 import { SiteHeader } from '../components/SiteHeader'
 
 export default function NotFound() {
   return (
     <div className="min-h-screen">
-      <Head title="Page not found — Inertia.Net">
-        <meta name="description" head-key="description" content="The requested page is not part of the Inertia.Net documentation." />
-      </Head>
+      <Seo
+        title="Page not found — Inertia.Net"
+        description="The requested page is not part of the Inertia.Net documentation."
+        noIndex
+      />
       <SiteHeader />
       <main className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 grid-bg opacity-50" />
