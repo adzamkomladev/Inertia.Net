@@ -2,7 +2,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.5.3** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.6.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -79,7 +79,7 @@ You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clie
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.5.3
+dotnet new install Inertia.Net.Templates::1.6.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -179,14 +179,14 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.5.3
-dotnet add package Inertia.Net.Mvc --version 1.5.3 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.5.3 # FastEndpoints only
-dotnet add package Inertia.Net.Testing --version 1.5.3 # test projects
-dotnet add package Inertia.Net.Live.SignalR # live props over SignalR (1.6 and later)
+dotnet add package Inertia.Net --version 1.6.0
+dotnet add package Inertia.Net.Mvc --version 1.6.0 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.6.0 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.6.0 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.6.0 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.5.3` for all Inertia.Net packages. Inertia.Net 1.5.3 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.6.0` for all Inertia.Net packages. Inertia.Net 1.6.0 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
