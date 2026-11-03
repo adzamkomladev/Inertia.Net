@@ -606,6 +606,56 @@
       ]
     },
     {
+      "slug": "live-props",
+      "url": "/docs/live-props",
+      "title": "Live props",
+      "description": "Props that refresh themselves when the server broadcasts an event.",
+      "section": "Loading data",
+      "order": 6,
+      "headings": [
+        {
+          "id": "define-each-event-once",
+          "text": "Define each event once",
+          "depth": 2
+        },
+        {
+          "id": "mark-props-live",
+          "text": "Mark props live",
+          "depth": 2
+        },
+        {
+          "id": "what-combines-with-live",
+          "text": "What combines with live",
+          "depth": 3
+        },
+        {
+          "id": "shared-live-props",
+          "text": "Shared live props",
+          "depth": 2
+        },
+        {
+          "id": "publish-events",
+          "text": "Publish events",
+          "depth": 2
+        },
+        {
+          "id": "on-the-client",
+          "text": "On the client",
+          "depth": 2
+        },
+        {
+          "id": "transports",
+          "text": "Transports",
+          "depth": 2
+        },
+        {
+          "id": "testing",
+          "text": "Testing",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "server-side-rendering",
       "url": "/docs/server-side-rendering",
       "title": "Server-side rendering",

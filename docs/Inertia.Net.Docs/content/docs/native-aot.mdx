@@ -41,7 +41,7 @@ The non-Inertia `400` validation problem needs the `ProblemDetails` JSON metadat
 
 ## 4. Avoid anonymous types
 
-Anonymous types do not work as props or flash values under AOT. Use `InertiaProps`, records or classes registered in the context.
+Anonymous types do not work as props, flash values or published [live prop](/docs/live-props) values under AOT. Use `InertiaProps`, records or classes registered in the context, and register the types you publish as live values in the same context.
 
 ## 5. Copy content files
 

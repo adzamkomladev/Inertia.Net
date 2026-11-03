@@ -55,6 +55,9 @@ public sealed partial class InertiaPage
     /// <summary>Once-prop metadata by key (empty object when absent).</summary>
     public JsonObject OnceProps => Raw["onceProps"] as JsonObject ?? [];
 
+    /// <summary>Live-prop listeners by path (empty object when absent): <c>{"listeners":[{"channel":{"name","type"},"events":[...]}],"throttle"?}</c>.</summary>
+    public JsonObject LiveProps => Raw["liveProps"] as JsonObject ?? [];
+
     /// <summary>Flash data (empty object when absent).</summary>
     public JsonObject Flash => Raw["flash"] as JsonObject ?? [];
 

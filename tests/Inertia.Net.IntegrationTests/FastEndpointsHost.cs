@@ -56,6 +56,17 @@ public static class FastEndpointsRoutes
         public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Page");
     }
 
+    public sealed class LiveEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Get("/live");
+
+        public override Task HandleAsync(CancellationToken ct)
+        {
+            HttpContext.Inertia().Share("bell", LivePage.Bell());
+            return Send.InertiaAsync("Live", LivePage.Props(new InertiaRequest(HttpContext.Request.Headers).SocketId));
+        }
+    }
+
     public sealed class PartialEndpoint : EndpointWithoutRequest
     {
         public override void Configure() => Get("/partial");

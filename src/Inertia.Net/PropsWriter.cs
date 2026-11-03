@@ -41,6 +41,7 @@ internal sealed class PropsWriter
     private Dictionary<string, List<string>>? _deferredProps;
     private Dictionary<string, (ScrollMetadata Metadata, bool Reset)>? _scrollProps;
     private Dictionary<string, (string Prop, long? ExpiresAt)>? _onceProps;
+    private Dictionary<string, LiveSpec>? _liveProps;
     private PropsPlanner? _planner;
 
     public PropsWriter(InertiaPageWriter owner) => _owner = owner;
@@ -81,6 +82,7 @@ internal sealed class PropsWriter
         _deferredProps = null;
         _scrollProps = null;
         _onceProps = null;
+        _liveProps = null;
         _planner = null;
         if (_path.Length > MaxRetainedPath)
         {
@@ -246,7 +248,7 @@ internal sealed class PropsWriter
         (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, lookup);
 
     /// <summary>
-    /// Writes sharedProps through onceProps, in protocol order, omitting empty ones. The shared keys are the first
+    /// Writes sharedProps through liveProps, in protocol order, omitting empty ones. The shared keys are the first
     /// <paramref name="sharedCount"/> of <paramref name="entries"/> (0 when they are not exposed).
     /// </summary>
     public void WriteMetadata(List<PropEntry> entries, int sharedCount)
@@ -308,6 +310,81 @@ internal sealed class PropsWriter
 
             _writer.WriteEndObject();
         }
+
+        if (_liveProps is not null)
+        {
+            WriteLiveProps(_liveProps);
+        }
+    }
+
+    // {path: {listeners: [{channel: {name, type}, events}], throttle?}}: listeners grouped by channel key in declaration order, events
+    // de-duplicated within a channel (HasLiveUpdates::addLiveListener).
+    private void WriteLiveProps(Dictionary<string, LiveSpec> liveProps)
+    {
+        _writer.WriteStartObject("liveProps");
+        foreach (var (path, spec) in liveProps)
+        {
+            _writer.WriteStartObject(path);
+            _writer.WriteStartArray("listeners");
+            var listeners = spec.Listeners;
+            for (var i = 0; i < listeners.Count; i++)
+            {
+                var channel = listeners[i].Channel;
+                if (IndexOfChannel(listeners, i, channel) < i)
+                {
+                    continue; // written with the first listener on this channel
+                }
+
+                _writer.WriteStartObject();
+                _writer.WriteStartObject("channel");
+                _writer.WriteString("name", channel.Name);
+                _writer.WriteString("type", channel.TypeName);
+                _writer.WriteEndObject();
+                _writer.WriteStartArray("events");
+                for (var j = i; j < listeners.Count; j++)
+                {
+                    if (listeners[j].Channel == channel && !HasEventBefore(listeners, i, j))
+                    {
+                        _writer.WriteStringValue(listeners[j].Event);
+                    }
+                }
+
+                _writer.WriteEndArray();
+                _writer.WriteEndObject();
+            }
+
+            _writer.WriteEndArray();
+            if (spec.ThrottleMs is { } throttle)
+            {
+                _writer.WriteNumber("throttle", throttle);
+            }
+
+            _writer.WriteEndObject();
+        }
+
+        _writer.WriteEndObject();
+
+        // Lists are a handful of entries: scanning beats allocating a lookup per prop.
+        static int IndexOfChannel(List<(LiveChannel Channel, string Event)> listeners, int end, LiveChannel channel)
+        {
+            for (var i = 0; i < end; i++)
+            {
+                if (listeners[i].Channel == channel) return i;
+            }
+
+            return end;
+        }
+
+        static bool HasEventBefore(List<(LiveChannel Channel, string Event)> listeners, int start, int index)
+        {
+            var (channel, name) = listeners[index];
+            for (var i = start; i < index; i++)
+            {
+                if (listeners[i].Channel == channel && string.Equals(listeners[i].Event, name, StringComparison.Ordinal)) return true;
+            }
+
+            return false;
+        }
     }
 
     // Shared props come first in the entry list (they are set before page props, and an override keeps its position), so their keys
@@ -367,10 +444,20 @@ internal sealed class PropsWriter
             ThrowIfPlanFailed();
             var p = prop as InertiaProp;
             SawParallel |= p is { IsParallel: true };
-            switch (Decide(p, prop, declaredType, parentWasResolved))
+            var inclusion = Decide(p, prop, declaredType, parentWasResolved);
+            if (inclusion == Inclusion.Filtered)
             {
-                case Inclusion.Filtered:
-                    return;
+                return;
+            }
+
+            // Before any loader runs, so excluded and rescued live props keep their listeners (deviation 13).
+            if (p?.LiveSpec is not null)
+            {
+                CollectLive(p, parentWasResolved);
+            }
+
+            switch (inclusion)
+            {
                 case Inclusion.Excluded:
                     CollectExcludedMetadata(p!);
                     if (key is null) _writer.WriteNullValue();
@@ -400,6 +487,11 @@ internal sealed class PropsWriter
                 if (value is InertiaProp inner)
                 {
                     p = inner;
+                    if (p.LiveSpec is not null)
+                    {
+                        CollectLive(p, parentWasResolved);
+                    }
+
                     if (!_isPartial && IsExcludedFromInitialResponse(p))
                     {
                         CollectExcludedMetadata(p);
@@ -841,6 +933,17 @@ internal sealed class PropsWriter
             ? _owner.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds() + (long)ttl.TotalMilliseconds
             : null;
         (_onceProps ??= new(StringComparer.Ordinal))[prop.OnceKey ?? path] = (path, expiresAt);
+    }
+
+    // collectLiveMetadata: Always props and children of resolved values bypass the partial filter, unlike once props.
+    private void CollectLive(InertiaProp prop, bool parentWasResolved)
+    {
+        if (_isPartial && !(prop.IsAlways || parentWasResolved) && !IsIncludedInPartialMetadata())
+        {
+            return;
+        }
+
+        (_liveProps ??= new(StringComparer.Ordinal))[new string(Path)] = prop.LiveSpec!;
     }
 
     private bool PathMatchesPartialRequest()

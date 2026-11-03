@@ -48,7 +48,7 @@ Add `public partial class Program;` to your app when it uses top-level statement
 
 ## Page assertions
 
-`Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)` and `HasDeferred(group, path)`.
+`Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)` and `HasLive(path, channel, event)` for [live props](/docs/live-props) (the channel as `"{type}:{name}"`, e.g. `private:orders.1`).
 
 ## Prop assertions
 
@@ -78,7 +78,7 @@ var except = await page.ReloadExceptAsync(_client, "users");
 
 ## InertiaPage members
 
-`Props`, `Raw`, `Prop(path)`, `HasProp(path)`, `PropBigInteger(path)`, `DeferredProps`, `MergeProps`, `PrependProps`, `DeepMergeProps`, `MatchPropsOn`, `RescuedProps`, `SharedProps`, `ScrollProps`, `OnceProps`, `Flash`, `EncryptHistory`, `ClearHistory`, `PreserveFragment`, `PreserveBigIntegers`.
+`Props`, `Raw`, `Prop(path)`, `HasProp(path)`, `PropBigInteger(path)`, `DeferredProps`, `MergeProps`, `PrependProps`, `DeepMergeProps`, `MatchPropsOn`, `RescuedProps`, `SharedProps`, `ScrollProps`, `OnceProps`, `LiveProps`, `Flash`, `EncryptHistory`, `ClearHistory`, `PreserveFragment`, `PreserveBigIntegers`.
 
 <Callout type="tip" title="Cookies and redirects">
 Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies. Disable `AllowAutoRedirect` to assert the redirect itself, then follow it with a second `InertiaGetAsync` to read the flash or errors.

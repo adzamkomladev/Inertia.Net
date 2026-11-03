@@ -27,6 +27,13 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     [HttpGet("/café")]
     public IResult Cafe() => Render("Page");
 
+    [HttpGet("/live")]
+    public IResult Live()
+    {
+        HttpContext.Inertia().Share("bell", LivePage.Bell());
+        return Render("Live", LivePage.Props(HttpContext.InertiaRequest().SocketId));
+    }
+
     [HttpGet("/array")]
     public IResult Array() => Render("Array", MinimalApiHost.ArrayProps());
 

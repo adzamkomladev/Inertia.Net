@@ -23,23 +23,24 @@ Inertia.Net **1.5.3** is a .NET 10 server adapter for the **Inertia.js v3** prot
 10. [Merging props](#merging-props)
 11. [Once props](#once-props)
 12. [Infinite scroll](#infinite-scroll)
-13. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
-14. [Flash data](#flash-data)
-15. [Redirects, Location and Back](#redirects-location-and-back)
-16. [History encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
-17. [Asset versioning](#asset-versioning)
-18. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
-19. [Vite integration](#vite-integration)
-20. [CSRF and antiforgery](#csrf-and-antiforgery)
-21. [Deploying behind a proxy](#deploying-behind-a-proxy)
-22. [Native AOT](#native-aot)
-23. [TypeScript types](#typescript-types), [DevTools](#devtools) and [development checks](#development-checks)
-24. [Testing](#testing)
-25. [Performance](#performance)
-26. [Configuration reference](#configuration-reference)
-27. [Migrating from other .NET adapters](#migrating-from-other-net-adapters)
-28. [Troubleshooting and FAQ](#troubleshooting-and-faq)
-29. [Contributing and license](#contributing-and-license)
+13. [Live props](#live-props)
+14. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
+15. [Flash data](#flash-data)
+16. [Redirects, Location and Back](#redirects-location-and-back)
+17. [History encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
+18. [Asset versioning](#asset-versioning)
+19. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
+20. [Vite integration](#vite-integration)
+21. [CSRF and antiforgery](#csrf-and-antiforgery)
+22. [Deploying behind a proxy](#deploying-behind-a-proxy)
+23. [Native AOT](#native-aot)
+24. [TypeScript types](#typescript-types), [DevTools](#devtools) and [development checks](#development-checks)
+25. [Testing](#testing)
+26. [Performance](#performance)
+27. [Configuration reference](#configuration-reference)
+28. [Migrating from other .NET adapters](#migrating-from-other-net-adapters)
+29. [Troubleshooting and FAQ](#troubleshooting-and-faq)
+30. [Contributing and license](#contributing-and-license)
 
 ---
 
@@ -147,6 +148,7 @@ The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself 
 - [x] Once props with keys, expiry and `fresh` (`onceProps`, `X-Inertia-Except-Once-Props`)
 - [x] Infinite scroll (`scrollProps`, merge intent header)
 - [x] Rescued props (`rescuedProps`)
+- [x] Live props (`liveProps`, `X-Socket-Id`, broadcast envelope, `IInertiaLive`); transport packages: see [Live props](#live-props)
 - [x] Shared props and `sharedProps`
 - [x] Validation errors, error bags, `WithAllErrors`
 - [x] Precognition (live validation)
@@ -661,8 +663,9 @@ Every page has an `errors` prop (an empty object when there are no errors). Key 
 | `DeepMerge(value)` | The client deep merges the value. |
 | `Once(() => ...)` | Resolved once and remembered by the client. Chain `.Until(ttl)`, `.As(key)`, `.Fresh()`. |
 | `Scroll(page, wrapper: "data", metadata)` | An infinite-scroll prop: merged at `{path}.{wrapper}` plus paging metadata. |
+| `Live(() => ..., LiveEvent)` | Reloaded (or updated in place) when the event is broadcast. Chain `.Live(...)` on any non-merge prop, `.Throttle(window)`. See [Live props](#live-props). |
 
-Every lazy factory (`Prop`, `Always`, `Optional`, `Defer`, `Merge`, `DeepMerge`, `Once`, `Scroll`) accepts five loader shapes:
+Every lazy factory (`Prop`, `Always`, `Optional`, `Defer`, `Merge`, `DeepMerge`, `Once`, `Scroll`, `Live`) accepts five loader shapes:
 
 ```csharp
 Prop(() => value)                                  // Func<T>
@@ -674,7 +677,7 @@ Prop(ct => repo.GetValueTaskAsync(ct))             // Func<CancellationToken, Va
 
 The token is `HttpContext.RequestAborted`. Overloads bind so that an `async` lambda always means the awaiting overload, never "a prop whose value is a Task".
 
-Fluent methods on every prop (they mutate and return the same instance): `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)`, `.Cache(key, duration, staleFor?, tags?)`.
+Fluent methods on every prop (they mutate and return the same instance): `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)`, `.Cache(key, duration, staleFor?, tags?)`, `.Live(event)`, `.Live(channel, events)`, `.Throttle(window)`.
 
 **Loaders run sequentially** by default, in prop order, and only when their prop is included in the response. That makes a scoped EF Core `DbContext` safe to use in several loaders. Mark independent async loaders with [`.Parallel()`](#parallel-props) to start them together. A loader that returns another prop (for example `Prop(() => Defer(...))`) is unwrapped once.
 
@@ -872,6 +875,24 @@ Render("Users/Index", new InertiaProps
 
 If the loader throws, the exception is logged and the page is still sent. The prop is left out of `props` and its path goes to `"rescuedProps": ["recommendations"]`. Without `.Rescue()` the exception propagates normally. Cancellation of the request is never rescued.
 
+**Live**
+
+```csharp
+["order"] = Prop(ct => orders.GetAsync(id, ct)).Live(OrderEvents.Updated(id)).Throttle(TimeSpan.FromMilliseconds(500)),
+```
+
+```json
+{
+  "props": { "errors": {}, "order": { "id": 1, "status": "paid" } },
+  "liveProps": {
+    "order": {
+      "listeners": [ { "channel": { "name": "orders.1", "type": "private" }, "events": ["OrderUpdated"] } ],
+      "throttle": 500
+    }
+  }
+}
+```
+
 **Typed page props**
 
 A typed object is AOT-friendly: it is walked through its `JsonTypeInfo`, and members of type `InertiaProp` are resolved by Inertia.Net while the rest is serialized normally. Property names follow the JSON naming policy (camelCase by default).
@@ -1046,6 +1067,107 @@ import { InfiniteScroll } from '@inertiajs/react'
 
 <InfiniteScroll data="posts">{posts.data.map((p) => <Post key={p.id} post={p} />)}</InfiniteScroll>
 ```
+
+---
+
+## Live props
+
+A live prop refreshes itself when the server broadcasts an event. The page response lists which props listen to which events
+(`liveProps`); the client subscribes to the channels, and when an event arrives it reloads those props with a partial reload, or
+applies the values the broadcast carries without a request. Nothing to subscribe or tear down in your components.
+
+Needs `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte` **3.11.0 or later**. Older clients ignore `liveProps`.
+
+**1. Define each event once.** A `LiveEvent` is an event name on a `LiveChannel`. The same value declares the prop and publishes:
+
+```csharp
+public static class OrderEvents
+{
+    public static LiveEvent Updated(Guid id) => new("OrderUpdated", LiveChannel.Private($"orders.{id}"));
+    public static LiveEvent StatsChanged { get; } = new("StatsChanged", LiveChannel.Public("stats"));
+}
+```
+
+Channel types are `Public`, `Private`, `Presence` and `EncryptedPrivate`. Names are unprefixed: a transport adds `private-` or
+`presence-` when its protocol needs it.
+
+**2. Mark props live.**
+
+```csharp
+app.MapGet("/orders/{id:guid}", (Guid id, AppDb db) => Render("Orders/Show", new InertiaProps
+{
+    ["order"]   = Prop(ct => db.Orders.SingleAsync(o => o.Id == id, ct))
+                      .Live(OrderEvents.Updated(id))
+                      .Throttle(TimeSpan.FromMilliseconds(500)),
+    ["metrics"] = Defer(ct => metrics.ForOrderAsync(id, ct)).Live(OrderEvents.Updated(id)),
+    ["stats"]   = Optional(() => stats.Today()).Live(OrderEvents.StatsChanged),
+}));
+```
+
+- `Live(...)` is repeatable: each call adds a listener. `.Live(channel, "A", "B")` listens to several events on one channel, and
+  `Live(() => ..., event)` is the factory form.
+- It combines with `Defer`, `Optional`, `Once`, `Always`, `Rescue`, `Parallel`, `Cache` and shared props. Props that are left out of a
+  response (deferred, optional, a once prop the client holds, a rescued loader) still report their listeners.
+- **Merge, deep-merge and scroll props cannot be live** (`InvalidOperationException`): a live prop is replaced whole.
+- `Throttle(window)` sets the shortest time between two reloads of the prop (the client's default is one second).
+- A live prop inside an array is reloaded with its whole array ([deviation 11](docs/protocol.md#deliberate-deviations-from-laravel)).
+  Use keyed objects for lists that change often.
+
+Shared props can be live, which is the usual way to keep a notification bell current on every page:
+
+```csharp
+builder.Services.AddInertia(o => o.Share("notifications", ctx =>
+{
+    var userId = ctx.User.FindFirstValue(ClaimTypes.NameIdentifier);
+    return userId is null ? null : Prop(ct => notifications.SummaryAsync(userId, ct)).Live(new LiveEvent("NotificationCreated", LiveChannel.Private($"users.{userId}")));
+}));
+```
+
+**3. Publish.** `AddInertiaLive()` registers `IInertiaLive`; a transport registers the broadcaster that delivers the messages.
+
+```csharp
+builder.Services.AddInertiaLive();   // then a transport, e.g. .AddSignalR() or your own IInertiaLiveBroadcaster
+
+// Everyone else on the channel reloads `order`; the caller already has the response.
+app.MapPost("/orders/{id:guid}/ship", async (Guid id, HttpContext context, IInertiaLive live) =>
+{
+    await orders.ShipAsync(id);
+    await live.PublishAsync(OrderEvents.Updated(id), exceptSocketId: context.InertiaRequest().SocketId);
+    return Back();
+});
+
+// From a background job, with values: clients apply them without a request.
+await live.PublishAsync(OrderEvents.Updated(order.Id), new { order = OrderDto.From(order) });
+```
+
+- Without values, every client reloads the live props that listen to the event. With values (an object or dictionary keyed by prop
+  path, `"auth.user"` included), those props are updated in place; live props left out are reloaded.
+- Values are serialized with the page serializer options, so they match what a reload returns. Under Native AOT that works for types
+  registered in the context you chain into the HTTP JSON options, like any prop type. The overload that takes a `JsonTypeInfo<T>`
+  (`live.PublishAsync(evt, dto, AppJsonContext.Default.OrderProps)`) uses that metadata's own options instead, as `JsonSerializer`
+  does.
+- **Every subscriber of the channel receives the same values.** Only publish values that everyone allowed on the channel may see;
+  otherwise publish without values and let each client reload its own.
+- `exceptSocketId` leaves one connection out. The client sends its id as `X-Socket-Id`; read it with
+  `HttpContext.InertiaRequest().SocketId`. It is client-supplied, so it is only ever used to exclude.
+- [Cached](#cached-props) live props reload the cached value: remove it with `IInertiaCache` before publishing.
+
+On the client, read a live prop like any other; `useProp` exposes its loading state, and `router.on('live', ...)` can veto an update:
+
+```tsx
+import { router, useProp } from '@inertiajs/react'
+
+const order = useProp<Order>('order')   // { value, loading, loaded }
+router.on('live', (event) => (event.detail.props.includes('posts') ? false : undefined))
+```
+
+**Transports.** The page metadata and the payload are transport-agnostic:
+
+- **Pusher-protocol servers** (Reverb, Soketi, Ably, Pusher) work with the client's built-in `pusher()` or `echo()` transport.
+  Implement `IInertiaLiveBroadcaster` to send `LiveMessage.Payload` with your server's publish API.
+- **Action Cable** or anything else: implement `IInertiaLiveBroadcaster` (one method) and a client `LiveTransport`.
+
+The broadcast payload is `{"__inertia":{"event":"OrderUpdated","props":{...}}}`; see [docs/protocol.md](docs/protocol.md#broadcast-payload).
 
 ---
 
@@ -1725,7 +1847,7 @@ Register the type that each loader returns and each plain value you place in `In
 
 **3. Call `services.AddProblemDetails()`.** The non-Inertia `400` validation problem needs the `ProblemDetails` JSON metadata, or it cannot be serialized without reflection.
 
-**4. Anonymous types do not work as props or flash values** under AOT. Use `InertiaProps`, records or classes registered in the context.
+**4. Anonymous types do not work as props, flash values or published live values** under AOT. Publish [live prop](#live-props) values as registered records or classes; the `IInertiaLive.PublishAsync` overload that takes a `JsonTypeInfo<T>` also works for types outside the HTTP JSON context. Use `InertiaProps`, records or classes registered in the context.
 
 **5. Content files.** `app.html` and the Vite manifest are read from disk at run time. Copy them to the publish directory, and set the content root to the binary's directory when it may run from elsewhere:
 
@@ -1885,7 +2007,7 @@ public class UsersTests(WebApplicationFactory<Program> factory) : IClassFixture<
 
 ### Assertions
 
-On the page: `Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`.
+On the page: `Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)`, `HasLive(path, "private:orders.1", "OrderUpdated")` (channel as `"{type}:{name}"`).
 
 On props and nested scopes (dot paths, array indexes allowed): `Has(key)`, `Has(key, count)`, `Has(key, scope)`, `Has(key, count, firstItemScope)`, `HasAll`, `HasAny`, `Missing`, `MissingAll`, `Where(key, value)`, `Where(key, predicate)`, `WhereNot`, `WhereNull`, `WhereNotNull`, `WhereType(key, "string|null")`, `WhereAllType`, `WhereContains(key, ...)`, `Count`, `CountBetween`, `Each(scope)`, `First(scope)`, `Dump()`.
 
@@ -1907,7 +2029,7 @@ var only = await page.ReloadOnlyAsync(_client, "users");                // also 
 var except = await page.ReloadExceptAsync(_client, "users");            // also asserts that "users" is missing
 ```
 
-Other `InertiaPage` members: `Props`, `Raw`, `Prop(path)`, `HasProp(path)`, `PropBigInteger(path)`, `DeferredProps`, `MergeProps`, `PrependProps`, `DeepMergeProps`, `MatchPropsOn`, `RescuedProps`, `SharedProps`, `ScrollProps`, `OnceProps`, `Flash`, `EncryptHistory`, `ClearHistory`, `PreserveFragment`, `PreserveBigIntegers`.
+Other `InertiaPage` members: `Props`, `Raw`, `Prop(path)`, `HasProp(path)`, `PropBigInteger(path)`, `DeferredProps`, `MergeProps`, `PrependProps`, `DeepMergeProps`, `MatchPropsOn`, `RescuedProps`, `SharedProps`, `ScrollProps`, `OnceProps`, `LiveProps`, `Flash`, `EncryptHistory`, `ClearHistory`, `PreserveFragment`, `PreserveBigIntegers`.
 
 Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies (the `WebApplicationFactory` default). Disable `AllowAutoRedirect` to assert the redirect itself, then follow it with a second `InertiaGetAsync` to read the flash or errors. Add `public partial class Program;` to your app when it uses top-level statements.
 

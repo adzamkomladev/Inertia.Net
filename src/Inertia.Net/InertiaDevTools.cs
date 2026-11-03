@@ -594,6 +594,17 @@ internal sealed partial class DevToolsRecorder
             }
         }
 
+        // A live prop keeps its own type (defer, once...) and lists its listeners and throttle.
+        if (page?["liveProps"] is JsonObject live)
+        {
+            foreach (var (path, value) in live)
+            {
+                var entry = At(path);
+                entry.TryAdd("inertiaType", "live");
+                entry["live"] = value?.DeepClone();
+            }
+        }
+
         foreach (var path in Strings(page?["rescuedProps"]))
         {
             At(path)["rescued"] = true;

@@ -419,4 +419,162 @@ public class PropsWriterTests
         Assert.Equal(new ScrollMetadata("page", null, 2, 1), ScrollMetadata.FromPage(1, hasMore: true));
         Assert.Equal(new ScrollMetadata("p", 2, null, 3), ScrollMetadata.FromPage(3, hasMore: false, "p"));
     }
+
+    private static readonly LiveEvent OrderUpdated = new("OrderUpdated", LiveChannel.Private("orders.1"));
+
+    private static string Listener(string name, string type, params string[] events) =>
+        $$$"""{"channel":{"name":"{{{name}}}","type":"{{{type}}}"},"events":[{{{string.Join(",", events.Select(e => $"\"{e}\""))}}}]}""";
+
+    private static readonly string OrderListener = Listener("orders.1", "private", "OrderUpdated");
+
+    [Fact]
+    public async Task Live_prop_reports_its_listeners_on_a_full_render()
+    {
+        var page = await Page(new InertiaProps { ["order"] = Inertia.Prop(() => 1).Live(OrderUpdated), ["plain"] = 2 });
+
+        JsonAssert.Equal("""{"errors":{},"order":1,"plain":2}""", page["props"]);
+        JsonAssert.Equal($$$"""{"order":{"listeners":[{{{OrderListener}}}]}}""", page["liveProps"]);
+    }
+
+    [Fact]
+    public async Task Live_listeners_are_grouped_by_channel_in_declaration_order_with_unique_events()
+    {
+        var page = await Page(new InertiaProps
+        {
+            ["order"] = Inertia.Prop(() => 1)
+                .Live(OrderUpdated)
+                .Live(LiveChannel.Public("stats"), "StatsChanged")
+                .Live(LiveChannel.Private("orders.1"), "OrderShipped", "OrderUpdated")
+                .Live(LiveChannel.Public("orders.1"), "OrderUpdated"),
+        });
+
+        JsonAssert.Equal(
+            $$$"""{"order":{"listeners":[{{{Listener("orders.1", "private", "OrderUpdated", "OrderShipped")}}},{{{Listener("stats", "public", "StatsChanged")}}},{{{Listener("orders.1", "public", "OrderUpdated")}}}]}}""",
+            page["liveProps"]);
+    }
+
+    [Fact]
+    public async Task Live_throttle_is_written_only_when_set()
+    {
+        var page = await Page(new InertiaProps
+        {
+            ["fast"] = Inertia.Prop(() => 1).Live(OrderUpdated),
+            ["slow"] = Inertia.Prop(() => 1).Live(OrderUpdated).Throttle(TimeSpan.FromMilliseconds(500)),
+        });
+
+        JsonAssert.Equal($$$"""{"fast":{"listeners":[{{{OrderListener}}}]},"slow":{"listeners":[{{{OrderListener}}}],"throttle":500}}""", page["liveProps"]);
+    }
+
+    [Fact]
+    public async Task Optional_and_deferred_live_props_report_listeners_without_values()
+    {
+        var page = await Page(new InertiaProps
+        {
+            ["optional"] = Inertia.Optional(() => 1).Live(OrderUpdated),
+            ["deferred"] = Inertia.Defer(() => 2).Live(OrderUpdated),
+        });
+
+        JsonAssert.Equal("""{"errors":{}}""", page["props"]);
+        JsonAssert.Equal("""{"default":["deferred"]}""", page["deferredProps"]);
+        Assert.Equal(["optional", "deferred"], page["liveProps"]!.AsObject().Select(p => p.Key));
+    }
+
+    [Fact]
+    public async Task A_once_live_prop_the_client_holds_keeps_both_entries()
+    {
+        var page = await Page(
+            new InertiaProps { ["locale"] = Inertia.Once(() => "en").Live(OrderUpdated) },
+            c => c.AsInertia().WithHeader(InertiaHeaders.ExceptOnceProps, "locale"));
+
+        JsonAssert.Equal("""{"errors":{}}""", page["props"]);
+        Assert.NotNull(page["onceProps"]!["locale"]);
+        Assert.NotNull(page["liveProps"]!["locale"]);
+    }
+
+    [Fact]
+    public async Task A_rescued_live_prop_keeps_its_listeners_on_full_and_partial_renders()
+    {
+        InertiaProps Props() => new() { ["order"] = Inertia.Prop<int>(() => throw new InvalidOperationException("down")).Rescue().Live(OrderUpdated) };
+
+        var full = await Page(Props());
+        JsonAssert.Equal("""["order"]""", full["rescuedProps"]);
+        Assert.NotNull(full["liveProps"]!["order"]);
+
+        var partial = await Page(Props(), c => c.AsPartial("order"));
+        JsonAssert.Equal("""["order"]""", partial["rescuedProps"]);
+        Assert.NotNull(partial["liveProps"]!["order"]);
+    }
+
+    [Fact]
+    public async Task Partial_only_reports_requested_always_and_nested_live_props()
+    {
+        var page = await Page(
+            new InertiaProps
+            {
+                ["order"] = Inertia.Prop(() => 1).Live(OrderUpdated),
+                ["other"] = Inertia.Prop(() => 2).Live(OrderUpdated),
+                ["bell"] = Inertia.Always(() => 3).Live(OrderUpdated),
+                ["panel"] = new InertiaProps { ["stats"] = Inertia.Prop(() => 4).Live(OrderUpdated) },
+                ["resolved"] = Inertia.Always(() => new InertiaProps { ["inner"] = Inertia.Prop(() => 5).Live(OrderUpdated) }),
+            },
+            c => c.AsPartial("order,panel"));
+
+        Assert.Equal(["order", "bell", "panel.stats", "resolved.inner"], page["liveProps"]!.AsObject().Select(p => p.Key));
+    }
+
+    [Fact]
+    public async Task Partial_except_reports_no_entry_for_the_excepted_prop()
+    {
+        var page = await Page(
+            new InertiaProps { ["order"] = Inertia.Prop(() => 1).Live(OrderUpdated), ["other"] = Inertia.Prop(() => 2).Live(OrderUpdated) },
+            c => c.AsPartial(except: "order"));
+
+        Assert.Equal(["other"], page["liveProps"]!.AsObject().Select(p => p.Key));
+    }
+
+    [Fact]
+    public async Task A_live_prop_at_a_dot_key_reports_the_dotted_path()
+    {
+        var page = await Page(new InertiaProps { ["auth.user"] = Inertia.Prop(() => "ada").Live(OrderUpdated) });
+
+        JsonAssert.Equal("""{"errors":{},"auth":{"user":"ada"}}""", page["props"]);
+        Assert.Equal(["auth.user"], page["liveProps"]!.AsObject().Select(p => p.Key));
+    }
+
+    [Fact]
+    public async Task A_shared_live_prop_reports_its_key()
+    {
+        var harness = new Harness(o => o.Share("notifications", Inertia.Prop(() => 3).Live(OrderUpdated)));
+        var page = await harness.PageAsync(new InertiaProps { ["page"] = 1 });
+
+        Assert.Equal(["notifications"], page["liveProps"]!.AsObject().Select(p => p.Key));
+    }
+
+    [Fact]
+    public async Task A_parallel_live_prop_reports_its_listeners()
+    {
+        var page = await Page(new InertiaProps
+        {
+            ["a"] = Inertia.Prop(async () => { await Task.Yield(); return 1; }).Parallel().Live(OrderUpdated),
+            ["b"] = Inertia.Prop(async () => { await Task.Yield(); return 2; }).Parallel(),
+        });
+
+        JsonAssert.Equal("""{"errors":{},"a":1,"b":2}""", page["props"]);
+        Assert.Equal(["a"], page["liveProps"]!.AsObject().Select(p => p.Key));
+    }
+
+    [Fact]
+    public async Task A_cached_live_prop_reports_its_listeners()
+    {
+        var page = await Page(new InertiaProps { ["a"] = Inertia.Prop(() => 1).Cache("live-cached", TimeSpan.FromMinutes(1)).Live(OrderUpdated) });
+
+        Assert.Equal(["a"], page["liveProps"]!.AsObject().Select(p => p.Key));
+    }
+
+    [Fact]
+    public async Task Without_live_props_the_key_is_absent()
+    {
+        var page = await Page(new InertiaProps { ["a"] = Inertia.Prop(() => 1) });
+        JsonAssert.Missing(page, "liveProps");
+    }
 }

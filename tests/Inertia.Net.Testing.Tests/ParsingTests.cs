@@ -23,6 +23,7 @@ public class ParsingTests
         Assert.Equal("Saved", (string)page.Flash["toast"]!);
         Assert.Empty(page.MergeProps);
         Assert.Empty(page.OnceProps);
+        Assert.Empty(page.LiveProps);
     }
 
     [Theory]
@@ -133,7 +134,8 @@ public class ParsingTests
         using var r = JsonResponse("""
             {"component":"A","props":{},"url":"/","version":"1","sharedProps":["errors"],"mergeProps":["a"],"prependProps":["b"],
              "deepMergeProps":["c"],"matchPropsOn":["a.id"],"rescuedProps":["d"],"scrollProps":{"feed":{"pageName":"page"}},
-             "onceProps":{"plans":{"prop":"plans","expiresAt":null}},"encryptHistory":true,"clearHistory":true,"preserveFragment":true}
+             "onceProps":{"plans":{"prop":"plans","expiresAt":null}},
+             "liveProps":{"order":{"listeners":[{"channel":{"name":"orders.1","type":"private"},"events":["OrderUpdated"]}],"throttle":500}},"encryptHistory":true,"clearHistory":true,"preserveFragment":true}
             """);
         var p = await r.GetInertiaPageAsync();
         Assert.Equal(["errors"], p.SharedProps);
@@ -144,6 +146,7 @@ public class ParsingTests
         Assert.Equal(["d"], p.RescuedProps);
         Assert.True(p.ScrollProps.ContainsKey("feed"));
         Assert.True(p.OnceProps.ContainsKey("plans"));
+        Assert.Equal(500, (int)p.LiveProps["order"]!["throttle"]!);
         Assert.True(p.EncryptHistory && p.ClearHistory && p.PreserveFragment);
         Assert.False(p.PreserveBigIntegers);
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);

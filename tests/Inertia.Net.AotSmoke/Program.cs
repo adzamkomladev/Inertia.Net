@@ -26,6 +26,9 @@ builder.Services.AddInertia(o =>
     o.CspNonce = ctx => ctx.Request.Headers["X-Nonce"].ToString();
     o.Vite.Prefetch = VitePrefetch.Waterfall;
 });
+// Live props: publishing goes to a broadcaster that keeps the last message (a transport package would deliver it).
+builder.Services.AddInertiaLive();
+builder.Services.AddSingleton<IInertiaLiveBroadcaster, LastMessageBroadcaster>();
 // Recording on in the published binary too, so the smoke checks cover the DevTools protocol under Native AOT.
 builder.Services.AddInertiaDevTools(o =>
 {
@@ -76,6 +79,7 @@ app.MapGet("/dashboard", (HttpContext context) =>
         ["cached"] = Prop(() => new Stat("cached", 5)).Cache("smoke-cached", TimeSpan.FromMinutes(5)),
         ["tagged"] = Prop(() => new Stat("tagged", Interlocked.Increment(ref SmokeCounters.TaggedLoads)))
             .Cache("smoke-tagged", TimeSpan.FromMinutes(5), staleFor: TimeSpan.FromMinutes(5), tags: ["smoke"]),
+        ["live"] = Prop(() => new Stat("live", 1)).Live(SmokeEvents.StatsChanged).Throttle(TimeSpan.FromMilliseconds(250)),
         ["today"] = Prop(async ct =>
         {
             await Task.Yield();
@@ -115,6 +119,21 @@ app.MapPost("/flash", (HttpContext context) =>
 
 app.MapGet("/external", () => Location("https://example.com/landing"));
 
+// Live publishing: the JsonTypeInfo overload is the AOT path; X-Socket-Id is read with context.InertiaRequest().
+app.MapPost("/live/publish", async (HttpContext context, IInertiaLive live, CancellationToken ct) =>
+{
+    await live.PublishAsync(SmokeEvents.StatsChanged, new LiveStats(new Stat("live", 2)), AppJsonContext.Default.LiveStats, context.InertiaRequest().SocketId, ct);
+    return Results.Redirect("/dashboard");
+});
+// The generic overload resolves LiveStats through the page serializer options (AppJsonContext is chained in): camelCase names.
+app.MapPost("/live/publish-page-options", async (IInertiaLive live, CancellationToken ct) =>
+{
+    await live.PublishAsync(SmokeEvents.StatsChanged, new LiveStats(new Stat("live", 3)), cancellationToken: ct);
+    return Results.Redirect("/dashboard");
+});
+app.MapGet("/live/last", (IInertiaLiveBroadcaster broadcaster) =>
+    ((LastMessageBroadcaster)broadcaster).Last is { } m ? $"{m.Channel.Key}|{m.ExceptSocketId}|{m.Payload.GetRawText()}" : "none");
+
 app.Run();
 
 internal sealed class HomePage
@@ -146,6 +165,24 @@ internal sealed class SmokeMaskConverter : JsonConverter<string>
 }
 
 internal sealed record Stat(string Name, int Value);
+
+internal sealed record LiveStats([property: JsonPropertyName("live")] Stat Live);
+
+internal static class SmokeEvents
+{
+    public static readonly LiveEvent StatsChanged = new("StatsChanged", LiveChannel.Public("stats"));
+}
+
+internal sealed class LastMessageBroadcaster : IInertiaLiveBroadcaster
+{
+    public LiveMessage? Last { get; private set; }
+
+    public ValueTask PublishAsync(LiveMessage message, CancellationToken cancellationToken = default)
+    {
+        Last = message;
+        return ValueTask.CompletedTask;
+    }
+}
 
 internal static class SmokeCounters
 {
@@ -179,6 +216,7 @@ public sealed class UserInput
 [JsonSerializable(typeof(UserInput))]
 [JsonSerializable(typeof(ContactRequest))]
 [JsonSerializable(typeof(SerializationPage))]
+[JsonSerializable(typeof(LiveStats))]
 internal sealed partial class AppJsonContext : JsonSerializerContext;
 
 [JsonNumberHandling(JsonNumberHandling.WriteAsString)]

@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Inertia.Net;
 
 /// <summary>
-/// A page prop with Inertia loading behavior (lazy, optional, deferred, always, merge, once, scroll, rescue, parallel, cached).
+/// A page prop with Inertia loading behavior (lazy, optional, deferred, always, merge, once, scroll, rescue, parallel, cached, live).
 /// Create instances with the factories on <see cref="Inertia"/>; the fluent methods mutate and return the same instance.
 /// </summary>
 [JsonConverter(typeof(InertiaPropJsonConverter))]
@@ -32,6 +32,7 @@ public abstract class InertiaProp
     internal bool ShouldRescue;
     internal bool IsParallel;
     internal PropCaching? Caching; // one reference, set only by Cache(): 8 bytes per prop rather than 16
+    internal LiveSpec? LiveSpec; // one reference, set only by Live(), like Caching
 
     // Set once any prop is marked Parallel(): until then no render pays for the planning walk.
     internal static volatile bool ParallelUsed;
@@ -94,6 +95,7 @@ public abstract class InertiaProp
     /// <summary>Deep merges the value into the client's existing value.</summary>
     public InertiaProp DeepMerge()
     {
+        ThrowIfLive();
         IsMerge = true;
         IsDeepMerge = true;
         return this;
@@ -103,6 +105,7 @@ public abstract class InertiaProp
     public InertiaProp MatchOn(params string[] keys)
     {
         ArgumentNullException.ThrowIfNull(keys);
+        ThrowIfLive();
         IsMerge = true;
         MatchOnKeys = [.. keys];
         return this;
@@ -181,8 +184,89 @@ public abstract class InertiaProp
         return this;
     }
 
+    /// <summary>
+    /// Makes the prop live: when <paramref name="event"/> is broadcast, clients showing the page reload the prop, or apply the value the
+    /// broadcast carries. Repeatable: every call adds a listener. The prop keeps its other behavior (deferred, optional, once, always,
+    /// shared); merge and scroll props cannot be live.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The prop is a merge, deep-merge or scroll prop.</exception>
+    public InertiaProp Live(LiveEvent @event)
+    {
+        ArgumentNullException.ThrowIfNull(@event);
+        return Live(@event.Channel, @event.Name);
+    }
+
+    /// <summary>Makes the prop live on <paramref name="channel"/> for each of <paramref name="events"/>. See <see cref="Live(LiveEvent)"/>.</summary>
+    /// <exception cref="ArgumentException"><paramref name="events"/> is empty or holds an empty name, or the channel has no name.</exception>
+    /// <exception cref="InvalidOperationException">The prop is a merge, deep-merge or scroll prop.</exception>
+    public InertiaProp Live(LiveChannel channel, params string[] events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        if (channel.Name is null)
+        {
+            throw new ArgumentException("The channel must be created with a name.", nameof(channel));
+        }
+
+        if (events.Length == 0)
+        {
+            throw new ArgumentException("A live prop needs at least one event.", nameof(events));
+        }
+
+        foreach (var name in events)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new ArgumentException("Live event names cannot be null or empty.", nameof(events));
+            }
+        }
+
+        if (IsMerge)
+        {
+            throw new InvalidOperationException(LiveMergeMessage);
+        }
+
+        var spec = LiveSpec ??= new LiveSpec();
+        foreach (var name in events)
+        {
+            spec.Listeners.Add((channel, name));
+        }
+
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the shortest time between two reloads of this live prop triggered by broadcasts (the client's default is one second). Values
+    /// carried in a broadcast are applied at once.
+    /// </summary>
+    /// <param name="window">A positive window, sent in whole milliseconds.</param>
+    /// <exception cref="InvalidOperationException">The prop is not live.</exception>
+    public InertiaProp Throttle(TimeSpan window)
+    {
+        if (LiveSpec is null)
+        {
+            throw new InvalidOperationException("Throttle() applies to live props: call Live(...) first.");
+        }
+
+        var ms = (long)window.TotalMilliseconds;
+        ArgumentOutOfRangeException.ThrowIfLessThan(ms, 1, nameof(window));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(ms, int.MaxValue, nameof(window));
+        LiveSpec.ThrottleMs = (int)ms;
+        return this;
+    }
+
+    private const string LiveMergeMessage = "Live updates are not supported on merge props (including deep-merge and scroll props): a live prop is reloaded whole.";
+
+    private void ThrowIfLive()
+    {
+        if (LiveSpec is not null)
+        {
+            throw new InvalidOperationException(LiveMergeMessage);
+        }
+    }
+
     private InertiaProp AddMergePath(bool append, string? path, string? matchOn)
     {
+        ThrowIfLive();
         IsMerge = true;
         if (path is null)
         {

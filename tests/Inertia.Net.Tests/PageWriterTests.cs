@@ -38,13 +38,14 @@ public class PageWriterTests
                 ["rescued"] = Inertia.Prop<int>(() => throw new InvalidOperationException()).Rescue(),
                 ["scroll"] = Inertia.Scroll(new PagedUsers([], 1, false)),
                 ["once"] = Inertia.Once(() => 1),
+                ["live"] = Inertia.Prop(() => 1).Live(new LiveEvent("Changed", LiveChannel.Public("live"))),
             },
             c => c.Inertia().ClearHistory().PreserveFragment().Flash("toast", "Saved"));
 
         Assert.Equal(
             [
                 "component", "props", "url", "version", "sharedProps", "mergeProps", "prependProps", "deepMergeProps", "matchPropsOn",
-                "deferredProps", "rescuedProps", "scrollProps", "onceProps", "preserveBigIntegers", "clearHistory", "encryptHistory", "flash", "preserveFragment",
+                "deferredProps", "rescuedProps", "scrollProps", "onceProps", "liveProps", "preserveBigIntegers", "clearHistory", "encryptHistory", "flash", "preserveFragment",
             ],
             page.Select(p => p.Key));
         Assert.True((bool)page["clearHistory"]!);

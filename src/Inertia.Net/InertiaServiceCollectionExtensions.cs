@@ -55,4 +55,15 @@ public static class InertiaServiceCollectionExtensions
             : ActivatorUtilities.CreateInstance<CookieInertiaStateStore>(sp));
         return services;
     }
+
+    /// <summary>
+    /// Adds <see cref="IInertiaLive"/>, which publishes live-prop events. Chain a transport (<c>.AddSignalR()</c> from
+    /// <c>Inertia.Net.Live.SignalR</c>) or register an <see cref="IInertiaLiveBroadcaster"/>. Safe to call more than once.
+    /// </summary>
+    public static IInertiaLiveBuilder AddInertiaLive(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.TryAddSingleton<IInertiaLive, InertiaLive>();
+        return new InertiaLiveBuilder(services);
+    }
 }

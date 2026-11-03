@@ -1,6 +1,6 @@
 # Inertia.Net
 
-Version 1.5 lets you remove, replace and tag cached props and SSR renders (`IInertiaCache`), serve them stale while they refresh (`staleFor`), and keep them in a cache store of your choice (`IInertiaCacheStore`). Upgrading from 1.3 or earlier? Read the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md): one default changed (redirects to another origin become a full visit). The [changelog](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md) lists every release. Start a new app with `dotnet new install Inertia.Net.Templates` and `dotnet new inertia`.
+Version 1.6 adds [live props](https://github.com/adzamkomladev/Inertia.Net#live-props): props that refresh themselves when the server broadcasts an event. Version 1.5 lets you remove, replace and tag cached props and SSR renders (`IInertiaCache`), serve them stale while they refresh (`staleFor`), and keep them in a cache store of your choice (`IInertiaCacheStore`). Upgrading from 1.3 or earlier? Read the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md): one default changed (redirects to another origin become a full visit). The [changelog](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md) lists every release. Start a new app with `dotnet new install Inertia.Net.Templates` and `dotnet new inertia`.
 
 The core of Inertia.Net, a .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs (this package), MVC (`Inertia.Net.Mvc`) and FastEndpoints (`Inertia.Net.FastEndpoints`), with the React, Vue and Svelte clients, and is Native AOT and trim compatible.
 
@@ -23,6 +23,7 @@ app.MapGet("/users", () => Render("Users/Index", new InertiaProps
     ["users"] = users,
     ["stats"] = Defer(ct => statsService.GetAsync(ct), group: "sidebar"),
     ["plans"] = Once(ct => plans.AllAsync(ct)).Until(TimeSpan.FromHours(1)),
+    ["online"] = Live(ct => presence.CountAsync(ct), new LiveEvent("PresenceChanged", LiveChannel.Public("presence"))),
 }));
 
 app.Run();
@@ -39,13 +40,24 @@ app.Run();
 
 `Render`, `Defer`, `Back()` and `Location(...)` are called unqualified: the package adds `global using Inertia.Net;` and `global using static Inertia.Net.Inertia;` when `ImplicitUsings` is enabled (`Inertia.Render` does not compile outside the `Inertia.Net` namespace). Opt out with `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>`.
 
-What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll) with opt-in parallel loaders and cached props, partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR (several servers, a supervised Node process pool, circuit breakers, render slots, per-response modes, metrics and a health check), validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), CSRF protection (`UseInertiaAntiforgery()`), an encrypted-cookie state store, an SSR response cache, Vite chunk prefetching and CSP nonces, `MapInertia` page endpoints, TypeScript declarations from your C# page types, and the Inertia DevTools recorder (`AddInertiaDevTools()`).
+What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll, live) with opt-in parallel loaders and cached props, partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR (several servers, a supervised Node process pool, circuit breakers, render slots, per-response modes, metrics and a health check), validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), CSRF protection (`UseInertiaAntiforgery()`), an encrypted-cookie state store, an SSR response cache, Vite chunk prefetching and CSP nonces, `MapInertia` page endpoints, TypeScript declarations from your C# page types, and the Inertia DevTools recorder (`AddInertiaDevTools()`).
 
 Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
 - [Quick start](https://github.com/adzamkomladev/Inertia.Net#quick-start) and [client setup](https://github.com/adzamkomladev/Inertia.Net#client-setup)
 - [Props reference](https://github.com/adzamkomladev/Inertia.Net#props-reference)
+- [Live props](https://github.com/adzamkomladev/Inertia.Net#live-props)
 - [Native AOT](https://github.com/adzamkomladev/Inertia.Net#native-aot)
 - [Configuration reference](https://github.com/adzamkomladev/Inertia.Net#configuration-reference)
+
+## Live props
+
+`Prop(...).Live(event)` (or `Live(() => ..., event)`) lists the prop in the page's `liveProps`: the client subscribes to the event's
+channel and reloads the prop, or applies the broadcast values, when the event arrives. It combines with deferred, optional, once,
+always and shared props; merge and scroll props cannot be live. `.Throttle(window)` spaces out reloads.
+
+`services.AddInertiaLive()` registers `IInertiaLive`, which publishes an event with or without values (`exceptSocketId` leaves the
+caller's own connection out, from `HttpContext.InertiaRequest().SocketId`). A transport delivers it: implement `IInertiaLiveBroadcaster` for your
+broadcaster. Needs the Inertia client 3.11.0 or later. See [Live props](https://github.com/adzamkomladev/Inertia.Net#live-props).
 
 ## Performance
 
