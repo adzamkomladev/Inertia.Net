@@ -5,7 +5,7 @@ section: Loading data
 order: 2
 ---
 
-`Defer` leaves a prop out of the first response and lists it under `deferredProps`. The client requests each group with a partial reload as soon as the page is mounted. The page becomes interactive without waiting for the slow data.
+`Defer` leaves a prop out of the first response and lists it under `deferredProps`. The client requests each group with a partial reload as soon as the page is mounted. The page becomes interactive without waiting for the slow data. A deferred prop can also be [live](/docs/live-props): it is fetched again whenever its event is broadcast.
 
 ```csharp
 return Render("Dashboard", new InertiaProps

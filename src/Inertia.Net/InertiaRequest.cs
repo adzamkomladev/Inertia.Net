@@ -42,6 +42,12 @@ public static class InertiaHeaders
     /// <summary><c>Purpose</c>: <c>prefetch</c> for prefetch requests.</summary>
     public const string Purpose = "Purpose";
 
+    /// <summary>
+    /// <c>X-Socket-Id</c>: the id of the client's live-props connection, sent so a broadcast can skip the client that caused it.
+    /// Client-supplied and untrusted.
+    /// </summary>
+    public const string SocketId = "X-Socket-Id";
+
     /// <summary><c>X-XSRF-TOKEN</c>: the antiforgery token the client copies from the <c>XSRF-TOKEN</c> cookie.</summary>
     public const string XsrfToken = "X-XSRF-TOKEN";
 
@@ -82,6 +88,7 @@ public readonly struct InertiaRequest
         ExceptOnceProps = ParseList(headers[InertiaHeaders.ExceptOnceProps]);
         MergeIntentPrepend = string.Equals(headers[InertiaHeaders.InfiniteScrollMergeIntent], "prepend", StringComparison.Ordinal);
         IsPrefetch = string.Equals(headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase);
+        SocketId = TrimmedOrNull(headers[InertiaHeaders.SocketId]);
     }
 
     /// <summary>The request carries <c>X-Inertia</c>.</summary>
@@ -113,6 +120,24 @@ public readonly struct InertiaRequest
 
     /// <summary>The request is a prefetch (<c>Purpose: prefetch</c>).</summary>
     public bool IsPrefetch { get; }
+
+    /// <summary>
+    /// The client's live-props connection id (<c>X-Socket-Id</c>), trimmed; null when absent or blank. Client-supplied: use it only to
+    /// leave that connection out of a broadcast (<see cref="IInertiaLive"/>'s <c>exceptSocketId</c>), never to identify a user.
+    /// </summary>
+    public string? SocketId { get; }
+
+    private static string? TrimmedOrNull(StringValues values)
+    {
+        string? value = values;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.AsSpan().Trim();
+        return trimmed.Length == value.Length ? value : trimmed.ToString();
+    }
 
     private static string? NullIfEmpty(StringValues values)
     {

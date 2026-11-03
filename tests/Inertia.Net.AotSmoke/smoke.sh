@@ -234,6 +234,19 @@ has '"requestType":"navigate"'
 has '"tabUuid":"smoke-tab"'
 has '"component":"About"'
 
+# 16. Live props: page metadata, X-Socket-Id binding and the published envelope (JsonTypeInfo path).
+inertia GET /dashboard
+has '"liveProps":{"live":{"listeners":[{"channel":{"name":"stats","type":"public"},"events":["StatsChanged"]}],"throttle":250}}'
+has '"live":{"name":"live","value":1}'
+inertia POST /live/publish -H 'X-Socket-Id: 42.7'
+status_is 302
+req GET /live/last
+has 'public:stats|42.7|{"__inertia":{"event":"StatsChanged","props":{"live":{"Name":"live","Value":2}}}}'
+inertia POST /live/publish-page-options
+status_is 302
+req GET /live/last
+has 'public:stats||{"__inertia":{"event":"StatsChanged","props":{"live":{"name":"live","value":3}}}}'
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES smoke check(s) failed. App log:"
   cat "$T/app.log"

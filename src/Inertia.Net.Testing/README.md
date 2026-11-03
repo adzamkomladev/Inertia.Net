@@ -1,6 +1,6 @@
 # Inertia.Net.Testing
 
-Use the 1.5 packages together; from 1.3 or earlier, see the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md).
+Use the 1.6 packages together; from 1.3 or earlier, see the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md).
 
 Test helpers for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net): Laravel-style fluent assertions over Inertia responses, for any test framework. It parses JSON responses and the first-visit HTML `<script data-page>`, and throws `InertiaAssertionException` when an assertion fails.
 
@@ -24,6 +24,9 @@ var page = await response.GetInertiaPageAsync();
 var deferred = await page.LoadDeferredPropsAsync(client, "sidebar");
 var only = await page.ReloadOnlyAsync(client, "users");
 ```
+
+Live props: `page.LiveProps` holds the `liveProps` metadata, and `HasLive("order")` or
+`HasLive("order", "private:orders.1", "OrderUpdated")` (channel as `"{type}:{name}"`) assert it.
 
 Nested scopes fail on properties you did not assert unless you call `Etc()`. Call `Interacted()` to enforce the same at the root.
 

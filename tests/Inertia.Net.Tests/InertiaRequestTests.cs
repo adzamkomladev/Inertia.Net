@@ -25,6 +25,17 @@ public class InertiaRequestTests
         Assert.Null(request.ExceptOnceProps);
         Assert.False(request.MergeIntentPrepend);
         Assert.False(request.IsPrefetch);
+        Assert.Null(request.SocketId);
+    }
+
+    [Theory]
+    [InlineData("", null)]
+    [InlineData("   ", null)]
+    [InlineData("1234.5678", "1234.5678")]
+    [InlineData("  abc  ", "abc")]
+    public void Socket_id_is_trimmed_and_blank_means_null(string header, string? expected)
+    {
+        Assert.Equal(expected, Parse(InertiaHeaders.SocketId, header).SocketId);
     }
 
     [Theory]

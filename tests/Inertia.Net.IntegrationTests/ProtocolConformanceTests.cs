@@ -15,6 +15,8 @@ namespace Inertia.Net.IntegrationTests;
 /// <item><term>GET /page</term><description><c>counters.HitPage()</c>; render <c>Page</c> with <c>{ message: "hello" }</c>.</description></item>
 /// <item><term>GET /café</term><description>render <c>Page</c> (no props).</description></item>
 /// <item><term>GET /partial</term><description>render <c>Partial</c> with <c>{ a: 1, b: Prop(() =&gt; 2), c: Always(3), d: Optional(() =&gt; 4) }</c>.</description></item>
+/// <item><term>GET /live</term><description>share <c>bell = LivePage.Bell()</c>; render <c>Live</c> with
+/// <c>LivePage.Props(InertiaRequest.SocketId)</c>.</description></item>
 /// <item><term>GET /deferred</term><description>render <c>Deferred</c> with <c>{ a: 1, b: Defer(() =&gt; "b"), c: Defer(() =&gt; "c", "other") }</c>.</description></item>
 /// <item><term>POST|PUT|PATCH|DELETE /form</term><description>JSON body <c>{ name }</c>, name required. Invalid: on an Inertia request,
 /// redirect back (302) with the errors keyed by the JSON field name (<c>name</c>) in the bag named by <c>X-Inertia-Error-Bag</c>
@@ -52,6 +54,56 @@ public abstract class ProtocolConformanceTests<THost>
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         JsonAssert.Equal("""[{"name":"first","extra":10},{"name":"second","extra":20}]""", (await response.PageAsync())["props"]!["rows"]);
+    }
+
+    private const string OrderListener = """{"listeners":[{"channel":{"name":"orders.1","type":"private"},"events":["OrderUpdated"]}]}""";
+    private const string StatsListener = """{"listeners":[{"channel":{"name":"stats","type":"public"},"events":["StatsChanged"]}]}""";
+
+    [Fact]
+    public async Task Live_props_report_listeners_on_the_initial_page_and_inertia_visits()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        var expected = $$$"""
+            {"bell":{"listeners":[{"channel":{"name":"users.1","type":"private"},"events":["Notified"]}]},
+             "order":{{{OrderListener}}},"stats":{{{StatsListener}}},"history":{{{OrderListener}}},
+             "feed":{"listeners":[{"channel":{"name":"stats","type":"public"},"events":["StatsChanged"]}],"throttle":500},
+             "flaky":{{{OrderListener}}}}
+            """;
+
+        var html = await (await client.GetAsync("/live", TestContext.Current.CancellationToken)).PageAsync();
+        JsonAssert.Equal(expected, html["liveProps"]);
+        JsonAssert.Equal("""{"default":["stats"]}""", html["deferredProps"]);
+        JsonAssert.Equal("""["flaky"]""", html["rescuedProps"]);
+        JsonAssert.Equal("""{"errors":{},"bell":3,"order":"order","feed":"feed","socket":null}""", html["props"]);
+
+        var visit = await (await client.InertiaGetAsync("/live", r => r.WithHeader(InertiaHeaders.SocketId, " 123.456 "))).PageAsync();
+        JsonAssert.Equal(expected, visit["liveProps"]);
+        Assert.Equal("123.456", (string?)visit["props"]!["socket"]);
+    }
+
+    [Fact]
+    public async Task Live_props_on_partial_reloads_report_only_included_props()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        Task<JsonObject> Partial(string? only, string? except = null) => client.InertiaGetAsync("/live", r =>
+        {
+            r.WithHeader(InertiaHeaders.PartialComponent, "Live");
+            if (only is not null) r.WithHeader(InertiaHeaders.PartialData, only);
+            if (except is not null) r.WithHeader(InertiaHeaders.PartialExcept, except);
+        }).ContinueWith(t => t.Result.PageAsync()).Unwrap();
+
+        var only = await Partial("order,flaky");
+        JsonAssert.Equal($$$"""{"order":{{{OrderListener}}},"flaky":{{{OrderListener}}}}""", only["liveProps"]);
+        JsonAssert.Equal("""["flaky"]""", only["rescuedProps"]);
+
+        var except = await Partial(null, "order,bell,flaky");
+        Assert.Equal(["stats", "history", "feed"], except["liveProps"]!.AsObject().Select(p => p.Key));
+
+        var deferredGroup = await Partial("stats");
+        JsonAssert.Equal($$$"""{"stats":{{{StatsListener}}}}""", deferredGroup["liveProps"]);
+        Assert.Equal("stats", (string?)deferredGroup["props"]!["stats"]);
     }
 
     [Fact]

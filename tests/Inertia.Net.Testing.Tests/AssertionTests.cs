@@ -9,7 +9,8 @@ public class AssertionTests
          "props":{"errors":{},"users":[{"id":1,"name":"Ann","email":"a@x"},{"id":2,"name":"Bob","email":"b@x"}],
                   "title":"Hi","n":5,"ratio":1.5,"ok":true,"nothing":null,"filters":{"search":"a"},"tags":["x","y"]},
          "flash":{"toast":"Saved","nested":{"a":1}},
-         "deferredProps":{"sidebar":["stats"],"default":["plans"]}}
+         "deferredProps":{"sidebar":["stats"],"default":["plans"]},
+         "liveProps":{"users":{"listeners":[{"channel":{"name":"users","type":"public"},"events":["UserCreated","UserDeleted"]}]}}}
         """;
 
     private static AssertableInertia Make() =>
@@ -165,6 +166,16 @@ public class AssertionTests
         Fails("Deferred prop [nope] was not found in any group.", p => p.HasDeferred("nope"));
         Fails("Deferred prop [stats] was not found in group [default].", p => p.HasDeferred("default", "stats"));
         Fails("Deferred prop [stats] was not found in group [zzz].", p => p.HasDeferred("zzz", "stats"));
+    }
+
+    [Fact]
+    public void Live_assertions()
+    {
+        Passes(p => p.HasLive("users").HasLive("users", "public:users", "UserCreated").HasLive("users", "public:users", "UserDeleted"));
+        Fails("Live prop [title] was not found.", p => p.HasLive("title"));
+        Fails("Live prop [title] was not found.", p => p.HasLive("title", "public:users", "UserCreated"));
+        Fails("Live prop [users] does not listen to [UserCreated] on channel [private:users].", p => p.HasLive("users", "private:users", "UserCreated"));
+        Fails("Live prop [users] does not listen to [Nope] on channel [public:users].", p => p.HasLive("users", "public:users", "Nope"));
     }
 
     [Fact]

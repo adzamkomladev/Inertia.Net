@@ -159,6 +159,32 @@ public static class Inertia
     /// <inheritdoc cref="Once{T}(Func{CancellationToken, ValueTask{T}})"/>
     public static InertiaProp Once<T>(Func<T> loader) => InertiaProp<T>.FromLoader(loader).Once();
 
+    /// <summary>A live prop: clients showing the page reload it (or apply the broadcast value) when <paramref name="event"/> is broadcast.</summary>
+    /// <param name="value">The value.</param>
+    /// <param name="event">The event the prop listens to; chain <see cref="InertiaProp.Live(LiveEvent)"/> for more.</param>
+    public static InertiaProp Live<T>(T value, LiveEvent @event) => InertiaProp<T>.FromValue(value).Live(@event);
+
+    /// <summary>A lazy live prop: clients showing the page reload it (or apply the broadcast value) when <paramref name="event"/> is broadcast.</summary>
+    /// <param name="loader">The loader.</param>
+    /// <param name="event">The event the prop listens to; chain <see cref="InertiaProp.Live(LiveEvent)"/> for more.</param>
+    [OverloadResolutionPriority(CtValueTask)]
+    public static InertiaProp Live<T>(Func<CancellationToken, ValueTask<T>> loader, LiveEvent @event) => Prop(loader).Live(@event);
+
+    /// <inheritdoc cref="Live{T}(Func{CancellationToken, ValueTask{T}}, LiveEvent)"/>
+    [OverloadResolutionPriority(CtTask)]
+    public static InertiaProp Live<T>(Func<CancellationToken, Task<T>> loader, LiveEvent @event) => Prop(loader).Live(@event);
+
+    /// <inheritdoc cref="Live{T}(Func{CancellationToken, ValueTask{T}}, LiveEvent)"/>
+    [OverloadResolutionPriority(NoCtTask)]
+    public static InertiaProp Live<T>(Func<Task<T>> loader, LiveEvent @event) => Prop(loader).Live(@event);
+
+    /// <inheritdoc cref="Live{T}(Func{CancellationToken, ValueTask{T}}, LiveEvent)"/>
+    [OverloadResolutionPriority(NoCtValueTask)]
+    public static InertiaProp Live<T>(Func<ValueTask<T>> loader, LiveEvent @event) => Prop(loader).Live(@event);
+
+    /// <inheritdoc cref="Live{T}(Func{CancellationToken, ValueTask{T}}, LiveEvent)"/>
+    public static InertiaProp Live<T>(Func<T> loader, LiveEvent @event) => Prop(loader).Live(@event);
+
     /// <summary>An infinite-scroll prop: <paramref name="wrapper"/> is merged and the paging metadata goes to <c>scrollProps</c>.</summary>
     /// <param name="value">The page of data; may implement <see cref="IProvidesScrollMetadata"/>.</param>
     /// <param name="wrapper">The key holding the items inside the value.</param>

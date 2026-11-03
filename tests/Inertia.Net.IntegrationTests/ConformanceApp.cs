@@ -188,3 +188,25 @@ public sealed class FakeSsrServer : HttpMessageHandler
         return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") });
     }
 }
+
+/// <summary>The <c>/live</c> page of the route contract, shared by every host.</summary>
+public static class LivePage
+{
+    public static readonly LiveEvent OrderUpdated = new("OrderUpdated", LiveChannel.Private("orders.1"));
+
+    public static readonly LiveEvent StatsChanged = new("StatsChanged", LiveChannel.Public("stats"));
+
+    /// <summary>The shared live prop (<c>bell</c>), shared by the handler before it renders.</summary>
+    public static InertiaProp Bell() => Prop(() => 3).Live(new LiveEvent("Notified", LiveChannel.Private("users.1")));
+
+    /// <summary>The page props; <c>socket</c> echoes <see cref="InertiaRequest.SocketId"/>.</summary>
+    public static InertiaProps Props(string? socketId) => new()
+    {
+        ["order"] = Prop(() => "order").Live(OrderUpdated),
+        ["stats"] = Defer(() => "stats").Live(StatsChanged),
+        ["history"] = Optional(() => "history").Live(OrderUpdated),
+        ["feed"] = Prop(() => "feed").Live(StatsChanged).Throttle(TimeSpan.FromMilliseconds(500)),
+        ["flaky"] = Prop<string>(() => throw new InvalidOperationException("down")).Rescue().Live(OrderUpdated),
+        ["socket"] = socketId,
+    };
+}

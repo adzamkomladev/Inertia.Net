@@ -145,4 +145,11 @@ public static class InertiaHttpContextExtensions
 
         return feature;
     }
+
+    /// <summary>Parses the request's Inertia headers, e.g. <c>context.InertiaRequest().SocketId</c>.</summary>
+    public static InertiaRequest InertiaRequest(this HttpContext httpContext)
+    {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        return new InertiaRequest(httpContext.Request.Headers);
+    }
 }

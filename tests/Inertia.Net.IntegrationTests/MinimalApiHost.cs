@@ -25,6 +25,12 @@ public sealed class MinimalApiHost : IConformanceHost
         });
 
         app.MapGet("/café", () => Render("Page"));
+
+        app.MapGet("/live", (HttpContext context) =>
+        {
+            context.Inertia().Share("bell", LivePage.Bell());
+            return Render("Live", LivePage.Props(context.InertiaRequest().SocketId));
+        });
         app.MapGet("/array", () => Render("Array", ArrayProps()));
 
         app.MapGet("/partial", () => Render("Partial", new InertiaProps

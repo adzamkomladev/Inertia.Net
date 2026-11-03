@@ -7,6 +7,23 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+### Added
+
+- Live props: props that refresh themselves when the server broadcasts an event (Inertia client 3.11.0 or later).
+  - `InertiaProp.Live(LiveEvent)`, `Live(LiveChannel, params string[] events)` and `Throttle(TimeSpan)`, plus the `Live(value|loader, LiveEvent)`
+    factories. `LiveChannel` (`Public`, `Private`, `Presence`, `EncryptedPrivate`) and `LiveEvent` define an event once for both sides.
+  - The `liveProps` page field, after `onceProps`. Deferred, optional, already-loaded once and rescued live props keep their listeners.
+  - `InertiaRequest.SocketId` (`X-Socket-Id`, `InertiaHeaders.SocketId`) and `HttpContext.InertiaRequest()`, which parses the
+    request's Inertia headers.
+  - `services.AddInertiaLive()` with `IInertiaLive` (publish with or without values, `exceptSocketId`; a `JsonTypeInfo<T>` overload for
+    Native AOT), `IInertiaLiveBroadcaster` and `LiveMessage` for transports, and `IInertiaLiveBuilder` for transport packages.
+  - Testing: `InertiaPage.LiveProps`, `AssertableInertia.HasLive(path)` and `HasLive(path, channel, event)`. DevTools lists live
+    listeners per prop.
+- Merge, deep-merge and scroll props cannot be live: `Live()` on one, or merging a live prop, throws `InvalidOperationException`.
+
+> Deviation from inertia-laravel: a rescued live prop keeps its `liveProps` entry on partial reloads too (Laravel drops it), so it stays
+> subscribed and the next event fetches it again. See `docs/protocol.md`, deviation 13.
+
 ## [1.5.3] - 2026-10-26
 
 ### Fixed

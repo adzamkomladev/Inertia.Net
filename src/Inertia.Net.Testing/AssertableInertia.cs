@@ -71,4 +71,26 @@ public sealed class AssertableInertia : AssertableJsonBase<AssertableInertia>
             Fail($"Deferred prop [{path}] was not found in group [{group}].");
         return this;
     }
+
+    /// <summary>Asserts that <paramref name="path"/> is listed as a live prop.</summary>
+    public AssertableInertia HasLive(string path)
+    {
+        if (!_page.LiveProps.ContainsKey(path)) Fail($"Live prop [{path}] was not found.");
+        return this;
+    }
+
+    /// <summary>
+    /// Asserts that the live prop at <paramref name="path"/> listens to <paramref name="event"/> on <paramref name="channel"/>, given as
+    /// <c>"{type}:{name}"</c> (the <c>LiveChannel.Key</c>, e.g. <c>private:orders.1</c>).
+    /// </summary>
+    public AssertableInertia HasLive(string path, string channel, string @event)
+    {
+        HasLive(path);
+        var listeners = _page.LiveProps[path]?["listeners"] as JsonArray ?? [];
+        var found = listeners.Any(l =>
+            $"{(string?)l?["channel"]?["type"]}:{(string?)l?["channel"]?["name"]}" == channel
+            && (l?["events"] as JsonArray ?? []).Any(e => (string?)e == @event));
+        if (!found) Fail($"Live prop [{path}] does not listen to [{@event}] on channel [{channel}].");
+        return this;
+    }
 }

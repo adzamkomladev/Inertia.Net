@@ -73,6 +73,10 @@ public sealed class DevToolsTests
         Assert.Equal("merge", (string?)props["feed"]!["inertiaType"]);
         Assert.Equal("append", (string?)props["feed"]!["mergeDirection"]);
         Assert.Equal("once", (string?)props["plans"]!["inertiaType"]);
+        Assert.Equal("defer", (string?)props["stats"]!["inertiaType"]);
+        Assert.Equal("StatsChanged", (string?)props["stats"]!["live"]!["listeners"]![0]!["events"]![0]);
+        Assert.Equal("live", (string?)props["order"]!["inertiaType"]);
+        Assert.Equal(2000, (int?)props["order"]!["live"]!["throttle"]);
         Assert.True((bool?)props["appName"]!["shared"]);
 
         var values = entry["propValues"]!;
@@ -366,8 +370,9 @@ public sealed class DevToolsTests
             {
                 ["user"] = new InertiaProps { ["name"] = "Ann", ["apiToken"] = "t0k3n" },
                 ["secretKey"] = "s3cr3t",
-                ["stats"] = Defer(() => 1, "sidebar"),
+                ["stats"] = Defer(() => 1, "sidebar").Live(new LiveEvent("StatsChanged", LiveChannel.Public("stats"))),
                 ["feed"] = Merge(new[] { 1, 2 }),
+                ["order"] = Prop(() => 1).Live(new LiveEvent("OrderUpdated", LiveChannel.Private("orders.1"))).Throttle(TimeSpan.FromSeconds(2)),
                 ["plans"] = Once(() => "free"),
             }));
             app.MapGet("/plain", () => Results.Text("plain"));

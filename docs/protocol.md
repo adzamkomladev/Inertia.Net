@@ -2,8 +2,8 @@
 
 This is the reference that Inertia.Net follows. It was compiled from:
 - the Inertia v3 docs (https://inertiajs.com/docs/v3/core-concepts/the-protocol);
-- the `inertiajs/inertia@3.x` client source (`packages/core/src/{types,request,requestParams,response,json,domUtils,ssrUtils,server}.ts`);
-- the reference server adapter `inertiajs/inertia-laravel@3.x` (`src/PropsResolver.php`, `Middleware.php`, `Response.php`, `ResponseFactory.php`, `Ssr/HttpGateway.php`, `Testing/AssertableInertia.php`).
+- the `inertiajs/inertia@3.x` client source (`packages/core/src/{types,request,requestParams,response,json,domUtils,ssrUtils,server,live,liveChannel,socketId}.ts`);
+- the reference server adapter `inertiajs/inertia-laravel@3.x` (`src/PropsResolver.php`, `Middleware.php`, `Response.php`, `ResponseFactory.php`, `HasLiveUpdates.php`, `LiveProp.php`, `Ssr/HttpGateway.php`, `Testing/AssertableInertia.php`).
 
 When this document and the Laravel adapter disagree, Laravel wins. The exceptions are the deliberate deviations listed at the end.
 
@@ -24,13 +24,14 @@ When this document and the Laravel adapter disagree, Laravel wins. The exception
 | `rescuedProps` | string[] | only when non-empty |
 | `scrollProps` | `{path: {pageName, previousPage, nextPage, currentPage, reset}}` | only when non-empty. Page values are int, string or null |
 | `onceProps` | `{key: {prop: path, expiresAt: msEpoch or null}}` | only when non-empty |
+| `liveProps` | `{path: {listeners: [{channel: {name, type}, events: string[]}], throttle?: int}}` | only when non-empty. `type` is `public`, `private`, `presence` or `encrypted-private`; names are unprefixed; `throttle` (ms) only when set. A partial response carries entries only for the props it includes, and the client merges them over its current set |
 | `preserveBigIntegers` | `true` | only when true |
 | `clearHistory` | `true` | only when true (v3 omits false) |
 | `encryptHistory` | `true` | only when true |
 | `flash` | object | only when there is flash data |
 | `preserveFragment` | `true` | only when true |
 
-**Key order.** Laravel emits keys in this order: component, props, url, version, sharedProps, mergeProps, prependProps, deepMergeProps, matchPropsOn, deferredProps, rescuedProps, scrollProps, onceProps, preserveBigIntegers, clearHistory, encryptHistory, flash, preserveFragment.
+**Key order.** Laravel emits keys in this order: component, props, url, version, sharedProps, mergeProps, prependProps, deepMergeProps, matchPropsOn, deferredProps, rescuedProps, scrollProps, onceProps, liveProps, preserveBigIntegers, clearHistory, encryptHistory, flash, preserveFragment.
 
 **BigInt.** When `preserveBigIntegers` is on, any integer with `|n| > 9007199254740991` is emitted as `{"$bigint":"<digits>"}`.
 
@@ -50,6 +51,7 @@ All list headers are comma-separated. Parse them as: split on `,`, trim, drop em
 | `X-Inertia-Except-Once-Props` | Once keys the client already has (defaults to `[]`) |
 | `X-Inertia-Infinite-Scroll-Merge-Intent` | `prepend` means prepend; anything else means append |
 | `Purpose: prefetch` | Prefetch request |
+| `X-Socket-Id` | Socket id of the client's live-props transport. Optional and untrusted: only used to leave that connection out of a broadcast |
 | `X-XSRF-TOKEN` | Client sends this from the `XSRF-TOKEN` cookie |
 
 ## 3. Responses and middleware flow
@@ -98,6 +100,7 @@ resolveProps(props, prefix, parentWasResolved):
     if isPartial and prop is not Always and not parentWasResolved:
         if only != null and not matchesOnly(path) and not leadsToOnly(path): skip
         if except != null and matchesExcept(path): skip            // except beats only
+    if prop is live: collectLive(path, prop, parentWasResolved)  // before the loader runs (deviation 13)
     if not isPartial and excludeFromInitialResponse(prop, path): skip
     value = resolveValue(prop, path)
     if path in rescuedProps: skip
@@ -154,6 +157,11 @@ collectMergeable(path, prop):
         for p in prependPaths: prependProps.append(path + "." + p)
   for s in matchOn: matchPropsOn.append(path + "." + s)
 
+collectLive(path, prop, parentWasResolved):
+  if isPartial and not (prop is Always or parentWasResolved) and not isIncludedInPartialMetadata(path): return
+  liveProps[path] = {listeners: prop.listeners grouped by "{type}:{name}" in declaration order, events unique per channel,
+                     throttle: prop.throttle if set}
+
 collectOnce(path, prop):
   if isPartial and not isIncludedInPartialMetadata(path): return
   onceProps[prop.key ?? path] = {prop: path, expiresAt: ttl ? now + ttl (ms) : null}
@@ -172,6 +180,7 @@ isIncludedInPartialMetadata(p) = (only == null or matchesOnly(p)) and (except ==
 | `Merge(v)` / `DeepMerge(v)` | merge = true; can be once. `Append(path?, matchOn?)`, `Prepend(path?, matchOn?)`, `MatchOn(...)` |
 | `Once(loader)` | once = true. `As(key)`, `Until(ttl)`, `Fresh()` |
 | `Scroll(v, wrapper = "data", metadata)` | merge = true; not deferred unless `.Defer()`; the merge path is `"{path}.{wrapper}"` |
+| `Live(event)` / `.Live(channel, events...)` | live = true; any non-merge prop (merge, deep-merge and scroll throw). Repeatable. `Throttle(window)` |
 
 **Semantics worth remembering:**
 - Partial reloads skip initial-load exclusion entirely. Once props are re-sent on a partial reload even if the client already has them.
@@ -182,6 +191,24 @@ isIncludedInPartialMetadata(p) = (only == null or matchesOnly(p)) and (except ==
 - **Typed dictionaries** (`Dictionary<TKey, TValue>` and other `IDictionary` types) whose value type can hold props are walked like objects. Keys are written as System.Text.Json writes them (string keys through `DictionaryKeyPolicy`; other keys through the serializer's dictionary key converter) and are path segments for partial reloads (`rows.someKey.extra`).
 - Manual typed traversal preserves registered System.Text.Json polymorphism, discriminator and unknown-derived-type rules, ignore/default rules, number handling and serialization callbacks. Each traversed object's callbacks run once. Ordinary DTOs retain the serializer fast path and source-generated metadata.
 - With big-integer preservation enabled, DOM integer text is parsed exactly and unsafe integers use `$bigint` markers, including flash and restored state.
+
+### Broadcast payload
+
+Live props are refreshed by events a server broadcasts on a channel. The transport (SignalR, Pusher, Echo, Action Cable) is not part
+of the protocol; the payload is:
+
+```json
+{ "__inertia": { "event": "OrderUpdated", "props": { "order": { "id": 1, "status": "shipped" } } } }
+```
+
+- `__inertia.event` is the event name the page's `liveProps` listeners match. Laravel's `broadcastProps()` leaves it out because
+  Echo routes by the broadcast's own event name; channel transports (Action Cable, SignalR) route by this key, so Inertia.Net always
+  writes it.
+- `props` is optional and keyed by dot path (`"auth.user"` stays a flat key). A listed prop's value is applied without a request; a
+  live prop with no value is reloaded with a partial reload. Values are serialized with the page serializer options.
+- Sibling keys beside `__inertia` are allowed and reach the client's cancelable `live` event untouched.
+- **Every subscriber of the channel receives the same values.** Only publish values that every client allowed on the channel may see.
+- `X-Socket-Id` lets the publisher leave its own connection out (`toOthers`).
 
 ## 5. Initial HTML (v3)
 
@@ -270,3 +297,4 @@ The React refresh preamble is:
 10. **The Vite hot file is only read in Development** (or use `Vite.DevServerUrl`), so a stale `hot` file deployed to production cannot point pages at a dev server. Laravel reads it in any environment.
 11. **Array descendant reloads return complete arrays.** The client replaces arrays on ordinary partial merges, so fragments can lose sibling fields or move an element to another index. Selecting a descendant loads the whole array; excluding a descendant excludes the whole array, preserving `Always` precedence. Use keyed objects for independent updates.
 12. **Redirects to another origin become a full visit** (`409` + `X-Inertia-Location`), as in inertia-rails 3.23 (`convert_external_redirects`). Laravel lets the XHR follow them, which the browser blocks without CORS. Prefetches are left alone. `ConvertExternalRedirects = false` restores Laravel's behavior.
+13. **Rescued live props keep their listeners on partial renders.** Live metadata is collected when the inclusion decision is made, before the loader runs, on full and partial renders alike. Laravel collects it in `excludeFromInitialResponse()` and `collectMetadata()`, and skips the latter for a rescued prop, so on a partial reload a rescued live prop loses its entry. Here it stays subscribed and the next event fetches it again.
