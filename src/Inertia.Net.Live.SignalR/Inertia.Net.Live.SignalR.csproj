@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net.Live.SignalR</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <Description>SignalR transport for Inertia.Net live props: hub, channel authorization and broadcaster (Native AOT compatible).</Description>
+    <PackageTags>$(PackageTags) signalr realtime live-props</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Inertia.Net\Inertia.Net.csproj" />
+  </ItemGroup>
+</Project>

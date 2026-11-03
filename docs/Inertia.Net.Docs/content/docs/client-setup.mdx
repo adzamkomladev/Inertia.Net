@@ -40,6 +40,8 @@ npm install -D vite typescript
 
 The starter templates use `ClientApp/pages`. The manual examples below use `resources/js/Pages`. Keep the resolver, file paths and Vite entry consistent with the layout you choose.
 
+The templates also ship `ClientApp/lib/inertia-signalr.ts`, the client transport for [live props over SignalR](/docs/live-props#signalr). Uncomment `live: signalr()` in `ClientApp/app.tsx` (or `app.ts`) to turn it on.
+
 ## Vite configuration
 
 The same Vite config works for every client; only the framework plugin changes.

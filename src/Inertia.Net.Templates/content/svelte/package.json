@@ -9,6 +9,7 @@
   "dependencies": {
     "@inertiajs/svelte": "^3.11.0",
     "@inertiajs/vite": "^3.11.0",
+    "@microsoft/signalr": "^10.0.0",
     "svelte": "^5.57.2"
   },
   "devDependencies": {

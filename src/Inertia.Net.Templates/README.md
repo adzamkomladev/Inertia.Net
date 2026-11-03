@@ -13,3 +13,7 @@ dotnet watch                                      # the app, in another: http://
 The app is a Minimal API with a typed Todos page: validation that redirects back with errors, flash messages, a deferred prop,
 generated TypeScript types for the pages and shared props, CSRF protection, compression, immutable caching of the Vite assets,
 chunk prefetching and the Inertia DevTools in Development. `npm run build` builds the client for production.
+
+For [live props](https://github.com/adzamkomladev/Inertia.Net#live-props) the app ships the SignalR client transport
+(`ClientApp/lib/inertia-signalr.ts`): add `Inertia.Net.Live.SignalR`, call `AddInertiaLive().AddSignalR()` and `MapInertiaLiveHub()`,
+and uncomment `live: signalr()` in `ClientApp/app`.

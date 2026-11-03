@@ -26,9 +26,8 @@ builder.Services.AddInertia(o =>
     o.CspNonce = ctx => ctx.Request.Headers["X-Nonce"].ToString();
     o.Vite.Prefetch = VitePrefetch.Waterfall;
 });
-// Live props: publishing goes to a broadcaster that keeps the last message (a transport package would deliver it).
-builder.Services.AddInertiaLive();
-builder.Services.AddSingleton<IInertiaLiveBroadcaster, LastMessageBroadcaster>();
+// Live props over SignalR (Inertia.Net.Live.SignalR): smoke.sh subscribes with a long-polling client made of curl calls.
+builder.Services.AddInertiaLive().AddSignalR();
 // Recording on in the published binary too, so the smoke checks cover the DevTools protocol under Native AOT.
 builder.Services.AddInertiaDevTools(o =>
 {
@@ -131,8 +130,7 @@ app.MapPost("/live/publish-page-options", async (IInertiaLive live, Cancellation
     await live.PublishAsync(SmokeEvents.StatsChanged, new LiveStats(new Stat("live", 3)), cancellationToken: ct);
     return Results.Redirect("/dashboard");
 });
-app.MapGet("/live/last", (IInertiaLiveBroadcaster broadcaster) =>
-    ((LastMessageBroadcaster)broadcaster).Last is { } m ? $"{m.Channel.Key}|{m.ExceptSocketId}|{m.Payload.GetRawText()}" : "none");
+app.MapInertiaLiveHub();
 
 app.Run();
 
@@ -171,17 +169,6 @@ internal sealed record LiveStats([property: JsonPropertyName("live")] Stat Live)
 internal static class SmokeEvents
 {
     public static readonly LiveEvent StatsChanged = new("StatsChanged", LiveChannel.Public("stats"));
-}
-
-internal sealed class LastMessageBroadcaster : IInertiaLiveBroadcaster
-{
-    public LiveMessage? Last { get; private set; }
-
-    public ValueTask PublishAsync(LiveMessage message, CancellationToken cancellationToken = default)
-    {
-        Last = message;
-        return ValueTask.CompletedTask;
-    }
 }
 
 internal static class SmokeCounters

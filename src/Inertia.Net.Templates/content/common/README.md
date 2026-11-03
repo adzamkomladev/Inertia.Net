@@ -20,10 +20,13 @@ production build from `npm run build` (`wwwroot/build`).
 | `Program.cs` | Routes, props, validation and the Inertia.Net setup |
 | `app.html` | The HTML shell of the first visit (`@vite`, `@inertiaHead`, `@inertia`) |
 | `ClientApp/pages` | One component per page: `Render("Todos/Index")` renders `ClientApp/pages/Todos/Index` |
+| `ClientApp/lib/inertia-signalr.ts` | The client transport for live props over SignalR (off until you enable it) |
 | `ClientApp/types/inertia.d.ts` | Types for the pages, shared props and flash data, rewritten from the C# types when the app starts in Development |
 
 ## Next steps
 
 - Add a page: a component under `ClientApp/pages`, a route that calls `Render`, and `o.TypeScript.Page<TProps>(...)` for its types.
 - Install the Inertia DevTools browser extension: the app records requests for it in Development.
+- Live props (props that refresh when the server broadcasts an event): add the `Inertia.Net.Live.SignalR` package, call
+  `builder.Services.AddInertiaLive().AddSignalR()` and `app.MapInertiaLiveHub()`, then uncomment `live: signalr()` in `ClientApp/app`.
 - Server-side rendering, once props, infinite scroll and the rest are in the Inertia.Net README.

@@ -115,6 +115,9 @@ For a production build, run `npm run build`, then `dotnet publish -c Release`. D
 
 The other two, CarParkerReplicas and TechLandierDistributed, run CarParker and TechLandier across replicas and run locally only. Each sample's README lists its demo logins and how to run it.
 
+This repository's own [`samples`](samples) are the apps the end-to-end tests run against. The React one has a `/live` page with live
+props over SignalR: a public counter and a shared, private unread count.
+
 ## Documentation site
 
 The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself an Inertia.Net app: a Minimal API renders the pages, React renders the layout, and MDX content provides the guides. It includes search, light/dark/system themes and code examples for every feature. The client uses Bun; see its [README](docs/Inertia.Net.Docs/README.md) to run it locally.
@@ -129,6 +132,7 @@ The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself 
 | Precognition | `.WithInertiaPrecognition()` | not available | `c.UseInertia()` |
 | Razor root view | no (`app.html` template) | optional (tag helpers) | no (`app.html` template) |
 | Native AOT | yes | no (MVC itself is not AOT) | yes (with the FastEndpoints source generator) |
+| Live props transport: SignalR | `Inertia.Net.Live.SignalR` | same | same |
 
 | Client | Package | Supported |
 |---|---|:---:|
@@ -148,7 +152,8 @@ The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself 
 - [x] Once props with keys, expiry and `fresh` (`onceProps`, `X-Inertia-Except-Once-Props`)
 - [x] Infinite scroll (`scrollProps`, merge intent header)
 - [x] Rescued props (`rescuedProps`)
-- [x] Live props (`liveProps`, `X-Socket-Id`, broadcast envelope, `IInertiaLive`); transport packages: see [Live props](#live-props)
+- [x] Live props (`liveProps`, `X-Socket-Id`, broadcast envelope, `IInertiaLive`), delivered over SignalR by `Inertia.Net.Live.SignalR`
+  or by your own broadcaster: see [Live props](#live-props)
 - [x] Shared props and `sharedProps`
 - [x] Validation errors, error bags, `WithAllErrors`
 - [x] Precognition (live validation)
@@ -169,6 +174,7 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net` | always. The core adapter, Minimal API support, Vite, SSR, state store, antiforgery cookie |
 | `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` to errors filter, Razor root view and tag helpers |
 | `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor, Precognition |
+| `Inertia.Net.Live.SignalR` | you deliver [live props](#live-props) over SignalR: hub, channel authorization, broadcaster |
 | `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
@@ -177,6 +183,7 @@ dotnet add package Inertia.Net --version 1.5.3
 dotnet add package Inertia.Net.Mvc --version 1.5.3 # MVC only
 dotnet add package Inertia.Net.FastEndpoints --version 1.5.3 # FastEndpoints only
 dotnet add package Inertia.Net.Testing --version 1.5.3 # test projects
+dotnet add package Inertia.Net.Live.SignalR # live props over SignalR (1.6 and later)
 ```
 
 Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.5.3` for all Inertia.Net packages. Inertia.Net 1.5.3 uses the Inertia.js v3 protocol; these are separate version numbers.
@@ -362,6 +369,9 @@ npm install -D vite typescript
 ```
 
 The starter templates use `ClientApp/pages`; the manual setup below uses `resources/js/Pages`. Keep the resolver, file paths and Vite entry consistent with the layout you choose.
+
+The starter templates also ship `ClientApp/lib/inertia-signalr.ts`, the client transport for [live props over SignalR](#signalr):
+uncomment `live: signalr()` in `ClientApp/app.tsx` (or `app.ts`) to turn it on.
 
 The examples keep the frontend in `resources/js` and the Vite output in `wwwroot/build`. Pages live in `resources/js/Pages`, so the component `Users/Index` is `resources/js/Pages/Users/Index.tsx`.
 
@@ -1161,7 +1171,28 @@ const order = useProp<Order>('order')   // { value, loading, loaded }
 router.on('live', (event) => (event.detail.props.includes('posts') ? false : undefined))
 ```
 
-**Transports.** The page metadata and the payload are transport-agnostic:
+### SignalR
+
+`Inertia.Net.Live.SignalR` runs the transport in your app: a SignalR hub the browser subscribes to, with channel authorization.
+
+```csharp
+builder.Services.AddInertiaLive().AddSignalR(o =>
+    o.Authorize((context, channel, ct) => ValueTask.FromResult(channel.Name == $"users.{context.UserIdentifier}")));
+app.MapInertiaLiveHub();   // /inertia-live
+```
+
+```ts
+import { signalr } from './lib/inertia-signalr'   // in dotnet new inertia apps; npm install @microsoft/signalr
+createInertiaApp({ live: signalr() })
+```
+
+Public channels are open; private, presence and encrypted-private channels need the authorizer's yes. The hub refuses other origins
+(403), closes connections when their authentication expires, and works with a Redis backplane or Azure SignalR Service. See the
+[package README](src/Inertia.Net.Live.SignalR/README.md) for the options, scale-out and security notes.
+
+### Other transports
+
+The page metadata and the payload are transport-agnostic:
 
 - **Pusher-protocol servers** (Reverb, Soketi, Ably, Pusher) work with the client's built-in `pusher()` or `echo()` transport.
   Implement `IInertiaLiveBroadcaster` to send `LiveMessage.Payload` with your server's publish API.
@@ -1826,7 +1857,7 @@ app.UseStaticFiles(new StaticFileOptions
 
 ## Native AOT
 
-`Inertia.Net` and `Inertia.Net.FastEndpoints` are annotated `IsAotCompatible` and a real app is published with Native AOT in CI (`tests/Inertia.Net.AotSmoke`, with zero trim and AOT warnings allowed). The library never reflects over your props: values are written with `JsonTypeInfo` from your `JsonSerializerContext`.
+`Inertia.Net`, `Inertia.Net.FastEndpoints` and `Inertia.Net.Live.SignalR` are annotated `IsAotCompatible` and a real app is published with Native AOT in CI (`tests/Inertia.Net.AotSmoke`, with zero trim and AOT warnings allowed). The library never reflects over your props: values are written with `JsonTypeInfo` from your `JsonSerializerContext`.
 
 **1. Register an app `JsonSerializerContext` for every prop type**, and chain it into the HTTP JSON options:
 
@@ -1847,7 +1878,7 @@ Register the type that each loader returns and each plain value you place in `In
 
 **3. Call `services.AddProblemDetails()`.** The non-Inertia `400` validation problem needs the `ProblemDetails` JSON metadata, or it cannot be serialized without reflection.
 
-**4. Anonymous types do not work as props, flash values or published live values** under AOT. Publish [live prop](#live-props) values as registered records or classes; the `IInertiaLive.PublishAsync` overload that takes a `JsonTypeInfo<T>` also works for types outside the HTTP JSON context. Use `InertiaProps`, records or classes registered in the context.
+**4. Anonymous types do not work as props, flash values or published live values** under AOT. Publish [live prop](#live-props) values as registered records or classes; the `IInertiaLive.PublishAsync` overload that takes a `JsonTypeInfo<T>` also works for types outside the HTTP JSON context. Use `InertiaProps`, records or classes registered in the context. `Inertia.Net.Live.SignalR` is AOT compatible; SignalR itself does not support strongly typed hubs (`Hub<T>`) under AOT, so keep any hubs of your own untyped.
 
 **5. Content files.** `app.html` and the Vite manifest are read from disk at run time. Copy them to the publish directory, and set the content root to the binary's directory when it may run from elsewhere:
 
@@ -1884,7 +1915,7 @@ builder.Services.AddFastEndpoints(new[] { DiscoveredTypes.All });
 </ItemGroup>
 ```
 
-Cached props, the SSR cache, nonces, prefetching, `MapInertia` and the DevTools recorder are all AOT safe and covered by the smoke test.
+Cached props, the SSR cache, nonces, prefetching, `MapInertia`, the DevTools recorder and live props over SignalR are all AOT safe and covered by the smoke test.
 
 The reference app is [tests/Inertia.Net.AotSmoke](tests/Inertia.Net.AotSmoke/Program.cs). Run it end to end with `bash eng/aot-smoke.sh` (Linux, needs clang and zlib).
 

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
+using Inertia.Net.Live.SignalR;
 using MinimalApi.React;
 
 var e2e = Environment.GetEnvironmentVariable("E2E") == "1";
@@ -26,12 +27,18 @@ builder.Services.AddInertia(o =>
     o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";
     o.TypeScript.FlashData<Flash>();
     o.Ssr.BundlePath = "ssr/ssr.js";
+    // A live prop on every page: the demo user's private channel (the sample has no sign-in, so the demo user is always id 1).
+    o.Share("inbox", Prop(() => new Inbox(AppState.Unread)).Live(SampleEvents.InboxChanged));
     if (ssr)
     {
         // Sets Ssr.Mode to Preferred. The port must match the one baked into the SSR bundle (vite.config.ts).
         o.Ssr.UseNodeProcess(n => n.BasePort = int.Parse(Environment.GetEnvironmentVariable("INERTIA_SSR_PORT") ?? "13714", CultureInfo.InvariantCulture));
     }
 });
+
+// Live props over SignalR: the hub is mapped below; the client enables it with createInertiaApp({ live: signalr() }).
+builder.Services.AddInertiaLive().AddSignalR(o =>
+    o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)));
 
 builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension, in Development only
 
@@ -53,6 +60,7 @@ app.UseInertia();
 app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
 
 app.MapInertiaDevTools();
+app.MapInertiaLiveHub(); // /inertia-live
 app.MapInertia("/", "Home");
 
 app.MapGet("/users", () => Render("Users/Index", new InertiaProps
@@ -71,6 +79,11 @@ app.MapDelete("/users/{id:int}", (int id) =>
     AppState.Users.RemoveAll(u => u.Id == id);
     return Back("/users").WithFlash("success", "User deleted");
 });
+
+app.MapGet("/live", () => Render("Live/Index", new InertiaProps
+{
+    ["counter"] = Live(() => new Counter(AppState.Counter), SampleEvents.CounterChanged),
+}));
 
 app.MapGet("/contacts/create", () => Render("Contacts/Create"));
 
@@ -101,6 +114,22 @@ if (e2e)
     // Test hooks called by the E2E runner, not by a browser page: exempt from CSRF validation.
     app.MapPost("/__e2e/bump-version", () => AppState.Version = Guid.NewGuid().ToString("N")).DisableAntiforgery();
     app.MapPost("/__e2e/reset", AppState.Reset).DisableAntiforgery();
+    // Live props: publish as another user would (no socket to leave out).
+    app.MapPost("/__e2e/live/increment", async (IInertiaLive live) =>
+    {
+        AppState.IncrementCounter();
+        await live.PublishAsync(SampleEvents.CounterChanged);
+    }).DisableAntiforgery();
+    app.MapPost("/__e2e/live/increment-with-value", async (IInertiaLive live) =>
+    {
+        var value = AppState.IncrementCounter();
+        await live.PublishAsync(SampleEvents.CounterChanged, new CounterUpdate(new Counter(value)));
+    }).DisableAntiforgery();
+    app.MapPost("/__e2e/live/inbox", async (IInertiaLive live) =>
+    {
+        AppState.IncrementUnread();
+        await live.PublishAsync(SampleEvents.InboxChanged);
+    }).DisableAntiforgery();
     app.MapGet("/__e2e/array", () => Render("ArrayRegression", new InertiaProps
     {
         ["rows"] = new List<DeferredRow>
@@ -129,6 +158,21 @@ namespace MinimalApi.React
 
     public sealed record DeferredRow(string Name, InertiaProp Extra);
 
+    public sealed record Counter(int Value);
+
+    /// <summary>Live values published with <c>CounterChanged</c>, keyed by prop path.</summary>
+    public sealed record CounterUpdate(Counter Counter);
+
+    public sealed record Inbox(int Unread);
+
+    /// <summary>The live events, shared by the props that listen and the code that publishes.</summary>
+    public static class SampleEvents
+    {
+        public static LiveEvent CounterChanged { get; } = new("CounterChanged", LiveChannel.Public("counter"));
+
+        public static LiveEvent InboxChanged { get; } = new("InboxChanged", LiveChannel.Private("users.1"));
+    }
+
     /// <summary>The flash data the pages read (<c>page.flash</c>), for the generated TypeScript declarations.</summary>
     public sealed record Flash(string? Success);
 
@@ -156,6 +200,9 @@ namespace MinimalApi.React
     [JsonSerializable(typeof(NewsletterForm))]
     [JsonSerializable(typeof(List<DeferredRow>))]
     [JsonSerializable(typeof(Flash))]
+    [JsonSerializable(typeof(Counter))]
+    [JsonSerializable(typeof(CounterUpdate))]
+    [JsonSerializable(typeof(Inbox))]
     internal sealed partial class AppJsonContext : JsonSerializerContext;
 
     /// <summary>In-memory demo state shared by all requests (a sample, not a database).</summary>
@@ -163,7 +210,7 @@ namespace MinimalApi.React
     {
         public const int PageSize = 10, FeedPages = 5;
 
-        private static int _plansCount;
+        private static int _plansCount, _counter, _unread;
 
         public static List<User> Users { get; } = Seed();
 
@@ -173,12 +220,24 @@ namespace MinimalApi.React
         /// <summary>How many times the once prop was actually resolved.</summary>
         public static int NextPlansCount() => Interlocked.Increment(ref _plansCount);
 
+        /// <summary>The live counter on the Live page.</summary>
+        public static int Counter => Volatile.Read(ref _counter);
+
+        public static int IncrementCounter() => Interlocked.Increment(ref _counter);
+
+        /// <summary>The demo user's unread messages, a shared live prop.</summary>
+        public static int Unread => Volatile.Read(ref _unread);
+
+        public static int IncrementUnread() => Interlocked.Increment(ref _unread);
+
         public static IResult Reset()
         {
             Users.Clear();
             Users.AddRange(Seed());
             Version = null;
             Interlocked.Exchange(ref _plansCount, 0);
+            Interlocked.Exchange(ref _counter, 0);
+            Interlocked.Exchange(ref _unread, 0);
             return Results.NoContent();
         }
 
