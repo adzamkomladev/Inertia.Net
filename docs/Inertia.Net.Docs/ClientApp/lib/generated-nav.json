@@ -44,7 +44,7 @@
       "slug": "installation",
       "url": "/docs/installation",
       "title": "Installation",
-      "description": "Install Inertia.Net, the optional MVC or FastEndpoints package, and the testing helpers.",
+      "description": "Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.",
       "section": "Get started",
       "order": 2,
       "headings": [
@@ -644,8 +644,18 @@
           "depth": 2
         },
         {
-          "id": "transports",
-          "text": "Transports",
+          "id": "signalr",
+          "text": "SignalR",
+          "depth": 2
+        },
+        {
+          "id": "who-may-join-a-channel",
+          "text": "Who may join a channel",
+          "depth": 3
+        },
+        {
+          "id": "custom-transports",
+          "text": "Custom transports",
           "depth": 2
         },
         {

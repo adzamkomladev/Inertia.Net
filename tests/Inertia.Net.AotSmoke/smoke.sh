@@ -234,18 +234,37 @@ has '"requestType":"navigate"'
 has '"tabUuid":"smoke-tab"'
 has '"component":"About"'
 
-# 16. Live props: page metadata, X-Socket-Id binding and the published envelope (JsonTypeInfo path).
+# 16. Live props: page metadata, then the SignalR hub with a long-polling client made of curl calls (records end with 0x1E).
 inertia GET /dashboard
 has '"liveProps":{"live":{"listeners":[{"channel":{"name":"stats","type":"public"},"events":["StatsChanged"]}],"throttle":250}}'
 has '"live":{"name":"live","value":1}'
-inertia POST /live/publish -H 'X-Socket-Id: 42.7'
+req POST '/inertia-live/negotiate?negotiateVersion=1'
+status_is 200
+has '"transport":"LongPolling"'
+CONNECTION_ID=$(sed -n 's/.*"connectionId":"\([^"]*\)".*/\1/p' "$T/b")
+CONNECTION_TOKEN=$(sed -n 's/.*"connectionToken":"\([^"]*\)".*/\1/p' "$T/b")
+hub_send() { req POST "/inertia-live?id=$CONNECTION_TOKEN" --data-binary "$1"$'\x1e'; status_is 200; }
+hub_poll() { req GET "/inertia-live?id=$CONNECTION_TOKEN" --max-time 10; status_is 200; }
+hub_poll # the first long poll returns at once
+hub_send '{"protocol":"json","version":1}'
+hub_poll
+has '{}'
+hub_send '{"type":1,"invocationId":"1","target":"Subscribe","arguments":["public","stats"]}'
+hub_poll
+has '{"type":3,"invocationId":"1","result":true}'
+# X-Socket-Id (read with context.InertiaRequest()) leaves this connection out; the generic overload uses the page options (camelCase).
+inertia POST /live/publish -H "X-Socket-Id: $CONNECTION_ID"
 status_is 302
-req GET /live/last
-has 'public:stats|42.7|{"__inertia":{"event":"StatsChanged","props":{"live":{"Name":"live","Value":2}}}}'
 inertia POST /live/publish-page-options
 status_is 302
-req GET /live/last
-has 'public:stats||{"__inertia":{"event":"StatsChanged","props":{"live":{"name":"live","value":3}}}}'
+hub_poll
+has '{"type":1,"target":"inertia","arguments":["public:stats",{"__inertia":{"event":"StatsChanged","props":{"live":{"name":"live","value":3}}}}]}'
+lacks '"Value":2'
+# The JsonTypeInfo overload writes with that context's own options.
+inertia POST /live/publish -H 'X-Socket-Id: someone-else'
+status_is 302
+hub_poll
+has '"arguments":["public:stats",{"__inertia":{"event":"StatsChanged","props":{"live":{"Name":"live","Value":2}}}}]'
 
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES smoke check(s) failed. App log:"

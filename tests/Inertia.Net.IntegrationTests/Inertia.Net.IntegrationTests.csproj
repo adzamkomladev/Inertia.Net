@@ -10,6 +10,7 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
   <ItemGroup>
@@ -21,5 +22,6 @@
     <ProjectReference Include="..\..\src\Inertia.Net.Mvc\Inertia.Net.Mvc.csproj" />
     <ProjectReference Include="..\..\src\Inertia.Net.FastEndpoints\Inertia.Net.FastEndpoints.csproj" />
     <ProjectReference Include="..\..\src\Inertia.Net.Testing\Inertia.Net.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Inertia.Net.Live.SignalR\Inertia.Net.Live.SignalR.csproj" />
   </ItemGroup>
 </Project>

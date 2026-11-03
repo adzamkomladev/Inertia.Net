@@ -109,7 +109,7 @@ builder.Services.AddInertia(o => o.Share("notifications", ctx =>
 `AddInertiaLive()` registers `IInertiaLive`. A transport registers the `IInertiaLiveBroadcaster` that delivers what it publishes.
 
 ```csharp
-builder.Services.AddInertiaLive();   // then a transport, or your own IInertiaLiveBroadcaster
+builder.Services.AddInertiaLive();   // then a transport: .AddSignalR() or your own IInertiaLiveBroadcaster
 ```
 
 <Tabs>
@@ -180,9 +180,57 @@ router.on('live', (event) => {
 })
 ```
 
-## Transports
+## SignalR
 
-The page metadata and the payload do not depend on how events travel, so the transport is your choice:
+`Inertia.Net.Live.SignalR` runs the transport inside your app: a SignalR hub the browser subscribes to, channel authorization, and the broadcaster that `IInertiaLive` publishes through.
+
+```sh
+dotnet add package Inertia.Net.Live.SignalR
+npm install @microsoft/signalr
+```
+
+```csharp
+builder.Services.AddInertiaLive().AddSignalR(o =>
+    o.Authorize((context, channel, ct) =>
+        ValueTask.FromResult(channel.Name == $"users.{context.UserIdentifier}")));
+
+var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseInertia();
+app.MapInertiaLiveHub();   // /inertia-live
+```
+
+Apps created with `dotnet new inertia` ship the client transport as `ClientApp/lib/inertia-signalr.ts`. In other apps, copy [the file](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Templates/content/common/ClientApp/lib/inertia-signalr.ts) in, then turn it on:
+
+```ts
+import { signalr } from './lib/inertia-signalr'
+
+createInertiaApp({ live: signalr() })
+```
+
+`@microsoft/signalr` loads on the first subscription, so pages without live props never download it. When a dropped connection comes back, the transport joins its channels again and Inertia reloads every live prop once, catching up on missed events.
+
+### Who may join a channel
+
+| Channel | Who joins |
+|---|---|
+| `Public` | Anyone who reaches the hub. Set `o.AuthorizePublicChannels = true` to ask the authorizer too. |
+| `Private`, `Presence`, `EncryptedPrivate` | Only connections the authorizer allows. With no authorizer, nobody. |
+
+For rules that need services, implement `ILiveChannelAuthorizer` and register it with `o.Authorize<OrderChannelAuthorizer>()`. It is created for each subscription, with constructor injection. SignalR has no presence member lists or end-to-end encryption, so presence and encrypted-private channels are authorized like private ones.
+
+The hub answers requests from other origins with 403 (add trusted ones to `o.AllowedOrigins`). That check stands in for antiforgery tokens on the hub. Connections close when their authentication expires.
+
+<Callout type="warning" title="More than one server">
+SignalR groups live on one server. Behind several instances, add a Redis backplane (`AddSignalR().AddStackExchangeRedis(...)`) or Azure SignalR Service; without one, a publish reaches only the clients connected to the instance that sent it.
+</Callout>
+
+The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.SignalR/README.md) lists the client options, how channels map to SignalR groups, and the security notes.
+
+## Custom transports
+
+The page metadata and the payload do not depend on SignalR, so any transport works:
 
 - **Pusher-protocol servers** (Reverb, Soketi, Ably, Pusher) work with the client's built-in `pusher()` or `echo()` transport. On the server, implement `IInertiaLiveBroadcaster` with your server's publish API.
 - **Anything else** (Action Cable, server-sent events, Azure Web PubSub): implement `IInertiaLiveBroadcaster` on the server and a `LiveTransport` on the client.

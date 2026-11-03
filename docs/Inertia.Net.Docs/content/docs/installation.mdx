@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install Inertia.Net, the optional MVC or FastEndpoints package, and the testing helpers.
+description: Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
 section: Get started
 order: 2
 ---
@@ -12,6 +12,7 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net` | always. The core adapter, Minimal API support, Vite, SSR, state store and antiforgery |
 | `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` filter, Razor root view and tag helpers |
 | `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
+| `Inertia.Net.Live.SignalR` | you deliver [live props](/docs/live-props) over SignalR: hub, channel authorization and broadcaster |
 | `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
@@ -20,6 +21,7 @@ dotnet add package Inertia.Net --version 1.5.3
 dotnet add package Inertia.Net.Mvc --version 1.5.3            # MVC only
 dotnet add package Inertia.Net.FastEndpoints --version 1.5.3  # FastEndpoints only
 dotnet add package Inertia.Net.Testing --version 1.5.3        # test projects
+dotnet add package Inertia.Net.Live.SignalR                   # live props over SignalR (1.6 and later)
 ```
 
 Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.5.3 implements Inertia.js v3.

@@ -9,6 +9,7 @@
   "dependencies": {
     "@inertiajs/vite": "^3.11.0",
     "@inertiajs/vue3": "^3.11.0",
+    "@microsoft/signalr": "^10.0.0",
     "vue": "^3.5.44"
   },
   "devDependencies": {

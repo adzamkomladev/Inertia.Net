@@ -55,7 +55,7 @@ jobs:
       - name: Check the package set
         run: |
           ls -l artifacts
-          for id in Inertia.Net Inertia.Net.Mvc Inertia.Net.FastEndpoints Inertia.Net.Testing Inertia.Net.Templates; do
+          for id in Inertia.Net Inertia.Net.Mvc Inertia.Net.FastEndpoints Inertia.Net.Live.SignalR Inertia.Net.Testing Inertia.Net.Templates; do
             test -f "artifacts/$id.$VERSION.nupkg" || { echo "Missing artifacts/$id.$VERSION.nupkg"; exit 1; }
           done
 

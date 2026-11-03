@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
     <ProjectReference Include="..\..\src\Inertia.Net.FastEndpoints\Inertia.Net.FastEndpoints.csproj" />
+    <ProjectReference Include="..\..\src\Inertia.Net.Live.SignalR\Inertia.Net.Live.SignalR.csproj" />
     <!-- Source-generated endpoint discovery (DiscoveredTypes) and request binding data (ReflectionCache) for Native AOT. -->
     <PackageReference Include="FastEndpoints.Generator" PrivateAssets="all" />
   </ItemGroup>

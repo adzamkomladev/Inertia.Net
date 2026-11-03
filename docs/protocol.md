@@ -207,6 +207,8 @@ of the protocol; the payload is:
 - `props` is optional and keyed by dot path (`"auth.user"` stays a flat key). A listed prop's value is applied without a request; a
   live prop with no value is reloaded with a partial reload. Values are serialized with the page serializer options.
 - Sibling keys beside `__inertia` are allowed and reach the client's cancelable `live` event untouched.
+- How the SignalR transport carries it (groups, hub methods, the socket id) is in the
+  [`Inertia.Net.Live.SignalR` README](../src/Inertia.Net.Live.SignalR/README.md#how-it-maps).
 - **Every subscriber of the channel receives the same values.** Only publish values that every client allowed on the channel may see.
 - `X-Socket-Id` lets the publisher leave its own connection out (`toOthers`).
 

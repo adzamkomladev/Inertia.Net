@@ -7,7 +7,7 @@ Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt
 ## Get started
 
 - [Introduction](https://inertia-dotnet.yebi.africa/docs/introduction): Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
-- [Installation](https://inertia-dotnet.yebi.africa/docs/installation): Install Inertia.Net, the optional MVC or FastEndpoints package, and the testing helpers.
+- [Installation](https://inertia-dotnet.yebi.africa/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
 - [Quick start](https://inertia-dotnet.yebi.africa/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 - [Client setup](https://inertia-dotnet.yebi.africa/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
 - [AI agents](https://inertia-dotnet.yebi.africa/docs/ai-agents): Give coding agents the context and conventions they need to build Inertia.Net pages correctly.

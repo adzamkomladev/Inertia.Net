@@ -5,7 +5,7 @@ section: Production
 order: 6
 ---
 
-`Inertia.Net` and `Inertia.Net.FastEndpoints` are annotated `IsAotCompatible`. A real app is published with Native AOT in CI (`tests/Inertia.Net.AotSmoke`) with zero trim and AOT warnings allowed. The library never reflects over your props: values are written with `JsonTypeInfo` from your `JsonSerializerContext`.
+`Inertia.Net`, `Inertia.Net.FastEndpoints` and `Inertia.Net.Live.SignalR` are annotated `IsAotCompatible`. A real app is published with Native AOT in CI (`tests/Inertia.Net.AotSmoke`) with zero trim and AOT warnings allowed. The library never reflects over your props: values are written with `JsonTypeInfo` from your `JsonSerializerContext`.
 
 ## 1. Register a JSON context
 
@@ -87,7 +87,7 @@ The SSR client never uses HTTP/3, so it can be trimmed out:
 </ItemGroup>
 ```
 
-Cached props, the SSR cache, nonces, prefetching, `MapInertia` and the DevTools recorder are all AOT safe and covered by the smoke test.
+Cached props, the SSR cache, nonces, prefetching, `MapInertia`, the DevTools recorder and [live props over SignalR](/docs/live-props#signalr) are all AOT safe and covered by the smoke test. SignalR itself does not support strongly typed hubs (`Hub<T>`) under AOT, so keep any hubs of your own untyped.
 
 <Callout type="tip" title="Catch missing registrations early">
 Set `JsonSerializerIsReflectionEnabledByDefault=false` in regular builds too. A missing `JsonSerializable` registration then fails in tests instead of only in the AOT publish.

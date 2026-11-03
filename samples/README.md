@@ -17,7 +17,8 @@ The .NET project of a sample builds without Node (`dotnet build`); the frontend 
 
 The layout (used by every page) shows:
 - shared prop `appName` in `data-testid="app-name"`;
-- nav links with `data-testid` `nav-home` (`/`), `nav-users` (`/users`), `nav-contacts` (`/contacts/create`), `nav-feed` (`/feed`);
+- nav links with `data-testid` `nav-home` (`/`), `nav-users` (`/users`), `nav-contacts` (`/contacts/create`), `nav-feed` (`/feed`),
+  and in the React sample `nav-live` (`/live`);
 - a flash area `data-testid="flash"` that shows `page.flash.success` when present (empty otherwise).
 
 | Route | Component | Contract |
@@ -28,6 +29,24 @@ The layout (used by every page) shows:
 | `GET /contacts/create` | `Contacts/Create` | Form 1 (`useForm`): inputs `data-testid="name"`, `data-testid="email"`, button `data-testid="submit"`, error slots `data-testid="error-name"`, `data-testid="error-email"` (empty element when no error). `POST /contacts` validates a record with `[Required] Name` and `[Required][EmailAddress] Email` using the framework's validation plus the adapter's validation glue; on failure it redirects back with errors, on success it redirects to `/` with flash `success` = `Contact created`. Form 2, error bag `newsletter`: input `data-testid="newsletter-email"`, button `data-testid="newsletter-submit"`, error slot `data-testid="error-newsletter-email"` showing `errors.newsletter.email`; `POST /newsletter` (`[Required][EmailAddress] Email`, sent with `X-Inertia-Error-Bag: newsletter`), success redirects to `/contacts/create` with flash `success` = `Subscribed`. |
 | `GET /feed` | `Feed/Index` | `posts`: a `Scroll` prop (wrapper key `data`), 10 items per page, 5 pages, page number in query `page`. Rendered with `<InfiniteScroll data="posts">`; every item `data-testid="post"`. Items must be tall enough (about 160 px) that 10 of them overflow a normal viewport. |
 
+## Live props (React sample only)
+
+The React sample also delivers [live props](../README.md#live-props) over SignalR (`Inertia.Net.Live.SignalR`): the hub is mapped at
+`/inertia-live`, the client uses the transport file `ClientApp/lib/inertia-signalr.ts` (`createInertiaApp({ live: signalr() })`), and the
+channel authorizer allows the demo user's private channel `users.1` (the sample has no sign-in). `specs/live.spec.ts` runs with
+`SAMPLE=react` only.
+
+| Route | Component | Contract |
+|---|---|---|
+| shared | every page | `inbox`: shared live prop `{unread}` on `LiveChannel.Private("users.1")`, event `InboxChanged`. |
+| `GET /live` | `Live/Index` | `counter`: live prop `{value}` on `LiveChannel.Public("counter")`, event `CounterChanged`, rendered in `data-testid="counter"`; `data-testid="counter-loading"` shows while `useProp('counter').loading`. `inbox.unread` in `data-testid="inbox"`. A checkbox `data-testid="hold-updates"` registers `router.on('live')` returning `false` for `counter`, and `data-testid="held"` counts the events it held back. |
+| `POST /__e2e/live/increment` | n/a | Increments the counter and publishes `CounterChanged` without values (clients reload `counter`). |
+| `POST /__e2e/live/increment-with-value` | n/a | Increments the counter and publishes `CounterChanged` with `{ counter: { value } }` (clients apply it without a request). |
+| `POST /__e2e/live/inbox` | n/a | Increments `unread` and publishes `InboxChanged` on `users.1`. |
+
+When the page sets `window.__e2e = true` before the app starts (the spec does, with `addInitScript`), the app exposes its hub
+connection as `window.__inertiaLive`, so the spec can stop it and check that missed events are caught up on reconnect.
+
 ## CSRF
 
 Every sample registers `services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken)` and calls `app.UseInertiaAntiforgery()`
@@ -37,7 +56,9 @@ after `app.UseInertia()`. Page loads set the `XSRF-TOKEN` cookie, which the Iner
 ## Test hooks (only mapped when the environment variable `E2E=1`)
 
 - `POST /__e2e/bump-version`: changes the asset version (the sample's `VersionResolver` reads a mutable singleton; it is `null`, meaning the hash of the Vite manifest, until bumped).
-- `POST /__e2e/reset`: restores the three seed users (ids 1 to 3), resets the once-prop counter and clears the version override. The spec calls it before every test.
+- `POST /__e2e/reset`: restores the three seed users (ids 1 to 3), resets the once-prop counter and clears the version override (and, in
+  the React sample, the live counter and unread count). The spec calls it before every test.
+- React sample: the live publish hooks in [Live props](#live-props-react-sample-only).
 
 Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
 

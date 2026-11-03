@@ -5,9 +5,14 @@ export interface InertiaPages {
 
 export interface SharedProps {
   appName: string
+  inbox: Inbox
 }
 
 export interface FlashData extends Flash {}
+
+export interface Inbox {
+  unread: number
+}
 
 export interface Flash {
   success: string | null

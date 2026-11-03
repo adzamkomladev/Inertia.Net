@@ -19,6 +19,15 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
     Native AOT), `IInertiaLiveBroadcaster` and `LiveMessage` for transports, and `IInertiaLiveBuilder` for transport packages.
   - Testing: `InertiaPage.LiveProps`, `AssertableInertia.HasLive(path)` and `HasLive(path, channel, event)`. DevTools lists live
     listeners per prop.
+- `Inertia.Net.Live.SignalR`: the SignalR transport for live props. `AddInertiaLive().AddSignalR(o => ...)` registers the
+  broadcaster and channel authorization (`ILiveChannelAuthorizer`, `o.Authorize(...)`; public channels open, the others refused unless
+  allowed); `MapInertiaLiveHub()` maps the hub with an origin check, closes connections whose authentication expires, and exempts the
+  hub from `UseInertiaAntiforgery()`. Native AOT compatible.
+- The client transport `ClientApp/lib/inertia-signalr.ts` in the `dotnet new inertia` templates (commented out in `app.tsx`/`app.ts`;
+  the templates now depend on `@microsoft/signalr`, which loads only when the transport subscribes). The templates and samples use
+  `@inertiajs/*` 3.11.
+- The React sample's `/live` page (a public counter and a shared private unread count) with end-to-end tests, and live props over
+  SignalR in the AOT smoke test.
 - Merge, deep-merge and scroll props cannot be live: `Live()` on one, or merging a live prop, throws `InvalidOperationException`.
 
 > Deviation from inertia-laravel: a rescued live prop keeps its `liveProps` entry on partial reloads too (Laravel drops it), so it stays
