@@ -261,10 +261,15 @@ public sealed class SsrResilienceTests
     public async Task Failed_and_aborted_renders_return_their_slots()
     {
         var mode = "error";
+        using var aborted = new CancellationTokenSource();
         var servers = new Servers(async (_, ct) =>
         {
             switch (mode)
             {
+                case "abort":
+                    // The client goes away while its render is in flight, before the render deadline can fire on a slow runner.
+                    aborted.Cancel();
+                    goto case "hang";
                 case "hang":
                     await Task.Delay(Timeout.Infinite, ct);
                     return null!;
@@ -288,7 +293,7 @@ public sealed class SsrResilienceTests
 
         mode = "hang";
         Assert.False(IsServerRendered(await GetAsync(harness))); // timeout
-        using var aborted = new CancellationTokenSource(TimeSpan.FromMilliseconds(30));
+        mode = "abort";
         var context = harness.Context();
         context.RequestAborted = aborted.Token;
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Harness.ExecuteAsync(context, Render("Home")));
