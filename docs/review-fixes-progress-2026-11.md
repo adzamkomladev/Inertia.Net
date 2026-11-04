@@ -20,6 +20,7 @@ Checks completed:
 - `dotnet test --solution Inertia.Net.slnx -c Release --no-build`: 1,413 passed, none failed/skipped.
 - `dotnet pack Inertia.Net.slnx -c Release --no-build -warnaserror -o artifacts`: passed, all seven packages and symbol packages.
 - `bash eng/aot-smoke.sh`: passed, no trim/AOT warnings.
+- Playwright: React 25 passed; Vue and Svelte each 14 passed with 11 framework-specific skips.
 - Three sample frontend clean installs/builds: passed; React included its SSR bundle.
 - Docs generation and client/SSR build: passed (34 pages).
 - Ordinary render allocation probe: unchanged at JSON 1,736, POCO 1,552, partial 568, HTML 1,800 B/request.
