@@ -37,6 +37,13 @@ public class UsersTests(WebApplicationFactory<Program> factory) : IClassFixture<
 
 Add `public partial class Program;` to your app when it uses top-level statements.
 
+To check that an error page keeps its HTTP status, use `Status` with the response's page assertion:
+
+```csharp
+using var response = await _client.InertiaGetAsync("/missing");
+await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
+```
+
 ## Request helpers
 
 | Helper | Purpose |

@@ -10,6 +10,7 @@ Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt
 - [Installation](https://inertia-dotnet.yebi.africa/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
 - [Quick start](https://inertia-dotnet.yebi.africa/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 - [Client setup](https://inertia-dotnet.yebi.africa/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
+- [What's new in 1.6.1 and 1.6.2](https://inertia-dotnet.yebi.africa/docs/whats-new): A practical guide to error pages, safer redirects and pagination.
 - [AI agents](https://inertia-dotnet.yebi.africa/docs/ai-agents): Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
 
 ## Essentials

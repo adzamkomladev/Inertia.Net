@@ -6,6 +6,22 @@ order: 6
 ---
 
 
+A long list is easier to browse when the server sends a small group of items at a time. A numbered page lets readers choose a page; a cursor page uses a marker to fetch the next or previous group. Start with a list already in memory:
+
+```csharp
+builder.Services.AddInertia();
+var app = builder.Build();
+app.UseInertia();
+
+// posts is an IReadOnlyList<PostDto> in a stable order.
+app.MapGet("/posts", (PageRequest request) => Render("Posts/Index", new InertiaProps
+{
+    ["posts"] = Pagination.Paginate(posts, request),
+}));
+```
+
+Visiting `/posts?page=2&perPage=5` returns the second group in `posts.data`. The default page size is 20 and the maximum is 100; configure both in [Pagination options](/docs/configuration#opagination-paginationoptions). For infinite scroll, wrap that value in `Scroll(...)` and render it with `InfiniteScroll` as shown in [Infinite scroll](/docs/infinite-scroll).
+
 `Pagination` creates page values; `Scroll` adds infinite-scroll metadata and merging. Use a page directly for a classic pager.
 
 | You write | You get |
@@ -49,7 +65,7 @@ import { Link } from '@inertiajs/react'
 
 ## Cursors
 
-The cursor overload of `PaginateAsync` takes a key selector and a fetch delegate. The delegate receives a decoded cursor with `Direction` (`After` or `Before`) and `Value`, a take count, and a cancellation token. Return rows in the requested direction, including up to one extra; the helper trims and reverses `Before` results to display order. Choose a stable unique non-null key. `hasMore` indicates more rows in the requested direction.
+A cursor is a marker for the position of an item, useful when readers move forward and backward rather than jump to page numbers. The cursor overload of `PaginateAsync` takes a key selector and a fetch delegate. The delegate receives a decoded cursor with `Direction` (`After` or `Before`) and `Value`, a take count, and a cancellation token. Return rows in the requested direction, including up to one extra; the helper trims and reverses `Before` results to display order. Choose a stable unique non-null key. `hasMore` indicates more rows in the requested direction.
 
 ```json
 { "data": [ { "id": 21 } ], "perPage": 20, "nextCursor": "eyJ...", "previousCursor": null, "hasMore": true, "cursorName": "cursor" }
@@ -64,6 +80,10 @@ var request = CursorRequest.From(query) with { Logger = logger };
 ```
 
 `Logger` is ignored by JSON serialization and does not affect request equality.
+
+## Defer or cache a page
+
+A page can use the same prop modifiers as other values. For example, `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` loads it after the first response; a lazy prop can also use `.Cache(...)`. See [Deferred props](/docs/deferred-props) and [Props](/docs/props) for loader and cache options.
 
 ## With EF Core
 

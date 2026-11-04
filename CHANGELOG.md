@@ -7,6 +7,8 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-04
+
 ### Added
 
 - `Inertia.Net.EntityFrameworkCore`: ordered numbered pagination and keyset cursor pagination for EF Core queries.
