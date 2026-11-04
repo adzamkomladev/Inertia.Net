@@ -15,6 +15,46 @@ public sealed class CachedPropsTests
 
     private InertiaProp Stats(string key = "stats") => Prop(() => new User($"load {++_loads}")).Cache(key, TimeSpan.FromMinutes(5));
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cached_dot_parents_keep_the_value_and_load_only_once(bool parallel)
+    {
+        InertiaProps Props() => new()
+        {
+            ["auth"] = (parallel ? Prop(_ => ValueTask.FromResult(new InertiaProps { ["name"] = $"load {++_loads}" })).Parallel()
+                : Prop(() => new InertiaProps { ["name"] = $"load {++_loads}" })).Cache("auth", TimeSpan.FromMinutes(1)),
+            ["auth.role"] = "admin",
+            ["other"] = 1,
+        };
+        await _harness.PageAsync(Props(), c => c.AsPartial(only: "other"));
+        Assert.Equal(0, _loads);
+        var first = await _harness.PageAsync(Props());
+        var second = await _harness.PageAsync(Props());
+        JsonAssert.Equal("""{"name":"load 1","role":"admin"}""", first["props"]!["auth"]);
+        JsonAssert.Equal("""{"name":"load 1","role":"admin"}""", second["props"]!["auth"]);
+        Assert.Equal(1, _loads);
+    }
+
+    [Theory]
+    [InlineData(InertiaCacheEntryKind.Prop)]
+    [InlineData(InertiaCacheEntryKind.Ssr)]
+    public async Task A_rejected_replacement_does_not_break_tag_invalidation(InertiaCacheEntryKind kind)
+    {
+        using var memory = new MemoryCache(new MemoryCacheOptions { SizeLimit = 10 });
+        var options = new InertiaOptions();
+        options.Ssr.Cache.MaxBytes = 10;
+        using var store = new MemoryInertiaCacheStore(memory, Options.Create(options), TimeProvider.System);
+        var key = new InertiaCacheKey(kind, "replacement");
+        byte[] original = [1];
+        var entry = new InertiaCacheEntryOptions(TimeSpan.FromMinutes(1), ["tag"]);
+        await store.SetAsync(key, original, entry, TestContext.Current.CancellationToken);
+        await store.SetAsync(key, new byte[11], entry, TestContext.Current.CancellationToken);
+        // MemoryCache implementations may remove the old entry on replacement rejection; if retained it must stay tagged.
+        await store.RemoveByTagAsync("tag", TestContext.Current.CancellationToken);
+        Assert.Null(await store.GetAsync(key, TestContext.Current.CancellationToken));
+    }
+
     [Fact]
     public async Task The_loader_runs_once_and_the_json_is_reused()
     {
@@ -582,7 +622,7 @@ public sealed class CachedPropsTests
         var invalidation = Task.Run(async () =>
         {
             invalidating.Set();
-            await store.RemoveByTagAsync("tag", default);
+            await store.RemoveByTagAsync("tag", TestContext.Current.CancellationToken);
         }, TestContext.Current.CancellationToken);
         try
         {
