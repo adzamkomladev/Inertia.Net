@@ -94,3 +94,7 @@ The SSR health check is covered in [Server-side rendering](/docs/server-side-ren
 - [ ] Response compression is enabled at the proxy or in the app.
 - [ ] SSR listens on loopback and its bundle is deployed when SSR is enabled.
 - [ ] The client build and server build are the same version, so `X-Inertia-Version` converges.
+
+## Hosts and SSR failures
+
+Keep `AllowedHosts` configured: an asset-version mismatch response includes the request URL. `Ssr.ConnectTimeout` bounds connection establishment (five seconds by default). In `SsrMode.Required`, the exception message is generic; diagnostic properties may contain private renderer details and should stay in trusted logs.

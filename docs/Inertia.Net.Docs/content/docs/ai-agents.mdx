@@ -36,14 +36,14 @@ This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inerti
 - Props: use `Defer(ct => ...)` for slow data, `Optional(() => ...)` for data loaded only on
   partial reloads, `Merge(...)` for paginated lists and `Once(...)` for data the client can keep.
 - Forms: POST/PUT/PATCH/DELETE endpoints validate with `.WithInertiaValidation()` (Minimal API),
-  the MVC filter or `c.UseInertia()` (FastEndpoints), then redirect. On success return a redirect
+  the MVC filter or `c.ConfigureInertia()` (FastEndpoints), then redirect. On success return a redirect
   or `Back()`. Report custom errors with `Back().WithErrors(...)`. Use `Back().WithFlash(...)` for messages.
 - Keep antiforgery on: `app.UseInertiaAntiforgery()` is required for unsafe requests.
 - Use typed page props (a record per page) for new pages and register them with
   `o.TypeScript.Page<T>("Component")` so the TypeScript types stay generated, not hand written.
 - Test pages with `Inertia.Net.Testing`: `client.InertiaGetAsync(url)` then
   `response.AssertInertiaAsync(page => page.Component(...).Has(...))`.
-- Before finishing: `dotnet build`, `dotnet test`, and `npm run build` (type-checks the client).
+- Before finishing: `dotnet build`, `dotnet test`, and the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`) (type-checks the client).
 ````
 
 If you use Vue or Svelte, change the component path and extension.
@@ -60,7 +60,7 @@ A request like this tells the agent which [props](/docs/props) to use, how [vali
 
 Agents are most reliable when they can verify a change. Inertia.Net gives them a few cheap checks:
 
-- **Compile-time types.** With [generated TypeScript types](/docs/typescript), a prop renamed in C# breaks the client build, so `npm run build` catches mismatches.
+- **Compile-time types.** With [generated TypeScript types](/docs/typescript), a prop renamed in C# breaks the client build, so the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`) catches mismatches.
 - **Response tests.** `Inertia.Net.Testing` asserts the component name and props without a browser. Ask the agent to add one test per page.
 - **Missing components.** In Development, [DevTools checks](/docs/devtools) report a `Render` call whose page component does not exist.
 

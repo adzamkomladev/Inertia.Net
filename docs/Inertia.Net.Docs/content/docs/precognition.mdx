@@ -1,0 +1,222 @@
+---
+title: Precognition
+description: Validate a form before submission without running its handler.
+section: Loading data
+order: 8
+---
+
+Precognition sends the same POST as the form with `Precognition: true`. The server validates it and returns without running the handler:
+
+```http
+POST /users HTTP/1.1
+Precognition: true
+Precognition-Validate-Only: email
+Content-Type: application/json
+
+{"email":"invalid"}
+
+HTTP/1.1 422 Unprocessable Entity
+Precognition: true
+Vary: Precognition
+Content-Type: application/json
+
+{"message":"The email field is not a valid e-mail address.","errors":{"email":["The email field is not a valid e-mail address."]}}
+```
+
+A valid request returns `204` and `Precognition-Success: true`. For Minimal APIs register `AddValidation()` and use:
+
+```csharp
+app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users"))
+   .WithInertiaPrecognition();
+```
+
+This replaces `.WithInertiaValidation()`; do not use both. It also handles normal validation redirects. Filters added after it do not run on precognitive requests. FastEndpoints enables this through `c.ConfigureInertia()`; MVC does not support Precognition.
+
+## Client setup
+
+Inertia 3 includes Precognition in its form integration. Each example validates on blur and displays the error:
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+import { useForm } from '@inertiajs/react'
+
+export default function UserForm() {
+  const form = useForm({ email: '' }).withPrecognition('post', '/users')
+  form.setValidationTimeout(3000)
+  return (
+    <form onSubmit={e => { e.preventDefault(); form.post('/users') }}>
+      <input value={form.data.email} onChange={e => form.setData('email', e.target.value)}
+        onBlur={() => form.validate('email')} />
+      {form.validating && <span>Validating…</span>}
+      {form.errors.email && <p>{form.errors.email}</p>}
+      <button type="submit">Save</button>
+    </form>
+  )
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup>
+import { useForm } from '@inertiajs/vue3'
+const form = useForm({ email: '' }).withPrecognition('post', '/users')
+form.setValidationTimeout(3000)
+</script>
+<template>
+  <input v-model="form.email" @blur="form.validate('email')" />
+  <span v-if="form.validating">Validating…</span>
+  <p v-if="form.errors.email">{{ form.errors.email }}</p>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script>
+  import { useForm } from '@inertiajs/svelte'
+  const form = useForm({ email: '' }).withPrecognition('post', '/users')
+  form.setValidationTimeout(3000)
+</script>
+<input bind:value={form.email} onblur={() => form.validate('email')} />
+{#if form.validating}<span>Validating…</span>{/if}
+{#if form.errors.email}<p>{form.errors.email}</p>{/if}
+```
+
+  </Tab>
+</Tabs>
+
+`Precognition-Validate-Only` selects returned errors by field, including nested paths. Validation still runs the validator: keep database rules cheap. Validate on blur for login and payment forms to avoid an error while the user is still typing. `setValidationTimeout(3000)` raises the debounce interval for expensive rules; it is not the HTTP deadline.
+
+## Antiforgery and authorization
+
+`UseInertiaAntiforgery()` validates precognitive POSTs like other unsafe requests; the Inertia client sends the token automatically. Authorization middleware runs before endpoint filters, so protected forms validate only for authorized users.
+
+## Rate limiting
+
+Precognitive POSTs pass through rate limiting before the endpoint filter, so using a single strict login bucket can lock users out while typing. Use separate bounded partitions for validation and real submissions, and check endpoint `InertiaPrecognitionMetadata` as well as `InertiaPrecognition.IsPrecognitive(request)`: the header alone does not guarantee the handler is skipped. Do not use `GetNoLimiter` for validation; validators consume CPU and may query a database. With the metadata present the handler is skipped, so the validation bucket does not allow credential attempts.
+
+On a rejected precognitive request set `Precognition: true` on the 429 response. This lets the client recognize the response; the validation request still rejects, so provide a retry or error message. Run `UseRouting`, `UseRateLimiter`, `UseInertia` and `UseInertiaAntiforgery` in that order. See the example below for a complete policy.
+
+The following `AddServices` method is copied from the Minimal API sample's `LoginDemo` class. The sample's `_generation` field exists only to reset E2E test buckets; real apps can partition on a stable client identity appropriate to their deployment. Import `System.Globalization`, `System.Threading.RateLimiting` and `Microsoft.AspNetCore.RateLimiting`, and declare `private static int _generation;` and `private static int _submissions;` in that class. The [complete sample class](https://github.com/adzamkomladev/Inertia.Net/blob/main/samples/MinimalApi.React/LoginDemo.cs) includes `LoginForm`, `LoginPage`, and the reset helper:
+
+```csharp
+    public static void AddServices(IServiceCollection services)
+    {
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("login", http =>
+            {
+                var validation = http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
+                    && InertiaPrecognition.IsPrecognitive(http.Request);
+                var client = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                // The generation lets the sample's E2E reset endpoint give each test fresh buckets.
+                var generation = Volatile.Read(ref _generation);
+                if (validation)
+                {
+                    return RateLimitPartition.GetSlidingWindowLimiter($"validation:{client}:{generation}", _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                    });
+                }
+
+                return RateLimitPartition.GetFixedWindowLimiter($"submit:{client}:{generation}", _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                });
+            });
+            options.OnRejected = (context, _) =>
+            {
+                var http = context.HttpContext;
+                if (http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
+                    && InertiaPrecognition.IsPrecognitive(http.Request))
+                {
+                    http.Response.Headers[InertiaPrecognition.Header] = "true";
+                    http.Response.Headers.Append("Vary", InertiaPrecognition.Header);
+                }
+
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    http.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+                return ValueTask.CompletedTask;
+            };
+        });
+    }
+```
+
+Register it before building the app and attach the policy to the endpoint:
+
+```csharp
+LoginDemo.AddServices(builder.Services);
+// After builder.Build():
+app.UseInertiaErrorPages(); // wraps rate-limit and page responses
+app.UseRouting();
+app.UseRateLimiter();
+app.UseInertia();
+app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
+LoginDemo.MapRoutes(app);
+```
+
+The sample routes use this method:
+
+```csharp
+    public static void MapRoutes(WebApplication app)
+    {
+        app.MapGet("/login", () => Render("Login", new LoginPage(Volatile.Read(ref _submissions))));
+        app.MapPost("/login", (LoginForm input) =>
+        {
+            Interlocked.Increment(ref _submissions);
+            return Back().WithFlash("success", "Demo form submitted");
+        }).WithInertiaPrecognition().RequireRateLimiting("login");
+    }
+```
+
+The sample partitions by remote IP for demonstration; configure trusted forwarded headers when behind a proxy and choose a partition key suited to your authentication and abuse model.
+
+## Testing
+
+With an `Inertia.Net.Testing` client that retains cookies, load the form page and attach its XSRF token. For an endpoint that validates `email`:
+
+```csharp
+using var page = await client.InertiaGetAsync("/users/create");
+async Task<HttpResponseMessage> ValidateAsync(string email)
+{
+    using var request = new HttpRequestMessage(HttpMethod.Post, "/users")
+    {
+        Content = JsonContent.Create(new { email }),
+    };
+    request.WithXsrfToken(page);
+    request.Headers.Add(InertiaPrecognition.Header, "true");
+    request.Headers.Add(InertiaPrecognition.ValidateOnlyHeader, "email");
+    return await client.SendAsync(request);
+}
+using var valid = await ValidateAsync("ann@example.com");
+Assert.Equal(HttpStatusCode.NoContent, valid.StatusCode);
+Assert.Equal("true", valid.Headers.GetValues(InertiaPrecognition.SuccessHeader).Single());
+using var invalid = await ValidateAsync("invalid");
+Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+using var body = JsonDocument.Parse(await invalid.Content.ReadAsStringAsync());
+Assert.True(body.RootElement.GetProperty("errors").TryGetProperty("email", out _));
+```
+
+Import `System.Net`, `System.Net.Http.Json`, `System.Text.Json`, `Inertia.Net` and `Inertia.Net.Testing`. [Testing](/docs/testing#testing-a-form-with-antiforgery) shows the client and token setup.
+
+## Protocol reference
+
+| Header | Direction | Meaning |
+|---|---|---|
+| `Precognition: true` | Request and response | Identifies a validation request and response |
+| `Precognition-Validate-Only` | Request | Comma-separated client field paths whose errors are returned |
+| `Precognition-Success: true` | Response | Validation succeeded (204) |
+| `Vary: Precognition` | Response | Varies the response by request type |
+
+A validation failure returns `422`; a limiter may return `429`. `InertiaPrecognition.IsPrecognitive(HttpRequest)` checks the header; `InertiaPrecognitionMetadata` identifies endpoints whose handler is skipped for these requests.

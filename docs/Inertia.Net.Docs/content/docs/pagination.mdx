@@ -90,7 +90,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.3
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -127,3 +127,7 @@ Register each closed page type in your app's `JsonSerializerContext` along with 
 ```
 
 See [Native AOT](/docs/native-aot).
+
+## Caching and scroll props
+
+A cached page still writes its scroll metadata. Use cache keys that include the page or cursor and all user or tenant dependencies. `Scroll(...)` can be deferred or cached; do not reuse its mutable prop instance across requests. Root `Append()` and `Prepend()` cannot be combined on the same prop. See [Props](/docs/props#cached-props) and [Infinite scroll](/docs/infinite-scroll).

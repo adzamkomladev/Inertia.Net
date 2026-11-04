@@ -51,6 +51,8 @@ Core configuration is passed to `AddInertia`; error page options use `AddInertia
 
 ## `o.Ssr`: `SsrOptions`
 
+`Ssr.ConnectTimeout` bounds connection establishment separately from the rendering deadline and defaults to five seconds; use a positive supported duration or `Timeout.InfiniteTimeSpan`.
+
 | Option | Default | Description |
 |---|---|---|
 | `Mode` | `Disabled` | `Disabled`, `Preferred` or `Required`. `Disabled` cannot be overridden per response. |
@@ -111,13 +113,13 @@ See [Error pages](/docs/error-pages) for setup, shared props and existing except
 | `app.UseInertia()` | The protocol middleware. Before the endpoints; after `UseSession()` when used. |
 | `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates unsafe requests (`419` on failure). |
 | `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |
-| `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder and read API. |
+| `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder and read API. A warning is logged when recording is enabled outside Development without an `Authorize` callback; the read API then returns 404. |
 | `app.UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` | Only writes the token cookie; validation is up to you. |
 | `endpoint.WithInertiaValidation()` | Minimal API: validation failures redirect back with errors. |
 | `endpoint.WithInertiaPrecognition()` | Minimal API: `WithInertiaValidation()` plus Precognition. |
 | `healthChecks.AddInertiaSsr(...)` | SSR health check from the gateway's state. |
 | `mvc.AddInertiaMvc(o => o.UseRazorRootView("App"))` | MVC filter, optional Razor root view and component resolver. |
-| `config.UseInertia(configure?)` | FastEndpoints: validation redirect and Precognition. |
+| `config.ConfigureInertia(configure?)` | FastEndpoints: validation redirect and Precognition. |
 | `Render(component, props?)` | `InertiaResult`: `.WithStatusCode`, `.WithRootView`, `.WithViewData`, `.WithSsr`, `.WithoutSsr`, `.WithSsrCache`. |
 | `Location(url)` | `InertiaLocationResult`. |
 | `Back(fallback = "~/")` | `InertiaBackResult`: `.WithErrors`, `.WithFlash`. |
@@ -127,3 +129,9 @@ See [Error pages](/docs/error-pages) for setup, shared props and existing except
 ## Extension points
 
 `IInertiaRootView`, `IInertiaStateStore`, `ViteAssets`, `InertiaRequest` (parsed headers), `InertiaHeaders` (header name constants), `InertiaSsrException`, `InertiaSsr.HttpClientName` (the SSR HTTP client) and `InertiaDiagnostics` (meter and activity source names).
+
+## Name collisions
+
+The package imports `Inertia.Net` and static members of `Inertia.Net.Inertia` when implicit usings are enabled. If a name such as `Location` collides with a type, use `Inertia.Net.Inertia.Location(url)`. To manage imports yourself, set `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` in the project and add `using Inertia.Net;` and `using static Inertia.Net.Inertia;` where needed.
+
+`InertiaPropJsonConverter`, `InertiaSsrHealthCheck`, `InertiaCacheEntryKind`, `InertiaCacheEntryOptions`, `InertiaPagesOptions`, `InertiaPrecognition.IsPrecognitive(...)` and `InertiaPrecognitionMetadata` are public APIs for serialization, health checks, cache stores, page checks and precognitive request handling.

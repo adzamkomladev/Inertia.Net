@@ -96,3 +96,25 @@ var except = await page.ReloadExceptAsync(_client, "users");
 <Callout type="tip" title="Cookies and redirects">
 Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies. Disable `AllowAutoRedirect` to assert the redirect itself, then follow it with a second `InertiaGetAsync` to read the flash or errors.
 </Callout>
+
+## Testing a form with antiforgery
+
+Keep cookies and disable redirects on the test client. Load the form first, then send its XSRF token on the Inertia POST and follow the redirect:
+
+```csharp
+using var formPage = await _client.InertiaGetAsync("/users/create");
+using var request = new HttpRequestMessage(HttpMethod.Post, "/users")
+{
+    Content = JsonContent.Create(new { email = "" }),
+};
+request.Headers.Add("X-Inertia", "true");
+request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+request.Headers.Referrer = new Uri(_client.BaseAddress!, "/users/create");
+request.WithXsrfToken(formPage);
+using var response = await _client.SendAsync(request);
+Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+using var redirected = await _client.InertiaGetAsync("/users/create");
+await redirected.AssertInertiaAsync(page => page.HasErrors().HasError("email"));
+```
+
+Import `System.Net` and `System.Net.Http.Json`. For a named bag use `HasErrorBag("createUser")` and `HasError("email", bag: "createUser")`. Dotted keys such as `items.0.email` are matched as flat error keys; with all errors enabled a message assertion matches any message. `GetXsrfToken()` and `WithXsrfToken()` accept custom cookie and header names. The cookie container must retain the antiforgery cookie as well as the Inertia state cookie.

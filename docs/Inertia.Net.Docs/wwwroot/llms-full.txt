@@ -66,8 +66,8 @@ Your .NET app still owns the request. The adapter adds the protocol middleware, 
 |---|:---:|:---:|:---:|
 | Package | `Inertia.Net` | `Inertia.Net` + `Inertia.Net.Mvc` | `Inertia.Net` + `Inertia.Net.FastEndpoints` |
 | Render / Back / Location | `Render(...)` returns `IResult` | same, return `IResult` from an action | `Send.InertiaAsync(...)` or return the result |
-| Validation redirect with errors | `.WithInertiaValidation()` | `ModelState` filter (global) | `c.UseInertia()` pre-processor |
-| Precognition | `.WithInertiaPrecognition()` | not available | `c.UseInertia()` |
+| Validation redirect with errors | `.WithInertiaValidation()` | `ModelState` filter (global) | `c.ConfigureInertia()` pre-processor |
+| Precognition | `.WithInertiaPrecognition()` | not available | `c.ConfigureInertia()` |
 | Razor root view | no (`app.html` template) | optional (tag helpers) | no (`app.html` template) |
 | Native AOT | yes | no (MVC itself is not AOT) | yes (with the FastEndpoints source generator) |
 
@@ -80,7 +80,7 @@ This site is an Inertia.Net app. The sidebar, search, docs pages and theme switc
 ## Requirements
 
 - .NET 10 SDK
-- JavaScript frontend build tools with npm, Bun, pnpm or Yarn; managed SSR requires Node.js at runtime
+- JavaScript frontend build tools with npm, Bun, pnpm or Yarn; managed SSR requires Node.js or Bun at runtime
 - An Inertia.js v3 client package for React, Vue or Svelte
 
 <Callout type="tip" title="Starting from scratch?">
@@ -89,6 +89,7 @@ Use the starter template: `dotnet new install Inertia.Net.Templates`, then `dotn
 
 ## Next steps
 
+- [First 10 minutes](/docs/first-10-minutes) takes you from the template to a form test.
 - [Install the packages](/docs/installation) in an existing app.
 - [Follow the quick start](/docs/quick-start) for a minimal end-to-end setup.
 - [Read the props reference](/docs/props) when you are ready to model page data.
@@ -114,26 +115,26 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.6.2
-dotnet add package Inertia.Net.Mvc --version 1.6.2            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.6.2  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.6.2        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.6.2   # live props over SignalR
+dotnet add package Inertia.Net --version 1.6.3
+dotnet add package Inertia.Net.Mvc --version 1.6.3            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.6.3  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.3 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.6.3        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.6.3   # live props over SignalR
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.6.2 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.6.3 implements Inertia.js v3.
 
 ## Requirements
 
 - .NET 10 SDK and an `Microsoft.NET.Sdk.Web` project.
-- JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js at runtime.
+- JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js or Bun at runtime.
 - An Inertia.js v3 client: `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte`.
 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.2
+dotnet new install Inertia.Net.Templates::1.6.3
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -182,222 +183,60 @@ Set `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` and add `using 
 
 ---
 
-# Quick start
+# First 10 minutes
 
-URL: https://inertia-dotnet.yebi.africa/docs/quick-start
+URL: https://inertia-dotnet.yebi.africa/docs/first-10-minutes
 
-> Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
+> Start a template app, try its validated form, and test the redirect.
 
-Already using the starter template? Its services, middleware, root template and frontend are configured for you. These steps are for adding Inertia to an existing app or building one manually.
-
-Every app needs the same four things:
-
-<Steps>
-  <Step title="Register Inertia and the protocol middleware" />
-  <Step title="Add a root template with the Inertia tokens" />
-  <Step title="Render a page from an endpoint" />
-  <Step title="Connect a client and run Vite" />
-</Steps>
-
-## 1. Register the services
-
-Choose one backend style. All three use the same protocol middleware and the same `Render(...)` result.
-
-<Tabs>
-  <Tab label="Minimal API">
-
-```csharp
-// Program.cs
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddValidation();                    // .NET 10 source-generated validation
-builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
-builder.Services.AddInertia(o =>
-{
-    o.Share("appName", "Demo");
-});
-
-var app = builder.Build();
-
-app.UseStaticFiles();                                // serves wwwroot/build (Vite output)
-app.UseInertia();                                    // before the endpoints
-app.UseInertiaAntiforgery();                         // XSRF-TOKEN cookie; 419 for unsafe requests without it
-
-app.MapGet("/", () => Render("Home", new InertiaProps
-{
-    ["greeting"] = "Hello from .NET",
-}));
-
-app.Run();
-```
-
-  </Tab>
-  <Tab label="MVC">
-
-```csharp
-// Program.cs
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddInertia();
-builder.Services.AddControllersWithViews().AddInertiaMvc();   // add .UseRazorRootView() here if you want Razor
-builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
-
-var app = builder.Build();
-
-app.UseStaticFiles();
-app.UseInertia();
-app.UseInertiaAntiforgery();
-app.MapControllers();
-app.Run();
-```
-
-```csharp
-using Microsoft.AspNetCore.Mvc;
-
-public sealed class HomeController : Controller
-{
-    [HttpGet("/")]
-    public IResult Index() => Render("Home", new InertiaProps
-    {
-        ["greeting"] = "Hello from .NET",
-    });
-}
-```
-
-  </Tab>
-  <Tab label="FastEndpoints">
-
-```csharp
-// Program.cs
-using FastEndpoints;
-using Inertia.Net.FastEndpoints;
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddInertia();
-builder.Services.AddFastEndpoints();
-builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
-
-var app = builder.Build();
-
-app.UseStaticFiles();
-app.UseInertia();
-app.UseInertiaAntiforgery();
-app.UseFastEndpoints(c => c.UseInertia());           // validation redirect + Precognition
-app.Run();
-```
-
-```csharp
-using FastEndpoints;
-using Inertia.Net.FastEndpoints;
-
-public sealed class HomeEndpoint : EndpointWithoutRequest<InertiaResult>
-{
-    public override void Configure() => Get("/");
-
-    public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) =>
-        Task.FromResult(Render("Home", new InertiaProps { ["greeting"] = "Hello from .NET" }));
-}
-```
-
-  </Tab>
-</Tabs>
-
-<Callout type="tip" title="Why AddValidation and antiforgery up front?">
-`AddValidation()` enables the Minimal API integration used by `.WithInertiaValidation()`. `UseInertiaAntiforgery()` issues the `XSRF-TOKEN` cookie and validates every unsafe request, so forms work from the first commit.
-</Callout>
-
-## 2. Add the root template
-
-The root template is an HTML file in the content root. The default name is `app.html`.
-
-```html
-<!-- app.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My app</title>
-  @viteReactRefresh
-  @vite("ClientApp/app.tsx")
-  @inertiaHead
-</head>
-<body>
-  @inertia
-</body>
-</html>
-```
-
-Remove `@viteReactRefresh` for Vue and Svelte. `@inertia` is required. The other tokens are described in [Pages and responses](/docs/pages-and-responses#the-root-template).
-
-Make sure `app.html` is copied to the output and publish directory:
-
-```xml
-<ItemGroup>
-  <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-</ItemGroup>
-```
-
-## 3. Create the page component
-
-The page name passed to `Render` must match the client resolver. With `@inertiajs/vite` the resolver maps `ClientApp/pages/**` automatically.
-
-```tsx
-// ClientApp/pages/Home.tsx
-export default function Home({ greeting }: { greeting: string }) {
-  return <h1>{greeting}</h1>
-}
-```
-
-The client entry only needs to start Inertia:
-
-```tsx
-// ClientApp/app.tsx
-import { createInertiaApp } from '@inertiajs/react'
-
-createInertiaApp()
-```
-
-<Callout type="info" title="Not using @inertiajs/vite?">
-Pass your own `resolve` and `setup` functions to `createInertiaApp`. The [client setup](/docs/client-setup) page shows both forms for React, Vue and Svelte.
-</Callout>
-
-## 4. Run it
-
-Install dependencies and start Vite from the project directory with your package manager:
-
-| Package manager | Install dependencies | Start Vite | Build assets |
-|---|---|---|---|
-| npm | `npm install` | `npm run dev` | `npm run build` |
-| Bun | `bun install` | `bun run dev` | `bun run build` |
-| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
-| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
-
-Keep Vite running in terminal 1. Start ASP.NET Core in terminal 2:
+Create the React starter (choose `vue` or `svelte` for another client):
 
 ```sh
-dotnet watch     # Development environment
+dotnet new install Inertia.Net.Templates::1.6.3
+dotnet new inertia -n MyApp --framework react
+cd MyApp
+npm install
+npm run dev
 ```
 
-Open the URL printed by `dotnet watch` (not the Vite URL). The first visit to `/` should display “Hello from .NET”.
+Use `bun install` and `bun run dev`, `pnpm install` and `pnpm run dev`, or `yarn install` and `yarn run dev` if you prefer. In a second terminal run `dotnet run`. Open the app's address and visit `/todos`; submit an empty title to see the validation message. The template includes Vite, antiforgery and a complete form.
 
-For production, run the build command from your row, then publish the app:
+The handler in `Program.cs` is:
 
-```sh
-dotnet publish -c Release
+```csharp
+app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
+{
+    todos.Add(input.Title!);
+    http.Inertia().Flash("success", "Todo added");
+    return Results.Redirect("/todos");
+}).WithInertiaValidation();
 ```
 
-Deploy `wwwroot/build` and `app.html` with the published app.
+`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The client form uses `useForm` and displays `form.errors.title`.
 
-## Where to go next
+To test the round trip, add `Inertia.Net.Testing` and `Microsoft.AspNetCore.Mvc.Testing` to a test project, expose `public partial class Program;` in the app, and create a cookie-preserving `WebApplicationFactory<Program>` client with `AllowAutoRedirect = false`:
 
-<Cards>
-  <Card title="Client setup" icon="code" href="/docs/client-setup">Vite configuration and the React, Vue and Svelte entries.</Card>
-  <Card title="Props" icon="blocks" href="/docs/props">Lazy, deferred, merged and cached page data.</Card>
-  <Card title="Validation" icon="shield" href="/docs/validation-and-errors">Redirects, error bags and Precognition.</Card>
-  <Card title="Server-side rendering" icon="rocket" href="/docs/server-side-rendering">Render the first visit on Node.</Card>
-</Cards>
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using Inertia.Net.Testing;
+
+using var page = await client.InertiaGetAsync("/todos");
+using var request = new HttpRequestMessage(HttpMethod.Post, "/todos")
+{
+    Content = JsonContent.Create(new { title = "" }),
+};
+request.Headers.Add("X-Inertia", "true");
+request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+request.Headers.Referrer = new Uri(client.BaseAddress!, "/todos");
+request.WithXsrfToken(page);
+using var response = await client.SendAsync(request);
+Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+using var redirected = await client.InertiaGetAsync("/todos");
+await redirected.AssertInertiaAsync(p => p.HasErrors().HasError("title"));
+```
+
+See [Testing](/docs/testing) for named error bags and custom XSRF names, and [Quick start](/docs/quick-start) for an existing application.
 
 ---
 
@@ -643,7 +482,7 @@ Inertia.Net can write TypeScript declarations for your page props, shared props 
 ## Development workflow
 
 ```sh
-npm run dev          # terminal 1: Vite on :5173, writes wwwroot/hot
+npm run dev          # or bun/pnpm/yarn run dev; Vite writes wwwroot/hot
 dotnet watch         # terminal 2: the app, ASPNETCORE_ENVIRONMENT=Development
 ```
 
@@ -652,7 +491,7 @@ Open the ASP.NET Core URL, not the Vite URL. In Development the app reads `wwwro
 For production:
 
 ```sh
-npm run build
+npm run build        # or bun/pnpm/yarn run build
 dotnet publish -c Release
 ```
 
@@ -678,88 +517,225 @@ Keep the SSR listener on loopback: the renderer trusts its output and has no aut
 
 ---
 
-# What's new in 1.6.1 and 1.6.2
+# Quick start
 
-URL: https://inertia-dotnet.yebi.africa/docs/whats-new
+URL: https://inertia-dotnet.yebi.africa/docs/quick-start
 
-> A practical guide to error pages, safer redirects and pagination.
+> Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 
-These releases help you show useful error pages and split long lists into smaller pages. Use the same version of each Inertia.Net package in your app; see [Installation](/docs/installation).
+Already using the starter template? Its services, middleware, root template and frontend are configured for you. These steps are for adding Inertia to an existing app or building one manually.
 
-## 1.6.1: show an error page
+Every app needs the same four things:
 
-A visitor who opens a missing URL can see your app's `Error` page while the response still has status 404. In `Program.cs`, add the services and middleware:
+<Steps>
+  <Step title="Register Inertia and the protocol middleware" />
+  <Step title="Add a root template with the Inertia tokens" />
+  <Step title="Render a page from an endpoint" />
+  <Step title="Connect a client and run Vite" />
+</Steps>
+
+## 1. Register the services
+
+Choose one backend style. All three use the same protocol middleware and the same `Render(...)` result.
+
+<Tabs>
+  <Tab label="Minimal API">
 
 ```csharp
-builder.Services.AddInertia();
-builder.Services.AddInertiaErrorPages();
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddValidation();                    // .NET 10 source-generated validation
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+builder.Services.AddInertia(o =>
+{
+    o.Share("appName", "Demo");
+    o.Pages.Directory = "ClientApp/pages";
+});
 
 var app = builder.Build();
-app.UseInertiaErrorPages();
-app.UseInertia();
-```
 
-Create an `Error` component in your client pages directory. It receives a `status` prop. Error pages are off in Development by default, so you can see developer diagnostics there. See [Error pages](/docs/error-pages) for a component example and how to preview it.
+app.UseStaticFiles();                                // serves wwwroot/build (Vite output)
+app.UseInertia();                                    // before the endpoints
+app.UseInertiaAntiforgery();                         // XSRF-TOKEN cookie; 419 for unsafe requests without it
 
-You can check the status and component in a test using `Inertia.Net.Testing`:
-
-```csharp
-using var response = await client.InertiaGetAsync("/missing");
-await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
-```
-
-## 1.6.1: return to the previous page
-
-After a form submission, `Back()` normally uses the browser's `Referer` header. Some browser policies omit it. Enable the following in `Program.cs` to remember the last successfully rendered page and use it as a fallback:
-
-```csharp
-builder.Services.AddInertia(o => o.State.RememberPreviousUrl = true);
-```
-
-The remembered address is shared across tabs in the same browser. See [Previous URL](/docs/redirects-and-history#previous-url) for the fallback order and cookie details.
-
-Inertia forms already retain their input after validation errors. If a full-page form needs to refill a field after a redirect, flash only the safe values you choose; never include passwords or tokens. The [flash data recipe](/docs/flash-data) shows how.
-
-## 1.6.2: send a list one page at a time
-
-For a list already in memory, a Minimal API can bind the requested page and return a numbered result:
-
-```csharp
-// posts is an IReadOnlyList<PostDto> in a stable order.
-app.MapGet("/posts", (PageRequest request) => Render("Posts/Index", new InertiaProps
+app.MapGet("/", () => Render("Home", new InertiaProps
 {
-    ["posts"] = Pagination.Paginate(posts, request),
+    ["greeting"] = "Hello from .NET",
 }));
+
+app.Run();
 ```
 
-Open `/posts?page=2&perPage=5` to request the second group of five. The result's `data` contains that group; `currentPage` and `lastPage` help build page links. The default size is 20, with a maximum of 100; [pagination options](/docs/configuration#opagination-paginationoptions) can change these limits and query names.
+  </Tab>
+  <Tab label="MVC">
 
-To load more as the reader scrolls, wrap the page in `Scroll(...)` and use the client `InfiniteScroll` component. For data from a database or API, the delegate overload fetches each group on demand. It also supports **cursor pages**: a cursor is a marker used to fetch the next or previous group. Pages can be deferred or cached, and test helpers can load the next or previous scroll page. Follow [Pagination](/docs/pagination), [Infinite scroll](/docs/infinite-scroll), and [Testing](/docs/testing) for examples.
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
 
-## 1.6.2: page an EF Core query
+builder.Services.AddInertia();
+builder.Services.AddControllersWithViews().AddInertiaMvc();   // add .UseRazorRootView() here if you want Razor
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 
-If your app already uses EF Core, install the optional package alongside your database provider:
+var app = builder.Build();
+
+app.UseStaticFiles();
+app.UseInertia();
+app.UseInertiaAntiforgery();
+app.MapControllers();
+app.Run();
+```
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+public sealed class HomeController : Controller
+{
+    [HttpGet("/")]
+    public IResult Index() => Render("Home", new InertiaProps
+    {
+        ["greeting"] = "Hello from .NET",
+    });
+}
+```
+
+  </Tab>
+  <Tab label="FastEndpoints">
+
+```csharp
+// Program.cs
+using FastEndpoints;
+using Inertia.Net.FastEndpoints;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddInertia();
+builder.Services.AddFastEndpoints();
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+
+var app = builder.Build();
+
+app.UseStaticFiles();
+app.UseInertia();
+app.UseInertiaAntiforgery();
+app.UseFastEndpoints(c => c.ConfigureInertia());           // validation redirect + Precognition
+app.Run();
+```
+
+```csharp
+using FastEndpoints;
+using Inertia.Net.FastEndpoints;
+
+public sealed class HomeEndpoint : EndpointWithoutRequest<InertiaResult>
+{
+    public override void Configure() => Get("/");
+
+    public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) =>
+        Task.FromResult(Render("Home", new InertiaProps { ["greeting"] = "Hello from .NET" }));
+}
+```
+
+  </Tab>
+</Tabs>
+
+<Callout type="tip" title="Why AddValidation and antiforgery up front?">
+`AddValidation()` enables the Minimal API integration used by `.WithInertiaValidation()`. `UseInertiaAntiforgery()` issues the `XSRF-TOKEN` cookie and validates every unsafe request, so forms work from the first commit.
+</Callout>
+
+See [Precognition](/docs/precognition) for live form validation.
+
+## 2. Add the root template
+
+The root template is an HTML file in the content root. The default name is `app.html`.
+
+```html
+<!-- app.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My app</title>
+  @inertiaHead
+  @viteReactRefresh
+  @vite("ClientApp/app.tsx")
+</head>
+<body>
+  @inertia
+</body>
+</html>
+```
+
+Remove `@viteReactRefresh` for Vue and Svelte. `@inertia` is required. The other tokens are described in [Pages and responses](/docs/pages-and-responses#the-root-template).
+
+Make sure `app.html` is copied to the output and publish directory:
+
+```xml
+<ItemGroup>
+  <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
+## 3. Create the page component
+
+The page name passed to `Render` must match the client resolver. With `@inertiajs/vite` the resolver maps `ClientApp/pages/**` automatically.
+
+```tsx
+// ClientApp/pages/Home.tsx
+export default function Home({ greeting }: { greeting: string }) {
+  return <h1>{greeting}</h1>
+}
+```
+
+The client entry only needs to start Inertia:
+
+```tsx
+// ClientApp/app.tsx
+import { createInertiaApp } from '@inertiajs/react'
+
+createInertiaApp()
+```
+
+<Callout type="info" title="Not using @inertiajs/vite?">
+Pass your own `resolve` and `setup` functions to `createInertiaApp`. The [client setup](/docs/client-setup) page shows both forms for React, Vue and Svelte.
+</Callout>
+
+## 4. Run it
+
+Install dependencies and start Vite from the project directory with your package manager:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Keep Vite running in terminal 1. Start ASP.NET Core in terminal 2:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2
+dotnet watch     # Development environment
 ```
 
-For an existing `AppDb` with a `Posts` set, these two calls show the ordering rules:
+Open the URL printed by `dotnet watch` (not the Vite URL). The first visit to `/` should display “Hello from .NET”.
 
-```csharp
-using Inertia.Net;
-using Microsoft.EntityFrameworkCore;
+For production, run the build command from your row, then publish the app:
 
-// Numbered pages: choose an order first. Id is unique for each post.
-var page = await db.Posts.OrderBy(p => p.Id).ToPageAsync(request, ct: ct);
-
-// Cursor pages: leave the query unordered; the helper orders it by Id.
-var cursorPage = await db.Posts.ToCursorPageAsync(p => p.Id, cursorRequest, ct: ct);
+```sh
+dotnet publish -c Release
 ```
 
-Each result has a `data` array for the current group. A cursor is a marker to send back unchanged to request another group. Choose non-null keys that identify each row uniquely; if several rows share the first key, add a unique second key as a tie-breaker. The [EF Core pagination example](/docs/pagination#with-ef-core) shows how to use the result with `Scroll`. For Native AOT, use the core delegate paginator with an AOT-compatible data source instead.
+Deploy `wwwroot/build` and `app.html` with the published app.
 
-Treat cursor strings as opaque. They are not tamper-proof; protect them with `IDataProtector` if your app requires tamper protection. An invalid nonempty cursor starts at the first page. When a logger is available, a Debug message records that fallback without the cursor value or exception details; see [Cursors](/docs/pagination#cursors).
+## Where to go next
+
+<Cards>
+  <Card title="Client setup" icon="code" href="/docs/client-setup">Vite configuration and the React, Vue and Svelte entries.</Card>
+  <Card title="Props" icon="blocks" href="/docs/props">Lazy, deferred, merged and cached page data.</Card>
+  <Card title="Validation" icon="shield" href="/docs/validation-and-errors">Redirects, error bags and Precognition.</Card>
+  <Card title="Server-side rendering" icon="rocket" href="/docs/server-side-rendering">Render the first visit on Node.</Card>
+</Cards>
 
 ---
 
@@ -800,14 +776,14 @@ This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inerti
 - Props: use `Defer(ct => ...)` for slow data, `Optional(() => ...)` for data loaded only on
   partial reloads, `Merge(...)` for paginated lists and `Once(...)` for data the client can keep.
 - Forms: POST/PUT/PATCH/DELETE endpoints validate with `.WithInertiaValidation()` (Minimal API),
-  the MVC filter or `c.UseInertia()` (FastEndpoints), then redirect. On success return a redirect
+  the MVC filter or `c.ConfigureInertia()` (FastEndpoints), then redirect. On success return a redirect
   or `Back()`. Report custom errors with `Back().WithErrors(...)`. Use `Back().WithFlash(...)` for messages.
 - Keep antiforgery on: `app.UseInertiaAntiforgery()` is required for unsafe requests.
 - Use typed page props (a record per page) for new pages and register them with
   `o.TypeScript.Page<T>("Component")` so the TypeScript types stay generated, not hand written.
 - Test pages with `Inertia.Net.Testing`: `client.InertiaGetAsync(url)` then
   `response.AssertInertiaAsync(page => page.Component(...).Has(...))`.
-- Before finishing: `dotnet build`, `dotnet test`, and `npm run build` (type-checks the client).
+- Before finishing: `dotnet build`, `dotnet test`, and the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`) (type-checks the client).
 ````
 
 If you use Vue or Svelte, change the component path and extension.
@@ -824,7 +800,7 @@ A request like this tells the agent which [props](/docs/props) to use, how [vali
 
 Agents are most reliable when they can verify a change. Inertia.Net gives them a few cheap checks:
 
-- **Compile-time types.** With [generated TypeScript types](/docs/typescript), a prop renamed in C# breaks the client build, so `npm run build` catches mismatches.
+- **Compile-time types.** With [generated TypeScript types](/docs/typescript), a prop renamed in C# breaks the client build, so the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`) catches mismatches.
 - **Response tests.** `Inertia.Net.Testing` asserts the component name and props without a browser. Ask the agent to add one test per page.
 - **Missing components.** In Development, [DevTools checks](/docs/devtools) report a `Render` call whose page component does not exist.
 
@@ -1038,6 +1014,8 @@ The token is `HttpContext.RequestAborted`. An `async` lambda always binds to the
 
 Fluent methods mutate and return the same instance: `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)` and `.Cache(key, duration, staleFor?, tags?)`.
 
+`Fresh()` makes a prop a once prop, and `WithGroup()` makes it deferred. Repeated `MatchOn()` calls add keys. Root `Append()` and `Prepend()` are mutually exclusive and combining them throws. Fluent methods mutate the prop, so create prop instances per request; do not share them across requests.
+
 ## Resolution order
 
 Loaders run sequentially by default, in prop order, and only when their prop is included in the response. That makes a scoped EF Core `DbContext` safe to use in several loaders.
@@ -1216,7 +1194,7 @@ Register `UsersPage` and its value types in your `JsonSerializerContext` under N
 
 ## Dot keys
 
-A top-level key containing dots is unpacked. `["user.name"] = "Ann"` becomes `"user": { "name": "Ann" }`.
+Cached props under dot keys use the cache too. A top-level key containing dots is unpacked. `["user.name"] = "Ann"` becomes `"user": { "name": "Ann" }`.
 
 ## BigInteger safety
 
@@ -1322,12 +1300,20 @@ URL: https://inertia-dotnet.yebi.africa/docs/validation-and-errors
 Inertia forms post, expect a redirect, and read validation errors from `props.errors` on the next page. Inertia.Net performs the redirect and carries the errors across it.
 
 - A field maps to its **first** message. With `o.WithAllErrors = true` it maps to an array of all messages (the client's `form.withAllErrors()` expects that).
-- Error keys are the JSON names of the model members, one naming-policy conversion per segment: `Address.Street` becomes `address.street`.
+- Error keys use dotted indices, for example `items.0.email`. Names use JSON member aliases when metadata exposes them and the applicable naming policy for other members. Dictionary keys are preserved. Minimal API and MVC use the page serializer’s HTTP JSON options; FastEndpoints uses its binding serializer policy. Custom resolvers that omit member metadata and paths without a model schema may fall back to naming-policy conversion; align field names and serializer settings.
 - **Error bags.** The client sends `X-Inertia-Error-Bag: createUser` when the form has `errorBag="createUser"`. Errors arrive as `errors: { createUser: { email: "..." } }`. Without the header, `errors` is the flat object `{ email: "..." }`. A bag stored under a name other than `default` is always nested by bag name.
 
 ```ts
 router.post('/users', data, { errorBag: 'createUser' })
 ```
+
+## Validation libraries
+
+| Backend | Validation |
+|---|---|
+| Minimal API | .NET 10 source-generated DataAnnotations through `AddValidation()`; `ValidationProblem` results; call FluentValidation `IValidator<T>` manually and return `WithErrors` |
+| MVC | MVC model validation and `ModelState` |
+| FastEndpoints | FastEndpoints validators, including FluentValidation |
 
 ## Minimal API
 
@@ -1364,7 +1350,23 @@ app.MapPost("/login", (LoginInput input, SignInService auth) =>
         }));
 ```
 
-`Back().WithErrors(IDictionary<string, string[]> errors, string bag = "default")` also takes arrays of messages.
+`Back().WithErrors(IDictionary<string, string[]> errors, string bag = "default")` also takes arrays of messages. FluentValidation is not automatically integrated into Minimal API `AddValidation()`. Call a registered `IValidator<T>` yourself and map its failures:
+
+```csharp
+app.MapPost("/users", async (CreateUserInput input, IValidator<CreateUserInput> validator) =>
+{
+    var result = await validator.ValidateAsync(input);
+    if (!result.IsValid)
+    {
+        var errors = result.Errors.GroupBy(e => e.PropertyName)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+        return Back().WithErrors(errors);
+    }
+    return Results.Redirect("/users");
+});
+```
+
+Import `FluentValidation` and register your validator. Supply client JSON field names in the dictionary when they differ from its property names.
 
 ## MVC
 
@@ -1384,7 +1386,7 @@ Binding failures get the generic message `The value is invalid.`, because their 
 
 ## FastEndpoints
 
-`c.UseInertia()` adds a global pre-processor. A validation failure of an Inertia non-GET request becomes a redirect back with the errors; other requests keep FastEndpoints' 400 JSON. FluentValidation validators work as usual.
+`c.ConfigureInertia()` adds a global pre-processor. A validation failure of an Inertia non-GET request becomes a redirect back with the errors; other requests keep FastEndpoints' 400 JSON. FluentValidation validators work as usual.
 
 ```csharp
 public sealed class CreateUserValidator : Validator<CreateUserRequest>
@@ -1392,35 +1394,14 @@ public sealed class CreateUserValidator : Validator<CreateUserRequest>
     public CreateUserValidator() => RuleFor(x => x.Email).NotEmpty().EmailAddress();
 }
 
-app.UseFastEndpoints(c => c.UseInertia(ep => ep.AllowAnonymous()));
+app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));
 ```
 
-`c.UseInertia()` sets `c.Endpoints.Configurator`. Pass your own configuration as its argument instead of setting the configurator separately. The pre-processor runs after an endpoint's own pre-processors, so one that already answered (a 403, say) wins.
+`c.ConfigureInertia()` composes with an existing `c.Endpoints.Configurator`. Its optional callback runs after Inertia setup. The pre-processor runs after an endpoint's own pre-processors, so one that already answered (a 403, say) wins.
 
 ## Precognition (live validation)
 
-Precognition validates a form as the user types, without running the handler. A request with `Precognition: true` is validated and answered with:
-
-- `204` and `Precognition-Success: true` when valid;
-- `422` and `{ "message": "...", "errors": { "field": ["..."] } }` when not, limited to the fields in `Precognition-Validate-Only`;
-- `Precognition: true` and `Vary: Precognition` on every response.
-
-```csharp
-// Minimal API: use it instead of WithInertiaValidation(), not in addition.
-app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users"))
-   .WithInertiaPrecognition();
-
-// FastEndpoints: c.UseInertia() already answers Precognition requests.
-```
-
-`WithInertiaPrecognition()` is a superset of `WithInertiaValidation()` and also requires `services.AddValidation()`: normal Inertia validation redirects keep working. Any endpoint filter you add after it does not run for a precognitive request. In MVC, Precognition is not available.
-
-Client (Inertia v3 has it built in):
-
-```tsx
-const form = useForm({ name: '', email: '' }).withPrecognition('post', '/users')
-// <input onBlur={() => form.validate('email')} />
-```
+[Precognition](/docs/precognition) validates a request without running the handler. Minimal APIs use `.WithInertiaPrecognition()` instead of `.WithInertiaValidation()`; FastEndpoints enables it with `ConfigureInertia()`. MVC does not support it.
 
 ## Error bags in the client
 
@@ -1749,6 +1730,10 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ExceptionHandlerOptions>
 exception handler declines requests that do not ask for an Inertia page or HTML, so API exceptions use the host’s ProblemDetails
 fallback and content negotiation. Existing ProblemDetails configuration and earlier application handlers still apply; empty
 status-code responses remain unchanged. Loaded flash and validation state is consumed when an error page renders, as on any other page response.
+
+## Validation, SSR and rate limits
+
+Validation redirects keep their existing behavior. A required SSR failure can be handled by the exception pipeline; configure the error page so it can render without relying on the same failed renderer. Rate-limit responses with an existing body are preserved; configure the rejection response explicitly, including the Precognition header for validation requests. See [Precognition](/docs/precognition#rate-limiting).
 
 ---
 
@@ -2213,7 +2198,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.3
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -2250,6 +2235,10 @@ Register each closed page type in your app's `JsonSerializerContext` along with 
 ```
 
 See [Native AOT](/docs/native-aot).
+
+## Caching and scroll props
+
+A cached page still writes its scroll metadata. Use cache keys that include the page or cursor and all user or tenant dependencies. `Scroll(...)` can be deferred or cached; do not reuse its mutable prop instance across requests. Root `Append()` and `Prepend()` cannot be combined on the same prop. See [Props](/docs/props#cached-props) and [Infinite scroll](/docs/infinite-scroll).
 
 ---
 
@@ -2440,7 +2429,7 @@ router.on('live', (event) => {
 
 ```sh
 dotnet add package Inertia.Net.Live.SignalR
-npm install @microsoft/signalr
+npm install @microsoft/signalr # or: bun add, pnpm add, yarn add @microsoft/signalr
 ```
 
 ```csharp
@@ -2513,6 +2502,236 @@ await response.AssertInertiaAsync(page => page
     .HasLive("order")
     .HasLive("order", "private:orders.1", "OrderUpdated"));
 ```
+
+## Limits, proxies and authorization changes
+
+SignalR defaults to 64 subscriptions per connection and a 200-character channel name. Configure `MaxSubscriptionsPerConnection` and `MaxChannelNameLength` through the SignalR options; both must be positive. Behind a TLS-terminating proxy configure trusted forwarded headers once and run `UseForwardedHeaders()` before the hub so origin and scheme checks see the external address.
+
+Authorization is checked when a client subscribes, not continuously. If access changes, disconnect the client or use a transport/application strategy that enforces revocation. A `removed` event can tell the UI to update, but it is not a security revocation mechanism.
+
+---
+
+# Precognition
+
+URL: https://inertia-dotnet.yebi.africa/docs/precognition
+
+> Validate a form before submission without running its handler.
+
+Precognition sends the same POST as the form with `Precognition: true`. The server validates it and returns without running the handler:
+
+```http
+POST /users HTTP/1.1
+Precognition: true
+Precognition-Validate-Only: email
+Content-Type: application/json
+
+{"email":"invalid"}
+
+HTTP/1.1 422 Unprocessable Entity
+Precognition: true
+Vary: Precognition
+Content-Type: application/json
+
+{"message":"The email field is not a valid e-mail address.","errors":{"email":["The email field is not a valid e-mail address."]}}
+```
+
+A valid request returns `204` and `Precognition-Success: true`. For Minimal APIs register `AddValidation()` and use:
+
+```csharp
+app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users"))
+   .WithInertiaPrecognition();
+```
+
+This replaces `.WithInertiaValidation()`; do not use both. It also handles normal validation redirects. Filters added after it do not run on precognitive requests. FastEndpoints enables this through `c.ConfigureInertia()`; MVC does not support Precognition.
+
+## Client setup
+
+Inertia 3 includes Precognition in its form integration. Each example validates on blur and displays the error:
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+import { useForm } from '@inertiajs/react'
+
+export default function UserForm() {
+  const form = useForm({ email: '' }).withPrecognition('post', '/users')
+  form.setValidationTimeout(3000)
+  return (
+    <form onSubmit={e => { e.preventDefault(); form.post('/users') }}>
+      <input value={form.data.email} onChange={e => form.setData('email', e.target.value)}
+        onBlur={() => form.validate('email')} />
+      {form.validating && <span>Validating…</span>}
+      {form.errors.email && <p>{form.errors.email}</p>}
+      <button type="submit">Save</button>
+    </form>
+  )
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup>
+import { useForm } from '@inertiajs/vue3'
+const form = useForm({ email: '' }).withPrecognition('post', '/users')
+form.setValidationTimeout(3000)
+</script>
+<template>
+  <input v-model="form.email" @blur="form.validate('email')" />
+  <span v-if="form.validating">Validating…</span>
+  <p v-if="form.errors.email">{{ form.errors.email }}</p>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script>
+  import { useForm } from '@inertiajs/svelte'
+  const form = useForm({ email: '' }).withPrecognition('post', '/users')
+  form.setValidationTimeout(3000)
+</script>
+<input bind:value={form.email} onblur={() => form.validate('email')} />
+{#if form.validating}<span>Validating…</span>{/if}
+{#if form.errors.email}<p>{form.errors.email}</p>{/if}
+```
+
+  </Tab>
+</Tabs>
+
+`Precognition-Validate-Only` selects returned errors by field, including nested paths. Validation still runs the validator: keep database rules cheap. Validate on blur for login and payment forms to avoid an error while the user is still typing. `setValidationTimeout(3000)` raises the debounce interval for expensive rules; it is not the HTTP deadline.
+
+## Antiforgery and authorization
+
+`UseInertiaAntiforgery()` validates precognitive POSTs like other unsafe requests; the Inertia client sends the token automatically. Authorization middleware runs before endpoint filters, so protected forms validate only for authorized users.
+
+## Rate limiting
+
+Precognitive POSTs pass through rate limiting before the endpoint filter, so using a single strict login bucket can lock users out while typing. Use separate bounded partitions for validation and real submissions, and check endpoint `InertiaPrecognitionMetadata` as well as `InertiaPrecognition.IsPrecognitive(request)`: the header alone does not guarantee the handler is skipped. Do not use `GetNoLimiter` for validation; validators consume CPU and may query a database. With the metadata present the handler is skipped, so the validation bucket does not allow credential attempts.
+
+On a rejected precognitive request set `Precognition: true` on the 429 response. This lets the client recognize the response; the validation request still rejects, so provide a retry or error message. Run `UseRouting`, `UseRateLimiter`, `UseInertia` and `UseInertiaAntiforgery` in that order. See the example below for a complete policy.
+
+The following `AddServices` method is copied from the Minimal API sample's `LoginDemo` class. The sample's `_generation` field exists only to reset E2E test buckets; real apps can partition on a stable client identity appropriate to their deployment. Import `System.Globalization`, `System.Threading.RateLimiting` and `Microsoft.AspNetCore.RateLimiting`, and declare `private static int _generation;` and `private static int _submissions;` in that class. The [complete sample class](https://github.com/adzamkomladev/Inertia.Net/blob/main/samples/MinimalApi.React/LoginDemo.cs) includes `LoginForm`, `LoginPage`, and the reset helper:
+
+```csharp
+    public static void AddServices(IServiceCollection services)
+    {
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("login", http =>
+            {
+                var validation = http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
+                    && InertiaPrecognition.IsPrecognitive(http.Request);
+                var client = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                // The generation lets the sample's E2E reset endpoint give each test fresh buckets.
+                var generation = Volatile.Read(ref _generation);
+                if (validation)
+                {
+                    return RateLimitPartition.GetSlidingWindowLimiter($"validation:{client}:{generation}", _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                    });
+                }
+
+                return RateLimitPartition.GetFixedWindowLimiter($"submit:{client}:{generation}", _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                });
+            });
+            options.OnRejected = (context, _) =>
+            {
+                var http = context.HttpContext;
+                if (http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
+                    && InertiaPrecognition.IsPrecognitive(http.Request))
+                {
+                    http.Response.Headers[InertiaPrecognition.Header] = "true";
+                    http.Response.Headers.Append("Vary", InertiaPrecognition.Header);
+                }
+
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    http.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+                return ValueTask.CompletedTask;
+            };
+        });
+    }
+```
+
+Register it before building the app and attach the policy to the endpoint:
+
+```csharp
+LoginDemo.AddServices(builder.Services);
+// After builder.Build():
+app.UseInertiaErrorPages(); // wraps rate-limit and page responses
+app.UseRouting();
+app.UseRateLimiter();
+app.UseInertia();
+app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
+LoginDemo.MapRoutes(app);
+```
+
+The sample routes use this method:
+
+```csharp
+    public static void MapRoutes(WebApplication app)
+    {
+        app.MapGet("/login", () => Render("Login", new LoginPage(Volatile.Read(ref _submissions))));
+        app.MapPost("/login", (LoginForm input) =>
+        {
+            Interlocked.Increment(ref _submissions);
+            return Back().WithFlash("success", "Demo form submitted");
+        }).WithInertiaPrecognition().RequireRateLimiting("login");
+    }
+```
+
+The sample partitions by remote IP for demonstration; configure trusted forwarded headers when behind a proxy and choose a partition key suited to your authentication and abuse model.
+
+## Testing
+
+With an `Inertia.Net.Testing` client that retains cookies, load the form page and attach its XSRF token. For an endpoint that validates `email`:
+
+```csharp
+using var page = await client.InertiaGetAsync("/users/create");
+async Task<HttpResponseMessage> ValidateAsync(string email)
+{
+    using var request = new HttpRequestMessage(HttpMethod.Post, "/users")
+    {
+        Content = JsonContent.Create(new { email }),
+    };
+    request.WithXsrfToken(page);
+    request.Headers.Add(InertiaPrecognition.Header, "true");
+    request.Headers.Add(InertiaPrecognition.ValidateOnlyHeader, "email");
+    return await client.SendAsync(request);
+}
+using var valid = await ValidateAsync("ann@example.com");
+Assert.Equal(HttpStatusCode.NoContent, valid.StatusCode);
+Assert.Equal("true", valid.Headers.GetValues(InertiaPrecognition.SuccessHeader).Single());
+using var invalid = await ValidateAsync("invalid");
+Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+using var body = JsonDocument.Parse(await invalid.Content.ReadAsStringAsync());
+Assert.True(body.RootElement.GetProperty("errors").TryGetProperty("email", out _));
+```
+
+Import `System.Net`, `System.Net.Http.Json`, `System.Text.Json`, `Inertia.Net` and `Inertia.Net.Testing`. [Testing](/docs/testing#testing-a-form-with-antiforgery) shows the client and token setup.
+
+## Protocol reference
+
+| Header | Direction | Meaning |
+|---|---|---|
+| `Precognition: true` | Request and response | Identifies a validation request and response |
+| `Precognition-Validate-Only` | Request | Comma-separated client field paths whose errors are returned |
+| `Precognition-Success: true` | Response | Validation succeeded (204) |
+| `Vary: Precognition` | Response | Varies the response by request type |
+
+A validation failure returns `422`; a limiter may return `429`. `InertiaPrecognition.IsPrecognitive(HttpRequest)` checks the header; `InertiaPrecognitionMetadata` identifies endpoints whose handler is skipped for these requests.
 
 ---
 
@@ -2769,6 +2988,12 @@ Concurrent misses for the same page share one fill per app instance. Waiting cou
 With `StaleFor`, a render past its `Duration` is still served and refreshed by the bounded background worker after response completion, like stale props. The connection can accept its next request while the renderer runs. Refreshes cancel when the host stops. If the 64-entry queue is full, the refresh is dropped and logged; monitor `inertia.cache.refresh.dropped` with `inertia.cache.kind=ssr`. `IInertiaCache.ClearSsrAsync()` removes every render.
 
 `Ssr.ConnectTimeout` bounds connection establishment independently of `Ssr.Timeout`; both accept a positive duration or `Timeout.InfiniteTimeSpan`. In Required mode, `InertiaSsrException.Message` contains a generic failure category suitable for an error page. Renderer diagnostics remain in application logs and diagnostic exception properties; do not expose those properties to clients.
+
+## Connection timeout and cached renders
+
+`Ssr.ConnectTimeout` defaults to five seconds and limits connection establishment; `Ssr.Timeout` bounds the entire render. In `Required` mode, exceptions use a generic public message; diagnostic properties can contain private renderer details, so do not display them to users.
+
+A stale SSR cache hit returns immediately and schedules refresh on a bounded background worker. Its queue holds 64 pending refreshes; a dropped refresh logs a warning and increments `inertia.cache.refresh.dropped` with `inertia.cache.kind=ssr`. Cached prop loaders used with stale refresh must use singleton dependencies or create their own scope; never capture request-scoped services or `HttpContext`. Global `Ssr.Cache.Duration` is suitable for anonymous pages. Prefer per-page `WithSsrCache` and keys that account for all user and tenant data.
 
 ---
 
@@ -3076,6 +3301,10 @@ The SSR health check is covered in [Server-side rendering](/docs/server-side-ren
 - [ ] SSR listens on loopback and its bundle is deployed when SSR is enabled.
 - [ ] The client build and server build are the same version, so `X-Inertia-Version` converges.
 
+## Hosts and SSR failures
+
+Keep `AllowedHosts` configured: an asset-version mismatch response includes the request URL. `Ssr.ConnectTimeout` bounds connection establishment (five seconds by default). In `SsrMode.Required`, the exception message is generic; diagnostic properties may contain private renderer details and should stay in trusted logs.
+
 ---
 
 # Native AOT
@@ -3240,6 +3469,22 @@ Keep pages well under a megabyte:
 
 Most per-request allocation in a real handler is the props you build, not the render.
 
+## Paired render measurements
+
+Warm, in-process probes on .NET 10 compared 32 alternating rounds in two runs. Times are medians of within-round ratios; B/op values are from run 2.
+
+| Workload | Before B/op | After B/op | Run 1 paired time | Run 2 paired time |
+|---|---:|---:|---:|---:|
+| JSON, 20 mixed props | 1,736 | 1,736 | −1.6% | −0.6% |
+| Integer-key dictionary, 1,000 props | 176,592 | 166,688 | −52.2% | −53.7% |
+| GUID-key dictionary, 500 rows | 140,712 | 140,304 | −28.5% | −33.0% |
+| Eight scroll props, append wrappers | 6,664 | 6,088 | −2.2% | −3.4% |
+| Eight scroll props, prepend wrappers | 6,880 | 6,112 | −6.2% | −5.4% |
+
+These synthetic measurements do not establish HTTP throughput or general latency. Pooled entries grow from 24 to 32 bytes, so warm savings do not imply a smaller cold or concurrent pool footprint. Full methods, controls and rejected candidates are in [benchmark results](https://github.com/adzamkomladev/Inertia.Net/blob/main/tests/Inertia.Net.Benchmarks/RESULTS.md).
+
+Parallel prop planning and DevTools recording each use a process-wide latch that remains active after first use. Measure with the features used by your own app.
+
 ---
 
 # Configuration
@@ -3293,6 +3538,8 @@ Core configuration is passed to `AddInertia`; error page options use `AddInertia
 | `PrefetchConcurrency` | `3` | Chunks `Waterfall` downloads at a time. |
 
 ## `o.Ssr`: `SsrOptions`
+
+`Ssr.ConnectTimeout` bounds connection establishment separately from the rendering deadline and defaults to five seconds; use a positive supported duration or `Timeout.InfiniteTimeSpan`.
 
 | Option | Default | Description |
 |---|---|---|
@@ -3354,13 +3601,13 @@ See [Error pages](/docs/error-pages) for setup, shared props and existing except
 | `app.UseInertia()` | The protocol middleware. Before the endpoints; after `UseSession()` when used. |
 | `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates unsafe requests (`419` on failure). |
 | `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |
-| `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder and read API. |
+| `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder and read API. A warning is logged when recording is enabled outside Development without an `Authorize` callback; the read API then returns 404. |
 | `app.UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` | Only writes the token cookie; validation is up to you. |
 | `endpoint.WithInertiaValidation()` | Minimal API: validation failures redirect back with errors. |
 | `endpoint.WithInertiaPrecognition()` | Minimal API: `WithInertiaValidation()` plus Precognition. |
 | `healthChecks.AddInertiaSsr(...)` | SSR health check from the gateway's state. |
 | `mvc.AddInertiaMvc(o => o.UseRazorRootView("App"))` | MVC filter, optional Razor root view and component resolver. |
-| `config.UseInertia(configure?)` | FastEndpoints: validation redirect and Precognition. |
+| `config.ConfigureInertia(configure?)` | FastEndpoints: validation redirect and Precognition. |
 | `Render(component, props?)` | `InertiaResult`: `.WithStatusCode`, `.WithRootView`, `.WithViewData`, `.WithSsr`, `.WithoutSsr`, `.WithSsrCache`. |
 | `Location(url)` | `InertiaLocationResult`. |
 | `Back(fallback = "~/")` | `InertiaBackResult`: `.WithErrors`, `.WithFlash`. |
@@ -3370,6 +3617,12 @@ See [Error pages](/docs/error-pages) for setup, shared props and existing except
 ## Extension points
 
 `IInertiaRootView`, `IInertiaStateStore`, `ViteAssets`, `InertiaRequest` (parsed headers), `InertiaHeaders` (header name constants), `InertiaSsrException`, `InertiaSsr.HttpClientName` (the SSR HTTP client) and `InertiaDiagnostics` (meter and activity source names).
+
+## Name collisions
+
+The package imports `Inertia.Net` and static members of `Inertia.Net.Inertia` when implicit usings are enabled. If a name such as `Location` collides with a type, use `Inertia.Net.Inertia.Location(url)`. To manage imports yourself, set `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` in the project and add `using Inertia.Net;` and `using static Inertia.Net.Inertia;` where needed.
+
+`InertiaPropJsonConverter`, `InertiaSsrHealthCheck`, `InertiaCacheEntryKind`, `InertiaCacheEntryOptions`, `InertiaPagesOptions`, `InertiaPrecognition.IsPrecognitive(...)` and `InertiaPrecognitionMetadata` are public APIs for serialization, health checks, cache stores, page checks and precognitive request handling.
 
 ---
 
@@ -3552,6 +3805,28 @@ var except = await page.ReloadExceptAsync(_client, "users");
 Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies. Disable `AllowAutoRedirect` to assert the redirect itself, then follow it with a second `InertiaGetAsync` to read the flash or errors.
 </Callout>
 
+## Testing a form with antiforgery
+
+Keep cookies and disable redirects on the test client. Load the form first, then send its XSRF token on the Inertia POST and follow the redirect:
+
+```csharp
+using var formPage = await _client.InertiaGetAsync("/users/create");
+using var request = new HttpRequestMessage(HttpMethod.Post, "/users")
+{
+    Content = JsonContent.Create(new { email = "" }),
+};
+request.Headers.Add("X-Inertia", "true");
+request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+request.Headers.Referrer = new Uri(_client.BaseAddress!, "/users/create");
+request.WithXsrfToken(formPage);
+using var response = await _client.SendAsync(request);
+Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+using var redirected = await _client.InertiaGetAsync("/users/create");
+await redirected.AssertInertiaAsync(page => page.HasErrors().HasError("email"));
+```
+
+Import `System.Net` and `System.Net.Http.Json`. For a named bag use `HasErrorBag("createUser")` and `HasError("email", bag: "createUser")`. Dotted keys such as `items.0.email` are matched as flat error keys; with all errors enabled a message assertion matches any message. `GetXsrfToken()` and `WithXsrfToken()` accept custom cookie and header names. The cookie container must retain the antiforgery cookie as well as the Inertia state cookie.
+
 ---
 
 # DevTools
@@ -3613,54 +3888,7 @@ The development startup also writes TypeScript declarations when `o.TypeScript.O
 Install the Inertia DevTools extension, open your app in Development, and use the extension's panel. The server entries are correlated by the `X-Inertia-Devtools-Id` header.
 </Callout>
 
----
-
-# Migrating from other adapters
-
-URL: https://inertia-dotnet.yebi.africa/docs/migrating
-
-> Map an InertiaCore-style API to Inertia.Net and check the behavior differences.
-
-The API is close to the Laravel adapter's names. The table maps the typical InertiaCore-style API (kapi2289/InertiaCore and its forks). Check names against the version you use.
-
-| Other adapters | Inertia.Net |
-|---|---|
-| `Inertia.Render("Users/Index", new { users })` | `Render("Users/Index", new InertiaProps { ["users"] = users })`, or a typed props object |
-| `return Inertia.Render(...)` in a controller (`Task<IActionResult>`) | `return Render(...)` as `IResult` (MVC executes it) |
-| `Inertia.Lazy(() => ...)` / `LazyProp` | `Optional(() => ...)` (never on first load) or `Prop(() => ...)` (lazy, included by default) |
-| `Inertia.Defer(...)` / `Inertia.Defer(..., "group")` | `Defer(..., group: "group")` |
-| `Inertia.Always(...)` | `Always(...)` |
-| `Inertia.Merge(...)` / `DeepMerge` | `Merge(...)`, `DeepMerge(...)`, plus `.Prepend()`, `.MatchOn()` |
-| (not supported) | `Once(...)`, `Scroll(...)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)` |
-| `Inertia.Share("key", value)` | `o.Share("key", value)`, `o.Share("key", ctx => ...)`, or `ctx.Inertia().Share(...)` |
-| `Inertia.Location(url)` | `Location(url)` |
-| `Inertia.Back()` | `Back()` / `Back(fallback)` |
-| `Inertia.ClearHistory()`, `Inertia.EncryptHistory()` | `ctx.Inertia().ClearHistory()`, `ctx.Inertia().EncryptHistory()` (per request, no shared state) |
-| `Inertia.Html(...)` / `Inertia.Head` in `_Layout.cshtml` | `app.html` with `@inertia`, `@inertiaHead`, `@vite(...)`, or the Razor tag helpers |
-| Flash via `TempData` or session | `ctx.Inertia().Flash(...)`, `Back().WithFlash(...)` (encrypted cookie by default) |
-| `ModelState` errors in session | MVC: `AddInertiaMvc()`; Minimal API: `.WithInertiaValidation()`; FastEndpoints: `c.UseInertia()` |
-| `Version` option or manifest hashing per request | `o.Version`, `o.VersionResolver`, or the cached manifest hash |
-| SSR options (`UseSsr`, `SsrUrl`) | `o.Ssr.Mode`, `o.Ssr.Urls`, `o.Ssr.ExcludePaths`, `Render(...).WithSsr(...)` |
-
-## Behavior differences to check
-
-- **v3 only.** There is no v2 client support. Upgrade the client packages to v3. The first page is the `<script data-page="app">` element, not a `data-page` attribute on the root div.
-- **Props are resolved without reflection.** Anonymous types need reflection-enabled serialization, and AOT apps register a `JsonSerializerContext`.
-- **HTTP JSON options.** Props serialize with the HTTP JSON options (camelCase by default), not Newtonsoft.
-- **Version check before the handler.** A stale client gets a `409` before your endpoint runs.
-- **State is an encrypted cookie by default.** Flash, errors and history flags use it unless you opt into the session store.
-
-## Upgrading Inertia.Net
-
-Package upgrade notes live in the repository:
-
-- [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md)
-- [1.3 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.3.md)
-- [1.1 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.1.md)
-
-<Callout type="tip" title="Use the same version">
-Update all Inertia.Net packages together. Mixing 1.5 with 1.4 packages can compile but produce different protocol output.
-</Callout>
+If recording is enabled outside Development without an `Authorize` callback, the app logs a warning and the read API returns 404. Map the reader with `MapInertiaDevTools()` and authorize its users. The recorder's process-wide latch remains active once used; parallel-prop planning also uses a process-wide latch after its first use.
 
 ---
 
@@ -3681,7 +3909,7 @@ The global usings come from the package's `buildTransitive` props and need `<Imp
     Inside a namespace that starts with `Inertia.Net.`, the name `Inertia` binds to the `Inertia.Net.Inertia` class. Source generators that emit non-`global::` names starting with `Inertia` then break. Do not put your app's code under an `Inertia.Net.*` namespace.
   </AccordionItem>
   <AccordionItem title="Vite manifest not found. Looked in: ...">
-    Run `npm run build`, or start the dev server so the hot file exists in Development, or set `o.Vite.ManifestPath` / `o.Vite.BuildDirectory`. Check that Vite writes `.vite/manifest.json` (`build.manifest: true`, Vite 5 and later) to `wwwroot/build`, and that the build output is part of what you deploy.
+    Run your package manager’s build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`), or start the dev server so the hot file exists in Development, or set `o.Vite.ManifestPath` / `o.Vite.BuildDirectory`. Check that Vite writes `.vite/manifest.json` (`build.manifest: true`, Vite 5 and later) to `wwwroot/build`, and that the build output is part of what you deploy.
   </AccordionItem>
   <AccordionItem title="Vite entry '...' was not found in the manifest">
     The `@vite("...")` argument must equal the manifest key, which is the path relative to the Vite root. The error lists the available entries.
@@ -3743,7 +3971,7 @@ Use `.WithInertiaValidation()` on the endpoint. Without it, the built-in `AddVal
 
 ## Validation keys do not match my field names
 
-Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). In MVC the policy is the one in the MVC `JsonOptions`. The page itself is written with the HTTP `JsonOptions`: keep both policies aligned.
+Keys use dotted indices and available JSON member aliases. Minimal API and MVC use the page serializer’s HTTP JSON options and FastEndpoints its binding serializer policy; keep these aligned with client field names. Metadata-free or custom resolver paths can fall back to naming-policy conversion. See [Validation](/docs/validation-and-errors).
 
 ## InertiaProp values can only be serialized by Inertia.Net
 
@@ -3788,6 +4016,26 @@ No. Props use System.Text.Json with the HTTP JSON options.
 
 Yes. Inertia handles only the endpoints that return `Render(...)`. The middleware leaves other responses alone, apart from `Vary: X-Inertia`.
 
+## Forms submit invalid data
+
+Minimal API endpoints need `.WithInertiaValidation()` or `.WithInertiaPrecognition()` and `AddValidation()`. Endpoint construction throws when validation resolvers are missing; routing can construct endpoints lazily. See [Validation](/docs/validation-and-errors).
+
+## 419 in tests
+
+Use a cookie-preserving client, load an Inertia page first, then use `request.WithXsrfToken(pageResponse)` on the form request. See [Testing](/docs/testing#testing-a-form-with-antiforgery).
+
+## Precognition: login locks users out while typing
+
+Precognitive POSTs pass through rate limiting. Use separate bounded validation and submission partitions and validate on blur; see [Precognition](/docs/precognition#rate-limiting). A throttled validation still rejects, so show a retry message.
+
+## 'Location' is a type but is used like a variable
+
+The imported static `Location` name may collide with a type. Call `Inertia.Net.Inertia.Location(url)` explicitly, or opt out with `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` and add your own imports. See [Configuration](/docs/configuration#name-collisions).
+
+## A cached prop loader runs every request
+
+Check that the key and duration are stable and the cache store works. Dot-key props support caching; include every user or tenant dependency in the cache key. A stale refresh needs its own scope and may be dropped when the background queue is full. See [Props](/docs/props#cached-props).
+
 ---
 
 # Build a todo app
@@ -3800,12 +4048,14 @@ ForgetMeNot is a small todo app, but it uses the same pieces as a real product: 
 
 <Callout type="info" title="What you need">
 - .NET 10 SDK
-- Bun 1.4 or newer
+- JavaScript tooling with npm, Bun, pnpm or Yarn
 - A code editor
 - A terminal
 
 No database server is required. ForgetMeNot uses SQLite, and the template already gives you a working React app.
 </Callout>
+
+Commands below use Bun; npm, pnpm and Yarn work as alternatives. The production example uses Bun as its SSR runtime.
 
 This guide is for someone who has not built an Inertia app before. Run the commands, look at the checkpoints, and only move on when the app behaves the way the checkpoint says.
 
@@ -3825,13 +4075,13 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.2
+dotnet new install Inertia.Net.Templates::1.6.3
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install
 ```
 
-Start the two development processes. Keep both terminals open:
+For npm, pnpm or Yarn, use `npm install`, `pnpm install` or `yarn install`. Start the two development processes. Keep both terminals open:
 
 ```sh
 # terminal 1
@@ -3841,7 +4091,7 @@ bun run dev
 dotnet watch
 ```
 
-Open `http://localhost:5180`. You should see the template home page and a working Todos page. Click around before changing anything.
+Alternatively run `npm run dev`, `pnpm run dev` or `yarn run dev` in terminal 1. Open `http://localhost:5180`. You should see the template home page and a working Todos page. Click around before changing anything.
 
 <Callout type="tip" title="Checkpoint">
 If the app does not load, run `dotnet new inertia --help` and confirm the template version. The frontend must be started before `dotnet watch` reads the Vite hot file, but a refresh is enough if you started them in the other order.
@@ -3870,6 +4120,8 @@ Install the packages:
 bun add -d tailwindcss @tailwindcss/vite
 bun add class-variance-authority clsx tailwind-merge lucide-react
 ```
+
+For npm use `npm install -D tailwindcss @tailwindcss/vite` and `npm install class-variance-authority clsx tailwind-merge lucide-react`. For pnpm or Yarn substitute `pnpm add -D` / `pnpm add` or `yarn add -D` / `yarn add`.
 
 Update `vite.config.ts`:
 
@@ -3920,11 +4172,13 @@ Now initialize shadcn/ui from the project directory:
 bunx --bun shadcn@latest init
 ```
 
-Accept the defaults. When it asks for the CSS file, choose `ClientApp/app.css`; when it asks for the import alias, use `@/`. Then add the components we need:
+For npm, pnpm or Yarn use `npx shadcn@latest init`, `pnpm dlx shadcn@latest init` or `yarn dlx shadcn@latest init`. Accept the defaults. When it asks for the CSS file, choose `ClientApp/app.css`; when it asks for the import alias, use `@/`. Then add the components we need:
 
 ```sh
 bunx --bun shadcn@latest add button card input label badge checkbox separator
 ```
+
+For the add command use `npx shadcn@latest add ...`, `pnpm dlx shadcn@latest add ...` or `yarn dlx shadcn@latest add ...` with the same component names.
 
 <Callout type="tip" title="Checkpoint">
 `ClientApp/components/ui/` should now contain `button.tsx`, `card.tsx`, `input.tsx` and the other components. If the CLI asks a question you do not understand, choose the default; you can always rerun it.
@@ -5027,14 +5281,14 @@ For the public route, sign out first and assert that `remindAt` and the owner's 
 
 ## 13. Run it in production
 
-Build both bundles with Bun:
+Build both bundles with your package manager:
 
 ```sh
 bun run build
 dotnet publish -c Release
 ```
 
-ForgetMeNot starts `ssr/ssr.js` with Bun. The container pattern is in the docs app and the published samples:
+Use `npm run build`, `pnpm run build` or `yarn run build` instead if preferred. ForgetMeNot starts `ssr/ssr.js` with Bun; install Bun in the production environment or configure a compatible Node runtime. The container pattern is in the docs app and the published samples:
 
 - `Dockerfile` from `docs/Inertia.Net.Docs`
 - `samples/Inkwell/Dockerfile` for a single app with SQLite and Bun SSR

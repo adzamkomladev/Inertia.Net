@@ -1,0 +1,55 @@
+---
+title: First 10 minutes
+description: Start a template app, try its validated form, and test the redirect.
+section: Get started
+order: 3
+---
+
+Create the React starter (choose `vue` or `svelte` for another client):
+
+```sh
+dotnet new install Inertia.Net.Templates::1.6.3
+dotnet new inertia -n MyApp --framework react
+cd MyApp
+npm install
+npm run dev
+```
+
+Use `bun install` and `bun run dev`, `pnpm install` and `pnpm run dev`, or `yarn install` and `yarn run dev` if you prefer. In a second terminal run `dotnet run`. Open the app's address and visit `/todos`; submit an empty title to see the validation message. The template includes Vite, antiforgery and a complete form.
+
+The handler in `Program.cs` is:
+
+```csharp
+app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
+{
+    todos.Add(input.Title!);
+    http.Inertia().Flash("success", "Todo added");
+    return Results.Redirect("/todos");
+}).WithInertiaValidation();
+```
+
+`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The client form uses `useForm` and displays `form.errors.title`.
+
+To test the round trip, add `Inertia.Net.Testing` and `Microsoft.AspNetCore.Mvc.Testing` to a test project, expose `public partial class Program;` in the app, and create a cookie-preserving `WebApplicationFactory<Program>` client with `AllowAutoRedirect = false`:
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using Inertia.Net.Testing;
+
+using var page = await client.InertiaGetAsync("/todos");
+using var request = new HttpRequestMessage(HttpMethod.Post, "/todos")
+{
+    Content = JsonContent.Create(new { title = "" }),
+};
+request.Headers.Add("X-Inertia", "true");
+request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+request.Headers.Referrer = new Uri(client.BaseAddress!, "/todos");
+request.WithXsrfToken(page);
+using var response = await client.SendAsync(request);
+Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+using var redirected = await client.InertiaGetAsync("/todos");
+await redirected.AssertInertiaAsync(p => p.HasErrors().HasError("title"));
+```
+
+See [Testing](/docs/testing) for named error bags and custom XSRF names, and [Quick start](/docs/quick-start) for an existing application.

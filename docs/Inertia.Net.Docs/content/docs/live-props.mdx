@@ -186,7 +186,7 @@ router.on('live', (event) => {
 
 ```sh
 dotnet add package Inertia.Net.Live.SignalR
-npm install @microsoft/signalr
+npm install @microsoft/signalr # or: bun add, pnpm add, yarn add @microsoft/signalr
 ```
 
 ```csharp
@@ -259,3 +259,9 @@ await response.AssertInertiaAsync(page => page
     .HasLive("order")
     .HasLive("order", "private:orders.1", "OrderUpdated"));
 ```
+
+## Limits, proxies and authorization changes
+
+SignalR defaults to 64 subscriptions per connection and a 200-character channel name. Configure `MaxSubscriptionsPerConnection` and `MaxChannelNameLength` through the SignalR options; both must be positive. Behind a TLS-terminating proxy configure trusted forwarded headers once and run `UseForwardedHeaders()` before the hub so origin and scheme checks see the external address.
+
+Authorization is checked when a client subscribes, not continuously. If access changes, disconnect the client or use a transport/application strategy that enforces revocation. A `removed` event can tell the UI to update, but it is not a security revocation mechanism.

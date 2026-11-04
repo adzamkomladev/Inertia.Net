@@ -18,26 +18,26 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.6.2
-dotnet add package Inertia.Net.Mvc --version 1.6.2            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.6.2  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.6.2        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.6.2   # live props over SignalR
+dotnet add package Inertia.Net --version 1.6.3
+dotnet add package Inertia.Net.Mvc --version 1.6.3            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.6.3  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.3 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.6.3        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.6.3   # live props over SignalR
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.6.2 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.6.3 implements Inertia.js v3.
 
 ## Requirements
 
 - .NET 10 SDK and an `Microsoft.NET.Sdk.Web` project.
-- JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js at runtime.
+- JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js or Bun at runtime.
 - An Inertia.js v3 client: `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte`.
 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.2
+dotnet new install Inertia.Net.Templates::1.6.3
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
