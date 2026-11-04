@@ -12,6 +12,13 @@ public sealed class AssertableInertia : AssertableJsonBase<AssertableInertia>
 
     private static void Fail(string message) => throw new InertiaAssertionException(message);
 
+    /// <summary>Asserts the HTTP response status code.</summary>
+    public AssertableInertia Status(int expected)
+    {
+        if (_page.StatusCode != expected) Fail($"Unexpected Inertia response status: expected [{expected}] but was [{_page.StatusCode}].");
+        return this;
+    }
+
     /// <summary>Asserts the page component.</summary>
     public AssertableInertia Component(string expected)
     {

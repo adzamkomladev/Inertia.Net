@@ -12,6 +12,9 @@ public sealed partial class InertiaPage
 
     private InertiaPage(JsonObject raw, JsonObject props) => (Raw, Props) = (raw, props);
 
+    /// <summary>The HTTP response status code, including non-success error page responses.</summary>
+    public int StatusCode { get; private init; }
+
     /// <summary>The whole page object.</summary>
     public JsonObject Raw { get; }
 
@@ -121,7 +124,7 @@ public sealed partial class InertiaPage
         if (raw["component"] is not JsonValue c || !c.TryGetValue<string>(out _)) throw Invalid("page has no string 'component'.");
         if (raw["url"] is not JsonValue u || !u.TryGetValue<string>(out _)) throw Invalid("page has no string 'url'.");
         if (raw["props"] is not JsonObject props) throw Invalid("page has no 'props' object.");
-        return new InertiaPage(raw, props);
+        return new InertiaPage(raw, props) { StatusCode = (int)response.StatusCode };
     }
 
     /// <summary>Partial reload asking only for <paramref name="only"/>; asserts that those props exist in the result.</summary>

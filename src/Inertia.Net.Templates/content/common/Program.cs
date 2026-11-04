@@ -22,6 +22,8 @@ builder.Services.AddInertia(o =>
     o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";
     o.TypeScript.Page<HomePage>("Home").Page<TodosPage>("Todos/Index").FlashData<Flash>();
 });
+// Render the Error page for production navigation errors; Development keeps its diagnostics.
+builder.Services.AddInertiaErrorPages();
 builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension, in Development only
 
 var app = builder.Build();
@@ -38,6 +40,7 @@ app.UseStaticFiles(new StaticFileOptions
         }
     },
 });
+app.UseInertiaErrorPages(); // before UseInertia(): also handles unmatched routes and unhandled exceptions
 app.UseInertia();
 app.UseInertiaAntiforgery(); // after UseAuthentication() once the app has sign-in
 app.MapInertiaDevTools();

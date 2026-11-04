@@ -20,6 +20,7 @@ Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt
 - [Validation](https://inertia-dotnet.yebi.africa/docs/validation-and-errors): Redirect back with validation errors for Minimal APIs, MVC and FastEndpoints, and add Precognition.
 - [Flash data](https://inertia-dotnet.yebi.africa/docs/flash-data): Carry a one-time message, toast or typed value across a redirect.
 - [Redirects and history](https://inertia-dotnet.yebi.africa/docs/redirects-and-history): Redirects, Back, Location, history encryption, clearing and URL fragments.
+- [Error pages](https://inertia-dotnet.yebi.africa/docs/error-pages): Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.
 
 ## Loading data
 

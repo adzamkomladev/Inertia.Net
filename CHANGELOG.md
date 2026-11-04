@@ -7,6 +7,13 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+### Added
+
+- Production Inertia error pages through `AddInertiaErrorPages()` and `UseInertiaErrorPages()`, with per-status components,
+  shared props, optional extra props and Development opt-in. Inertia requests receive JSON pages; HTML navigations use the root
+  template and SSR. API responses, existing bodies, redirects, protocol 409s and antiforgery 419s keep their existing handling.
+- Error pages in the React, Vue and Svelte samples and starter templates, plus non-success response status assertions in the testing helpers.
+
 ## [1.6.0] - 2026-11-03
 
 ### Added

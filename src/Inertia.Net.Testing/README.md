@@ -25,6 +25,8 @@ var deferred = await page.LoadDeferredPropsAsync(client, "sidebar");
 var only = await page.ReloadOnlyAsync(client, "users");
 ```
 
+Error pages: non-2xx Inertia responses are parsed too; `.Status(404)` asserts the HTTP status alongside `.Component("Error").Where("status", 404)`.
+
 Live props: `page.LiveProps` holds the `liveProps` metadata, and `HasLive("order")` or
 `HasLive("order", "private:orders.1", "OrderUpdated")` (channel as `"{type}:{name}"`) assert it.
 
