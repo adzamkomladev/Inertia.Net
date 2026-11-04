@@ -1318,7 +1318,7 @@ Inertia forms post, expect a redirect, and read validation errors from `props.er
 router.post('/users', data, { errorBag: 'createUser' })
 ```
 
-Validation keys use client JSON names and dotted collection indices. Minimal API uses HTTP JSON naming; MVC uses its JSON naming policy; FastEndpoints uses its binding serializer policy. Explicit JSON aliases apply where metadata is available; source-generated metadata is needed for reliable aliases under Native AOT. See the [validation guide](docs/Inertia.Net.Docs/content/docs/validation-and-errors.mdx) for details.
+Validation keys use client JSON names and dotted collection indices. Minimal API and MVC use the page serializer’s HTTP JSON options; FastEndpoints uses its binding serializer policy. Explicit JSON aliases apply where metadata is available; source-generated metadata is needed for reliable aliases under Native AOT. See the [validation guide](docs/Inertia.Net.Docs/content/docs/validation-and-errors.mdx) for details.
 
 | Validation source | Integration |
 |---|---|
@@ -1385,7 +1385,7 @@ public IActionResult Store([FromBody] CreateUserInput input)
 }
 ```
 
-MVC uses its configured JSON naming policy for keys. Binding failures get the generic message `The value is invalid.`, because their exception messages can expose internals.
+MVC uses the page serializer’s HTTP JSON naming policy for keys. Binding failures get the generic message `The value is invalid.`, because their exception messages can expose internals.
 
 ### FastEndpoints
 
@@ -1419,7 +1419,7 @@ app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users")).Wit
 
 `WithInertiaPrecognition()` is a superset of `WithInertiaValidation()` and also requires `services.AddValidation()`: normal Inertia validation redirects keep working. Any endpoint filter you add after it does not run for a precognitive request. In MVC, Precognition is not available.
 
-Rate-limit both validation and submissions. Only grant a separate bounded validation bucket when `InertiaPrecognition.IsPrecognitive(request)` **and** the endpoint has `InertiaPrecognitionMetadata`; the header alone does not prove the handler will be skipped. On a 429, add `Precognition: true` for precognitive requests so the client recognizes the response; the request still rejects, so show a retry or error message. See the [Precognition guide](docs/Inertia.Net.Docs/content/docs/validation-and-errors.mdx) for a complete policy.
+Rate-limit both validation and submissions. Only grant a separate bounded validation bucket when `InertiaPrecognition.IsPrecognitive(request)` **and** the endpoint has `InertiaPrecognitionMetadata`; the header alone does not prove the handler will be skipped. On a 429, add `Precognition: true` for precognitive requests so the client recognizes the response; the request still rejects, so show a retry or error message. See the [Precognition guide](docs/Inertia.Net.Docs/content/docs/precognition.mdx) for a complete policy.
 
 The [sample login policy](samples/MinimalApi.React/LoginDemo.cs) uses a bounded sliding window for validation and a stricter fixed window for submissions. This excerpt omits its test-reset bookkeeping (add `using System.Threading.RateLimiting;`, `using Microsoft.AspNetCore.RateLimiting;` and `using System.Globalization;`):
 
@@ -1885,7 +1885,7 @@ app.MapHealthChecks("/health");
 
 The check reports what the renders have already shown, without calling the SSR servers: healthy while SSR is disabled, goes through the Vite dev server, or every server can take renders; degraded while some servers' circuits are open or some managed instances are not ready; the registration's failure status (default unhealthy) when none can. Its data lists each server's state (`closed`, `half-open`, `open` or `not-ready`). A server that went down is reported healthy until renders fail.
 
-Stale refreshes use a bounded background queue of 64 items. Work creates its own service scope and must not capture request-scoped services; use a scope or factory inside the loader. Dropped work is logged and counted by `inertia.cache.refresh.dropped`. Required SSR exposes a generic failure message; detailed failures are logged.
+Stale refreshes use a bounded background queue of 64 items. Prop loaders must use singleton dependencies or create a scope or context inside the loader; they must not capture request-scoped services. Dropped work is logged and counted by `inertia.cache.refresh.dropped`. Required SSR exposes a generic failure message; detailed failures are logged.
 
 ### 5. Observability
 
@@ -2338,17 +2338,23 @@ var except = await page.ReloadExceptAsync(_client, "users");            // also 
 
 Other `InertiaPage` members: `Props`, `Raw`, `Prop(path)`, `HasProp(path)`, `PropBigInteger(path)`, `DeferredProps`, `MergeProps`, `PrependProps`, `DeepMergeProps`, `MatchPropsOn`, `RescuedProps`, `SharedProps`, `ScrollProps`, `OnceProps`, `LiveProps`, `Flash`, `EncryptHistory`, `ClearHistory`, `PreserveFragment`, `PreserveBigIntegers`.
 
-Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies (the `WebApplicationFactory` default). Disable `AllowAutoRedirect` to assert the redirect itself, then follow it with a second `InertiaGetAsync` to read the flash or errors. For example, post with the same client, assert the redirect, then use `InertiaGetAsync` to follow it:
+Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies (the `WebApplicationFactory` default). Disable `AllowAutoRedirect` to assert the redirect itself. Load the form to obtain its XSRF token and keep the paired antiforgery cookie too. This example uses the samples’ contact form:
 
 ```csharp
-using var submitted = await _client.InertiaRequestAsync(HttpMethod.Post, "/users",
-    JsonContent.Create(new { email = "" }));
+_client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
+using var form = await _client.GetAsync("/contacts/create");
+using var submitted = await _client.InertiaRequestAsync(HttpMethod.Post, "/contacts",
+    JsonContent.Create(new { name = "", email = "" }), configure: request =>
+    {
+        request.Headers.Referrer = new Uri(_client.BaseAddress!, "/contacts/create");
+        request.WithXsrfToken(form);
+    });
 Assert.Equal(HttpStatusCode.Redirect, submitted.StatusCode);
-using var followed = await _client.InertiaGetAsync("/users/create");
-await followed.AssertInertiaAsync(p => p.Where("errors.email", "Email is required."));
+using var followed = await _client.GetAsync("/contacts/create");
+await followed.AssertInertiaAsync(p => p.HasErrors().HasError("name").HasError("email"));
 ```
 
-The default bag is exposed as flat `errors.email`; a named bag is nested, for example `errors.createUser.email`. Use the same cookie-preserving client for both requests. Add `public partial class Program;` to your app when it uses top-level statements.
+`GetXsrfToken()` reads and URL-decodes the token; `WithXsrfToken()` accepts a token or page response and optional custom cookie/header names. `HasErrors(bag?)`, `HasError(field, message?, bag?)` and `HasErrorBag(bag)` accept client keys such as `items.0.email` and string or array messages. The default bag is exposed as flat `errors.email`; a named bag is nested, for example `errors.createUser.email`. Use the same cookie-preserving client for both requests. Add `public partial class Program;` to your app when it uses top-level statements.
 
 ---
 
@@ -2640,7 +2646,7 @@ The state cookie is limited to about 4 KB by browsers. Flash less data, or use `
 Use `.WithInertiaValidation()` on the endpoint. Without it, the built-in `AddValidation()` filter returns a `400` problem details that the Inertia client cannot use. Make sure the model types are `public` (see [Native AOT](#native-aot)). The request must be an Inertia request and not a GET.
 
 **Validation keys do not match my field names.**
-Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). In MVC the policy is the one in the MVC `JsonOptions`. The page itself is written with the HTTP `JsonOptions`: keep both policies aligned.
+Keys use JSON member aliases where metadata provides them and the naming policy for other members (`Address.Street` becomes `address.street`). Minimal API and MVC use the page serializer’s HTTP JSON options; FastEndpoints uses its binding serializer policy. Keep client field names aligned with those settings.
 
 **`InvalidOperationException: InertiaProp values can only be serialized by Inertia.Net`.**
 An `InertiaProp` ended up somewhere Inertia.Net does not walk: a `Flash(...)` value, a read-only dictionary type that does not implement `IDictionary`, or a type with a custom converter. Lists, typed dictionaries (`Dictionary<TKey, TValue>` with any key type; keys are written as System.Text.Json writes them), `object` members and `IDictionary<string, object?>` are walked. Put props in `InertiaProps`, or declare the member as `InertiaProp` (or `object`) on the typed page object.

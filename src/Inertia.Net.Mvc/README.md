@@ -1,6 +1,5 @@
 # Inertia.Net.Mvc
 
-
 MVC integration for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
 
 ```sh

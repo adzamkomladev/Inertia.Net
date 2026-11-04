@@ -7,6 +7,48 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-11-04
+
+### Fixed
+
+- Cached props retain caching and live listeners beneath dot keys, including parallel renders.
+- Stale prop and SSR refreshes run on a bounded background worker so completed responses release their HTTP connection promptly.
+  Background prop loaders must use singleton dependencies or create their own service scope.
+- Cache tags publish after successful entry storage; refresh claims are released on rejection and shutdown.
+- Validation error keys honor generated JSON aliases and indexed paths. Missing Minimal API validation registration fails when
+  the endpoint is constructed. SSR exceptions expose a safe category while retaining diagnostic detail in logs.
+- Dictionary property names honor converters, and numeric DOM output handles escaped and segmented values without changing spelling.
+- Parallel loader failures log their property path and cancel sibling work. SSR circuit windows use elapsed time.
+
+### Changed
+
+- FastEndpoints setup uses `ConfigureInertia()`, preserving the existing configurator before applying Inertia setup.
+- `Fresh()` implies `Once()`, `WithGroup()` implies `Defer()`, repeated `MatchOn()` calls accumulate, and explicit root
+  `Append()`/`Prepend()` conflicts throw. Prop instances belong to one request.
+- SignalR bounds subscriptions, channel/event names and socket IDs; invalid options fail at startup. Proxy-origin mismatches
+  and DevTools recording without a reader produce diagnostics.
+- Package builds track public API inventories and enable recommended analyzers without distributing analyzer dependencies.
+
+### Added
+
+- Public Precognition header constants, request detection and endpoint metadata for partitioned rate limiting.
+- XSRF testing helpers and validation-error assertions, including named bags and indexed field paths.
+- `Ssr.ConnectTimeout` and the `inertia.cache.refresh.dropped` metric for the bounded refresh queue.
+- A React login validation demo with separate bounded validation/submission budgets and browser regression coverage.
+
+### Performance
+
+- Built-in integer dictionary keys save 9,904 B per 1,000 entries; GUID keys save 408 B per 500 entries in the paired probes.
+  Safe-integer DOM output removes 15,920 B per 500 values. Scroll metadata, converter-backed members and fill waiters allocate less.
+- Ordinary render allocation is unchanged. Parallel failure-path reporting adds 8 B per planned loader. Cache-hit memoization
+  was rejected because it could hide an earlier loader's invalidation. See the benchmark results for timing intervals and limits.
+
+### Documentation
+
+- Updated the README, package guides and documentation site to describe the current APIs, with a first-ten-minutes walkthrough,
+  Precognition guide, rate-limit recipe and runnable testing examples. Removed obsolete version and migration pages.
+- Documented npm, Bun, pnpm and Yarn as supported package-manager choices, with equivalent install, development and build commands.
+
 ## [1.6.2] - 2026-11-04
 
 ### Added
