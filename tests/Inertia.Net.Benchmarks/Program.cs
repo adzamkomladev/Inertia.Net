@@ -8,6 +8,15 @@ if (args is ["--render-probe"]) { await RenderProbe.RunAsync(); return; }
 if (args is ["--mvc-probe"]) { MvcProbe.Run(); return; }
 if (args is ["--payload-probe"]) { await PayloadProbe.RunAsync(); return; }
 if (args is ["--cache-probe"]) { await CacheProbe.RunAsync(); return; }
+if (args is ["--pagination-check"])
+{
+    var pagination = new PaginationBenchmarks();
+    try { pagination.Setup(); Console.WriteLine("Pagination fixture checks passed."); }
+    finally { pagination.Cleanup(); }
+    return;
+}
+if (args is ["--pagination-probe"]) { await PaginationProbe.RunAsync(); return; }
+if (args is ["--pagination-probe", var paginationOutput]) { await PaginationProbe.RunAsync(paginationOutput); return; }
 if (args is ["--allocation-probe"]) { await AllocationProbe.RunAsync(); return; }
 if (args is ["--paired-latency", var variants, var pairedOutput]) { await PairedLatencyProbe.RunAsync(variants, pairedOutput); return; }
 if (args is ["--memory-comparison", var memoryDirectory, var memoryOutput]) { await PairedLatencyProbe.RunAsync(memoryDirectory, memoryOutput, memory: true); return; }

@@ -1,0 +1,3092 @@
+{
+  "rounds": 32,
+  "comparison": "Same-build hand-written and helper pages with byte-identical JSON; controls call the same method in both slots.",
+  "environment": {
+    "measuredAtUtc": "2026-11-04T10:00:27.2797698+00:00",
+    "runtime": ".NET 10.0.14",
+    "os": "Ubuntu 24.04.5 LTS",
+    "architecture": "X64",
+    "processorCount": 1,
+    "processAffinity": "80",
+    "serverGc": false,
+    "latencyMode": "Interactive"
+  },
+  "hashes": {
+    "benchmarks": "11E43150E4F8B614C877CADC7FB66AEE8F8BE8DFFD2608F7EBCA39D2F8562BB4",
+    "core": "F015E17A84E5D1F3C929131292E774E0DA9263FAF76BBEC5E68D03A7AF46018E"
+  },
+  "rows": [
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 0,
+      "Count": 128,
+      "Nanoseconds": 78043.75,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 0,
+      "Count": 128,
+      "Nanoseconds": 164047.65625,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 1,
+      "Count": 128,
+      "Nanoseconds": 69451.5625,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 1,
+      "Count": 128,
+      "Nanoseconds": 59285.9375,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 2,
+      "Count": 128,
+      "Nanoseconds": 98367.96875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 2,
+      "Count": 128,
+      "Nanoseconds": 124371.875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 3,
+      "Count": 128,
+      "Nanoseconds": 89479.6875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 3,
+      "Count": 128,
+      "Nanoseconds": 70692.1875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 4,
+      "Count": 128,
+      "Nanoseconds": 76035.15625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 4,
+      "Count": 128,
+      "Nanoseconds": 69088.28125,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 5,
+      "Count": 128,
+      "Nanoseconds": 71141.40625,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 5,
+      "Count": 128,
+      "Nanoseconds": 70297.65625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 6,
+      "Count": 128,
+      "Nanoseconds": 69496.875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 6,
+      "Count": 128,
+      "Nanoseconds": 70707.8125,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 7,
+      "Count": 128,
+      "Nanoseconds": 67308.59375,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 7,
+      "Count": 128,
+      "Nanoseconds": 74880.46875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 8,
+      "Count": 128,
+      "Nanoseconds": 77380.46875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 8,
+      "Count": 128,
+      "Nanoseconds": 70467.1875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 9,
+      "Count": 128,
+      "Nanoseconds": 74404.6875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 9,
+      "Count": 128,
+      "Nanoseconds": 71280.46875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 10,
+      "Count": 128,
+      "Nanoseconds": 76934.375,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 10,
+      "Count": 128,
+      "Nanoseconds": 85312.5,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 11,
+      "Count": 128,
+      "Nanoseconds": 62667.96875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 11,
+      "Count": 128,
+      "Nanoseconds": 67997.65625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 12,
+      "Count": 128,
+      "Nanoseconds": 70006.25,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 12,
+      "Count": 128,
+      "Nanoseconds": 76047.65625,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 13,
+      "Count": 128,
+      "Nanoseconds": 67212.5,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 13,
+      "Count": 128,
+      "Nanoseconds": 73415.625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 14,
+      "Count": 128,
+      "Nanoseconds": 79463.28125,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 14,
+      "Count": 128,
+      "Nanoseconds": 69366.40625,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 15,
+      "Count": 128,
+      "Nanoseconds": 73135.9375,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 15,
+      "Count": 128,
+      "Nanoseconds": 73219.53125,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 16,
+      "Count": 128,
+      "Nanoseconds": 70788.28125,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 16,
+      "Count": 128,
+      "Nanoseconds": 72071.875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 17,
+      "Count": 128,
+      "Nanoseconds": 77383.59375,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 17,
+      "Count": 128,
+      "Nanoseconds": 60692.96875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 18,
+      "Count": 128,
+      "Nanoseconds": 62167.96875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 18,
+      "Count": 128,
+      "Nanoseconds": 59767.1875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 19,
+      "Count": 128,
+      "Nanoseconds": 61181.25,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 19,
+      "Count": 128,
+      "Nanoseconds": 78391.40625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 20,
+      "Count": 128,
+      "Nanoseconds": 63762.5,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 20,
+      "Count": 128,
+      "Nanoseconds": 69083.59375,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 21,
+      "Count": 128,
+      "Nanoseconds": 68253.125,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 21,
+      "Count": 128,
+      "Nanoseconds": 68347.65625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 22,
+      "Count": 128,
+      "Nanoseconds": 76053.90625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 22,
+      "Count": 128,
+      "Nanoseconds": 57378.125,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 23,
+      "Count": 128,
+      "Nanoseconds": 62153.125,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 23,
+      "Count": 128,
+      "Nanoseconds": 66089.84375,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 24,
+      "Count": 128,
+      "Nanoseconds": 69828.90625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 24,
+      "Count": 128,
+      "Nanoseconds": 66936.71875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 25,
+      "Count": 128,
+      "Nanoseconds": 77392.96875,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 25,
+      "Count": 128,
+      "Nanoseconds": 73242.96875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 26,
+      "Count": 128,
+      "Nanoseconds": 68801.5625,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 26,
+      "Count": 128,
+      "Nanoseconds": 80871.09375,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 27,
+      "Count": 128,
+      "Nanoseconds": 70850.78125,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 27,
+      "Count": 128,
+      "Nanoseconds": 76803.125,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 28,
+      "Count": 128,
+      "Nanoseconds": 67353.125,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 28,
+      "Count": 128,
+      "Nanoseconds": 74295.3125,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 29,
+      "Count": 128,
+      "Nanoseconds": 72964.84375,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 29,
+      "Count": 128,
+      "Nanoseconds": 62742.96875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 30,
+      "Count": 128,
+      "Nanoseconds": 59436.71875,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 30,
+      "Count": 128,
+      "Nanoseconds": 75790.625,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "current",
+      "Round": 31,
+      "Count": 128,
+      "Nanoseconds": 65466.40625,
+      "AllocatedBytes": 1752.4375
+    },
+    {
+      "Method": "Full",
+      "Variant": "baseline",
+      "Round": 31,
+      "Count": 128,
+      "Nanoseconds": 64209.375,
+      "AllocatedBytes": 1832.4375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 0,
+      "Count": 512,
+      "Nanoseconds": 64465.625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 0,
+      "Count": 512,
+      "Nanoseconds": 68257.6171875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 1,
+      "Count": 512,
+      "Nanoseconds": 68402.9296875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 1,
+      "Count": 512,
+      "Nanoseconds": 68430.6640625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 2,
+      "Count": 512,
+      "Nanoseconds": 76449.8046875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 2,
+      "Count": 512,
+      "Nanoseconds": 73815.625,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 3,
+      "Count": 512,
+      "Nanoseconds": 74339.0625,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 3,
+      "Count": 512,
+      "Nanoseconds": 152881.25,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 4,
+      "Count": 512,
+      "Nanoseconds": 74956.25,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 4,
+      "Count": 512,
+      "Nanoseconds": 71522.0703125,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 5,
+      "Count": 512,
+      "Nanoseconds": 84881.4453125,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 5,
+      "Count": 512,
+      "Nanoseconds": 99626.5625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 6,
+      "Count": 512,
+      "Nanoseconds": 89138.4765625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 6,
+      "Count": 512,
+      "Nanoseconds": 65548.2421875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 7,
+      "Count": 512,
+      "Nanoseconds": 67153.90625,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 7,
+      "Count": 512,
+      "Nanoseconds": 68731.25,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 8,
+      "Count": 512,
+      "Nanoseconds": 65680.46875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 8,
+      "Count": 512,
+      "Nanoseconds": 71244.7265625,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 9,
+      "Count": 512,
+      "Nanoseconds": 96896.875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 9,
+      "Count": 512,
+      "Nanoseconds": 117400.5859375,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 10,
+      "Count": 512,
+      "Nanoseconds": 115094.7265625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 10,
+      "Count": 512,
+      "Nanoseconds": 103558.59375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 11,
+      "Count": 512,
+      "Nanoseconds": 436069.921875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 11,
+      "Count": 512,
+      "Nanoseconds": 322883.0078125,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 12,
+      "Count": 512,
+      "Nanoseconds": 101180.6640625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 12,
+      "Count": 512,
+      "Nanoseconds": 86827.734375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 13,
+      "Count": 512,
+      "Nanoseconds": 82522.4609375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 13,
+      "Count": 512,
+      "Nanoseconds": 99510.15625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 14,
+      "Count": 512,
+      "Nanoseconds": 92994.3359375,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 14,
+      "Count": 512,
+      "Nanoseconds": 100638.8671875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 15,
+      "Count": 512,
+      "Nanoseconds": 91270.8984375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 15,
+      "Count": 512,
+      "Nanoseconds": 149871.6796875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 16,
+      "Count": 512,
+      "Nanoseconds": 94263.8671875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 16,
+      "Count": 512,
+      "Nanoseconds": 81251.3671875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 17,
+      "Count": 512,
+      "Nanoseconds": 110739.2578125,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 17,
+      "Count": 512,
+      "Nanoseconds": 103655.46875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 18,
+      "Count": 512,
+      "Nanoseconds": 96205.2734375,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 18,
+      "Count": 512,
+      "Nanoseconds": 123892.3828125,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 19,
+      "Count": 512,
+      "Nanoseconds": 225383.984375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 19,
+      "Count": 512,
+      "Nanoseconds": 96755.859375,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 20,
+      "Count": 512,
+      "Nanoseconds": 96096.875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 20,
+      "Count": 512,
+      "Nanoseconds": 93563.671875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 21,
+      "Count": 512,
+      "Nanoseconds": 87548.046875,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 21,
+      "Count": 512,
+      "Nanoseconds": 89741.9921875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 22,
+      "Count": 512,
+      "Nanoseconds": 90404.6875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 22,
+      "Count": 512,
+      "Nanoseconds": 89464.84375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 23,
+      "Count": 512,
+      "Nanoseconds": 101480.078125,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 23,
+      "Count": 512,
+      "Nanoseconds": 88081.640625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 24,
+      "Count": 512,
+      "Nanoseconds": 85445.703125,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 24,
+      "Count": 512,
+      "Nanoseconds": 81913.0859375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 25,
+      "Count": 512,
+      "Nanoseconds": 87728.90625,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 25,
+      "Count": 512,
+      "Nanoseconds": 87957.8125,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 26,
+      "Count": 512,
+      "Nanoseconds": 93552.1484375,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 26,
+      "Count": 512,
+      "Nanoseconds": 87242.7734375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 27,
+      "Count": 512,
+      "Nanoseconds": 101966.6015625,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 27,
+      "Count": 512,
+      "Nanoseconds": 99627.1484375,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 28,
+      "Count": 512,
+      "Nanoseconds": 162568.5546875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 28,
+      "Count": 512,
+      "Nanoseconds": 109952.34375,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 29,
+      "Count": 512,
+      "Nanoseconds": 121433.203125,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 29,
+      "Count": 512,
+      "Nanoseconds": 91797.8515625,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 30,
+      "Count": 512,
+      "Nanoseconds": 110523.2421875,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 30,
+      "Count": 512,
+      "Nanoseconds": 149289.0625,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "current",
+      "Round": 31,
+      "Count": 512,
+      "Nanoseconds": 192603.125,
+      "AllocatedBytes": 1816.109375
+    },
+    {
+      "Method": "PartialPrepend",
+      "Variant": "baseline",
+      "Round": 31,
+      "Count": 512,
+      "Nanoseconds": 262608.0078125,
+      "AllocatedBytes": 1896.109375
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 0,
+      "Count": 32768,
+      "Nanoseconds": 732.40966796875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 0,
+      "Count": 32768,
+      "Nanoseconds": 1012.396240234375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 1,
+      "Count": 32768,
+      "Nanoseconds": 999.5513916015625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 1,
+      "Count": 32768,
+      "Nanoseconds": 519.677734375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 2,
+      "Count": 32768,
+      "Nanoseconds": 522.7386474609375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 2,
+      "Count": 32768,
+      "Nanoseconds": 874.0936279296875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 3,
+      "Count": 32768,
+      "Nanoseconds": 823.1689453125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 3,
+      "Count": 32768,
+      "Nanoseconds": 452.28271484375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 4,
+      "Count": 32768,
+      "Nanoseconds": 638.446044921875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 4,
+      "Count": 32768,
+      "Nanoseconds": 867.425537109375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 5,
+      "Count": 32768,
+      "Nanoseconds": 765.863037109375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 5,
+      "Count": 32768,
+      "Nanoseconds": 374.3438720703125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 6,
+      "Count": 32768,
+      "Nanoseconds": 576.5472412109375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 6,
+      "Count": 32768,
+      "Nanoseconds": 802.0721435546875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 7,
+      "Count": 32768,
+      "Nanoseconds": 1034.3994140625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 7,
+      "Count": 32768,
+      "Nanoseconds": 591.754150390625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 8,
+      "Count": 32768,
+      "Nanoseconds": 686.749267578125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 8,
+      "Count": 32768,
+      "Nanoseconds": 779.705810546875,
+      "AllocatedBytes": 32.000732421875
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 9,
+      "Count": 32768,
+      "Nanoseconds": 695.684814453125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 9,
+      "Count": 32768,
+      "Nanoseconds": 332.6690673828125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 10,
+      "Count": 32768,
+      "Nanoseconds": 505.8624267578125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 10,
+      "Count": 32768,
+      "Nanoseconds": 663.4521484375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 11,
+      "Count": 32768,
+      "Nanoseconds": 939.544677734375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 11,
+      "Count": 32768,
+      "Nanoseconds": 616.8212890625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 12,
+      "Count": 32768,
+      "Nanoseconds": 723.0224609375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 12,
+      "Count": 32768,
+      "Nanoseconds": 1219.683837890625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 13,
+      "Count": 32768,
+      "Nanoseconds": 1090.5487060546875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 13,
+      "Count": 32768,
+      "Nanoseconds": 500.5584716796875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 14,
+      "Count": 32768,
+      "Nanoseconds": 927.2705078125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 14,
+      "Count": 32768,
+      "Nanoseconds": 808.1787109375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 15,
+      "Count": 32768,
+      "Nanoseconds": 795.123291015625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 15,
+      "Count": 32768,
+      "Nanoseconds": 562.548828125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 16,
+      "Count": 32768,
+      "Nanoseconds": 518.988037109375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 16,
+      "Count": 32768,
+      "Nanoseconds": 1156.67724609375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 17,
+      "Count": 32768,
+      "Nanoseconds": 1639.9688720703125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 17,
+      "Count": 32768,
+      "Nanoseconds": 862.548828125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 18,
+      "Count": 32768,
+      "Nanoseconds": 704.0924072265625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 18,
+      "Count": 32768,
+      "Nanoseconds": 705.670166015625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 19,
+      "Count": 32768,
+      "Nanoseconds": 730.487060546875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 19,
+      "Count": 32768,
+      "Nanoseconds": 540.1214599609375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 20,
+      "Count": 32768,
+      "Nanoseconds": 483.3404541015625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 20,
+      "Count": 32768,
+      "Nanoseconds": 804.98046875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 21,
+      "Count": 32768,
+      "Nanoseconds": 856.6436767578125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 21,
+      "Count": 32768,
+      "Nanoseconds": 631.26220703125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 22,
+      "Count": 32768,
+      "Nanoseconds": 771.0113525390625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 22,
+      "Count": 32768,
+      "Nanoseconds": 462.7410888671875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 23,
+      "Count": 32768,
+      "Nanoseconds": 564.178466796875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 23,
+      "Count": 32768,
+      "Nanoseconds": 808.6883544921875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 24,
+      "Count": 32768,
+      "Nanoseconds": 828.369140625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 24,
+      "Count": 32768,
+      "Nanoseconds": 472.0611572265625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 25,
+      "Count": 32768,
+      "Nanoseconds": 588.4033203125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 25,
+      "Count": 32768,
+      "Nanoseconds": 687.60986328125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 26,
+      "Count": 32768,
+      "Nanoseconds": 852.7313232421875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 26,
+      "Count": 32768,
+      "Nanoseconds": 474.8138427734375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 27,
+      "Count": 32768,
+      "Nanoseconds": 242.32177734375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 27,
+      "Count": 32768,
+      "Nanoseconds": 541.7205810546875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 28,
+      "Count": 32768,
+      "Nanoseconds": 801.055908203125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 28,
+      "Count": 32768,
+      "Nanoseconds": 488.1744384765625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 29,
+      "Count": 32768,
+      "Nanoseconds": 489.4134521484375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 29,
+      "Count": 32768,
+      "Nanoseconds": 256.5582275390625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 30,
+      "Count": 32768,
+      "Nanoseconds": 177.6153564453125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 30,
+      "Count": 32768,
+      "Nanoseconds": 110.9039306640625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "current",
+      "Round": 31,
+      "Count": 32768,
+      "Nanoseconds": 204.4830322265625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestValid",
+      "Variant": "baseline",
+      "Round": 31,
+      "Count": 32768,
+      "Nanoseconds": 200.885009765625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 0,
+      "Count": 262144,
+      "Nanoseconds": 83.57505798339844,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 0,
+      "Count": 262144,
+      "Nanoseconds": 94.44503784179688,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 1,
+      "Count": 262144,
+      "Nanoseconds": 85.06813049316406,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 1,
+      "Count": 262144,
+      "Nanoseconds": 83.46328735351562,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 2,
+      "Count": 262144,
+      "Nanoseconds": 84.10720825195312,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 2,
+      "Count": 262144,
+      "Nanoseconds": 84.3902587890625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 3,
+      "Count": 262144,
+      "Nanoseconds": 86.53526306152344,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 3,
+      "Count": 262144,
+      "Nanoseconds": 88.49296569824219,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 4,
+      "Count": 262144,
+      "Nanoseconds": 86.79122924804688,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 4,
+      "Count": 262144,
+      "Nanoseconds": 80.36270141601562,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 5,
+      "Count": 262144,
+      "Nanoseconds": 95.72830200195312,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 5,
+      "Count": 262144,
+      "Nanoseconds": 91.12548828125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 6,
+      "Count": 262144,
+      "Nanoseconds": 84.88388061523438,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 6,
+      "Count": 262144,
+      "Nanoseconds": 81.29005432128906,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 7,
+      "Count": 262144,
+      "Nanoseconds": 82.77206420898438,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 7,
+      "Count": 262144,
+      "Nanoseconds": 79.99305725097656,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 8,
+      "Count": 262144,
+      "Nanoseconds": 86.03248596191406,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 8,
+      "Count": 262144,
+      "Nanoseconds": 83.26835632324219,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 9,
+      "Count": 262144,
+      "Nanoseconds": 85.37254333496094,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 9,
+      "Count": 262144,
+      "Nanoseconds": 87.28523254394531,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 10,
+      "Count": 262144,
+      "Nanoseconds": 86.01913452148438,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 10,
+      "Count": 262144,
+      "Nanoseconds": 87.34092712402344,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 11,
+      "Count": 262144,
+      "Nanoseconds": 82.23419189453125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 11,
+      "Count": 262144,
+      "Nanoseconds": 85.21270751953125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 12,
+      "Count": 262144,
+      "Nanoseconds": 87.30659484863281,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 12,
+      "Count": 262144,
+      "Nanoseconds": 85.68077087402344,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 13,
+      "Count": 262144,
+      "Nanoseconds": 84.17015075683594,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 13,
+      "Count": 262144,
+      "Nanoseconds": 171.53282165527344,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 14,
+      "Count": 262144,
+      "Nanoseconds": 115.73066711425781,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 14,
+      "Count": 262144,
+      "Nanoseconds": 144.63157653808594,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 15,
+      "Count": 262144,
+      "Nanoseconds": 353.9875030517578,
+      "AllocatedBytes": 32.005126953125
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 15,
+      "Count": 262144,
+      "Nanoseconds": 197.45750427246094,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 16,
+      "Count": 262144,
+      "Nanoseconds": 91.97273254394531,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 16,
+      "Count": 262144,
+      "Nanoseconds": 84.64393615722656,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 17,
+      "Count": 262144,
+      "Nanoseconds": 79.74815368652344,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 17,
+      "Count": 262144,
+      "Nanoseconds": 79.248046875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 18,
+      "Count": 262144,
+      "Nanoseconds": 75.58403015136719,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 18,
+      "Count": 262144,
+      "Nanoseconds": 76.8585205078125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 19,
+      "Count": 262144,
+      "Nanoseconds": 326.08070373535156,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 19,
+      "Count": 262144,
+      "Nanoseconds": 94.17381286621094,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 20,
+      "Count": 262144,
+      "Nanoseconds": 88.77983093261719,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 20,
+      "Count": 262144,
+      "Nanoseconds": 91.01600646972656,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 21,
+      "Count": 262144,
+      "Nanoseconds": 83.83522033691406,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 21,
+      "Count": 262144,
+      "Nanoseconds": 96.94900512695312,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 22,
+      "Count": 262144,
+      "Nanoseconds": 91.357421875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 22,
+      "Count": 262144,
+      "Nanoseconds": 103.47480773925781,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 23,
+      "Count": 262144,
+      "Nanoseconds": 344.88525390625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 23,
+      "Count": 262144,
+      "Nanoseconds": 96.47674560546875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 24,
+      "Count": 262144,
+      "Nanoseconds": 122.01690673828125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 24,
+      "Count": 262144,
+      "Nanoseconds": 81.18362426757812,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 25,
+      "Count": 262144,
+      "Nanoseconds": 79.39033508300781,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 25,
+      "Count": 262144,
+      "Nanoseconds": 86.05384826660156,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 26,
+      "Count": 262144,
+      "Nanoseconds": 83.41751098632812,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 26,
+      "Count": 262144,
+      "Nanoseconds": 145.66726684570312,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 27,
+      "Count": 262144,
+      "Nanoseconds": 82.15980529785156,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 27,
+      "Count": 262144,
+      "Nanoseconds": 81.78176879882812,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 28,
+      "Count": 262144,
+      "Nanoseconds": 79.94499206542969,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 28,
+      "Count": 262144,
+      "Nanoseconds": 80.58967590332031,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 29,
+      "Count": 262144,
+      "Nanoseconds": 205.29861450195312,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 29,
+      "Count": 262144,
+      "Nanoseconds": 90.21797180175781,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 30,
+      "Count": 262144,
+      "Nanoseconds": 84.86175537109375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 30,
+      "Count": 262144,
+      "Nanoseconds": 87.99705505371094,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "current",
+      "Round": 31,
+      "Count": 262144,
+      "Nanoseconds": 81.85882568359375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "RequestGarbage",
+      "Variant": "baseline",
+      "Round": 31,
+      "Count": 262144,
+      "Nanoseconds": 85.87837219238281,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 0,
+      "Count": 8192,
+      "Nanoseconds": 3203.50341796875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 0,
+      "Count": 8192,
+      "Nanoseconds": 3852.4658203125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 1,
+      "Count": 8192,
+      "Nanoseconds": 3411.90185546875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 1,
+      "Count": 8192,
+      "Nanoseconds": 3367.32177734375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 2,
+      "Count": 8192,
+      "Nanoseconds": 3103.89404296875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 2,
+      "Count": 8192,
+      "Nanoseconds": 3552.06298828125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 3,
+      "Count": 8192,
+      "Nanoseconds": 3759.92431640625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 3,
+      "Count": 8192,
+      "Nanoseconds": 3502.0263671875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 4,
+      "Count": 8192,
+      "Nanoseconds": 3364.1357421875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 4,
+      "Count": 8192,
+      "Nanoseconds": 3192.724609375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 5,
+      "Count": 8192,
+      "Nanoseconds": 3547.7783203125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 5,
+      "Count": 8192,
+      "Nanoseconds": 3498.49853515625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 6,
+      "Count": 8192,
+      "Nanoseconds": 3851.171875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 6,
+      "Count": 8192,
+      "Nanoseconds": 3626.08642578125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 7,
+      "Count": 8192,
+      "Nanoseconds": 3518.59130859375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 7,
+      "Count": 8192,
+      "Nanoseconds": 4539.66064453125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 8,
+      "Count": 8192,
+      "Nanoseconds": 5594.42138671875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 8,
+      "Count": 8192,
+      "Nanoseconds": 8586.8408203125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 9,
+      "Count": 8192,
+      "Nanoseconds": 3302.81982421875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 9,
+      "Count": 8192,
+      "Nanoseconds": 3208.23974609375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 10,
+      "Count": 8192,
+      "Nanoseconds": 3244.20166015625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 10,
+      "Count": 8192,
+      "Nanoseconds": 3312.31689453125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 11,
+      "Count": 8192,
+      "Nanoseconds": 3340.9912109375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 11,
+      "Count": 8192,
+      "Nanoseconds": 3443.359375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 12,
+      "Count": 8192,
+      "Nanoseconds": 3682.40966796875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 12,
+      "Count": 8192,
+      "Nanoseconds": 3192.17529296875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 13,
+      "Count": 8192,
+      "Nanoseconds": 3184.6435546875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 13,
+      "Count": 8192,
+      "Nanoseconds": 3572.32666015625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 14,
+      "Count": 8192,
+      "Nanoseconds": 4212.2314453125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 14,
+      "Count": 8192,
+      "Nanoseconds": 6063.87939453125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 15,
+      "Count": 8192,
+      "Nanoseconds": 5532.51953125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 15,
+      "Count": 8192,
+      "Nanoseconds": 5321.240234375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 16,
+      "Count": 8192,
+      "Nanoseconds": 4625.06103515625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 16,
+      "Count": 8192,
+      "Nanoseconds": 3060.58349609375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 17,
+      "Count": 8192,
+      "Nanoseconds": 3032.36083984375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 17,
+      "Count": 8192,
+      "Nanoseconds": 2901.0498046875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 18,
+      "Count": 8192,
+      "Nanoseconds": 2931.93359375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 18,
+      "Count": 8192,
+      "Nanoseconds": 2778.759765625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 19,
+      "Count": 8192,
+      "Nanoseconds": 3007.65380859375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 19,
+      "Count": 8192,
+      "Nanoseconds": 2958.447265625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 20,
+      "Count": 8192,
+      "Nanoseconds": 2955.810546875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 20,
+      "Count": 8192,
+      "Nanoseconds": 2948.7548828125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 21,
+      "Count": 8192,
+      "Nanoseconds": 2956.18896484375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 21,
+      "Count": 8192,
+      "Nanoseconds": 2825.439453125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 22,
+      "Count": 8192,
+      "Nanoseconds": 2845.64208984375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 22,
+      "Count": 8192,
+      "Nanoseconds": 3672.71728515625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 23,
+      "Count": 8192,
+      "Nanoseconds": 3251.8798828125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 23,
+      "Count": 8192,
+      "Nanoseconds": 3297.54638671875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 24,
+      "Count": 8192,
+      "Nanoseconds": 3216.10107421875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 24,
+      "Count": 8192,
+      "Nanoseconds": 3150.6103515625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 25,
+      "Count": 8192,
+      "Nanoseconds": 3015.68603515625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 25,
+      "Count": 8192,
+      "Nanoseconds": 3157.58056640625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 26,
+      "Count": 8192,
+      "Nanoseconds": 3276.52587890625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 26,
+      "Count": 8192,
+      "Nanoseconds": 3156.4208984375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 27,
+      "Count": 8192,
+      "Nanoseconds": 3687.1337890625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 27,
+      "Count": 8192,
+      "Nanoseconds": 3252.0751953125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 28,
+      "Count": 8192,
+      "Nanoseconds": 3345.5322265625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 28,
+      "Count": 8192,
+      "Nanoseconds": 3558.65478515625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 29,
+      "Count": 8192,
+      "Nanoseconds": 3001.5625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 29,
+      "Count": 8192,
+      "Nanoseconds": 3290.24658203125,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 30,
+      "Count": 8192,
+      "Nanoseconds": 3033.0810546875,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 30,
+      "Count": 8192,
+      "Nanoseconds": 3215.869140625,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "current",
+      "Round": 31,
+      "Count": 8192,
+      "Nanoseconds": 4178.271484375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "CursorRoundTrip",
+      "Variant": "baseline",
+      "Round": 31,
+      "Count": 8192,
+      "Nanoseconds": 2990.7958984375,
+      "AllocatedBytes": 312
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 0,
+      "Count": 2048,
+      "Nanoseconds": 11510.498046875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 0,
+      "Count": 2048,
+      "Nanoseconds": 11323.73046875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 1,
+      "Count": 2048,
+      "Nanoseconds": 12003.173828125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 1,
+      "Count": 2048,
+      "Nanoseconds": 11867.041015625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 2,
+      "Count": 2048,
+      "Nanoseconds": 11657.275390625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 2,
+      "Count": 2048,
+      "Nanoseconds": 11095.947265625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 3,
+      "Count": 2048,
+      "Nanoseconds": 11177.197265625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 3,
+      "Count": 2048,
+      "Nanoseconds": 10550.87890625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 4,
+      "Count": 2048,
+      "Nanoseconds": 10602.783203125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 4,
+      "Count": 2048,
+      "Nanoseconds": 18218.9453125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 5,
+      "Count": 2048,
+      "Nanoseconds": 35253.857421875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 5,
+      "Count": 2048,
+      "Nanoseconds": 13780.859375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 6,
+      "Count": 2048,
+      "Nanoseconds": 12689.0625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 6,
+      "Count": 2048,
+      "Nanoseconds": 13254.296875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 7,
+      "Count": 2048,
+      "Nanoseconds": 11611.865234375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 7,
+      "Count": 2048,
+      "Nanoseconds": 11848.92578125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 8,
+      "Count": 2048,
+      "Nanoseconds": 11590.673828125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 8,
+      "Count": 2048,
+      "Nanoseconds": 14144.580078125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 9,
+      "Count": 2048,
+      "Nanoseconds": 11877.685546875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 9,
+      "Count": 2048,
+      "Nanoseconds": 11367.3828125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 10,
+      "Count": 2048,
+      "Nanoseconds": 11508.7890625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 10,
+      "Count": 2048,
+      "Nanoseconds": 12149.70703125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 11,
+      "Count": 2048,
+      "Nanoseconds": 11906.25,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 11,
+      "Count": 2048,
+      "Nanoseconds": 11493.701171875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 12,
+      "Count": 2048,
+      "Nanoseconds": 11848.6328125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 12,
+      "Count": 2048,
+      "Nanoseconds": 11395.654296875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 13,
+      "Count": 2048,
+      "Nanoseconds": 11310.9375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 13,
+      "Count": 2048,
+      "Nanoseconds": 10545.1171875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 14,
+      "Count": 2048,
+      "Nanoseconds": 10919.970703125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 14,
+      "Count": 2048,
+      "Nanoseconds": 11210.009765625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 15,
+      "Count": 2048,
+      "Nanoseconds": 12960.83984375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 15,
+      "Count": 2048,
+      "Nanoseconds": 11871.484375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 16,
+      "Count": 2048,
+      "Nanoseconds": 11610.25390625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 16,
+      "Count": 2048,
+      "Nanoseconds": 11543.017578125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 17,
+      "Count": 2048,
+      "Nanoseconds": 12353.22265625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 17,
+      "Count": 2048,
+      "Nanoseconds": 12151.953125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 18,
+      "Count": 2048,
+      "Nanoseconds": 13363.623046875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 18,
+      "Count": 2048,
+      "Nanoseconds": 14802.734375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 19,
+      "Count": 2048,
+      "Nanoseconds": 11626.46484375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 19,
+      "Count": 2048,
+      "Nanoseconds": 11540.4296875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 20,
+      "Count": 2048,
+      "Nanoseconds": 26745.5078125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 20,
+      "Count": 2048,
+      "Nanoseconds": 19234.5703125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 21,
+      "Count": 2048,
+      "Nanoseconds": 16049.8046875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 21,
+      "Count": 2048,
+      "Nanoseconds": 18924.70703125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 22,
+      "Count": 2048,
+      "Nanoseconds": 20359.521484375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 22,
+      "Count": 2048,
+      "Nanoseconds": 20223.73046875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 23,
+      "Count": 2048,
+      "Nanoseconds": 16677.001953125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 23,
+      "Count": 2048,
+      "Nanoseconds": 22664.013671875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 24,
+      "Count": 2048,
+      "Nanoseconds": 19308.056640625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 24,
+      "Count": 2048,
+      "Nanoseconds": 16052.1484375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 25,
+      "Count": 2048,
+      "Nanoseconds": 17783.59375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 25,
+      "Count": 2048,
+      "Nanoseconds": 17860.107421875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 26,
+      "Count": 2048,
+      "Nanoseconds": 24769.873046875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 26,
+      "Count": 2048,
+      "Nanoseconds": 18118.75,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 27,
+      "Count": 2048,
+      "Nanoseconds": 27589.892578125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 27,
+      "Count": 2048,
+      "Nanoseconds": 10933.0078125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 28,
+      "Count": 2048,
+      "Nanoseconds": 9919.970703125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 28,
+      "Count": 2048,
+      "Nanoseconds": 9480.712890625,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 29,
+      "Count": 2048,
+      "Nanoseconds": 9801.26953125,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 29,
+      "Count": 2048,
+      "Nanoseconds": 10022.607421875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 30,
+      "Count": 2048,
+      "Nanoseconds": 10520.849609375,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 30,
+      "Count": 2048,
+      "Nanoseconds": 9708.10546875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "current",
+      "Round": 31,
+      "Count": 2048,
+      "Nanoseconds": 9976.513671875,
+      "AllocatedBytes": 32
+    },
+    {
+      "Method": "PlainSerialize",
+      "Variant": "baseline",
+      "Round": 31,
+      "Count": 2048,
+      "Nanoseconds": 9445.556640625,
+      "AllocatedBytes": 32
+    }
+  ]
+}

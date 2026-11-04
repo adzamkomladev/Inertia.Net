@@ -1,0 +1,31 @@
+{
+  "os": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "cpu": "AMD EPYC Processor (with IBPB)",
+  "logicalProcessors": 8,
+  "allowedCpus": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "measurementCpu": 7,
+  "sdk": "10.0.403",
+  "runtime": ".NET 10.0.14",
+  "sourceHead": "599a31f6125a51681119296c0c37f830135740fb",
+  "sourceState": "Phase 1 pagination commit plus benchmark fixtures in the working tree; DLL hashes are authoritative for the measured binaries.",
+  "method": "Two independent processes; each warms all fixtures, calibrates batches to at least 20 ms, then records 32 alternating baseline/current rounds per workload. Both variants are methods in one build with byte-identical output.",
+  "allocationCounter": "GC.GetTotalAllocatedBytes(true), process-wide; per-operation allocation excludes setup and sample bookkeeping.",
+  "pinning": "taskset -c 7, DOTNET_PROCESSOR_COUNT=1; workstation GC.",
+  "limitations": "Synthetic in-process handler construction and Stream.Null response writes, no network/database. Virtual host frequency and unrelated host activity are uncontrolled. Only this task builds/tests/servers are coordinated to stop before final measurement.",
+  "reproduce": [
+    "dotnet build Inertia.Net.slnx -c Release -warnaserror -m:1",
+    "dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --pagination-check",
+    "DOTNET_ROOT=/root/.dotnet DOTNET_PROCESSOR_COUNT=1 taskset -c 7 /root/.dotnet/dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --pagination-probe tests/Inertia.Net.Benchmarks/results/2026-11-pagination/paired-1.json",
+    "DOTNET_ROOT=/root/.dotnet DOTNET_PROCESSOR_COUNT=1 taskset -c 7 /root/.dotnet/dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --pagination-probe tests/Inertia.Net.Benchmarks/results/2026-11-pagination/paired-2.json",
+    "python3 tests/Inertia.Net.Benchmarks/results/2026-11-pagination/summarize.py"
+  ]
+}

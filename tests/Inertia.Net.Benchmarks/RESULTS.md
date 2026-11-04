@@ -1,5 +1,81 @@
 # Inertia.Net benchmark results
 
+## Pagination helpers — 2026-11-04
+
+The hand-written baseline and `Scroll(Pagination.Paginate(...))` construct and render page 3 (20 rows) of the same 10,000-item
+in-memory feed. Both variants run in one build, with byte-identical JSON verified before measurement. Two independent processes each
+run 32 alternating-order paired rounds after warmup. The task's builds, tests and sample/docs servers were stopped during measurement.
+
+### Allocation and latency
+
+Representative absolute medians from run 2; changes are medians of the 32 within-round latency ratios in each run. They need not
+equal ratios of the displayed absolute medians. Allocations are rounded to the nearest byte; raw samples retain fractional counter
+variation. One operation constructs and renders one feed response, parses one already-parsed query, round-trips one cursor, or
+serializes one plain feed value, respectively.
+
+| Workload | Hand-written B/op | Helper B/op | Hand-written ms/op | Helper ms/op | Run 1 paired time change | Run 2 paired time change |
+|---|---:|---:|---:|---:|---:|---:|
+| Full Inertia JSON | 1,832 | 1,752 | 0.071332 | 0.072219 | +4.1% | −1.6% |
+| Partial reload, prepend | 1,896 | 1,816 | 0.086829 | 0.091667 | +2.6% | +2.3% |
+| Request `From`, valid query (control) | 32 | 32 | 0.000376 | 0.000388 | +4.4% | +3.6% |
+| Request `From`, garbage query (control) | 32 | 32 | 0.000085 | 0.000099 | −0.6% | −7.4% |
+| Cursor `(DateTimeOffset, long)` round-trip (control) | 312 | 312 | 0.002828 | 0.002812 | −0.3% | −0.9% |
+| Plain STJ feed serialization (control) | 32 | 32 | 0.009745 | 0.009972 | +0.9% | +5.2% |
+
+The rendering guards pass in both runs: the helper allocates **80 B less** per response (limit: at most 64 B extra), and the median
+paired latency change stays below **+5%**. These are observed paired medians, not a statistical upper bound: the exploratory 95%
+bootstrap intervals reach +9.0% and +4.2% for full renders, and +10.6% and +5.3% for prepend renders. The unchanged STJ control moves
++5.2% in run 2. These results do not establish a rendering speed-up or rule out every small regression on this host.
+
+Garbage-input parsing allocates one `PageRequest` record (32 B). The warmed cursor path allocates three objects (312 B): a
+`PooledBufferWriter`, a `Utf8JsonWriter`, and the returned base64url string. Its byte array comes from the pool; decoding uses stack
+storage and unboxed value types. This meets the one-allocation request and three-allocation cursor limits for these inputs. The
+probe measures allocated **bytes**; object counts are corroborated by source inspection, not a runtime object-count profiler.
+
+### What the fixtures prove
+
+- **Equivalent numbered feeds:** the baseline uses `Skip/Take/ToArray`, a hand-written page record and explicit
+  `ScrollMetadata.FromPage`; the helper slices the source and obtains scroll metadata from `Page<User>`. Each operation includes
+  constructing the page, scroll prop, props collection and result, then writing JSON to `Stream.Null` through `BenchApp`.
+- **Matched output:** the hand-written record deliberately includes the complete `Page<T>` metadata. The previous sample's
+  data-only wrapper was smaller; comparing that output with a full `Page<T>` would mix serialization size with helper overhead.
+  These measurements do not quantify that payload-size increase. Setup checks byte-identical output, rows 41–60, page/total values,
+  `posts.data` merge or prepend paths, and the next-page metadata.
+- **Request parsing:** both queries are parsed by ASP.NET before measurement. The valid query is `?page=3&perPage=20`; the garbage
+  query has nonnumeric values for both keys. This measures `PageRequest.From`, including its returned record, and excludes HTTP query
+  parsing and `BindAsync` dependency resolution.
+- **Cursor:** the two-key internal codec preserves an offset `DateTimeOffset` and a `long` tie-breaker, including the direction.
+  The result is checked before measurement. This does not measure a database query or larger/string cursor keys.
+- **Controls:** both slots use the identical action instance for request parsing, cursor round-trips and plain source-generated STJ
+  serialization. The STJ control writes just the feed value and its pagination metadata into a reused buffer, without Inertia.
+
+These are synthetic in-process measurements, not production latency, Kestrel throughput, database performance or an EF Core comparison.
+Warm pool behavior does not describe first-call or pool-pressure allocation.
+
+Environment: Ubuntu 24.04, Linux 6.8.0-147, x64 KVM virtual machine reporting an AMD EPYC processor (8 logical CPUs), SDK 10.0.403,
+.NET 10.0.14, workstation GC. Both processes were pinned to logical CPU 7 (`taskset -c 7`, affinity mask `80` hex), with
+`DOTNET_PROCESSOR_COUNT=1`. Virtual-host frequency and unrelated host activity are uncontrolled. Allocation uses process-wide
+`GC.GetTotalAllocatedBytes(true)`; small runtime bookkeeping appears in the unrounded samples.
+
+Raw paired samples, environment and DLL hashes, and the deterministic summary are in
+[results/2026-11-pagination](results/2026-11-pagination). The summary adapts the existing paired-results script, with 5,000 bootstrap
+resamples and seed 20261104. The initial two runs used separate equivalent request-control lambdas; their valid-query timings differed
+by 37% and 65%. Those observations are retained under `exploratory/`. The final harness shares one action in both control slots, and
+the table above uses two fresh processes with the revised benchmark DLL hash.
+
+Reproduce from the repository root, choosing an available logical CPU on the measurement host:
+
+```sh
+dotnet build Inertia.Net.slnx -c Release -warnaserror -m:1
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --pagination-check
+DOTNET_PROCESSOR_COUNT=1 taskset -c 7 dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --pagination-probe tests/Inertia.Net.Benchmarks/results/2026-11-pagination/paired-1.json
+DOTNET_PROCESSOR_COUNT=1 taskset -c 7 dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --pagination-probe tests/Inertia.Net.Benchmarks/results/2026-11-pagination/paired-2.json
+python3 tests/Inertia.Net.Benchmarks/results/2026-11-pagination/summarize.py
+```
+
+`PaginationBenchmarks` also exposes the fixtures with BenchmarkDotNet's `[MemoryDiagnoser]`; the recorded results above come from
+`--pagination-probe`, without BenchmarkDotNet's generated benchmark runtime.
+
 ## Security, cache resilience and diagnostics fixes — 2026-10-26
 
 Baseline is commit `34e9e2781acc40a3aab043d8d89acce602783ca0` (before these fixes); current is that working tree with the fixes.

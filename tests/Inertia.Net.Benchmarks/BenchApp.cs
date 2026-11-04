@@ -178,6 +178,8 @@ public sealed class UsersPage
     public required InertiaProp Feed { get; init; }
 }
 
+[JsonSerializable(typeof(PaginationFeedPage))]
+[JsonSerializable(typeof(Page<User>))]
 [JsonSerializable(typeof(User[]))]
 [JsonSerializable(typeof(Stat[]))]
 [JsonSerializable(typeof(Filters))]
