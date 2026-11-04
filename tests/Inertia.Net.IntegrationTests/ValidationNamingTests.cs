@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.IntegrationTests;
 
+[Collection("FastEndpoints")]
 public sealed class ValidationNamingTests
 {
     [Theory]
@@ -25,10 +26,20 @@ public sealed class ValidationNamingTests
             _ => await ConformanceApp.StartAsync<Host>(Setup()),
         };
         var client = app.CreateClient();
-        await client.InertiaAsync(HttpMethod.Post, "/naming/" + adapter, new { mail = "", display_name = "", items = new[] { new { mail = "" } } });
+        await client.InertiaAsync(HttpMethod.Post, "/naming/" + adapter, new { mail = "", displayName = "", items = new[] { new { mail = "" } } });
         var page = await (await client.InertiaGetAsync("/page")).PageAsync();
         var keys = page["props"]!["errors"]!.AsObject().Select(entry => entry.Key).Order().ToArray();
-        Assert.Equal(["display_name", "items.0.mail", "mail"], keys);
+        Assert.Equal(["displayName", "items.0.mail", "mail"], keys);
+    }
+
+    [Fact]
+    public async Task Mvc_uses_http_page_naming_even_when_mvc_binding_uses_another_policy()
+    {
+        await using var app = await ConformanceApp.StartAsync<MvcHost>(Setup(snakeCase: true));
+        var client = app.CreateClient();
+        await client.InertiaAsync(HttpMethod.Post, "/naming/mvc", new { mail = "", displayName = "", items = new[] { new { mail = "" } } });
+        var page = await (await client.InertiaGetAsync("/page")).PageAsync();
+        Assert.Equal(["display_name", "items.0.mail", "mail"], page["props"]!["errors"]!.AsObject().Select(entry => entry.Key).Order().ToArray());
     }
 
     [Fact]
@@ -36,21 +47,21 @@ public sealed class ValidationNamingTests
     {
         await using var app = await ConformanceApp.StartAsync<Host>(Setup());
         var client = app.CreateClient();
-        await client.InertiaAsync(HttpMethod.Post, "/naming/returned", new { mail = "valid", display_name = "valid", items = new[] { new { mail = "valid" } } });
+        await client.InertiaAsync(HttpMethod.Post, "/naming/returned", new { mail = "valid", displayName = "valid", items = new[] { new { mail = "valid" } } });
         var page = await (await client.InertiaGetAsync("/page")).PageAsync();
         Assert.Equal(["items.0.mail", "mail"], page["props"]!["errors"]!.AsObject().Select(entry => entry.Key).Order().ToArray());
-        var response = await client.InertiaAsync(HttpMethod.Post, "/naming/precognition", new { mail = "", display_name = "", items = new[] { new { mail = "" } } },
+        var response = await client.InertiaAsync(HttpMethod.Post, "/naming/precognition", new { mail = "", displayName = "", items = new[] { new { mail = "" } } },
             configure: request => { request.WithHeader("Precognition", "true"); request.WithHeader("Precognition-Validate-Only", "items.0.mail"); });
         Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, response.StatusCode);
         var errors = System.Text.Json.Nodes.JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["errors"]!.AsObject();
         Assert.Equal(["items.0.mail"], errors.Select(entry => entry.Key));
     }
 
-    private static ConformanceSetup Setup() => new()
+    private static ConformanceSetup Setup(bool snakeCase = false) => new()
     {
         Services = services => services.ConfigureHttpJsonOptions(options =>
         {
-            options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+            options.SerializerOptions.PropertyNamingPolicy = snakeCase ? JsonNamingPolicy.SnakeCaseLower : JsonNamingPolicy.CamelCase;
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, NamingJsonContext.Default);
         }),
     };

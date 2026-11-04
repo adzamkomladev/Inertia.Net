@@ -123,6 +123,8 @@ app.MapPost("/users", (HttpContext context, [Required] UserInput input) =>
     return Results.Redirect("/dashboard");
 }).WithInertiaValidation();
 
+app.MapPost("/validation-alias", (AliasInput input) => Results.Ok()).WithInertiaPrecognition();
+
 app.MapPut("/users/{id:int}", (int id) => Results.Redirect("/dashboard"));
 
 app.MapPost("/back", () => Back("/users/create")
@@ -214,6 +216,17 @@ public sealed class UserInput
     public string? Email { get; set; }
 }
 
+public sealed class AliasInput
+{
+    [Required, JsonPropertyName("mail")] public string? Email { get; set; }
+    public List<AliasItem> Items { get; set; } = [];
+}
+public sealed class AliasItem
+{
+    [Required, JsonPropertyName("mail")] public string? Email { get; set; }
+}
+
+[JsonSerializable(typeof(AliasInput))]
 [JsonSerializable(typeof(HomePage))]
 [JsonSerializable(typeof(Stat))]
 [JsonSerializable(typeof(Stat[]))]

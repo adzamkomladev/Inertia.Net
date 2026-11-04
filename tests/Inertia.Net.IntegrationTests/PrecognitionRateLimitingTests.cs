@@ -80,7 +80,7 @@ public sealed class PrecognitionRateLimitingTests
                 options.AddPolicy("login", context =>
                 {
                     var validation = InertiaPrecognition.IsPrecognitive(context.Request)
-                        && context.GetEndpoint()?.Metadata.Any(metadata => metadata.GetType().Name == "InertiaPrecognitionMetadata") == true;
+                        && context.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null;
                     return RateLimitPartition.GetFixedWindowLimiter($"{context.Request.Path}:{validation}", _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = validation ? 2 : 1,

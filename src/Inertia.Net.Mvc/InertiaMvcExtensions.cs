@@ -65,7 +65,7 @@ public static class InertiaMvcExtensions
         {
             var inner = o.InvalidModelStateResponseFactory;
             o.InvalidModelStateResponseFactory = context => InertiaValidationFilter.IsInertiaMutation(context.HttpContext)
-                ? new ResultAdapter(InertiaModelStateFilter.BackWithErrors(context.HttpContext, context.ModelState))
+                ? new ResultAdapter(InertiaModelStateFilter.BackWithErrors(context))
                 : inner(context);
         });
 
