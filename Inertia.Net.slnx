@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Inertia.Net.EntityFrameworkCore/Inertia.Net.EntityFrameworkCore.csproj" />
     <Project Path="src/Inertia.Net.FastEndpoints/Inertia.Net.FastEndpoints.csproj" />
     <Project Path="src/Inertia.Net.Live.SignalR/Inertia.Net.Live.SignalR.csproj" />
     <Project Path="src/Inertia.Net.Mvc/Inertia.Net.Mvc.csproj" />
@@ -16,6 +17,7 @@
     <Project Path="docs/Inertia.Net.Docs/Inertia.Net.Docs.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Inertia.Net.EntityFrameworkCore.Tests/Inertia.Net.EntityFrameworkCore.Tests.csproj" />
     <Project Path="tests/Inertia.Net.AotSmoke/Inertia.Net.AotSmoke.csproj" />
     <Project Path="tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj" />
     <Project Path="tests/Inertia.Net.IntegrationTests/Inertia.Net.IntegrationTests.csproj" />

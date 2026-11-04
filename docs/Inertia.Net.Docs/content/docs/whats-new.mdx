@@ -57,4 +57,27 @@ Open `/posts?page=2&perPage=5` to request the second group of five. The result's
 
 To load more as the reader scrolls, wrap the page in `Scroll(...)` and use the client `InfiniteScroll` component. For data from a database or API, the delegate overload fetches each group on demand. It also supports **cursor pages**: a cursor is a marker used to fetch the next or previous group. Pages can be deferred or cached, and test helpers can load the next or previous scroll page. Follow [Pagination](/docs/pagination), [Infinite scroll](/docs/infinite-scroll), and [Testing](/docs/testing) for examples.
 
+## 1.6.2: page an EF Core query
+
+If your app already uses EF Core, install the optional package alongside your database provider:
+
+```sh
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2
+```
+
+For an existing `AppDb` with a `Posts` set, these two calls show the ordering rules:
+
+```csharp
+using Inertia.Net;
+using Microsoft.EntityFrameworkCore;
+
+// Numbered pages: choose an order first. Id is unique for each post.
+var page = await db.Posts.OrderBy(p => p.Id).ToPageAsync(request, ct: ct);
+
+// Cursor pages: leave the query unordered; the helper orders it by Id.
+var cursorPage = await db.Posts.ToCursorPageAsync(p => p.Id, cursorRequest, ct: ct);
+```
+
+Each result has a `data` array for the current group. A cursor is a marker to send back unchanged to request another group. Choose non-null keys that identify each row uniquely; if several rows share the first key, add a unique second key as a tie-breaker. The [EF Core pagination example](/docs/pagination#with-ef-core) shows how to use the result with `Scroll`. For Native AOT, use the core delegate paginator with an AOT-compatible data source instead.
+
 Treat cursor strings as opaque. They are not tamper-proof; protect them with `IDataProtector` if your app requires tamper protection. An invalid nonempty cursor starts at the first page. When a logger is available, a Debug message records that fallback without the cursor value or exception details; see [Cursors](/docs/pagination#cursors).

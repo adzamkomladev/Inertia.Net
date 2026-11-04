@@ -62,27 +62,39 @@ public static class Pagination
         if (cursor is null) request.LogInvalidCursor();
         var before = cursor?.Direction == CursorDirection.Before;
         var rows = await fetch(cursor, request.PerPage + 1, ct).ConfigureAwait(false);
-        var hasMore = rows.Count > request.PerPage;
-        var data = Trim(rows, request.PerPage, before);
+        return CreateCursorPage<T, KeyEncoder<T, TKey>>(rows, request.PerPage, before,
+            cursor is not null, cursor is null ? null : request.Cursor, cursorName, new(key));
+    }
+
+    internal static CursorPage<T> CreateCursorPage<T, TEncoder>(IReadOnlyList<T> rows, int perPage, bool before,
+        bool hasCursor, string? currentCursor, string cursorName, TEncoder encoder) where TEncoder : struct, ICursorEncoder<T>
+    {
+        var hasMore = rows.Count > perPage;
+        var data = Trim(rows, perPage, before);
         string? previous = null;
         string? next = null;
         if (data.Count > 0)
         {
-            if (before ? hasMore : cursor is not null)
+            if (before ? hasMore : hasCursor)
             {
-                previous = CursorCodec.Encode(new Cursor<TKey>(CursorDirection.Before, key(data[0])));
+                previous = encoder.Encode(data[0], CursorDirection.Before);
             }
 
             if (before || hasMore)
             {
-                next = CursorCodec.Encode(new Cursor<TKey>(CursorDirection.After, key(data[^1])));
+                next = encoder.Encode(data[^1], CursorDirection.After);
             }
         }
 
-        return new CursorPage<T>(data, request.PerPage, next, previous, hasMore, cursorName, cursor is null ? null : request.Cursor);
+        return new CursorPage<T>(data, perPage, next, previous, hasMore, cursorName, currentCursor);
     }
 
-    private static void Validate(int page, int perPage)
+    private readonly struct KeyEncoder<T, TKey>(Func<T, TKey> key) : ICursorEncoder<T>
+    {
+        public string Encode(T row, CursorDirection direction) => CursorCodec.Encode(new Cursor<TKey>(direction, key(row)));
+    }
+
+    internal static void Validate(int page, int perPage)
     {
         if (page < 1) throw new ArgumentOutOfRangeException(nameof(page));
         if (perPage < 1 || perPage == int.MaxValue) throw new ArgumentOutOfRangeException(nameof(perPage));
@@ -99,4 +111,9 @@ public static class Pagination
         }
         return result;
     }
+}
+
+internal interface ICursorEncoder<T>
+{
+    string Encode(T row, CursorDirection direction);
 }

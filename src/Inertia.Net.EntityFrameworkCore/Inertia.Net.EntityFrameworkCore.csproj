@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net</RootNamespace>
+    <Description>Entity Framework Core pagination for Inertia.Net (not Native AOT compatible).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Inertia.Net/Inertia.Net.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+</Project>

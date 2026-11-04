@@ -36,7 +36,7 @@ All samples enable `o.State.RememberPreviousUrl = true`. The shared `specs/back.
 
 | Route | Component | Contract |
 |---|---|---|
-| `GET /feed/cursor` | `Feed/Cursor` | 50 posts ordered by descending `id`, 10 per cursor page. `<InfiniteScroll data="posts">` renders `data-testid="post"`. The delegate fetches keyset rows and the paginator supplies opaque cursors. |
+| `GET /feed/cursor` | `Feed/Cursor` | 50 posts ordered by descending `id`, 10 per cursor page. `<InfiniteScroll data="posts">` renders `data-testid="post"`. EF Core queries a seeded in-memory SQLite database with keyset predicates; the paginator supplies opaque cursors. |
 | `GET /users?page=` | `Users/Index` | Classic `Page<User>`, five users per page. `data-testid="pager"` contains `page-{n}` buttons that call `router.get` with `only: ['users']` and `preserveState`. |
 
 `specs/pagination.spec.ts` runs with `SAMPLE=react`. It seeds twelve users using the E2E-only

@@ -109,6 +109,7 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` filter, Razor root view and tag helpers |
 | `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
 | `Inertia.Net.Live.SignalR` | you deliver [live props](/docs/live-props) over SignalR: hub, channel authorization and broadcaster |
+| `Inertia.Net.EntityFrameworkCore` | you page EF Core queries with numbered or cursor pagination |
 | `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
@@ -116,6 +117,7 @@ Inertia.Net is split into small packages. Install the core package and one optio
 dotnet add package Inertia.Net --version 1.6.2
 dotnet add package Inertia.Net.Mvc --version 1.6.2            # MVC only
 dotnet add package Inertia.Net.FastEndpoints --version 1.6.2  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2 # EF Core pagination
 dotnet add package Inertia.Net.Testing --version 1.6.2        # test projects
 dotnet add package Inertia.Net.Live.SignalR --version 1.6.2   # live props over SignalR
 ```
@@ -704,6 +706,29 @@ app.MapGet("/posts", (PageRequest request) => Render("Posts/Index", new InertiaP
 Open `/posts?page=2&perPage=5` to request the second group of five. The result's `data` contains that group; `currentPage` and `lastPage` help build page links. The default size is 20, with a maximum of 100; [pagination options](/docs/configuration#opagination-paginationoptions) can change these limits and query names.
 
 To load more as the reader scrolls, wrap the page in `Scroll(...)` and use the client `InfiniteScroll` component. For data from a database or API, the delegate overload fetches each group on demand. It also supports **cursor pages**: a cursor is a marker used to fetch the next or previous group. Pages can be deferred or cached, and test helpers can load the next or previous scroll page. Follow [Pagination](/docs/pagination), [Infinite scroll](/docs/infinite-scroll), and [Testing](/docs/testing) for examples.
+
+## 1.6.2: page an EF Core query
+
+If your app already uses EF Core, install the optional package alongside your database provider:
+
+```sh
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2
+```
+
+For an existing `AppDb` with a `Posts` set, these two calls show the ordering rules:
+
+```csharp
+using Inertia.Net;
+using Microsoft.EntityFrameworkCore;
+
+// Numbered pages: choose an order first. Id is unique for each post.
+var page = await db.Posts.OrderBy(p => p.Id).ToPageAsync(request, ct: ct);
+
+// Cursor pages: leave the query unordered; the helper orders it by Id.
+var cursorPage = await db.Posts.ToCursorPageAsync(p => p.Id, cursorRequest, ct: ct);
+```
+
+Each result has a `data` array for the current group. A cursor is a marker to send back unchanged to request another group. Choose non-null keys that identify each row uniquely; if several rows share the first key, add a unique second key as a tie-breaker. The [EF Core pagination example](/docs/pagination#with-ef-core) shows how to use the result with `Scroll`. For Native AOT, use the core delegate paginator with an AOT-compatible data source instead.
 
 Treat cursor strings as opaque. They are not tamper-proof; protect them with `IDataProtector` if your app requires tamper protection. An invalid nonempty cursor starts at the first page. When a logger is available, a Debug message records that fallback without the cursor value or exception details; see [Cursors](/docs/pagination#cursors).
 
@@ -2155,7 +2180,35 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 
 ## With EF Core
 
-An `Inertia.Net.EntityFrameworkCore` package with queryable helpers is planned for a later phase. Until then, use the delegate overload with your own queries.
+If your app uses EF Core, install the optional package alongside your database provider:
+
+```sh
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2
+```
+
+The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
+
+```csharp
+using Inertia.Net;
+using Microsoft.EntityFrameworkCore;
+
+// Numbered pages: order first, including a unique tie-breaker if needed.
+var page = await db.Posts.OrderByDescending(p => p.Id)
+    .ToPageAsync(request, ct: ct);
+
+// Cursor pages: pass an unordered query. The helper applies the ordering.
+var cursorPage = await db.Posts
+    .ToCursorPageAsync(p => p.CreatedAt, p => p.Id, cursorRequest,
+        descending: true, ct: ct);
+
+return Render("Feed", new InertiaProps { ["posts"] = Scroll(cursorPage) });
+```
+
+Both results contain the selected group in `data`. A cursor is a marker: send it back unchanged to request the next or previous group. `ToPageAsync` requires an ordered query and counts rows by default; pass `countTotal: false` to skip the count and return null `total` and `lastPage`. `ToCursorPageAsync` rejects an already ordered query and orders by the supplied key and optional tie-breaker itself. Both guards throw `InvalidOperationException`. The cursor helper fetches in both directions without counting.
+
+Choose a stable, fully unique ordering: use a unique key, or add a unique tie-breaker when the first key can repeat. Nullable keys are unsupported. The cursor codec supports the types listed above, but EF translation and ordering for each type depend on the database provider; for example, SQLite needs a suitable value conversion to order `DateTimeOffset`. The name from a bound request or `From(...)` is used for the corresponding page parameter; an explicit `pageName` or `cursorName` argument takes precedence.
+
+The EF Core package is not marked Native AOT compatible. EF Core has its own compiled-model requirements; for Native AOT applications, use the core delegate paginators with an AOT-compatible data source instead.
 
 ## Native AOT
 

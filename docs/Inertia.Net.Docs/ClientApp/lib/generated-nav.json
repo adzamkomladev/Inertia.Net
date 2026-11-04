@@ -167,6 +167,11 @@
           "id": "162-send-a-list-one-page-at-a-time",
           "text": "1.6.2: send a list one page at a time",
           "depth": 2
+        },
+        {
+          "id": "162-page-an-ef-core-query",
+          "text": "1.6.2: page an EF Core query",
+          "depth": 2
         }
       ]
     },

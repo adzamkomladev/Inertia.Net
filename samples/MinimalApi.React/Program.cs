@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Inertia.Net.Live.SignalR;
 using MinimalApi.React;
 
@@ -14,6 +16,15 @@ var builder = WebApplication.CreateBuilder(args);
 // The app's source-generated JSON context: Inertia.Net serializes prop values through these options (Native AOT friendly).
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 builder.Services.AddValidation();
+// Keep a named in-memory database alive; request-scoped contexts use their own connections.
+const string feedConnectionString = "Data Source=InertiaFeed;Mode=Memory;Cache=Shared";
+builder.Services.AddSingleton(_ =>
+{
+    var connection = new SqliteConnection(feedConnectionString);
+    connection.Open();
+    return connection;
+});
+builder.Services.AddDbContext<FeedDbContext>(options => options.UseSqlite(feedConnectionString));
 // CSRF: the Inertia client sends the XSRF-TOKEN cookie back as X-XSRF-TOKEN; UseInertiaAntiforgery() issues and validates it.
 builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddResponseCompression(); // gzip and Brotli for the page JSON and HTML (see the README on HTTPS)
@@ -46,6 +57,14 @@ builder.Services.AddInertiaErrorPages(o => o.EnabledInDevelopment = e2e);
 builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension, in Development only
 
 var app = builder.Build();
+_ = app.Services.GetRequiredService<SqliteConnection>();
+using (var scope = app.Services.CreateScope())
+{
+    var database = scope.ServiceProvider.GetRequiredService<FeedDbContext>();
+    database.Database.EnsureCreated();
+    database.Posts.AddRange(AppState.Posts);
+    database.SaveChanges();
+}
 
 app.UseResponseCompression();
 app.UseStaticFiles(new StaticFileOptions
@@ -109,24 +128,10 @@ app.MapGet("/feed", (HttpContext http) => Render("Feed/Index", new InertiaProps
         PageRequest.From(http.Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize))),
 }));
 
-app.MapGet("/feed/cursor", async (HttpContext http, CancellationToken ct) =>
+app.MapGet("/feed/cursor", async (HttpContext http, FeedDbContext database, CancellationToken ct) =>
 {
     var request = CursorRequest.From(http, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize);
-    var posts = await Pagination.PaginateAsync<Post, int>(request, post => post.Id, (cursor, take, token) =>
-    {
-        token.ThrowIfCancellationRequested();
-        IEnumerable<Post> rows = AppState.Posts.Reverse();
-        if (cursor is { Direction: CursorDirection.After } after)
-        {
-            rows = rows.Where(post => post.Id < after.Value);
-        }
-        else if (cursor is { Direction: CursorDirection.Before } before)
-        {
-            rows = rows.Where(post => post.Id > before.Value).Reverse();
-        }
-
-        return Task.FromResult<IReadOnlyList<Post>>(rows.Take(take).ToArray());
-    }, ct: ct);
+    var posts = await database.Posts.AsNoTracking().ToCursorPageAsync(post => post.Id, request, descending: true, ct: ct);
     return Render("Feed/Cursor", new InertiaProps { ["posts"] = Scroll(posts) });
 });
 

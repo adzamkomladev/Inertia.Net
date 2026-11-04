@@ -11,6 +11,8 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ### Added
 
+- `Inertia.Net.EntityFrameworkCore`: ordered numbered pagination and keyset cursor pagination for EF Core queries.
+
 - Numbered and cursor pagination values, request binding, in-memory and delegate paginators, `Scroll` metadata integration, and safe Debug logging for malformed cursors.
 - Pagination testing assertions and helpers to load the next or previous scroll page.
 
