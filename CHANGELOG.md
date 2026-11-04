@@ -133,7 +133,7 @@ renders in a private cache bounded by `Ssr.Cache.MaxBytes`, as in 1.4.
 Adds cached props, an SSR response cache, Vite chunk prefetching, CSP nonces, generated TypeScript declarations, the Inertia DevTools
 protocol, `MapInertia`, `InertiaView` for MVC and `dotnet new` templates (`Inertia.Net.Templates`). One default changes: a redirect to
 another origin, answered to an Inertia request, becomes a `409` with `X-Inertia-Location`; see
-[docs/migrating-to-1.4.md](docs/migrating-to-1.4.md). The Inertia v3 JSON protocol and the cookie, session and TempData formats are
+[current documentation](README.md). The Inertia v3 JSON protocol and the cookie, session and TempData formats are
 unchanged. Update all packages together.
 
 ### Changed
@@ -189,7 +189,7 @@ unchanged. Update all packages together.
 
 Reworks server-side rendering so that a slow, failing or overloaded SSR server cannot slow down or take down the app, adds several SSR
 servers and a supervised Node process pool, metrics and traces, and opt-in parallel prop loading. The SSR options change shape, so
-existing SSR configuration must be updated; see [docs/migrating-to-1.3.md](docs/migrating-to-1.3.md). The Inertia v3 JSON protocol and
+existing SSR configuration must be updated; see [current SSR documentation](README.md#server-side-rendering). The Inertia v3 JSON protocol and
 the cookie, session and TempData formats are unchanged. Update all four packages together.
 
 ### Breaking changes
@@ -312,7 +312,7 @@ packages together.
 
 ## [1.1.0] - 2026-10-13
 
-See [migration guidance](docs/migrating-to-1.1.md) for observable behavior changes. This minor release includes behavior corrections that may require application changes, despite retaining public APIs and redirect-state formats. Update all four packages together.
+See [current documentation](README.md) for observable behavior changes. This minor release includes behavior corrections that may require application changes, despite retaining public APIs and redirect-state formats. Update all four packages together.
 
 ### Changed
 

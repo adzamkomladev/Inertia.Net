@@ -1,6 +1,6 @@
 # Inertia.Net.Live.SignalR
 
-Use the 1.6 packages together. [Live props](https://github.com/adzamkomladev/Inertia.Net#live-props) need the Inertia client 3.11.0 or later.
+[Live props](https://github.com/adzamkomladev/Inertia.Net#live-props) need the Inertia client 3.11.0 or later.
 
 The SignalR transport for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net) live props: a hub the browser subscribes to,
 channel authorization, and the `IInertiaLiveBroadcaster` that `IInertiaLive` publishes through. Nothing else to host: the hub runs in
@@ -8,7 +8,6 @@ your app. Native AOT compatible.
 
 ```sh
 dotnet add package Inertia.Net.Live.SignalR
-npm install @microsoft/signalr
 ```
 
 ## Server
@@ -33,6 +32,8 @@ await live.PublishAsync(OrderEvents.Updated(id), exceptSocketId: context.Inertia
 ```
 
 ## Client
+
+Add `@microsoft/signalr` using npm, Bun, pnpm or Yarn.
 
 New apps from `dotnet new inertia` ship the transport as `ClientApp/lib/inertia-signalr.ts`; otherwise copy
 [the file](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Templates/content/common/ClientApp/lib/inertia-signalr.ts)
@@ -106,6 +107,8 @@ builder.Services.AddSignalR().AddStackExchangeRedis(redisConnectionString);   //
 Without one, use sticky sessions and expect a publish on one instance to reach only the clients connected to it.
 
 ## Security
+
+By default a connection may subscribe to 64 channels (`MaxSubscriptionsPerConnection`), and channel names may be 200 characters (`MaxChannelNameLength`). Configure trusted forwarded headers behind a proxy so origin checks see the external scheme and host. Authorization occurs when subscribing and again on reconnect; changing permissions does not evict an existing subscription.
 
 - **Origin check.** Browsers do not apply CORS to WebSockets, and the hub authenticates with the app's cookie. A request whose `Origin`
   is neither the app's own nor in `o.AllowedOrigins` gets 403. That check stands in for CSRF protection, so `UseInertiaAntiforgery()`

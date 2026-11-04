@@ -1,6 +1,5 @@
 # Inertia.Net.Testing
 
-Use the 1.6.2 packages together; from 1.3 or earlier, see the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md).
 
 Test helpers for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net): Laravel-style fluent assertions over Inertia responses, for any test framework. It parses JSON responses and the first-visit HTML `<script data-page>`, and throws `InertiaAssertionException` when an assertion fails.
 
@@ -24,6 +23,17 @@ var page = await response.GetInertiaPageAsync();
 var deferred = await page.LoadDeferredPropsAsync(client, "sidebar");
 var only = await page.ReloadOnlyAsync(client, "users");
 ```
+
+For form redirects, keep cookies and disable automatic redirects on the client; post the form and follow with `InertiaGetAsync` on the same client:
+
+```csharp
+using var submitted = await client.InertiaRequestAsync(HttpMethod.Post, "/users", JsonContent.Create(new { email = "" }));
+Assert.Equal(HttpStatusCode.Redirect, submitted.StatusCode);
+using var followed = await client.InertiaGetAsync("/users/create");
+await followed.AssertInertiaAsync(p => p.Where("errors.email", "Email is required."));
+```
+
+This example uses `System.Net` and `System.Net.Http.Json`. Default-bag errors are flat (`errors.email`); a named bag is nested (`errors.createUser.email`).
 
 For infinite scroll, `new AssertableInertia(page).HasScroll("posts")` checks for scroll metadata; the overload with current and next page values checks those too.
 

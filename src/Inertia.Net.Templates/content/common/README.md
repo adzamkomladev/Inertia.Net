@@ -32,6 +32,8 @@ your row to write `wwwroot/build`, then publish with `dotnet publish -c Release`
 | `ClientApp/lib/inertia-signalr.ts` | The client transport for live props over SignalR (off until you enable it) |
 | `ClientApp/types/inertia.d.ts` | Types for the pages, shared props and flash data, rewritten from the C# types when the app starts in Development |
 
+The template disables reflection-based JSON serialization. Use named DTOs and register their source-generated JSON metadata; anonymous values require reflection-enabled serialization.
+
 ## Next steps
 
 - Add a page: a component under `ClientApp/pages`, a route that calls `Render`, and `o.TypeScript.Page<TProps>(...)` for its types.
