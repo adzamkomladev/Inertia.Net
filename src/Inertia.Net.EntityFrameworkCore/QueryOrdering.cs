@@ -34,7 +34,7 @@ internal static class QueryOrdering
             }
 
             if (call.Method.DeclaringType == typeof(EntityFrameworkQueryableExtensions)
-                || call.Method.DeclaringType?.FullName == "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions")
+                || IsQuerySplittingAnnotation(call))
             {
                 expression = call.Arguments[0];
                 continue;
@@ -44,5 +44,24 @@ internal static class QueryOrdering
         }
 
         return false;
+    }
+
+    private static bool IsQuerySplittingAnnotation(MethodCallExpression call)
+    {
+        var method = call.Method;
+        if (method.Name is not ("AsSplitQuery" or "AsSingleQuery") || !method.IsPublic || !method.IsStatic
+            || !method.IsGenericMethod || method.GetGenericArguments() is not [var elementType]
+            || call.Arguments.Count != 1)
+            return false;
+
+        var sourceType = typeof(IQueryable<>).MakeGenericType(elementType);
+        if (method.ReturnType != sourceType || method.GetParameters() is not [var source] || source.ParameterType != sourceType)
+            return false;
+
+        // Relational annotations are optional: recognize their signed assembly and public signature without depending on that package.
+        var coreAssembly = typeof(EntityFrameworkQueryableExtensions).Assembly.GetName();
+        var origin = method.Module.Assembly.GetName();
+        return origin.Name == coreAssembly.Name + ".Relational"
+            && origin.GetPublicKeyToken().AsSpan().SequenceEqual(coreAssembly.GetPublicKeyToken());
     }
 }

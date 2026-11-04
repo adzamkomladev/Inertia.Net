@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Emit;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Data.Sqlite;
@@ -60,6 +61,46 @@ public sealed class PaginationTests
         var valid = fixture.Db.Rows.OrderBy(row => row.Id).Where(row => row.Id > 0).Select(row => row).AsNoTracking();
         var page = await valid.ToPageAsync(new PageRequest(1, 3), ct: Ct);
         Assert.Equal([1, 2, 3], page.Data.Select(row => row.Id));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Query_splitting_annotations_preserve_the_underlying_order_guard(bool split)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        IQueryable<Row> Annotate(IQueryable<Row> source) => split ? source.AsSplitQuery() : source.AsSingleQuery();
+        var ordered = Annotate(fixture.Db.Rows.OrderBy(row => row.Id));
+        var page = await ordered.ToPageAsync(new PageRequest(2, 3), ct: Ct);
+        Assert.Equal([4, 5, 6], page.Data.Select(row => row.Id));
+        Assert.Throws<InvalidOperationException>(() => { _ = ordered.ToCursorPageAsync(row => row.Id, new CursorRequest(), ct: Ct); });
+        var unordered = Annotate(fixture.Db.Rows.Where(row => row.Id > 0));
+        Assert.Throws<InvalidOperationException>(() => { _ = unordered.ToPageAsync(new PageRequest(), ct: Ct); });
+        var cursor = await unordered.ToCursorPageAsync(row => row.Id, new CursorRequest(PerPage: 3), ct: Ct);
+        Assert.Equal([1, 2, 3], cursor.Data.Select(row => row.Id));
+        var distinct = Annotate(fixture.Db.Rows.OrderBy(row => row.Id).Distinct());
+        Assert.Throws<InvalidOperationException>(() => { _ = distinct.ToPageAsync(new PageRequest(), ct: Ct); });
+    }
+
+    [Fact]
+    public async Task A_foreign_type_with_the_relational_extension_name_is_not_an_order_annotation()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("Untrusted.QueryAnnotations"), AssemblyBuilderAccess.RunAndCollect);
+        var type = assembly.DefineDynamicModule("Annotations").DefineType("Microsoft.EntityFrameworkCore.RelationalQueryableExtensions",
+            TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+        var method = type.DefineMethod("AsSplitQuery", MethodAttributes.Public | MethodAttributes.Static);
+        var entity = method.DefineGenericParameters("T")[0];
+        var queryType = typeof(IQueryable<>).MakeGenericType(entity);
+        method.SetReturnType(queryType);
+        method.SetParameters(queryType);
+        method.GetILGenerator().Emit(OpCodes.Ldarg_0);
+        method.GetILGenerator().Emit(OpCodes.Ret);
+        var annotation = type.CreateType()!.GetMethod("AsSplitQuery")!.MakeGenericMethod(typeof(Row));
+        var source = fixture.Db.Rows.OrderBy(row => row.Id);
+        var query = source.Provider.CreateQuery<Row>(Expression.Call(annotation, source.Expression));
+        Assert.Throws<InvalidOperationException>(() => { _ = query.ToPageAsync(new PageRequest(), ct: Ct); });
+        Assert.Empty(fixture.Sql.Commands);
     }
 
     [Theory]
@@ -424,28 +465,51 @@ public sealed class PaginationTests
         public static async Task<Fixture> CreateAsync()
         {
             var connection = new SqliteConnection("Data Source=:memory:");
-            await connection.OpenAsync(Ct);
-            var sql = new CaptureSql();
-            var options = new DbContextOptionsBuilder<Database>().EnableServiceProviderCaching(false).UseSqlite(connection).AddInterceptors(sql).Options;
-            var db = new Database(options);
-            await db.Database.EnsureCreatedAsync(Ct);
-            db.Rows.AddRange(Enumerable.Range(1, 25).Select(id => new Row
+            Database? db = null;
+            try
             {
-                Id = id,
-                NullableId = id,
-                CreatedAt = new DateTime(2026, 1, 1).AddDays((id - 1) / 3),
-                Name = $"row{id:D2}",
-                Token = Guid.Parse($"00000000-0000-0000-0000-{id:D12}"),
-                Flag = id % 2 == 0,
-            }));
-            await db.SaveChangesAsync(Ct);
-            sql.Commands.Clear();
-            return new Fixture(connection, db, sql);
+                await connection.OpenAsync(Ct);
+                var sql = new CaptureSql();
+                var options = new DbContextOptionsBuilder<Database>().EnableServiceProviderCaching(false).UseSqlite(connection).AddInterceptors(sql).Options;
+                db = new Database(options);
+                await db.Database.EnsureCreatedAsync(Ct);
+                db.Rows.AddRange(Enumerable.Range(1, 25).Select(id => new Row
+                {
+                    Id = id,
+                    NullableId = id,
+                    CreatedAt = new DateTime(2026, 1, 1).AddDays(Math.Floor((id - 1) / 3d)),
+                    Name = $"row{id:D2}",
+                    Token = Guid.Parse($"00000000-0000-0000-0000-{id:D12}"),
+                    Flag = id % 2 == 0,
+                }));
+                await db.SaveChangesAsync(Ct);
+                sql.Commands.Clear();
+                return new Fixture(connection, db, sql);
+            }
+            catch
+            {
+                try
+                {
+                    if (db is not null) await db.DisposeAsync();
+                }
+                finally
+                {
+                    await connection.DisposeAsync();
+                }
+
+                throw;
+            }
         }
         public async ValueTask DisposeAsync()
         {
-            await Db.DisposeAsync();
-            await connection.DisposeAsync();
+            try
+            {
+                await Db.DisposeAsync();
+            }
+            finally
+            {
+                await connection.DisposeAsync();
+            }
         }
     }
 }
