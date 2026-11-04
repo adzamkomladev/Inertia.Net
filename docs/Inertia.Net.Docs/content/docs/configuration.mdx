@@ -74,7 +74,9 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`. The full SSR o
 | Option | Default | Description |
 |---|---|---|
 | `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
-| `CookieSecurePolicy` | `SameAsRequest` | When the state cookie is `Secure`. |
+| `RememberPreviousUrl` | `false` | Remember successful page GET URLs for `Back()` when Referer is unavailable. |
+| `PreviousUrlCookieName` | `".Inertia.Previous"` | Plain previous-URL cookie, with either state store; non-empty and different from `CookieName`. |
+| `CookieSecurePolicy` | `SameAsRequest` | When state and previous-URL cookies are `Secure`. |
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. |
 | `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData. Inertia.Net.Mvc package. |
 
