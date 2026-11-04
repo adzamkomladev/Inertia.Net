@@ -33,7 +33,7 @@ await live.PublishAsync(OrderEvents.Updated(id), exceptSocketId: context.Inertia
 
 ## Client
 
-Add `@microsoft/signalr` using npm, Bun, pnpm or Yarn.
+Add `@microsoft/signalr` with your package manager: `npm install @microsoft/signalr`, `bun add @microsoft/signalr`, `pnpm add @microsoft/signalr` or `yarn add @microsoft/signalr`.
 
 New apps from `dotnet new inertia` ship the transport as `ClientApp/lib/inertia-signalr.ts`; otherwise copy
 [the file](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Templates/content/common/ClientApp/lib/inertia-signalr.ts)

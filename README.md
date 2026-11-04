@@ -204,6 +204,8 @@ Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScr
 
 ## Quick start
 
+New to Inertia.Net? Follow [Your first 10 minutes](docs/Inertia.Net.Docs/content/docs/first-10-minutes.mdx) for a step-by-step first app.
+
 Already using the starter template? Its services, middleware, root template and frontend are configured for you. The steps below are for adding Inertia to an existing app or building one manually. Choose one backend and one frontend.
 
 For a new project without the starter template, run `dotnet new web -n MyApp`, then `cd MyApp`, install the packages above, and create a `package.json` before the client setup (`npm init -y`, `bun init -y`, `pnpm init` or `yarn init`).
@@ -1419,23 +1421,38 @@ app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users")).Wit
 
 Rate-limit both validation and submissions. Only grant a separate bounded validation bucket when `InertiaPrecognition.IsPrecognitive(request)` **and** the endpoint has `InertiaPrecognitionMetadata`; the header alone does not prove the handler will be skipped. On a 429, add `Precognition: true` for precognitive requests so the client recognizes the response; the request still rejects, so show a retry or error message. See the [Precognition guide](docs/Inertia.Net.Docs/content/docs/validation-and-errors.mdx) for a complete policy.
 
-A bounded policy can distinguish those requests after routing (add `using System.Threading.RateLimiting;`):
+The [sample login policy](samples/MinimalApi.React/LoginDemo.cs) uses a bounded sliding window for validation and a stricter fixed window for submissions. This excerpt omits its test-reset bookkeeping (add `using System.Threading.RateLimiting;`, `using Microsoft.AspNetCore.RateLimiting;` and `using System.Globalization;`):
 
 ```csharp
-builder.Services.AddRateLimiter(o =>
+builder.Services.AddRateLimiter(options =>
 {
-    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    o.AddPolicy("login", context =>
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("login", http =>
     {
-        var validation = InertiaPrecognition.IsPrecognitive(context.Request)
-            && context.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null;
-        return RateLimitPartition.GetFixedWindowLimiter($"{context.Connection.RemoteIpAddress}:{validation}", _ =>
-            new FixedWindowRateLimiterOptions { PermitLimit = validation ? 30 : 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+        var validation = http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
+            && InertiaPrecognition.IsPrecognitive(http.Request);
+        var client = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (validation)
+            return RateLimitPartition.GetSlidingWindowLimiter($"validation:{client}", _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 30, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0,
+            });
+        return RateLimitPartition.GetFixedWindowLimiter($"submit:{client}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0,
+        });
     });
-    o.OnRejected = (context, _) =>
+    options.OnRejected = (context, _) =>
     {
-        if (InertiaPrecognition.IsPrecognitive(context.HttpContext.Request))
-            context.HttpContext.Response.Headers[InertiaPrecognition.Header] = "true";
+        var http = context.HttpContext;
+        if (http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
+            && InertiaPrecognition.IsPrecognitive(http.Request))
+        {
+            http.Response.Headers[InertiaPrecognition.Header] = "true";
+            http.Response.Headers.Append("Vary", InertiaPrecognition.Header);
+        }
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            http.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
         return ValueTask.CompletedTask;
     };
 });
@@ -1753,7 +1770,7 @@ Build both bundles. The SSR build writes a Node script; run it with Node:
 node ssr/ssr.js        # listens on http://127.0.0.1:13714
 ```
 
-The SSR build leaves `node_modules` imports external, so run the server where `node_modules` is installed (a Docker image with `npm ci --omit=dev` is the usual way). Either let the app start it (`o.Ssr.UseNodeProcess()`, below), or run it yourself with a process manager (systemd, pm2) or as a sidecar container (`docker compose` service) and add its URL to `o.Ssr.Urls`. The entries above listen on `INERTIA_SSR_PORT` when it is set, which the app needs to run [several instances](#let-the-app-run-the-node-server).
+The SSR build leaves `node_modules` imports external, so run the server where `node_modules` is installed (for example, install production dependencies in the Docker image using your chosen package manager and lockfile). Either let the app start it (`o.Ssr.UseNodeProcess()`, below), or run it yourself with a process manager (systemd, pm2) or as a sidecar container (`docker compose` service) and add its URL to `o.Ssr.Urls`. The entries above listen on `INERTIA_SSR_PORT` when it is set, which the app needs to run [several instances](#let-the-app-run-the-node-server).
 
 ### 2. Enable it
 
