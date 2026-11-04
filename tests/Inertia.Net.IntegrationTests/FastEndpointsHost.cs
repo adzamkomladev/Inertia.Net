@@ -32,6 +32,12 @@ public static class FastEndpointsRoutes
 {
     private static readonly Http[] Mutations = [Http.POST, Http.PUT, Http.PATCH, Http.DELETE];
 
+    public sealed class ThrowEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Get("/throw");
+        public override Task HandleAsync(CancellationToken ct) => throw new InvalidOperationException("failed");
+    }
+
     public sealed class ArrayEndpoint : EndpointWithoutRequest
     {
         public override void Configure() => Get("/array");

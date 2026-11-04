@@ -35,7 +35,10 @@ builder.Services.AddInertiaDevTools(o =>
     o.Authorize = _ => true;
 });
 
+builder.Services.AddInertiaErrorPages();
+
 var app = builder.Build();
+app.UseInertiaErrorPages();
 app.UseInertia();
 app.UseFastEndpoints(c =>
 {
@@ -44,6 +47,7 @@ app.UseFastEndpoints(c =>
     c.Binding.ReflectionCache.AddFromInertiaNetAotSmoke();
 });
 
+app.MapGet("/throw", (Func<IResult>)(() => throw new InvalidOperationException("smoke")));
 app.MapGet("/healthz", () => "ok");
 app.MapInertiaDevTools();
 app.MapInertia("/about", "About", new InertiaProps { ["since"] = 2026 });

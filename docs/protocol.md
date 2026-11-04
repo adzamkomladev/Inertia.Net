@@ -57,7 +57,7 @@ All list headers are comma-separated. Parse them as: split on `,`, trim, drop em
 ## 3. Responses and middleware flow
 
 - `Vary: X-Inertia` goes on **every** response that passes through the middleware.
-- A JSON page response has status 200, `Content-Type: application/json`, and `X-Inertia: true`.
+- A JSON page response normally has status 200, `Content-Type: application/json`, and `X-Inertia: true`. Error pages are ordinary pages with a non-200 status; `AddInertiaErrorPages()` can render them for routing failures and unhandled exceptions.
 - An HTML page response is the root template with the page embedded (§5).
 
 The middleware runs in this order:

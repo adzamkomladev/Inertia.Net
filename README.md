@@ -2,7 +2,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.7.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.6.1** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -26,7 +26,7 @@ Inertia.Net **1.7.0** is a .NET 10 server adapter for the **Inertia.js v3** prot
 13. [Live props](#live-props)
 14. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
 15. [Flash data](#flash-data)
-16. [Redirects, Location and Back](#redirects-location-and-back)
+16. [Redirects, Location and Back](#redirects-location-and-back), [Error pages](#error-pages)
 17. [History encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
 18. [Asset versioning](#asset-versioning)
 19. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
@@ -79,7 +79,7 @@ You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clie
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.0
+dotnet new install Inertia.Net.Templates::1.6.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -132,6 +132,7 @@ The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself 
 | Precognition | `.WithInertiaPrecognition()` | not available | `c.UseInertia()` |
 | Razor root view | no (`app.html` template) | optional (tag helpers) | no (`app.html` template) |
 | Native AOT | yes | no (MVC itself is not AOT) | yes (with the FastEndpoints source generator) |
+| Error pages (routing, authorization, exceptions) | `AddInertiaErrorPages()` | same | same |
 | Live props transport: SignalR | `Inertia.Net.Live.SignalR` | same | same |
 
 | Client | Package | Supported |
@@ -179,14 +180,14 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.7.0
-dotnet add package Inertia.Net.Mvc --version 1.7.0 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.7.0 # FastEndpoints only
-dotnet add package Inertia.Net.Testing --version 1.7.0 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.7.0 # live props over SignalR
+dotnet add package Inertia.Net --version 1.6.1
+dotnet add package Inertia.Net.Mvc --version 1.6.1 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.6.1 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.6.1 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.6.1 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.7.0` for all Inertia.Net packages. Inertia.Net 1.7.0 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.6.1` for all Inertia.Net packages. Inertia.Net 1.6.1 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -1385,6 +1386,83 @@ This cookie is used with both cookie and session state stores. It is **per brows
 
 ---
 
+## Error pages
+
+Render routing failures, authorization failures and unhandled exceptions as Inertia pages in production:
+
+```csharp
+builder.Services.AddInertia();
+builder.Services.AddInertiaErrorPages(o =>
+{
+    o.Component = "Error";                         // default
+    o.Components[404] = "Errors/NotFound";          // optional per-status component
+    o.StatusCodes = [403, 404, 500, 503];           // default
+    o.Props = (context, status, exception) => new InertiaProps
+    {
+        ["requestId"] = context.TraceIdentifier,
+    };
+});
+
+var app = builder.Build();
+app.UseInertiaErrorPages();                        // before UseInertia and the endpoints
+app.UseInertia();
+```
+
+Create the named components in your client pages directory. Each receives `status`, the optional `Props` callback's values, and
+shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
+responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.
+
+For example, `ClientApp/pages/Error.tsx`:
+
+```tsx
+export default function Error({ status }: { status: number }) {
+  const title = status === 404 ? 'Page not found'
+    : status === 403 ? 'Access denied'
+    : status === 503 ? 'Service unavailable'
+    : 'Something went wrong'
+
+  return <main><h1>{status}: {title}</h1><a href="/">Return home</a></main>
+}
+```
+
+The handler answers requests with `X-Inertia` or an `Accept: text/html` navigation. It preserves the error status: XHR receives a
+JSON page with `X-Inertia: true`; the first visit receives the normal root template. Root views and SSR work as for any other
+render. An error component must also resolve in your SSR bundle when SSR is enabled.
+
+Only configured error statuses with an empty response are replaced. API clients, existing response bodies, redirects, Inertia's
+`409` responses and antiforgery's `419` responses are left to their existing handlers. Exceptions use the status selected by
+ASP.NET Core's exception middleware (500 by default). The default statuses are 403, 404, 500 and 503; extend `StatusCodes` to handle
+other error statuses. A page explicitly returned with `Render(...).WithStatusCode(404)` keeps its component and props.
+
+In Development, error pages are disabled so the developer exception page and Inertia debug modal stay available. Set
+`o.EnabledInDevelopment = true` to preview your error components. The Inertia client renders non-2xx Inertia responses by default;
+application `httpException` event handlers or `onHttpException` callbacks can cancel that rendering.
+
+**Already using `UseExceptionHandler()`?** `AddInertiaErrorPages()` registers an `IExceptionHandler` in the existing chain. Register
+API-specific handlers first if they should take priority. Use one exception middleware, then install just the status-code part:
+
+```csharp
+app.UseExceptionHandler();
+app.UseInertiaErrorPages(useExceptionHandler: false);
+app.UseInertia();
+```
+
+ASP.NET Core 10 suppresses exception diagnostics by default when an `IExceptionHandler` handles the exception. The Inertia
+handler follows that policy and emits only a Debug message naming the rendered component. To keep the built-in exception logs
+and diagnostics, configure the exception middleware explicitly:
+
+```csharp
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ExceptionHandlerOptions>(o =>
+    o.SuppressDiagnosticsCallback = _ => false);
+```
+
+`AddInertiaErrorPages()` also registers the built-in ProblemDetails service as the exception middleware’s fallback. The Inertia
+exception handler declines requests that do not ask for an Inertia page or HTML, so API exceptions use the host’s ProblemDetails
+fallback and content negotiation. Existing ProblemDetails configuration and earlier application handlers still apply; empty
+status-code responses remain unchanged. Loaded flash and validation state is consumed when an error page renders, as on any other page response.
+
+---
+
 ## History encryption, clearing and fragments
 
 ```csharp
@@ -2023,6 +2101,8 @@ by default). Outside Development there is no check and no file access.
 
 ## Testing
 
+The response helpers also parse non-2xx Inertia pages; use `.Status(404)` in an assertion to check an error page’s HTTP status.
+
 `Inertia.Net.Testing` has Laravel-style fluent assertions over Inertia responses and `HttpClient` helpers. It parses both JSON responses (`X-Inertia: true`) and the first-visit HTML `<script data-page>`, and decodes `$bigint` values. Failures throw `InertiaAssertionException` with a readable message, so it works with any test framework.
 
 ```csharp
@@ -2235,11 +2315,22 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. The session is only loaded when the request has a session cookie. |
 | `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData (cookie or session provider) instead of the encrypted cookie. Inertia.Net.Mvc package. |
 
+### `AddInertiaErrorPages(o => ...)`: `InertiaErrorPagesOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `Component` | `"Error"` | Component for error pages without a per-status override. |
+| `Components` | empty | Status-to-component overrides; keys must also be in `StatusCodes`. |
+| `StatusCodes` | `[403, 404, 500, 503]` | Non-empty set of error statuses (400–599). Protocol `409` and antiforgery `419` responses are preserved. |
+| `EnabledInDevelopment` | `false` | Render error pages in Development too. |
+| `Props` | `null` | `Func<HttpContext, int, Exception?, InertiaProps>` for extra error page props. |
+
 ### Middleware, endpoint and result API
 
 | API | Description |
 |---|---|
 | `services.AddInertia(configure?)` | Registers services and options. |
+| `services.AddInertiaErrorPages(configure?)` / `app.UseInertiaErrorPages(useExceptionHandler: true)` | Registers error page handling and wraps the pipeline before `UseInertia()`. Set the flag to `false` when using your own `UseExceptionHandler()`. |
 | `app.UseInertia()` | The protocol middleware. Before the endpoints, after `UseSession()` when the session store is used. |
 | `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates every unsafe request (`419` on failure). Options: `CookieName`, `SecurePolicy`, `ShouldValidate`, `OnRejected`, `CookieRefresh` (`Always`, `Lazy`). |
 | `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |
@@ -2294,6 +2385,9 @@ Behavior differences to check when you migrate:
 ---
 
 ## Troubleshooting and FAQ
+
+**My 404 shows the Inertia modal in production.**
+Register `AddInertiaErrorPages()` and call `UseInertiaErrorPages()` before `UseInertia()`. Create the configured error components; see [Error pages](#error-pages).
 
 **`Inertia.Render(...)` does not compile / "'Inertia' is a namespace".**
 Call `Render(...)` unqualified. The namespace `Inertia.Net` shadows the class name outside the `Inertia.Net` namespace. The global usings come from the package's `buildTransitive` props and need `<ImplicitUsings>enable</ImplicitUsings>`. Without implicit usings (or with `InertiaNetImplicitUsings` set to `false`) add `using static Inertia.Net.Inertia;` to the file. See the [callout](#installation). A class library that references `Inertia.Net` gets the same global usings.
