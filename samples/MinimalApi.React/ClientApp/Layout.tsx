@@ -8,12 +8,13 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div style={{ fontFamily: 'sans-serif', maxWidth: 640, margin: '0 auto', padding: 16 }}>
       <header>
         <strong data-testid="app-name">{props.appName}</strong>
-        <nav style={{ display: 'flex', gap: 12, margin: '8px 0' }}>
+        <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 12, margin: '8px 0' }}>
           <Link href="/" data-testid="nav-home">Home</Link>
           <Link href="/users" data-testid="nav-users">Users</Link>
           <Link href="/contacts/create" data-testid="nav-contacts">Contacts</Link>
           <Link href="/feed" data-testid="nav-feed">Feed</Link>
           <Link href="/live" data-testid="nav-live">Live</Link>
+          <Link href="/login" data-testid="nav-login">Login</Link>
         </nav>
         <div data-testid="flash">{flash.success ?? null}</div>
       </header>

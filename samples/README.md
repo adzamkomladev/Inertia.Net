@@ -70,6 +70,14 @@ channel authorizer allows the demo user's private channel `users.1` (the sample 
 When the page sets `window.__e2e = true` before the app starts (the spec does, with `addInitScript`), the app exposes its hub
 connection as `window.__inertiaLive`, so the spec can stop it and check that missed events are caught up on reconnect.
 
+## Login validation (React sample only)
+
+`GET /login` shows a dummy email/password form using Precognition on blur. Its POST endpoint has two bounded per-client
+rate-limit buckets: 30 sliding-window validations per minute and five fixed-window submissions per minute. Both reject with
+429; only validation responses carry `Precognition: true`. Accepted submissions update a demo counter without signing in.
+`specs/precognition.spec.ts` covers field errors, validation beyond the strict submission limit and both rejection paths.
+The E2E reset hook resets this counter and the rate-limit partitions too.
+
 ## CSRF
 
 Every sample registers `services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken)` and calls `app.UseInertiaAntiforgery()`

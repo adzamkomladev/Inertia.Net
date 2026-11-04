@@ -16,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 // The app's source-generated JSON context: Inertia.Net serializes prop values through these options (Native AOT friendly).
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 builder.Services.AddValidation();
+LoginDemo.AddServices(builder.Services);
 // Keep a named in-memory database alive; request-scoped contexts use their own connections.
 const string feedConnectionString = "Data Source=InertiaFeed;Mode=Memory;Cache=Shared";
 builder.Services.AddSingleton(_ =>
@@ -53,7 +54,11 @@ builder.Services.AddInertiaLive().AddSignalR(o =>
     o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)));
 
 // Keep development diagnostics unless the browser tests explicitly enable error pages.
-builder.Services.AddInertiaErrorPages(o => o.EnabledInDevelopment = e2e);
+builder.Services.AddInertiaErrorPages(o =>
+{
+    o.EnabledInDevelopment = e2e;
+    o.StatusCodes.Add(StatusCodes.Status429TooManyRequests);
+});
 builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension, in Development only
 
 var app = builder.Build();
@@ -78,13 +83,16 @@ app.UseStaticFiles(new StaticFileOptions
         }
     },
 });
-app.UseInertiaErrorPages(); // before UseInertia(): handle errors from the whole page pipeline
+app.UseInertiaErrorPages(); // wraps rate-limit and page responses
+app.UseRouting();
+app.UseRateLimiter();
 app.UseInertia();
 app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
 
 app.MapInertiaDevTools();
 app.MapInertiaLiveHub(); // /inertia-live
 app.MapInertia("/", "Home");
+LoginDemo.MapRoutes(app);
 
 app.MapGet("/users", (HttpContext http) => Render("Users/Index", new InertiaProps
 {
@@ -228,6 +236,8 @@ namespace MinimalApi.React
     [JsonSerializable(typeof(Page<Post>))]
     [JsonSerializable(typeof(CursorPage<Post>))]
     [JsonSerializable(typeof(Page<User>))]
+    [JsonSerializable(typeof(LoginForm))]
+    [JsonSerializable(typeof(LoginPage))]
     [JsonSerializable(typeof(ContactForm))]
     [JsonSerializable(typeof(NewsletterForm))]
     [JsonSerializable(typeof(List<DeferredRow>))]
@@ -267,6 +277,7 @@ namespace MinimalApi.React
 
         public static IResult Reset()
         {
+            LoginDemo.Reset();
             Users.Clear();
             Users.AddRange(Seed());
             Version = null;
