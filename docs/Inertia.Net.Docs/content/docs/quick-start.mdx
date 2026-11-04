@@ -2,7 +2,7 @@
 title: Quick start
 description: Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 section: Get started
-order: 3
+order: 4
 ---
 
 Already using the starter template? Its services, middleware, root template and frontend are configured for you. These steps are for adding Inertia to an existing app or building one manually.
@@ -32,6 +32,7 @@ builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddInertia(o =>
 {
     o.Share("appName", "Demo");
+    o.Pages.Directory = "ClientApp/pages";
 });
 
 var app = builder.Build();
@@ -100,7 +101,7 @@ var app = builder.Build();
 app.UseStaticFiles();
 app.UseInertia();
 app.UseInertiaAntiforgery();
-app.UseFastEndpoints(c => c.UseInertia());           // validation redirect + Precognition
+app.UseFastEndpoints(c => c.ConfigureInertia());           // validation redirect + Precognition
 app.Run();
 ```
 
@@ -124,6 +125,8 @@ public sealed class HomeEndpoint : EndpointWithoutRequest<InertiaResult>
 `AddValidation()` enables the Minimal API integration used by `.WithInertiaValidation()`. `UseInertiaAntiforgery()` issues the `XSRF-TOKEN` cookie and validates every unsafe request, so forms work from the first commit.
 </Callout>
 
+See [Precognition](/docs/precognition) for live form validation.
+
 ## 2. Add the root template
 
 The root template is an HTML file in the content root. The default name is `app.html`.
@@ -136,9 +139,9 @@ The root template is an HTML file in the content root. The default name is `app.
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My app</title>
+  @inertiaHead
   @viteReactRefresh
   @vite("ClientApp/app.tsx")
-  @inertiaHead
 </head>
 <body>
   @inertia

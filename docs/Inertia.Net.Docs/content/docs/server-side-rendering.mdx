@@ -252,3 +252,9 @@ Concurrent misses for the same page share one fill per app instance. Waiting cou
 With `StaleFor`, a render past its `Duration` is still served and refreshed by the bounded background worker after response completion, like stale props. The connection can accept its next request while the renderer runs. Refreshes cancel when the host stops. If the 64-entry queue is full, the refresh is dropped and logged; monitor `inertia.cache.refresh.dropped` with `inertia.cache.kind=ssr`. `IInertiaCache.ClearSsrAsync()` removes every render.
 
 `Ssr.ConnectTimeout` bounds connection establishment independently of `Ssr.Timeout`; both accept a positive duration or `Timeout.InfiniteTimeSpan`. In Required mode, `InertiaSsrException.Message` contains a generic failure category suitable for an error page. Renderer diagnostics remain in application logs and diagnostic exception properties; do not expose those properties to clients.
+
+## Connection timeout and cached renders
+
+`Ssr.ConnectTimeout` defaults to five seconds and limits connection establishment; `Ssr.Timeout` bounds the entire render. In `Required` mode, exceptions use a generic public message; diagnostic properties can contain private renderer details, so do not display them to users.
+
+A stale SSR cache hit returns immediately and schedules refresh on a bounded background worker. Its queue holds 64 pending refreshes; a dropped refresh logs a warning and increments `inertia.cache.refresh.dropped` with `inertia.cache.kind=ssr`. Cached prop loaders used with stale refresh must use singleton dependencies or create their own scope; never capture request-scoped services or `HttpContext`. Global `Ssr.Cache.Duration` is suitable for anonymous pages. Prefer per-page `WithSsrCache` and keys that account for all user and tenant data.

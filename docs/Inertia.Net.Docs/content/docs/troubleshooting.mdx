@@ -16,7 +16,7 @@ The global usings come from the package's `buildTransitive` props and need `<Imp
     Inside a namespace that starts with `Inertia.Net.`, the name `Inertia` binds to the `Inertia.Net.Inertia` class. Source generators that emit non-`global::` names starting with `Inertia` then break. Do not put your app's code under an `Inertia.Net.*` namespace.
   </AccordionItem>
   <AccordionItem title="Vite manifest not found. Looked in: ...">
-    Run `npm run build`, or start the dev server so the hot file exists in Development, or set `o.Vite.ManifestPath` / `o.Vite.BuildDirectory`. Check that Vite writes `.vite/manifest.json` (`build.manifest: true`, Vite 5 and later) to `wwwroot/build`, and that the build output is part of what you deploy.
+    Run your package manager’s build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`), or start the dev server so the hot file exists in Development, or set `o.Vite.ManifestPath` / `o.Vite.BuildDirectory`. Check that Vite writes `.vite/manifest.json` (`build.manifest: true`, Vite 5 and later) to `wwwroot/build`, and that the build output is part of what you deploy.
   </AccordionItem>
   <AccordionItem title="Vite entry '...' was not found in the manifest">
     The `@vite("...")` argument must equal the manifest key, which is the path relative to the Vite root. The error lists the available entries.
@@ -78,7 +78,7 @@ Use `.WithInertiaValidation()` on the endpoint. Without it, the built-in `AddVal
 
 ## Validation keys do not match my field names
 
-Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). In MVC the policy is the one in the MVC `JsonOptions`. The page itself is written with the HTTP `JsonOptions`: keep both policies aligned.
+Keys use dotted indices and available JSON member aliases. Minimal API and MVC use the page serializer’s HTTP JSON options and FastEndpoints its binding serializer policy; keep these aligned with client field names. Metadata-free or custom resolver paths can fall back to naming-policy conversion. See [Validation](/docs/validation-and-errors).
 
 ## InertiaProp values can only be serialized by Inertia.Net
 
@@ -122,3 +122,23 @@ No. Props use System.Text.Json with the HTTP JSON options.
 ## Can I mix Razor Pages or views with Inertia pages?
 
 Yes. Inertia handles only the endpoints that return `Render(...)`. The middleware leaves other responses alone, apart from `Vary: X-Inertia`.
+
+## Forms submit invalid data
+
+Minimal API endpoints need `.WithInertiaValidation()` or `.WithInertiaPrecognition()` and `AddValidation()`. Endpoint construction throws when validation resolvers are missing; routing can construct endpoints lazily. See [Validation](/docs/validation-and-errors).
+
+## 419 in tests
+
+Use a cookie-preserving client, load an Inertia page first, then use `request.WithXsrfToken(pageResponse)` on the form request. See [Testing](/docs/testing#testing-a-form-with-antiforgery).
+
+## Precognition: login locks users out while typing
+
+Precognitive POSTs pass through rate limiting. Use separate bounded validation and submission partitions and validate on blur; see [Precognition](/docs/precognition#rate-limiting). A throttled validation still rejects, so show a retry message. To render a custom Inertia error page for a real submission rejected with 429, add 429 with `AddInertiaErrorPages(o => o.StatusCodes.Add(429))` and put `UseInertiaErrorPages()` before `UseRateLimiter()`. Precognitive JSON responses keep their 429 and `Precognition: true` header.
+
+## 'Location' is a type but is used like a variable
+
+The imported static `Location` name may collide with a type. Call `Inertia.Net.Inertia.Location(url)` explicitly, or opt out with `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` and add your own imports. See [Configuration](/docs/configuration#name-collisions).
+
+## A cached prop loader runs every request
+
+Check that the key and duration are stable and the cache store works. Dot-key props support caching; include every user or tenant dependency in the cache key. A stale refresh needs its own scope and may be dropped when the background queue is full. See [Props](/docs/props#cached-props).

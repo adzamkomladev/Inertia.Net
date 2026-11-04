@@ -9,12 +9,14 @@ ForgetMeNot is a small todo app, but it uses the same pieces as a real product: 
 
 <Callout type="info" title="What you need">
 - .NET 10 SDK
-- Bun 1.4 or newer
+- JavaScript tooling with npm, Bun, pnpm or Yarn
 - A code editor
 - A terminal
 
 No database server is required. ForgetMeNot uses SQLite, and the template already gives you a working React app.
 </Callout>
+
+Commands below use Bun; npm, pnpm and Yarn work as alternatives. The production example uses Bun as its SSR runtime.
 
 This guide is for someone who has not built an Inertia app before. Run the commands, look at the checkpoints, and only move on when the app behaves the way the checkpoint says.
 
@@ -34,13 +36,13 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.2
+dotnet new install Inertia.Net.Templates::1.6.3
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install
 ```
 
-Start the two development processes. Keep both terminals open:
+For npm, pnpm or Yarn, use `npm install`, `pnpm install` or `yarn install`. Start the two development processes. Keep both terminals open:
 
 ```sh
 # terminal 1
@@ -50,7 +52,7 @@ bun run dev
 dotnet watch
 ```
 
-Open `http://localhost:5180`. You should see the template home page and a working Todos page. Click around before changing anything.
+Alternatively run `npm run dev`, `pnpm run dev` or `yarn run dev` in terminal 1. Open `http://localhost:5180`. You should see the template home page and a working Todos page. Click around before changing anything.
 
 <Callout type="tip" title="Checkpoint">
 If the app does not load, run `dotnet new inertia --help` and confirm the template version. The frontend must be started before `dotnet watch` reads the Vite hot file, but a refresh is enough if you started them in the other order.
@@ -79,6 +81,8 @@ Install the packages:
 bun add -d tailwindcss @tailwindcss/vite
 bun add class-variance-authority clsx tailwind-merge lucide-react
 ```
+
+For npm use `npm install -D tailwindcss @tailwindcss/vite` and `npm install class-variance-authority clsx tailwind-merge lucide-react`. For pnpm or Yarn substitute `pnpm add -D` / `pnpm add` or `yarn add -D` / `yarn add`.
 
 Update `vite.config.ts`:
 
@@ -129,11 +133,13 @@ Now initialize shadcn/ui from the project directory:
 bunx --bun shadcn@latest init
 ```
 
-Accept the defaults. When it asks for the CSS file, choose `ClientApp/app.css`; when it asks for the import alias, use `@/`. Then add the components we need:
+For npm, pnpm or Yarn use `npx shadcn@latest init`, `pnpm dlx shadcn@latest init` or `yarn dlx shadcn@latest init`. Accept the defaults. When it asks for the CSS file, choose `ClientApp/app.css`; when it asks for the import alias, use `@/`. Then add the components we need:
 
 ```sh
 bunx --bun shadcn@latest add button card input label badge checkbox separator
 ```
+
+For the add command use `npx shadcn@latest add ...`, `pnpm dlx shadcn@latest add ...` or `yarn dlx shadcn@latest add ...` with the same component names.
 
 <Callout type="tip" title="Checkpoint">
 `ClientApp/components/ui/` should now contain `button.tsx`, `card.tsx`, `input.tsx` and the other components. If the CLI asks a question you do not understand, choose the default; you can always rerun it.
@@ -1236,14 +1242,14 @@ For the public route, sign out first and assert that `remindAt` and the owner's 
 
 ## 13. Run it in production
 
-Build both bundles with Bun:
+Build both bundles with your package manager:
 
 ```sh
 bun run build
 dotnet publish -c Release
 ```
 
-ForgetMeNot starts `ssr/ssr.js` with Bun. The container pattern is in the docs app and the published samples:
+Use `npm run build`, `pnpm run build` or `yarn run build` instead if preferred. ForgetMeNot starts `ssr/ssr.js` with Bun; install Bun in the production environment or configure a compatible Node runtime. The container pattern is in the docs app and the published samples:
 
 - `Dockerfile` from `docs/Inertia.Net.Docs`
 - `samples/Inkwell/Dockerfile` for a single app with SQLite and Bun SSR

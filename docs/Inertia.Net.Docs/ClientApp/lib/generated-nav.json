@@ -71,39 +71,13 @@
       ]
     },
     {
-      "slug": "quick-start",
-      "url": "/docs/quick-start",
-      "title": "Quick start",
-      "description": "Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.",
+      "slug": "first-10-minutes",
+      "url": "/docs/first-10-minutes",
+      "title": "First 10 minutes",
+      "description": "Start a template app, try its validated form, and test the redirect.",
       "section": "Get started",
       "order": 3,
-      "headings": [
-        {
-          "id": "1-register-the-services",
-          "text": "1. Register the services",
-          "depth": 2
-        },
-        {
-          "id": "2-add-the-root-template",
-          "text": "2. Add the root template",
-          "depth": 2
-        },
-        {
-          "id": "3-create-the-page-component",
-          "text": "3. Create the page component",
-          "depth": 2
-        },
-        {
-          "id": "4-run-it",
-          "text": "4. Run it",
-          "depth": 2
-        },
-        {
-          "id": "where-to-go-next",
-          "text": "Where to go next",
-          "depth": 2
-        }
-      ]
+      "headings": []
     },
     {
       "slug": "client-setup",
@@ -146,31 +120,36 @@
       ]
     },
     {
-      "slug": "whats-new",
-      "url": "/docs/whats-new",
-      "title": "What's new in 1.6.1 and 1.6.2",
-      "description": "A practical guide to error pages, safer redirects and pagination.",
+      "slug": "quick-start",
+      "url": "/docs/quick-start",
+      "title": "Quick start",
+      "description": "Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.",
       "section": "Get started",
       "order": 4,
       "headings": [
         {
-          "id": "161-show-an-error-page",
-          "text": "1.6.1: show an error page",
+          "id": "1-register-the-services",
+          "text": "1. Register the services",
           "depth": 2
         },
         {
-          "id": "161-return-to-the-previous-page",
-          "text": "1.6.1: return to the previous page",
+          "id": "2-add-the-root-template",
+          "text": "2. Add the root template",
           "depth": 2
         },
         {
-          "id": "162-send-a-list-one-page-at-a-time",
-          "text": "1.6.2: send a list one page at a time",
+          "id": "3-create-the-page-component",
+          "text": "3. Create the page component",
           "depth": 2
         },
         {
-          "id": "162-page-an-ef-core-query",
-          "text": "1.6.2: page an EF Core query",
+          "id": "4-run-it",
+          "text": "4. Run it",
+          "depth": 2
+        },
+        {
+          "id": "where-to-go-next",
+          "text": "Where to go next",
           "depth": 2
         }
       ]
@@ -354,6 +333,11 @@
       "order": 4,
       "headings": [
         {
+          "id": "validation-libraries",
+          "text": "Validation libraries",
+          "depth": 2
+        },
+        {
           "id": "minimal-api",
           "text": "Minimal API",
           "depth": 2
@@ -496,6 +480,11 @@
         {
           "id": "already-using-useexceptionhandler",
           "text": "Already using UseExceptionHandler()",
+          "depth": 2
+        },
+        {
+          "id": "validation-ssr-and-rate-limits",
+          "text": "Validation, SSR and rate limits",
           "depth": 2
         }
       ]
@@ -682,6 +671,11 @@
           "id": "native-aot",
           "text": "Native AOT",
           "depth": 2
+        },
+        {
+          "id": "caching-and-scroll-props",
+          "text": "Caching and scroll props",
+          "depth": 2
         }
       ]
     },
@@ -742,6 +736,46 @@
           "id": "testing",
           "text": "Testing",
           "depth": 2
+        },
+        {
+          "id": "limits-proxies-and-authorization-changes",
+          "text": "Limits, proxies and authorization changes",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "precognition",
+      "url": "/docs/precognition",
+      "title": "Precognition",
+      "description": "Validate a form before submission without running its handler.",
+      "section": "Loading data",
+      "order": 8,
+      "headings": [
+        {
+          "id": "client-setup",
+          "text": "Client setup",
+          "depth": 2
+        },
+        {
+          "id": "antiforgery-and-authorization",
+          "text": "Antiforgery and authorization",
+          "depth": 2
+        },
+        {
+          "id": "rate-limiting",
+          "text": "Rate limiting",
+          "depth": 2
+        },
+        {
+          "id": "testing",
+          "text": "Testing",
+          "depth": 2
+        },
+        {
+          "id": "protocol-reference",
+          "text": "Protocol reference",
+          "depth": 2
         }
       ]
     },
@@ -796,6 +830,11 @@
         {
           "id": "9-response-cache",
           "text": "9. Response cache",
+          "depth": 2
+        },
+        {
+          "id": "connection-timeout-and-cached-renders",
+          "text": "Connection timeout and cached renders",
           "depth": 2
         }
       ]
@@ -942,6 +981,11 @@
           "id": "deployment-checklist",
           "text": "Deployment checklist",
           "depth": 2
+        },
+        {
+          "id": "hosts-and-ssr-failures",
+          "text": "Hosts and SSR failures",
+          "depth": 2
         }
       ]
     },
@@ -1017,6 +1061,11 @@
           "id": "design-notes",
           "text": "Design notes",
           "depth": 2
+        },
+        {
+          "id": "paired-render-measurements",
+          "text": "Paired render measurements",
+          "depth": 2
         }
       ]
     },
@@ -1071,6 +1120,11 @@
         {
           "id": "extension-points",
           "text": "Extension points",
+          "depth": 2
+        },
+        {
+          "id": "name-collisions",
+          "text": "Name collisions",
           "depth": 2
         }
       ]
@@ -1137,6 +1191,11 @@
           "id": "inertiapage-members",
           "text": "InertiaPage members",
           "depth": 2
+        },
+        {
+          "id": "testing-a-form-with-antiforgery",
+          "text": "Testing a form with antiforgery",
+          "depth": 2
         }
       ]
     },
@@ -1166,26 +1225,6 @@
         {
           "id": "what-to-check-before-deploying",
           "text": "What to check before deploying",
-          "depth": 2
-        }
-      ]
-    },
-    {
-      "slug": "migrating",
-      "url": "/docs/migrating",
-      "title": "Migrating from other adapters",
-      "description": "Map an InertiaCore-style API to Inertia.Net and check the behavior differences.",
-      "section": "Reference",
-      "order": 5,
-      "headings": [
-        {
-          "id": "behavior-differences-to-check",
-          "text": "Behavior differences to check",
-          "depth": 2
-        },
-        {
-          "id": "upgrading-inertianet",
-          "text": "Upgrading Inertia.Net",
           "depth": 2
         }
       ]
@@ -1301,6 +1340,31 @@
         {
           "id": "can-i-mix-razor-pages-or-views-with-inertia-pages",
           "text": "Can I mix Razor Pages or views with Inertia pages?",
+          "depth": 2
+        },
+        {
+          "id": "forms-submit-invalid-data",
+          "text": "Forms submit invalid data",
+          "depth": 2
+        },
+        {
+          "id": "419-in-tests",
+          "text": "419 in tests",
+          "depth": 2
+        },
+        {
+          "id": "precognition-login-locks-users-out-while-typing",
+          "text": "Precognition: login locks users out while typing",
+          "depth": 2
+        },
+        {
+          "id": "location-is-a-type-but-is-used-like-a-variable",
+          "text": "'Location' is a type but is used like a variable",
+          "depth": 2
+        },
+        {
+          "id": "a-cached-prop-loader-runs-every-request",
+          "text": "A cached prop loader runs every request",
           "depth": 2
         }
       ]

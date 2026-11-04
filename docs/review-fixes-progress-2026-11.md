@@ -77,3 +77,34 @@ Version, template package pin, docs package pin and docs header are 1.6.3. Stric
 1,494 tests passed with none skipped, strict pack produced seven packages and six symbol packages without analyzer leakage,
 and actual Native AOT smoke passed without IL warnings. Docs generation/client+SSR build and browser suites passed:
 React 25; Vue/Svelte 14 each with 11 framework-specific skips each. Phase 3 PR #37 merged after all CI checks succeeded.
+
+## Phases 5 and 6
+
+Updated root/package READMEs and the feature guides to current APIs, removed version/migration pages and regenerated navigation,
+search and llms exports. Installation guides explicitly support npm, Bun, pnpm and Yarn. The first-ten-minutes guide now includes
+an actual starter form and a cookie-preserving XSRF round-trip test. Precognition's HTTP, three client examples and test use the
+sample login route; the copied server rate-limit and route methods match the sample byte for byte. Client snippets are abridged
+examples and demonstrate a longer debounce setting for expensive rules.
+
+The React sample has a labeled email/password demo with blur validation, accessible errors and processing feedback. Separate
+bounded per-client buckets allow 30 validations and five submissions per minute. The browser regression checks an actual 422,
+seven further successful blur validations without executing the handler, five real submissions, and both 429 response paths.
+The sample opts 429 into error pages explicitly. Its reset endpoint gives each E2E test fresh limiter partitions.
+
+Final local checks: strict Release build (zero warnings/errors), 1,494 tests passed with none skipped, strict pack (seven packages
+and six symbol packages), Native AOT smoke without IL warnings, three frontend builds (React includes SSR), and regenerated
+docs client/SSR build. Playwright: React 26 passed; Vue/Svelte 14 each with 12 expected framework-specific skips each. Initial
+parallel browser processes collided in their shared output directory; isolated-output reruns passed, without source changes.
+The docs browser checks opened 20 changed pages, checked all three Precognition tabs, highlighting, search and llms.txt;
+subsequent snippet edits were rebuilt, with the changed examples opened again. README local links and diff whitespace checks passed.
+
+Desktop/mobile default, invalid and 429 login captures passed review with no clipping. Screenshots of each sample's initial page
+and invalid form were captured. Build logs, docs captures and sample captures are preserved in the task's external verification
+folder so worktree cleanup cannot remove them. The design detector returned no findings; inherited native sample styling was
+retained. Existing docs design-sidecar drift was reported, without changing the docs site's design system.
+
+The isolated slow-renderer browser trace and upstream protocol follow-up list are in
+[phase 6 evidence](review-fixes-phase6-evidence-2026-11.md). On one verified reused HTTP/1.1 connection, a stale SSR response took
+18.4 ms and the next request 18.6 ms while a 4,004 ms real renderer refresh remained active. This is ordering evidence, not a
+throughput or general latency claim. Streaming remains excluded from 1.6.3 and belongs to the separate phase 7 follow-up.
+Phase 4 PR #38 merged after all CI checks succeeded.

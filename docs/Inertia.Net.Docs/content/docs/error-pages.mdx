@@ -78,3 +78,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ExceptionHandlerOptions>
 exception handler declines requests that do not ask for an Inertia page or HTML, so API exceptions use the host’s ProblemDetails
 fallback and content negotiation. Existing ProblemDetails configuration and earlier application handlers still apply; empty
 status-code responses remain unchanged. Loaded flash and validation state is consumed when an error page renders, as on any other page response.
+
+## Validation, SSR and rate limits
+
+Validation redirects keep their existing behavior. A required SSR failure can be handled by the exception pipeline; configure the error page so it can render without relying on the same failed renderer. Rate-limit responses with an existing body are preserved; configure the rejection response explicitly, including the Precognition header for validation requests. See [Precognition](/docs/precognition#rate-limiting).

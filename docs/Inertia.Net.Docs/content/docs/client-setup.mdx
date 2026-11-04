@@ -241,7 +241,7 @@ Inertia.Net can write TypeScript declarations for your page props, shared props 
 ## Development workflow
 
 ```sh
-npm run dev          # terminal 1: Vite on :5173, writes wwwroot/hot
+npm run dev          # or bun/pnpm/yarn run dev; Vite writes wwwroot/hot
 dotnet watch         # terminal 2: the app, ASPNETCORE_ENVIRONMENT=Development
 ```
 
@@ -250,7 +250,7 @@ Open the ASP.NET Core URL, not the Vite URL. In Development the app reads `wwwro
 For production:
 
 ```sh
-npm run build
+npm run build        # or bun/pnpm/yarn run build
 dotnet publish -c Release
 ```
 

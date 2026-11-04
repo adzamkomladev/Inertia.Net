@@ -1,6 +1,7 @@
 # Security, performance and developer-experience fixes (review, November 2026)
 
-Status: open, targeting **1.6.3**. Original review: 1.5.3 (`5d0fa8a`). **Corrected baseline: fetched `origin/main`
+Status: phases 1–6 implemented and verified for **1.6.3**; release integration in progress.
+See [execution record](review-fixes-progress-2026-11.md) for evidence and reviewed corrections. Original review: 1.5.3 (`5d0fa8a`). **Corrected baseline: fetched `origin/main`
 at `2dd4a4b`, with GitHub release `v1.6.2` confirmed on 2026-11-04.** The earlier reassessment used the stale local checkout
 at `6bafde2` and incorrectly treated shipped features as future dependencies. This correction supersedes that assessment.
 Line references below are navigation hints from earlier revisions; resolve symbols against the fetched baseline before editing.
@@ -20,7 +21,7 @@ remote history, release listings, source changes and test inventory; it did not 
 
 It is written to be executed by a **Sol (medium/high) coordinator** delegating code implementation to **Sol 6.1 (medium/high) workers**
 and browser/research work to **Terra 6.1 (medium/high) workers**, following the same
-shape as [plan-pagination-2026-11.md](plan-pagination-2026-11.md) and [plan-back-and-error-pages-2026-11.md](plan-back-and-error-pages-2026-11.md);
+phased-release shape as the earlier pagination and back/error-page work;
 the delegation map, gates and stop conditions are in the last sections. Each task names the files it touches, its size (S: hours,
 M: a day or two, L: more), how it is verified, and the worker profile:
 

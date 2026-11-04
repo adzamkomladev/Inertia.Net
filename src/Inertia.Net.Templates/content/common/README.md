@@ -32,10 +32,12 @@ your row to write `wwwroot/build`, then publish with `dotnet publish -c Release`
 | `ClientApp/lib/inertia-signalr.ts` | The client transport for live props over SignalR (off until you enable it) |
 | `ClientApp/types/inertia.d.ts` | Types for the pages, shared props and flash data, rewritten from the C# types when the app starts in Development |
 
+The template disables reflection-based JSON serialization. Use named DTOs and register their source-generated JSON metadata; anonymous values require reflection-enabled serialization.
+
 ## Next steps
 
 - Add a page: a component under `ClientApp/pages`, a route that calls `Render`, and `o.TypeScript.Page<TProps>(...)` for its types.
 - Install the Inertia DevTools browser extension: the app records requests for it in Development.
 - Live props (props that refresh when the server broadcasts an event): add the `Inertia.Net.Live.SignalR` package, call
-  `builder.Services.AddInertiaLive().AddSignalR()` and `app.MapInertiaLiveHub()`, then uncomment `live: signalr()` in `ClientApp/app`.
+  `builder.Services.AddInertiaLive().AddSignalR()` and `app.MapInertiaLiveHub()`, add `@microsoft/signalr` with your package manager, then uncomment `live: signalr()` in `ClientApp/app`.
 - Server-side rendering, once props, infinite scroll and the rest are in the Inertia.Net README.

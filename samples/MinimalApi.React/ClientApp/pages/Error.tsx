@@ -3,6 +3,7 @@ import Layout from '../Layout'
 
 const messages: Record<number, [string, string]> = {
   403: ['Access denied', 'You do not have permission to view this page.'],
+  429: ['Too many requests', 'Please wait a minute before submitting again.'],
   404: ['Page not found', 'The page you are looking for could not be found.'],
   500: ['Server error', 'Something went wrong. Please try again.'],
   503: ['Service unavailable', 'The service is temporarily unavailable. Please try again later.'],

@@ -74,6 +74,6 @@ Types missing from the JSON metadata (under Native AOT, register them in your co
 
 Number handling follows member settings, then type settings, then the global JSON options. Custom converter output is typed as `unknown` with a warning when its shape cannot be inferred.
 
-<Callout type="warning" title="Keep the HTTP and MVC naming policies aligned">
-Props are written with the HTTP `JsonOptions`. MVC error keys use the MVC `JsonOptions`. If the two naming policies differ, generated prop names and validation error keys will not match.
+<Callout type="info" title="Validation and JSON names">
+Props and MVC validation error keys use the HTTP `JsonOptions`. FastEndpoints error keys use its binding serializer policy. Keep client field names aligned with the applicable policy; custom resolvers without member metadata may require client JSON names for aliases.
 </Callout>

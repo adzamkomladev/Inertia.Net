@@ -8,9 +8,9 @@ Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt
 
 - [Introduction](https://inertia-dotnet.yebi.africa/docs/introduction): Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
 - [Installation](https://inertia-dotnet.yebi.africa/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
-- [Quick start](https://inertia-dotnet.yebi.africa/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
+- [First 10 minutes](https://inertia-dotnet.yebi.africa/docs/first-10-minutes): Start a template app, try its validated form, and test the redirect.
 - [Client setup](https://inertia-dotnet.yebi.africa/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
-- [What's new in 1.6.1 and 1.6.2](https://inertia-dotnet.yebi.africa/docs/whats-new): A practical guide to error pages, safer redirects and pagination.
+- [Quick start](https://inertia-dotnet.yebi.africa/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 - [AI agents](https://inertia-dotnet.yebi.africa/docs/ai-agents): Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
 
 ## Essentials
@@ -32,6 +32,7 @@ Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt
 - [Infinite scroll](https://inertia-dotnet.yebi.africa/docs/infinite-scroll): Merge pages of items and report paging metadata to the InfiniteScroll client component.
 - [Pagination](https://inertia-dotnet.yebi.africa/docs/pagination): Create numbered and cursor pages for pagers and infinite scroll.
 - [Live props](https://inertia-dotnet.yebi.africa/docs/live-props): Props that refresh themselves when the server broadcasts an event.
+- [Precognition](https://inertia-dotnet.yebi.africa/docs/precognition): Validate a form before submission without running its handler.
 
 ## Production
 
@@ -49,7 +50,6 @@ Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt
 - [TypeScript types](https://inertia-dotnet.yebi.africa/docs/typescript): Generate declarations for page props, shared props and flash data from your .NET contracts.
 - [Testing](https://inertia-dotnet.yebi.africa/docs/testing): Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
 - [DevTools](https://inertia-dotnet.yebi.africa/docs/devtools): Record visits for the Inertia DevTools extension and catch missing page components during development.
-- [Migrating from other adapters](https://inertia-dotnet.yebi.africa/docs/migrating): Map an InertiaCore-style API to Inertia.Net and check the behavior differences.
 - [Troubleshooting](https://inertia-dotnet.yebi.africa/docs/troubleshooting): Common errors, their causes, and how to fix them.
 
 ## Tutorial
