@@ -52,6 +52,7 @@ public static class InertiaValidationEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.DisableValidation();
+        builder.WithMetadata(new InertiaPrecognitionMetadata());
         builder.AddEndpointFilterFactory((context, next) => InertiaValidationFilter.Create(context, next, precognition: true));
         return builder;
     }
@@ -77,6 +78,7 @@ internal static class InertiaValidationFilter
                 .LogDebug("No validatable parameters were found for endpoint {Endpoint}.", context.MethodInfo.Name);
         }
         var naming = NamingPolicy(context.ApplicationServices);
+        var schema = BodySchema(context.MethodInfo, context.ApplicationServices);
         return async invocation =>
         {
             var httpContext = invocation.HttpContext;
@@ -84,7 +86,7 @@ internal static class InertiaValidationFilter
             {
                 if (InertiaPrecognition.IsPrecognitive(httpContext.Request))
                 {
-                    return InertiaPrecognition.Result(httpContext, validatable is null ? null : await ValidateAsync(invocation, validatable.Value), naming);
+                    return InertiaPrecognition.Result(httpContext, validatable is null ? null : await ValidateAsync(invocation, validatable.Value), naming, schema);
                 }
 
                 InertiaPrecognition.AppendVary(httpContext.Response.Headers);
@@ -92,11 +94,11 @@ internal static class InertiaValidationFilter
 
             if (validatable is not null && await ValidateAsync(invocation, validatable.Value) is { } errors)
             {
-                return IsInertiaMutation(httpContext) ? Back(httpContext, ToClientKeys(errors, naming)) : TypedResults.ValidationProblem(errors);
+                return IsInertiaMutation(httpContext) ? Back(httpContext, ToClientKeys(errors, naming, schema)) : TypedResults.ValidationProblem(errors);
             }
 
             var result = await next(invocation);
-            return IsInertiaMutation(httpContext) && GetValidationErrors(result) is { } returned ? Back(httpContext, returned) : result;
+            return IsInertiaMutation(httpContext) && GetValidationErrors(result) is { } returned ? Back(httpContext, ToClientKeys(new Dictionary<string, string[]>(returned), naming, schema)) : result;
         };
     }
 
@@ -104,10 +106,10 @@ internal static class InertiaValidationFilter
         !HttpMethods.IsGet(httpContext.Request.Method) && !string.IsNullOrEmpty(httpContext.Request.Headers[InertiaHeaders.Inertia]);
 
     // Microsoft.Extensions.Validation reports CLR member paths ("Address.Street"); the client knows the JSON names, so each
-    // segment goes through the JSON naming policy ("address.street"). [JsonPropertyName] overrides are not applied.
+    // segment uses the page JSON contract, including aliases when generated member metadata is available.
     internal static Dictionary<string, string[]> ToClientKeys(Dictionary<string, string[]> errors, JsonNamingPolicy? naming, JsonTypeInfo? schema = null)
     {
-        if (naming is null && !errors.Keys.Any(k => k.Contains('[', StringComparison.Ordinal)))
+        if (schema is null && naming is null && !errors.Keys.Any(k => k.Contains('[', StringComparison.Ordinal)))
         {
             return errors;
         }
@@ -153,11 +155,39 @@ internal static class InertiaValidationFilter
             // FastEndpoints may already have named part of a validation path through its global resolver.
             var property = schema?.Kind == JsonTypeInfoKind.Object
                 ? schema.Properties.FirstOrDefault(p => p.Name == member) ?? schema.Properties.FirstOrDefault(p => p.Name == converted)
+                    ?? schema.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo provider
+                        && (provider.Name == member || naming?.ConvertName(provider.Name) == member))
                 : null;
             result.Append(property?.Name ?? converted);
             schema = property is null ? null : GetSchema(schema!.Options, property.PropertyType);
         }
         return result.ToString();
+    }
+
+    internal static JsonTypeInfo? BodySchema(MethodInfo method, IServiceProvider services)
+    {
+        if (services.GetService<InertiaPageWriter>() is not { } writer) return null;
+        var isService = services.GetService<IServiceProviderIsService>();
+        var parameters = method.GetParameters();
+        var body = parameters.FirstOrDefault(parameter => parameter.GetCustomAttributes(inherit: false).Any(attribute => attribute is IFromBodyMetadata));
+        JsonTypeInfo? result = null;
+        foreach (var parameter in body is null ? parameters : [body])
+        {
+            var type = parameter.ParameterType;
+            if (type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(CancellationToken)
+                || type == typeof(HttpContext) || type == typeof(HttpRequest) || type == typeof(HttpResponse)
+                || type == typeof(System.Security.Claims.ClaimsPrincipal)
+                || isService?.IsService(type) == true
+                || parameter.GetCustomAttributes(inherit: false).Any(attribute => attribute is IFromServiceMetadata or IFromQueryMetadata or IFromRouteMetadata or IFromHeaderMetadata)) continue;
+            var schema = GetSchema(writer.SerializerOptions, type);
+            if (schema?.Kind is JsonTypeInfoKind.Object or JsonTypeInfoKind.Enumerable or JsonTypeInfoKind.Dictionary)
+            {
+                if (result is not null) return null; // Ambiguous inferred body: only the naming policy can safely apply.
+                result = schema;
+            }
+        }
+
+        return result;
     }
 
     private static JsonTypeInfo? ElementSchema(JsonTypeInfo? schema) => schema?.ElementType is { } type

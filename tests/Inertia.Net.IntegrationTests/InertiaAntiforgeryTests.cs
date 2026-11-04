@@ -1,3 +1,4 @@
+using Inertia.Net.Testing;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -50,7 +51,7 @@ public abstract class InertiaAntiforgeryConformanceTests<THost>
         await using var app = await StartAsync();
         var client = app.CreateClient();
         var token = await InertiaAntiforgeryTests.TokenAsync(client);
-        var response = await client.InertiaAsync(new HttpMethod(method), "/form", new { name = "Ann" }, r => r.WithHeader(InertiaHeaders.XsrfToken, token));
+        var response = await client.InertiaAsync(new HttpMethod(method), "/form", new { name = "Ann" }, r => r.WithXsrfToken(token));
         Assert.Contains((int)response.StatusCode, new[] { 302, 303 });
         Assert.EndsWith("/page", response.Headers.Location!.ToString(), StringComparison.Ordinal);
     }
@@ -63,7 +64,7 @@ public abstract class InertiaAntiforgeryConformanceTests<THost>
         var token = await InertiaAntiforgeryTests.TokenAsync(client);
         var response = await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "" }, r =>
         {
-            r.WithHeader(InertiaHeaders.XsrfToken, token);
+            r.WithXsrfToken(token);
             r.Headers.Referrer = new Uri("http://localhost/page");
         });
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
@@ -85,9 +86,8 @@ public sealed class InertiaAntiforgeryTests
 {
     internal static async Task<string> TokenAsync(HttpClient client)
     {
-        var response = await client.InertiaGetAsync("/page");
-        var cookie = response.Headers.GetValues("Set-Cookie").First(c => c.StartsWith("XSRF-TOKEN=", StringComparison.Ordinal));
-        return Uri.UnescapeDataString(cookie["XSRF-TOKEN=".Length..cookie.IndexOf(';')]);
+        using var response = await client.InertiaGetAsync("/page");
+        return response.GetXsrfToken();
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class InertiaAntiforgeryTests
         var client = app.CreateClient();
         var token = await TokenAsync(client);
         using var request = new HttpRequestMessage(HttpMethod.Post, "/form-body") { Content = new FormUrlEncodedContent([new("name", "Ann")]) };
-        request.WithHeader(InertiaHeaders.XsrfToken, token);
+        request.WithXsrfToken(token);
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Ann", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
@@ -225,7 +225,7 @@ public sealed class LazyXsrfCookieTests
         Assert.Contains("data-page", await full.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
         Assert.False(SetsToken(full));
 
-        var saved = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => r.WithHeader(InertiaHeaders.XsrfToken, token));
+        var saved = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => r.WithXsrfToken(token));
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
     }
 
@@ -239,12 +239,11 @@ public sealed class LazyXsrfCookieTests
         // Signed in now: the anonymous token no longer validates, so the page load issues a new one.
         var signedIn = await client.InertiaGetAsync("/page", r => r.WithHeader("X-Test-User", "ann"));
         Assert.True(SetsToken(signedIn));
-        var cookie = signedIn.Headers.GetValues("Set-Cookie").First(c => c.StartsWith("XSRF-TOKEN=", StringComparison.Ordinal));
-        var token = Uri.UnescapeDataString(cookie["XSRF-TOKEN=".Length..cookie.IndexOf(';')]);
+        var token = signedIn.GetXsrfToken();
 
-        var stale = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => { r.WithHeader("X-Test-User", "ann"); r.WithHeader(InertiaHeaders.XsrfToken, anonymous); });
+        var stale = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => { r.WithHeader("X-Test-User", "ann"); r.WithXsrfToken(anonymous); });
         Assert.Equal(419, (int)stale.StatusCode);
-        var fresh = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => { r.WithHeader("X-Test-User", "ann"); r.WithHeader(InertiaHeaders.XsrfToken, token); });
+        var fresh = await client.InertiaAsync(HttpMethod.Post, "/save", configure: r => { r.WithHeader("X-Test-User", "ann"); r.WithXsrfToken(token); });
         Assert.Equal(HttpStatusCode.OK, fresh.StatusCode);
     }
 

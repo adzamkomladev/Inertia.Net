@@ -36,3 +36,13 @@ Required regression coverage should include source-generated failures, returned 
 with nested collection indices; dictionary keys retain their spelling. Include null naming policy plus aliases, already-normalized
 keys, duplicate errors converging to a single client key and precognition validate-only matching. Verify that the three adapter
 paths emit the same client key under the same configured page serializer policy while keeping their request binding behavior.
+
+## Generated member metadata probe
+
+A standalone .NET 10.0.14 metadata probe on this host resolved a `[JsonPropertyName("email_address")]` property through a
+source-generated context. `JsonPropertyInfo.AttributeProvider` returned `RuntimePropertyInfo`; publishing that same program
+with Native AOT and `JsonSerializerIsReflectionEnabledByDefault=false` succeeded without trim warnings and returned
+`NativeFormatRuntimePropertyInfo`. Therefore the built-in generated metadata supports an AOT-safe mapping using the supplied
+member provider's `Name`, without adding a runtime property-discovery reflection call. Custom resolvers may omit that provider;
+those must supply client JSON names for aliases that cannot be inferred. Adapter regression and repository AOT verification
+still need to cover the final implementation.

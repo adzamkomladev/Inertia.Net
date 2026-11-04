@@ -97,11 +97,11 @@ public static class Inertia
     public static InertiaProp Always<T>(Func<T> loader) => WithAlways(InertiaProp<T>.FromLoader(loader));
 
     /// <summary>A prop the client appends to its current value instead of replacing it.</summary>
-    public static InertiaProp Merge<T>(T value) => InertiaProp<T>.FromValue(value).Append();
+    public static InertiaProp Merge<T>(T value) => WithMerge(InertiaProp<T>.FromValue(value));
 
     /// <summary>A lazy prop the client appends to its current value instead of replacing it.</summary>
     [OverloadResolutionPriority(CtValueTask)]
-    public static InertiaProp Merge<T>(Func<CancellationToken, ValueTask<T>> loader) => InertiaProp<T>.FromLoader(loader).Append();
+    public static InertiaProp Merge<T>(Func<CancellationToken, ValueTask<T>> loader) => WithMerge(InertiaProp<T>.FromLoader(loader));
 
     /// <inheritdoc cref="Merge{T}(Func{CancellationToken, ValueTask{T}})"/>
     [OverloadResolutionPriority(CtTask)]
@@ -116,7 +116,7 @@ public static class Inertia
     public static InertiaProp Merge<T>(Func<ValueTask<T>> loader) => Merge(Wrap(loader));
 
     /// <inheritdoc cref="Merge{T}(Func{CancellationToken, ValueTask{T}})"/>
-    public static InertiaProp Merge<T>(Func<T> loader) => InertiaProp<T>.FromLoader(loader).Append();
+    public static InertiaProp Merge<T>(Func<T> loader) => WithMerge(InertiaProp<T>.FromLoader(loader));
 
     /// <summary>A prop the client deep merges into its current value.</summary>
     public static InertiaProp DeepMerge<T>(T value) => InertiaProp<T>.FromValue(value).DeepMerge();
@@ -258,6 +258,12 @@ public static class Inertia
     private static InertiaProp WithAlways(InertiaProp prop)
     {
         prop.IsAlways = true;
+        return prop;
+    }
+
+    private static InertiaProp WithMerge(InertiaProp prop)
+    {
+        prop.IsMerge = true;
         return prop;
     }
 

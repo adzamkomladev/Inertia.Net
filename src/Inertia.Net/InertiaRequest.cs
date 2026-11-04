@@ -126,8 +126,9 @@ public readonly struct InertiaRequest
     public bool IsPrecognition { get; }
 
     /// <summary>
-    /// The client's live-props connection id (<c>X-Socket-Id</c>), trimmed; null when absent or blank. Client-supplied: use it only to
-    /// leave that connection out of a broadcast (<see cref="IInertiaLive"/>'s <c>exceptSocketId</c>), never to identify a user.
+    /// The client's live-props connection id (<c>X-Socket-Id</c>), trimmed; null when absent, blank or longer than 128 characters.
+    /// Client-supplied: use it only to leave that connection out of a broadcast (<see cref="IInertiaLive"/>'s <c>exceptSocketId</c>),
+    /// never to identify a user.
     /// </summary>
     public string? SocketId { get; }
 
@@ -140,6 +141,11 @@ public readonly struct InertiaRequest
         }
 
         var trimmed = value.AsSpan().Trim();
+        if (trimmed.Length > 128)
+        {
+            return null;
+        }
+
         return trimmed.Length == value.Length ? value : trimmed.ToString();
     }
 

@@ -134,6 +134,10 @@ internal sealed partial class DevToolsRecorder
         _time = time;
         _pages = pages;
         _logger = logger;
+        if (_enabled && !_development && _options.Authorize is null)
+        {
+            LogNoReader(logger);
+        }
     }
 
     // Set once any app records: until then a render skips the capture lookup (the same idea as InertiaProp.ParallelUsed).
@@ -778,6 +782,9 @@ internal sealed partial class DevToolsRecorder
             writer.WriteString(name, value);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Inertia DevTools recording is enabled outside Development, but its read API returns 404 because InertiaDevToolsOptions.Authorize is not set. Set InertiaDevToolsOptions.Authorize to allow readers.")]
+    private static partial void LogNoReader(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inertia DevTools could not record the request to {Path}.")]
     private static partial void LogRecordingFailed(ILogger logger, Exception exception, PathString path);

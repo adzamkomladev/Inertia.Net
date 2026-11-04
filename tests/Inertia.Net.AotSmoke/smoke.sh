@@ -196,6 +196,12 @@ has '"email":"'
 inertia GET /users/create
 has '"errors":{}'
 
+# Generated CLR-to-JSON aliases and nested indices remain available under Native AOT.
+inertia POST /validation-alias -H 'Precognition: true' -H 'Content-Type: application/json' --data '{"mail":"","items":[{"mail":""}]}'
+status_is 422
+has '"mail":['
+has '"items.0.mail":['
+
 # Non-Inertia clients still get the 400 problem details.
 req POST /users -H 'Content-Type: application/json' --data '{"name":""}'
 status_is 400
