@@ -231,7 +231,7 @@ of the protocol; the payload is:
 ## 6. Validation errors
 
 - `props.errors` is always present.
-- Numeric collection indices use dotted client paths (`Items[0].Email` → `items.0.email`); dictionary keys retain their spelling. Naming policies apply to member segments, using each adapter's binding serializer. Duplicate normalized keys combine messages. Precognition validate-only matching uses the same index normalization. `[JsonPropertyName]` validation overrides remain unsupported.
+- Numeric collection indices use dotted client paths (`Items[0].Email` → `items.0.email`); dictionary keys retain their spelling. Naming policies apply to member segments: Minimal API and MVC use the page serializer, while FastEndpoints uses its binding serializer. Duplicate normalized keys combine messages. Precognition validate-only matching uses the same index normalization. When the request schema and CLR member metadata are available, including built-in .NET 10 generated metadata under Native AOT, `[JsonPropertyName]` aliases are applied. Without an unambiguous request schema, or when a custom resolver omits member metadata, callers must supply client JSON names for aliases; the naming policy still applies to other member segments.
 - Within each bag, a field maps to its first message, or to all messages when `WithAllErrors` is on.
 - `errors` is chosen as follows:
   - no errors stored → `{}`;

@@ -31,3 +31,17 @@ Checks completed:
 
 The documentation also explicitly supports npm, Bun, pnpm and Yarn, with equivalent install/dev/build commands. Repository CI
 continues using its committed lockfiles and reproducible install commands.
+
+## Phase 2
+
+Implemented public Precognition request detection and endpoint metadata, rate-limit policy regression coverage, XSRF testing
+helpers and validation-error assertions, schema-aware error normalization (including generated aliases), fluent prop rules,
+DevTools recording diagnostics and bounded SignalR subscriptions/channel names/socket IDs with proxy diagnostics.
+MVC error keys use the page serializer's policy; FastEndpoints retains its binding serializer policy. Custom metadata without
+CLR member providers and ambiguous body schemas require client JSON names for aliases. Native AOT smoke now exercises alias
+and indexed Precognition error paths explicitly.
+
+Regression tests failed before the corresponding fixes; the phase 1 cache/live/merge and released pagination/error-page tests
+remain covered. Checks: Release build with zero warnings/errors; all 1,457 tests passed with none skipped; seven-package pack;
+AOT smoke with no trim/AOT warnings; docs generation and client/SSR build; Playwright React 25 passed and Vue/Svelte each
+14 passed with 11 framework-specific skips. Phase 1 PR #35 merged after every CI check succeeded.
