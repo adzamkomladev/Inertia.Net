@@ -5,7 +5,7 @@ section: Essentials
 order: 7
 ---
 
-Render routing failures, authorization failures and unhandled exceptions as Inertia pages in production:
+When someone visits a missing page or the server encounters an error, you can show a page from your app instead of a blank response. Add this setup in `Program.cs` for production:
 
 ```csharp
 builder.Services.AddInertia();

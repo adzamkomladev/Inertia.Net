@@ -20,13 +20,13 @@ return Location("https://billing.example.com");    // leave the SPA
 
 ## Previous URL
 
-Enable `o.State.RememberPreviousUrl = true` when a `Referrer-Policy: no-referrer` policy or the browser strips `Referer`:
+If a form returns `Back()` but the browser does not send its previous address (`Referer`), enable this option. For example, it helps when your site uses `Referrer-Policy: no-referrer`:
 
 ```csharp
 builder.Services.AddInertia(o => o.State.RememberPreviousUrl = true);
 ```
 
-`Back()` and the middleware's empty-response redirect consult the same-host `Referer` first, then the remembered URL, then the fallback. `context.Inertia().PreviousUrl` reads the remembered URL, or returns `null` when disabled, absent or invalid; it is user-controlled input validated as a relative path.
+After a successful page visit, a later `Back()` can use that saved address. `Back()` and the middleware's empty-response redirect consult the same-host `Referer` first, then the remembered URL, then the fallback. `context.Inertia().PreviousUrl` reads the remembered URL, or returns `null` when disabled, absent or invalid; it is user-controlled input validated as a relative path.
 
 Only successful status-200 page GET renders are remembered, including initial HTML visits. Partial reloads, prefetches, Precognition, non-GET requests and error pages are excluded. The value is the relative `PathBase + Path + QueryString`, without scheme or host, in the plain `.Inertia.Previous` session cookie (`HttpOnly`, `SameSite=Lax`, `Path=/`, essential, with `Secure` following `o.State.CookieSecurePolicy`). The cookie is written only when the URL changes. Set `o.State.PreviousUrlCookieName` to change its name; it must differ from `o.State.CookieName`.
 
