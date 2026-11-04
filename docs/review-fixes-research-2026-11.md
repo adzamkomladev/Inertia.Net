@@ -110,7 +110,7 @@ Phase 7 was already excluded from the 1.6.3 release text but was still required 
 and implementation now belong solely to the separate post-release branch. The future gate also needs a design-specific decision:
 a memory win for design A alone cannot establish a TTFB case for shipping design B.
 
-The coordinator reports that both real size-limited `MemoryCache` replacement tests for 1.4 passed against the baseline: the cache
+Recorded test evidence shows that both real size-limited `MemoryCache` replacement tests for 1.4 passed against the baseline: the cache
 removed the replaced entry rather than preserving the old value assumed by the plan. Post-commit tag-index publication can remain
 a defensive consistency improvement, but must not be reported as a reproduced surviving-entry defect. This subsection records the
-coordinator's test report; this review did not run those tests independently.
+supplied test output; this source review did not run those tests independently.

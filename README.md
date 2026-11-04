@@ -1323,7 +1323,7 @@ router.post('/users', data, { errorBag: 'createUser' })
 
 ### Minimal API
 
-`WithInertiaValidation()` for a route or a route group. Requires `services.AddValidation()` for attribute validation.
+`WithInertiaValidation()` applies to a route or route group and requires `services.AddValidation()`. Without validation resolvers, it throws `InvalidOperationException` when the endpoint is constructed. Routing may construct endpoints lazily, so this need not happen during application startup.
 
 ```csharp
 builder.Services.AddValidation();
@@ -1398,7 +1398,7 @@ app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users")).Wit
 // FastEndpoints: nothing to add, c.UseInertia() already answers Precognition requests.
 ```
 
-`WithInertiaPrecognition()` is a superset of `WithInertiaValidation()`: normal Inertia validation redirects keep working. Any endpoint filter you add after it does not run for a precognitive request. In MVC, Precognition is not available.
+`WithInertiaPrecognition()` is a superset of `WithInertiaValidation()` and also requires `services.AddValidation()`: normal Inertia validation redirects keep working. Any endpoint filter you add after it does not run for a precognitive request. In MVC, Precognition is not available.
 
 Client (Inertia v3 has it built in):
 
