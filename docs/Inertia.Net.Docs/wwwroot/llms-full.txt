@@ -2593,14 +2593,14 @@ export default function LoginForm() {
   useEffect(() => { form.setValidationTimeout(3000) }, [])
   return (
     <form onSubmit={e => { e.preventDefault(); form.post('/login') }}>
-      <input value={form.data.email} onChange={e => form.setData('email', e.target.value)}
-        onBlur={() => form.validate('email')} />
-      <input type="password" value={form.data.password} onChange={e => form.setData('password', e.target.value)}
-        onBlur={() => form.validate('password')} />
+      <label>Email <input value={form.data.email} onChange={e => form.setData('email', e.target.value)}
+        onBlur={() => form.validate('email')} /></label>
+      <label>Password <input type="password" value={form.data.password} onChange={e => form.setData('password', e.target.value)}
+        onBlur={() => form.validate('password')} /></label>
       {form.errors.password && <p>{form.errors.password}</p>}
       {form.validating && <span>Validating…</span>}
       {form.errors.email && <p>{form.errors.email}</p>}
-      <button type="submit">Save</button>
+      <button type="submit">Submit demo</button>
     </form>
   )
 }
@@ -2617,10 +2617,10 @@ form.setValidationTimeout(3000)
 </script>
 <template>
   <form @submit.prevent="form.post('/login')">
-  <input v-model="form.email" @blur="form.validate('email')" />
-  <input v-model="form.password" type="password" @blur="form.validate('password')" />
-  <p v-if="form.errors.password">{{ form.errors.password }}</p>
-  <button type="submit">Submit demo</button>
+    <label>Email <input v-model="form.email" @blur="form.validate('email')" /></label>
+    <label>Password <input v-model="form.password" type="password" @blur="form.validate('password')" /></label>
+    <p v-if="form.errors.password">{{ form.errors.password }}</p>
+    <button type="submit">Submit demo</button>
   </form>
   <span v-if="form.validating">Validating…</span>
   <p v-if="form.errors.email">{{ form.errors.email }}</p>
@@ -2637,8 +2637,8 @@ form.setValidationTimeout(3000)
   form.setValidationTimeout(3000)
 </script>
 <form onsubmit={(event) => { event.preventDefault(); form.post('/login') }}>
-  <input bind:value={form.email} onblur={() => form.validate('email')} />
-  <input type="password" bind:value={form.password} onblur={() => form.validate('password')} />
+  <label>Email <input bind:value={form.email} onblur={() => form.validate('email')} /></label>
+  <label>Password <input type="password" bind:value={form.password} onblur={() => form.validate('password')} /></label>
   {#if form.errors.password}<p>{form.errors.password}</p>{/if}
   <button type="submit">Submit demo</button>
 </form>
@@ -3755,8 +3755,8 @@ Types missing from the JSON metadata (under Native AOT, register them in your co
 
 Number handling follows member settings, then type settings, then the global JSON options. Custom converter output is typed as `unknown` with a warning when its shape cannot be inferred.
 
-<Callout type="warning" title="Keep the HTTP and MVC naming policies aligned">
-Props are written with the HTTP `JsonOptions`. MVC error keys use the MVC `JsonOptions`. If the two naming policies differ, generated prop names and validation error keys will not match.
+<Callout type="info" title="Validation and JSON names">
+Props and MVC validation error keys use the HTTP `JsonOptions`. FastEndpoints error keys use its binding serializer policy. Keep client field names aligned with the applicable policy; custom resolvers without member metadata may require client JSON names for aliases.
 </Callout>
 
 ---
