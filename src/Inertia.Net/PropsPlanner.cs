@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.Logging;
 
 namespace Inertia.Net;
 
@@ -29,11 +30,13 @@ internal sealed class PropsPlanner : IDisposable
     /// <summary>A started loader failed without being rescued; the others were cancelled and the render fails.</summary>
     public bool Failed => _failed;
 
+    public CancellationToken Token => _cancellation.Token;
+
     /// <summary>
     /// Plans a prop the walk will resolve, in protocol order. An instance added twice is not planned: it resolves at each path. A cached
     /// prop's pending <paramref name="lookup"/> is awaited first: a hit is the task's result, and the loader does not run.
     /// </summary>
-    public void Add(InertiaProp prop, Task<CachedProp?>? lookup = null)
+    public void Add(InertiaProp prop, string path, Task<CachedProp?>? lookup = null)
     {
         if (Find(prop) is { } existing)
         {
@@ -46,7 +49,7 @@ internal sealed class PropsPlanner : IDisposable
             return;
         }
 
-        _planned.Add(new Planned(prop) { Lookup = lookup });
+        _planned.Add(new Planned(prop, path) { Lookup = lookup });
         _startable++;
     }
 
@@ -122,6 +125,10 @@ internal sealed class PropsPlanner : IDisposable
             {
                 await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 _ = task.Exception; // observed: the walk reports failures itself
+                if (planned.Failure is { } failure)
+                {
+                    _owner.Logger.LogWarning(failure.SourceException, "Parallel Inertia prop '{Path}' failed to resolve.", planned.Path);
+                }
             }
         }
     }
@@ -192,9 +199,11 @@ internal sealed class PropsPlanner : IDisposable
         }
     }
 
-    private sealed class Planned(InertiaProp prop)
+    private sealed class Planned(InertiaProp prop, string path)
     {
         public InertiaProp Prop { get; } = prop;
+
+        public string Path { get; } = path;
 
         public Task<object?>? Task { get; set; }
 

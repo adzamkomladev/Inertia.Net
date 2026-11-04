@@ -9,8 +9,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Inertia.Net;
 
-/// <summary>A top-level prop with the declared type of its value.</summary>
-internal readonly record struct PropEntry(string Key, object? Value, Type Type);
+/// <summary>A prop entry with its declared value type and optional member serializer.</summary>
+internal readonly record struct PropEntry(string Key, object? Value, Type Type, JsonTypeInfo? Serializer = null);
 
 /// <summary>
 /// Port of inertia-laravel 3.x <c>PropsResolver</c> (docs/protocol.md §4): one walk that filters, resolves,
@@ -130,9 +130,9 @@ internal sealed class PropsWriter
     private async ValueTask WriteEntriesAsync(List<PropEntry> props)
     {
         _writer.WriteStartObject();
-        foreach (var entry in props)
+        for (var index = 0; index < props.Count; index++)
         {
-            await WriteEntryAsync(entry.Key, -1, entry.Value, entry.Type, parentWasResolved: false);
+            await WriteEntryAsync(props[index], parentWasResolved: false);
         }
 
         _writer.WriteEndObject();
@@ -146,7 +146,7 @@ internal sealed class PropsWriter
         {
             foreach (var entry in props)
             {
-                PlanEntry(entry.Key, entry.Value, entry.Type);
+                if (entry.Serializer is null) PlanEntry(entry.Key, entry.Value, entry.Type);
             }
         }
         catch
@@ -168,7 +168,7 @@ internal sealed class PropsWriter
                 SawParallel |= prop.IsParallel;
                 if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    PlanLoad(prop);
+                    PlanLoad(prop, key);
                 }
 
                 return;
@@ -180,7 +180,7 @@ internal sealed class PropsWriter
                 SawParallel = true;
                 if (Decide(null, value, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    PlanLoad(lazy.Source);
+                    PlanLoad(lazy.Source, key);
                 }
 
                 return;
@@ -224,14 +224,14 @@ internal sealed class PropsWriter
 
     // A cached prop's loader only starts on a miss. A store that answers at once (the memory store) is asked here, and a hit plans
     // nothing: the walk finds it again and writes it without a loader. Another store's answer is awaited by the started task first.
-    private void PlanLoad(InertiaProp prop)
+    private void PlanLoad(InertiaProp prop, string key)
     {
         if (prop.Caching is { } caching)
         {
             var lookup = _owner.Caching.GetPropAsync(caching, _cancellationToken);
             if (!lookup.IsCompletedSuccessfully)
             {
-                Prefetch(prop, lookup.AsTask());
+                Prefetch(prop, key, lookup.AsTask());
                 return;
             }
 
@@ -241,11 +241,11 @@ internal sealed class PropsWriter
             }
         }
 
-        Prefetch(prop, lookup: null);
+        Prefetch(prop, key, lookup: null);
     }
 
-    private void Prefetch(InertiaProp prop, Task<CachedProp?>? lookup) =>
-        (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, lookup);
+    private void Prefetch(InertiaProp prop, string key, Task<CachedProp?>? lookup) =>
+        (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, _pathLength == key.Length ? key : new string(Path), lookup);
 
     /// <summary>
     /// Writes sharedProps through liveProps, in protocol order, omitting empty ones. The shared keys are the first
@@ -430,6 +430,26 @@ internal sealed class PropsWriter
             }
 
             return false;
+        }
+    }
+
+    // Member serializers do not resolve loaders; keep them out of the asynchronous loader's state.
+    private ValueTask WriteEntryAsync(PropEntry entry, bool parentWasResolved)
+    {
+        if (entry.Serializer is null) return WriteEntryAsync(entry.Key, -1, entry.Value, entry.Type, parentWasResolved);
+        var mark = Push(entry.Key);
+        try
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfPlanFailed();
+            if (Decide(null, entry.Value, entry.Type, parentWasResolved, entry.Serializer) == Inclusion.Filtered) return default;
+            _writer.WritePropertyName(entry.Key);
+            JsonSerializer.Serialize(_writer, entry.Value, entry.Serializer);
+            return default;
+        }
+        finally
+        {
+            _pathLength = mark;
         }
     }
 
@@ -719,7 +739,7 @@ internal sealed class PropsWriter
         {
             for (var i = 0; i < count; i++)
             {
-                await WriteEntryAsync(entries[i].Key, -1, entries[i].Value, entries[i].Type, parentWasResolved);
+                await WriteEntryAsync(entries[i], parentWasResolved);
             }
         }
         finally
@@ -771,9 +791,10 @@ internal sealed class PropsWriter
         _cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            var cancellationToken = _planner?.Token ?? _cancellationToken;
             var value = await (_planner is not null && _planner.TryTake(prop, out var started)
                 ? new ValueTask<object?>(started)
-                : cached ? _owner.LoadCachedPropAsync(prop, _cancellationToken) : prop.ResolveAsync(_cancellationToken));
+                : cached ? _owner.LoadCachedPropAsync(prop, cancellationToken) : prop.ResolveAsync(cancellationToken));
             return value is InertiaPageWriter.RescuedCachedProp rescued ? Rescue(rescued.Exception) : (true, value);
         }
         catch (Exception ex) when (!cached && prop.ShouldRescue
@@ -815,7 +836,7 @@ internal sealed class PropsWriter
 
     // Whether the prop (or plain value) at Path is part of this response, decided before any loader runs and without side effects,
     // so the parallel planner and the writer agree on which loaders run.
-    private Inclusion Decide(InertiaProp? p, object? prop, Type declaredType, bool parentWasResolved)
+    private Inclusion Decide(InertiaProp? p, object? prop, Type declaredType, bool parentWasResolved, JsonTypeInfo? serializer = null)
     {
         // Always props and the children of resolved values bypass partial filtering.
         if (_isPartial && !parentWasResolved && p is not { IsAlways: true })
@@ -825,7 +846,8 @@ internal sealed class PropsWriter
                 return Inclusion.Filtered;
             }
 
-            if (_request.Except is { } excluded && LeadsToAny(excluded, Path) && IsArray(prop, declaredType))
+            if (_request.Except is { } excluded && LeadsToAny(excluded, Path)
+                && (serializer is not null ? serializer.Kind == JsonTypeInfoKind.Enumerable : IsArray(prop, declaredType)))
             {
                 return Inclusion.Filtered;
             }
@@ -909,46 +931,39 @@ internal sealed class PropsWriter
 
         // Scroll merge intent. Deliberate deviation 2: applied before any metadata is collected,
         // so a deferred scroll prop reports "{path}.{wrapper}" just like a resolved one.
-        if (prop.ScrollWrapper is { } wrapper)
-        {
-            if (_request.MergeIntentPrepend)
-            {
-                prependPaths = [.. prependPaths ?? [], wrapper];
-            }
-            else
-            {
-                appendPaths = [.. appendPaths ?? [], wrapper];
-            }
-        }
+        var wrapper = prop.ScrollWrapper;
 
         if (prop.IsDeepMerge)
         {
             (_deepMergeProps ??= []).Add(path);
         }
-        else if (appendPaths is not { Count: > 0 } && prependPaths is not { Count: > 0 })
+        else if (wrapper is null && appendPaths is not { Count: > 0 } && prependPaths is not { Count: > 0 })
         {
             (prop.AppendAtRoot ? _mergeProps ??= [] : _prependProps ??= []).Add(path);
         }
         else
         {
-            AddPaths(ref _mergeProps, path, appendPaths);
-            AddPaths(ref _prependProps, path, prependPaths);
+            AddPaths(ref _mergeProps, path, appendPaths, _request.MergeIntentPrepend ? null : wrapper);
+            AddPaths(ref _prependProps, path, prependPaths, _request.MergeIntentPrepend ? wrapper : null);
         }
 
         AddPaths(ref _matchPropsOn, path, prop.MatchOnKeys);
     }
 
     // Adds "{path}.{suffix}" for each suffix. (A `suffixes ?? []` fallback would allocate an empty list per call.)
-    private static void AddPaths(ref List<string>? target, string path, List<string>? suffixes)
+    private static void AddPaths(ref List<string>? target, string path, List<string>? suffixes, string? extraSuffix = null)
     {
-        if (suffixes is null)
+        if (suffixes is not null)
         {
-            return;
+            foreach (var suffix in suffixes)
+            {
+                (target ??= []).Add($"{path}.{suffix}");
+            }
         }
 
-        foreach (var suffix in suffixes)
+        if (extraSuffix is not null)
         {
-            (target ??= []).Add($"{path}.{suffix}");
+            (target ??= []).Add($"{path}.{extraSuffix}");
         }
     }
 

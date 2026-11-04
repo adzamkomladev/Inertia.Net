@@ -45,3 +45,19 @@ Regression tests failed before the corresponding fixes; the phase 1 cache/live/m
 remain covered. Checks: Release build with zero warnings/errors; all 1,457 tests passed with none skipped; seven-package pack;
 AOT smoke with no trim/AOT warnings; docs generation and client/SSR build; Playwright React 25 passed and Vue/Svelte each
 14 passed with 11 framework-specific skips. Phase 1 PR #35 merged after every CI check succeeded.
+
+## Phase 3
+
+Implemented converter-aware dictionary key formatting with built-in fast paths, allocation-free safe-integer DOM output,
+segmented/escaped numeric reads, parallel failure path logging and linked cancellation, elapsed-time circuit breaking, and
+measured scroll/member-wrapper/fill-waiter allocation reductions. Retain converter instance identity. Planned cache-hit
+memoization was rejected: it saved allocation but served a value after a preceding loader invalidated its key/tag.
+Traversed read-only dictionary contracts with derived base-type key instances need a mutable dictionary; unsupported factories
+fail explicitly instead of silently emitting `ToString()` keys.
+
+Checks: Release build with zero warnings/errors; all 1,491 tests passed with none skipped; seven-package pack; AOT smoke
+(including GUID and read-only date keys), docs generation/client+SSR build, and three browser suites passed. React25 and
+Vue/Svelte14 each (11 framework-specific skips each). Two paired processes each ran32 rounds; integer keys allocate9,904 B
+less per1,000 entries and GUID keys408 B less per500 rows. Ordinary render allocation is unchanged. Parallel path reporting
+adds160 B per20 completed loaders; yielding loaders show net16 B less after the entry-loop optimization. Timings, intervals,
+raw samples, isolated DOM/small-allocation results and limitations are recorded in the benchmark RESULTS document.

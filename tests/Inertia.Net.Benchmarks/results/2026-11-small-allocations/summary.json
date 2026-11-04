@@ -1,0 +1,208 @@
+{
+  "rows": [
+    {
+      "run": 1,
+      "method": "Json20",
+      "baselineMs": 0.0885048828125,
+      "baselineBytes": 1736.0,
+      "currentMs": 0.0869509765625,
+      "currentBytes": 1736.0,
+      "latencyChangePercent": -2.852732758825649,
+      "latency95PercentInterval": [
+        -6.553338126785624,
+        -0.4281103104256223
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "YieldingLoader",
+      "baselineMs": 0.04267880859375,
+      "baselineBytes": 1576.0,
+      "currentMs": 0.0384794921875,
+      "currentBytes": 1536.0,
+      "latencyChangePercent": -0.9709094714426381,
+      "latency95PercentInterval": [
+        -8.538420366985445,
+        5.000462663168159
+      ],
+      "allocationChangeBytes": -40.0
+    },
+    {
+      "run": 1,
+      "method": "ScrollAppend8",
+      "baselineMs": 0.0806625,
+      "baselineBytes": 6664.0,
+      "currentMs": 0.0761650390625,
+      "currentBytes": 6088.0,
+      "latencyChangePercent": -2.189644788334549,
+      "latency95PercentInterval": [
+        -9.789967260418397,
+        2.991926875524653
+      ],
+      "allocationChangeBytes": -576.0
+    },
+    {
+      "run": 1,
+      "method": "ScrollPrepend8",
+      "baselineMs": 0.040871484375,
+      "baselineBytes": 6880.0,
+      "currentMs": 0.0390517578125,
+      "currentBytes": 6112.0,
+      "latencyChangePercent": -6.172317470221367,
+      "latency95PercentInterval": [
+        -8.945538049367624,
+        4.030363326879494
+      ],
+      "allocationChangeBytes": -768.0
+    },
+    {
+      "run": 1,
+      "method": "ConverterProperties8",
+      "baselineMs": 0.01628232421875,
+      "baselineBytes": 408.0,
+      "currentMs": 0.0165637451171875,
+      "currentBytes": 152.0,
+      "latencyChangePercent": -9.329550808857245,
+      "latency95PercentInterval": [
+        -13.730397931152826,
+        -3.1231364695027963
+      ],
+      "allocationChangeBytes": -256.0
+    },
+    {
+      "run": 1,
+      "method": "ContendedFillAttempt",
+      "baselineMs": 7.206392288208007e-05,
+      "baselineBytes": 96.0,
+      "currentMs": 2.563028335571289e-05,
+      "currentBytes": 0.0,
+      "latencyChangePercent": -63.45298599007472,
+      "latency95PercentInterval": [
+        -65.85095123948417,
+        -61.93570361830901
+      ],
+      "allocationChangeBytes": -96.0
+    },
+    {
+      "run": 1,
+      "method": "PlannedCacheHits32",
+      "baselineMs": 0.043503125,
+      "baselineBytes": 1688.0,
+      "currentMs": 0.0477869140625,
+      "currentBytes": 1688.0,
+      "latencyChangePercent": -0.6052712156886408,
+      "latency95PercentInterval": [
+        -3.2318995669254558,
+        2.7512115836314743
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "Json20",
+      "baselineMs": 0.10065234375,
+      "baselineBytes": 1736.0,
+      "currentMs": 0.0932322265625,
+      "currentBytes": 1736.0,
+      "latencyChangePercent": -3.6446657345089175,
+      "latency95PercentInterval": [
+        -10.702620144673542,
+        0.010082958625989846
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "YieldingLoader",
+      "baselineMs": 0.0422412109375,
+      "baselineBytes": 1576.0,
+      "currentMs": 0.04224208984375,
+      "currentBytes": 1536.0,
+      "latencyChangePercent": -3.7287982607939028,
+      "latency95PercentInterval": [
+        -7.236536703817903,
+        0.01195734068187293
+      ],
+      "allocationChangeBytes": -40.0
+    },
+    {
+      "run": 2,
+      "method": "ScrollAppend8",
+      "baselineMs": 0.072808984375,
+      "baselineBytes": 6664.0,
+      "currentMs": 0.0695009765625,
+      "currentBytes": 6088.0,
+      "latencyChangePercent": -3.4366021093865715,
+      "latency95PercentInterval": [
+        -10.080902662771457,
+        -0.3273949989904157
+      ],
+      "allocationChangeBytes": -576.0
+    },
+    {
+      "run": 2,
+      "method": "ScrollPrepend8",
+      "baselineMs": 0.032028759765625,
+      "baselineBytes": 6880.0,
+      "currentMs": 0.0293537109375,
+      "currentBytes": 6112.0,
+      "latencyChangePercent": -5.355432972064222,
+      "latency95PercentInterval": [
+        -8.477370643580656,
+        -1.6736694390997786
+      ],
+      "allocationChangeBytes": -768.0
+    },
+    {
+      "run": 2,
+      "method": "ConverterProperties8",
+      "baselineMs": 0.0123265625,
+      "baselineBytes": 408.0,
+      "currentMs": 0.011162744140625,
+      "currentBytes": 152.0,
+      "latencyChangePercent": -10.479874630651398,
+      "latency95PercentInterval": [
+        -14.04469405530957,
+        -3.7547148106266306
+      ],
+      "allocationChangeBytes": -256.0
+    },
+    {
+      "run": 2,
+      "method": "ContendedFillAttempt",
+      "baselineMs": 7.775325775146484e-05,
+      "baselineBytes": 96.0,
+      "currentMs": 2.622222900390625e-05,
+      "currentBytes": 0.0,
+      "latencyChangePercent": -66.28718571292862,
+      "latency95PercentInterval": [
+        -66.96409987505714,
+        -65.6056420455391
+      ],
+      "allocationChangeBytes": -96.0
+    },
+    {
+      "run": 2,
+      "method": "PlannedCacheHits32",
+      "baselineMs": 0.04172021484375,
+      "baselineBytes": 1688.0,
+      "currentMs": 0.041641796875,
+      "currentBytes": 1688.0,
+      "latencyChangePercent": -1.2885900813081608,
+      "latency95PercentInterval": [
+        -7.165353342256859,
+        6.188512108089128
+      ],
+      "allocationChangeBytes": 0.0
+    }
+  ],
+  "rejectedCandidates": [
+    {
+      "candidate": "Reuse synchronous planned cache hits in a retained per-writer dictionary",
+      "baselineBytes": 1688.0,
+      "candidateBytes": 920.0,
+      "reason": "A preceding sequential loader's RemovePropAsync or RemoveByTagAsync is ignored; both invalidation regressions return 1 instead of 2."
+    }
+  ]
+}

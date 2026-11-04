@@ -1,0 +1,25 @@
+Running tests from /tmp/inertia-smallalloc-phase2/tests/Inertia.Net.Tests/bin/Release/net10.0/Inertia.Net.Tests.dll (net10.0|x64)
+failed Inertia.Net.Tests.SmallAllocationTests.A_preceding_loader_can_invalidate_a_planned_cache_hit(byTag: False) (418ms)
+  from /tmp/inertia-smallalloc-phase2/tests/Inertia.Net.Tests/bin/Release/net10.0/Inertia.Net.Tests.dll (net10.0|x64)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at Inertia.Net.Tests.SmallAllocationTests.A_preceding_loader_can_invalidate_a_planned_cache_hit(Boolean byTag) in /tmp/inertia-smallalloc-phase2/tests/Inertia.Net.Tests/SmallAllocationTests.cs:32
+    --- End of stack trace from previous location ---
+failed Inertia.Net.Tests.SmallAllocationTests.A_preceding_loader_can_invalidate_a_planned_cache_hit(byTag: True) (61ms)
+  from /tmp/inertia-smallalloc-phase2/tests/Inertia.Net.Tests/bin/Release/net10.0/Inertia.Net.Tests.dll (net10.0|x64)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at Inertia.Net.Tests.SmallAllocationTests.A_preceding_loader_can_invalidate_a_planned_cache_hit(Boolean byTag) in /tmp/inertia-smallalloc-phase2/tests/Inertia.Net.Tests/SmallAllocationTests.cs:32
+    --- End of stack trace from previous location ---
+/tmp/inertia-smallalloc-phase2/tests/Inertia.Net.Tests/bin/Release/net10.0/Inertia.Net.Tests.dll (net10.0|x64) failed with 2 error(s) (4s 922ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 6
+  failed: 2
+  succeeded: 4
+  skipped: 0
+  duration: 5s 810ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)

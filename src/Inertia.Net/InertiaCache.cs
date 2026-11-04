@@ -262,6 +262,7 @@ internal sealed partial class InertiaCaching
     /// <summary>Claims a missing entry, or returns the current fill whose successful bytes are shared even if storage fails.</summary>
     public bool TryBeginFill(InertiaCacheKey key, out TaskCompletionSource<byte[]?> completion)
     {
+        if (_filling.TryGetValue(key, out completion!)) return false;
         var candidate = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
         completion = _filling.GetOrAdd(key, candidate);
         return ReferenceEquals(completion, candidate);

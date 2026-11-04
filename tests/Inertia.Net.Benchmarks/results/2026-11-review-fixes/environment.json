@@ -10,5 +10,17 @@
     "Inertia.Net.dll": "c9473f87f306aaa9204b823ce7ed9060d6e0774f3335914244a8cf5db615afc9",
     "Inertia.Net.Benchmarks.dll": "2e410fe021c441b2149d23afec7bbac4714bdd27922e3e7566a189ba200aa1c6"
   },
-  "limitations": "Initial standalone before probes run while other release work may compile or test. Timings are exploratory; allocations are counters. Final paired measurements need quiet runs with identical fixtures."
+  "limitations": "Initial standalone before probes run while other release work may compile or test. Timings are exploratory; allocations are counters. Final paired measurements need quiet runs with identical fixtures.",
+  "pairedPhase3": {
+    "baselineCommit": "2dd4a4b",
+    "currentCommit": "fa63822cddab402ec0c7f879996bd794b2fa3d8f",
+    "cpuAffinityCommand": "taskset -c 7",
+    "dotnetProcessorCount": 1,
+    "benchmarkFixtures": "Identical ResourceBenchmarks, ReviewLatencyBenchmarks and BenchApp source in both variants, including GuidKeys500.",
+    "coreDllSha256": {
+      "baseline": "c9473f87f306aaa9204b823ce7ed9060d6e0774f3335914244a8cf5db615afc9",
+      "current": "77559c90a45ae0adfeb7d5758356be12d424971fc421d1e4c356e0be028ce5f6"
+    },
+    "limitations": "Warm in-process reused contexts. Idle unrelated host services remained; task builds, tests and servers were stopped during paired measurement. Linux affinity is recorded by the shell command; probe processAffinity is null on Linux."
+  }
 }
