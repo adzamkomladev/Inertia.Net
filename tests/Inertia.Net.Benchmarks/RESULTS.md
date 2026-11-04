@@ -1169,3 +1169,45 @@ production latency guarantee.
 ## Notes for apps
 
 Most per-request allocation in a real handler is the props themselves (see "Build 20 props"), not the render.
+
+## Review fixes: dictionary keys and render controls — 2026-11-04
+
+Baseline is `2dd4a4b` (1.6.2); current contains phases 1–3. Both variants compile identical benchmark fixtures, including
+`Dictionary<Guid, BenchRow>` with 500 entries. Two independent processes warm each variant and run 32 alternating-order paired
+rounds. Task builds, tests and sample servers were stopped during measurement. CPU 7 was selected with `taskset -c 7` and
+`DOTNET_PROCESSOR_COUNT=1`; unrelated idle host services remained. Environment and core/fixture DLL hashes are retained with
+the samples. This is warm in-process rendering into `Stream.Null`, using reused contexts, not Kestrel throughput or production latency.
+
+Absolute medians below use run 2; time changes are medians of within-round ratios, which need not equal ratios of the absolute medians.
+
+| Workload | Before B/op | After B/op | Before ms/op | After ms/op | Run 1 paired time | Run 2 paired time |
+|---|---:|---:|---:|---:|---:|---:|
+| JSON, 20 mixed props | 1,736 | 1,736 | 0.089828 | 0.088965 | -1.6% | -0.6% |
+| Partial reload, 2 of 20 | 568 | 568 | 0.037944 | 0.037323 | +4.3% | +2.7% |
+| HTML + Vite, 20 props | 1,800 | 1,800 | 0.148665 | 0.146547 | +0.8% | -4.4% |
+| Plain STJ control | 312 | 312 | 0.043368 | 0.037998 | -0.4% | -3.3% |
+| Integer-key dictionary, 1,000 props | 176,592 | 166,688 | 2.483669 | 1.043381 | -52.2% | -53.7% |
+| GUID-key dictionary, 500 rows | 140,712 | 140,304 | 1.816794 | 1.254569 | -28.5% | -33.0% |
+| 20 immediately completed parallel loaders | 3,992 | 4,152 | 0.027631 | 0.028079 | -0.5% | +1.0% |
+| 3 yielding parallel loaders | 3,720 | 3,704 | 0.043652 | 0.039732 | +1.1% | -3.1% |
+
+The integer and GUID rows show consistent improvements in both runs. Their run 2 exploratory 95% bootstrap intervals are
+−60.5% to −51.6% and −40.4% to −27.6%, respectively. Ordinary render allocation is unchanged; ordinary-render and parallel
+timing intervals include zero. The untouched STJ control moves −3.3% in run 2, demonstrating host variation. These measurements
+do not establish a general rendering speed-up or rule out every small regression.
+
+Retaining failure paths adds 160 B per 20 immediately completed parallel loaders (8 B per planned entry); root path strings are
+reused. Three yielding loaders show a net 16 B reduction: 24 B of added planner state is offset by the 40 B entry-loop saving.
+Nested parallel paths may additionally allocate path strings and are not quantified by these rows. GUID names retain their exact
+STJ spelling; common integer formatting also benefits from the runtime's small-integer string cache. Key-converter and read-only
+date-format regressions compare names directly against STJ, and Native AOT smoke covers GUID and read-only date dictionaries.
+
+The earlier standalone SSR cached/stale probe remains 664 B/request before and after; it measures hits while a refresh claim is
+retained, not background execution. The gated HTTP/1.1 integration test establishes that response completion no longer waits for
+the refresh. No network latency improvement is inferred from the cache probe.
+
+Raw samples, deterministic 5,000-resample summary (seed 20261104), environment, and standalone render/cache probes:
+[results/2026-11-review-fixes](results/2026-11-review-fixes). Reproduce the paired run with `--review-comparison <variants> <output>`,
+where `<variants>/baseline` and `<variants>/current` contain the respective checkouts and identical fixtures, followed by
+`python3 tests/Inertia.Net.Benchmarks/results/2026-11-review-fixes/summarize.py`. See the dedicated DOM and small-allocation
+sections for their separately isolated measurements and rejected cache-hit memoization experiment.
