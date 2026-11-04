@@ -126,7 +126,7 @@ app.MapGet("/feed", (HttpContext http) => Render("Feed/Index", new InertiaProps
 
 app.MapGet("/feed/cursor", async (HttpContext http, FeedDbContext database, CancellationToken ct) =>
 {
-    var request = CursorRequest.From(http.Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize);
+    var request = CursorRequest.From(http, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize);
     var posts = await database.Posts.AsNoTracking().ToCursorPageAsync(post => post.Id, request, descending: true, ct: ct);
     return Render("Feed/Cursor", new InertiaProps { ["posts"] = Scroll(posts) });
 });

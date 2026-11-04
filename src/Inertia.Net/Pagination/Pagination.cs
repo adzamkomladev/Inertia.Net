@@ -59,6 +59,7 @@ public static class Pagination
     {
         ct.ThrowIfCancellationRequested();
         var cursor = CursorCodec.Decode<TKey>(request.Cursor);
+        if (cursor is null) request.LogInvalidCursor();
         var before = cursor?.Direction == CursorDirection.Before;
         var rows = await fetch(cursor, request.PerPage + 1, ct).ConfigureAwait(false);
         return CreateCursorPage<T, KeyEncoder<T, TKey>>(rows, request.PerPage, before,
