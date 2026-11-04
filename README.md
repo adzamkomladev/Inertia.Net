@@ -176,6 +176,7 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` to errors filter, Razor root view and tag helpers |
 | `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor, Precognition |
 | `Inertia.Net.Live.SignalR` | you deliver [live props](#live-props) over SignalR: hub, channel authorization, broadcaster |
+| `Inertia.Net.EntityFrameworkCore` | you page EF Core queries with numbered or cursor pagination |
 | `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
@@ -183,6 +184,7 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 dotnet add package Inertia.Net --version 1.7.0
 dotnet add package Inertia.Net.Mvc --version 1.7.0 # MVC only
 dotnet add package Inertia.Net.FastEndpoints --version 1.7.0 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.0 # EF Core pagination
 dotnet add package Inertia.Net.Testing --version 1.7.0 # test projects
 dotnet add package Inertia.Net.Live.SignalR --version 1.7.0 # live props over SignalR
 ```
@@ -1126,7 +1128,29 @@ Cursors are URL-safe base64 of a compact JSON array: direction (`"a"` or `"b"`) 
 
 ### With EF Core
 
-An `Inertia.Net.EntityFrameworkCore` package with queryable helpers is planned for a later phase. Until then, use the delegate overload with your own queries.
+Install `Inertia.Net.EntityFrameworkCore` to page EF Core queries:
+
+```csharp
+using Inertia.Net;
+using Microsoft.EntityFrameworkCore;
+
+// Numbered pages: order first, including a unique tie-breaker if needed.
+var page = await db.Posts.OrderByDescending(p => p.Id)
+    .ToPageAsync(request, ct: ct);
+
+// Cursor pages: pass an unordered query. The helper applies the ordering.
+var cursorPage = await db.Posts
+    .ToCursorPageAsync(p => p.CreatedAt, p => p.Id, cursorRequest,
+        descending: true, ct: ct);
+
+return Render("Feed", new InertiaProps { ["posts"] = Scroll(cursorPage) });
+```
+
+`ToPageAsync` requires an ordered query and counts rows by default; pass `countTotal: false` to skip the count and return null `total` and `lastPage`. `ToCursorPageAsync` rejects an already ordered query and orders by the supplied key and optional tie-breaker itself. Both guards throw `InvalidOperationException`. The cursor helper fetches in both directions without counting.
+
+Choose a stable, fully unique ordering: use a unique key, or add a unique tie-breaker when the first key can repeat. Nullable keys are unsupported. The cursor codec supports the types listed above, but EF translation and ordering for each type depend on the database provider; for example, SQLite needs a suitable value conversion to order `DateTimeOffset`. The name from a bound request or `From(...)` is used for the corresponding page parameter; an explicit `pageName` or `cursorName` argument takes precedence.
+
+The EF Core package is not marked Native AOT compatible. EF Core has its own compiled-model requirements; for Native AOT applications, use the core delegate paginators with an AOT-compatible data source instead.
 
 ### Native AOT
 

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Inertia.Net.EntityFrameworkCore.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <Using Include="Xunit" />
+    <ProjectReference Include="../../src/Inertia.Net.EntityFrameworkCore/Inertia.Net.EntityFrameworkCore.csproj" />
+  </ItemGroup>
+</Project>
