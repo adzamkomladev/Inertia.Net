@@ -1,0 +1,32 @@
+# November review fixes: execution record
+
+Release target: 1.6.3. Baseline: fetched `origin/main`, `2dd4a4b` (1.6.2).
+
+## Phase 1
+
+Implemented cached/live dot-parent resolution, bounded background refresh, SSR connection timeout, defensive cache-tag
+publication, missing validation registration diagnostics, and generic public SSR exception messages. Background stale loaders
+require singleton dependencies or a scope created inside the loader; this lifetime change was approved on 2026-11-04.
+The plan was reassessed against released 1.6.2 source; the research memos record corrected assumptions.
+
+Regression evidence before fixes: cached sequential dot parent loaded twice; parallel parent lost its cached value; live parent
+lost listener metadata; response completion and the next HTTP/1.1 request waited for SSR refresh; default handler connection
+establishment was unbounded; SSR exceptions disclosed renderer diagnostics; missing validation resolvers passed silently.
+Real MemoryCache rejected-replacement tests already passed on the baseline; tag publication is a defensive improvement.
+
+Checks completed:
+
+- `dotnet build Inertia.Net.slnx -c Release -warnaserror`: passed, zero warnings/errors.
+- `dotnet test --solution Inertia.Net.slnx -c Release --no-build`: 1,413 passed, none failed/skipped.
+- `dotnet pack Inertia.Net.slnx -c Release --no-build -warnaserror -o artifacts`: passed, all seven packages and symbol packages.
+- `bash eng/aot-smoke.sh`: passed, no trim/AOT warnings.
+- Three sample frontend clean installs/builds: passed; React included its SSR bundle.
+- Docs generation and client/SSR build: passed (34 pages).
+- Ordinary render allocation probe: unchanged at JSON 1,736, POCO 1,552, partial 568, HTML 1,800 B/request.
+- Prop cached/tagged/stale allocation: unchanged at 560/624/576 B/request; SSR cached/stale unchanged at 664 B/request.
+  Raw standalone probes are under `tests/Inertia.Net.Benchmarks/results/2026-11-review-fixes`; concurrent work makes their timings
+  exploratory. Final paired measurements remain pending. The stale probe measures hits while a refresh claim is retained,
+  not background worker execution; the gated connection regression covers that behavior.
+
+The documentation also explicitly supports npm, Bun, pnpm and Yarn, with equivalent install/dev/build commands. Repository CI
+continues using its committed lockfiles and reproducible install commands.
