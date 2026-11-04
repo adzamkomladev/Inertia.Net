@@ -2553,10 +2553,11 @@ Inertia 3 includes Precognition in its form integration. Each example validates 
 
 ```tsx
 import { useForm } from '@inertiajs/react'
+import { useEffect } from 'react'
 
 export default function UserForm() {
   const form = useForm({ email: '' }).withPrecognition('post', '/users')
-  form.setValidationTimeout(3000)
+  useEffect(() => { form.setValidationTimeout(3000) }, [])
   return (
     <form onSubmit={e => { e.preventDefault(); form.post('/users') }}>
       <input value={form.data.email} onChange={e => form.setData('email', e.target.value)}
@@ -2665,7 +2666,13 @@ The following `AddServices` method is copied from the Minimal API sample's `Logi
     }
 ```
 
-Register it before building the app and attach the policy to the endpoint:
+Register it before building the app. The sample also opts 429 into error-page handling for real Inertia submissions; 429 is not a default error-page status:
+
+```csharp
+builder.Services.AddInertiaErrorPages(o => o.StatusCodes.Add(429));
+```
+
+Map an error page with a retry message. Precognitive requests accepting JSON retain their 429 response and `Precognition: true` header. Attach the policy to the endpoint:
 
 ```csharp
 LoginDemo.AddServices(builder.Services);
@@ -4026,7 +4033,7 @@ Use a cookie-preserving client, load an Inertia page first, then use `request.Wi
 
 ## Precognition: login locks users out while typing
 
-Precognitive POSTs pass through rate limiting. Use separate bounded validation and submission partitions and validate on blur; see [Precognition](/docs/precognition#rate-limiting). A throttled validation still rejects, so show a retry message.
+Precognitive POSTs pass through rate limiting. Use separate bounded validation and submission partitions and validate on blur; see [Precognition](/docs/precognition#rate-limiting). A throttled validation still rejects, so show a retry message. To render a custom Inertia error page for a real submission rejected with 429, add 429 with `AddInertiaErrorPages(o => o.StatusCodes.Add(429))` and put `UseInertiaErrorPages()` before `UseRateLimiter()`. Precognitive JSON responses keep their 429 and `Precognition: true` header.
 
 ## 'Location' is a type but is used like a variable
 
