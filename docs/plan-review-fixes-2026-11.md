@@ -350,6 +350,13 @@ converters, enum cases and dictionaries whose metadata cannot construct a probe.
 **Verify.** A benchmark row in `tests/Inertia.Net.Benchmarks` (`Dictionary<Guid, Row>` with 500 entries) before and after, reported
 in `RESULTS.md` format.
 
+**Implementation evidence.** Common built-in string/int/long/Guid keys use direct formatting. Other runtime-matching keys use
+System.Text.Json's property-name converter dispatch, preserving enum/custom formatting and supporting read-only date-key
+contracts without a probe collection. Mutable contracts with derived instances of a declared base key retain typed probe
+serialization. A traversed read-only contract with derived base-type keys and no mutable factory fails explicitly; materialize
+a mutable dictionary rather than silently emitting invariant `ToString()` names. Regression tests compare all emitted names
+against System.Text.Json, and AOT smoke includes GUID and read-only date keys.
+
 ### 3.2 `PreserveBigIntegers` allocations and `ValueSpan` misuse (S, Sol medium)
 
 **Problem.** `BigIntegerConverters.WriteElement` (`src/Inertia.Net/BigIntegerConverters.cs:45-46`) calls `GetRawText()` and
@@ -394,6 +401,11 @@ Batch the following, each measured with the allocation probe before and after; d
 Each candidate needs a workload that executes it (scroll metadata, converter-bearing typed properties, fill contention, planned
 cache hits, respectively). Preserve converter contracts and duplicate-prop behavior. Record unchanged or rejected candidates
 with their measurements rather than implementing them to satisfy the list.
+
+**Measured decision.** Retain scroll suffix, member-wrapper and contended-fill improvements. Reject planned-cache-hit
+memoization despite its 768 B saving for 32 hits: it reused a value after an earlier sequential loader explicitly invalidated
+that key or tag. Both invalidation regressions remain covered. Converter instance identity remains unchanged. See the paired
+small-allocation results and retained-memory limitations in `tests/Inertia.Net.Benchmarks/RESULTS.md`.
 
 ### 3.5 Monotonic circuit-breaker clock (S, Sol medium)
 
