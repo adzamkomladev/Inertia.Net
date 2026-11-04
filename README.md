@@ -8,7 +8,7 @@ Inertia.Net **1.6.2** is a .NET 10 server adapter for the **Inertia.js v3** prot
 
 Version 1.6.1 added [production error pages](#error-pages), a [remembered previous URL](#previous-url) for `Back()` when the browser omits `Referer`, and HTTP status assertions for tests. Inertia forms keep their input after validation; the [flash recipe](#flash-data) shows how to return selected safe fields for a full-page form.
 
-Version 1.6.2 adds [pagination](#pagination): return numbered pages for a pager, or use cursor pages and [infinite scroll](#infinite-scroll) to load more as the reader scrolls. The [step-by-step release guide](docs/Inertia.Net.Docs/content/docs/whats-new.mdx) explains both releases.
+Version 1.6.2 adds [pagination](#pagination): return numbered pages for a pager, or use cursor pages and [infinite scroll](#infinite-scroll) to load more as the reader scrolls. The optional `Inertia.Net.EntityFrameworkCore` package pages EF Core database queries. The [step-by-step release guide](docs/Inertia.Net.Docs/content/docs/whats-new.mdx) explains both releases.
 
 ## Contents
 

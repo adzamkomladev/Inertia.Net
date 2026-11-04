@@ -87,7 +87,13 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 
 ## With EF Core
 
-Install `Inertia.Net.EntityFrameworkCore` to page EF Core queries:
+If your app uses EF Core, install the optional package alongside your database provider:
+
+```sh
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.2
+```
+
+The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
 
 ```csharp
 using Inertia.Net;
@@ -105,7 +111,7 @@ var cursorPage = await db.Posts
 return Render("Feed", new InertiaProps { ["posts"] = Scroll(cursorPage) });
 ```
 
-`ToPageAsync` requires an ordered query and counts rows by default; pass `countTotal: false` to skip the count and return null `total` and `lastPage`. `ToCursorPageAsync` rejects an already ordered query and orders by the supplied key and optional tie-breaker itself. Both guards throw `InvalidOperationException`. The cursor helper fetches in both directions without counting.
+Both results contain the selected group in `data`. A cursor is a marker: send it back unchanged to request the next or previous group. `ToPageAsync` requires an ordered query and counts rows by default; pass `countTotal: false` to skip the count and return null `total` and `lastPage`. `ToCursorPageAsync` rejects an already ordered query and orders by the supplied key and optional tie-breaker itself. Both guards throw `InvalidOperationException`. The cursor helper fetches in both directions without counting.
 
 Choose a stable, fully unique ordering: use a unique key, or add a unique tie-breaker when the first key can repeat. Nullable keys are unsupported. The cursor codec supports the types listed above, but EF translation and ordering for each type depend on the database provider; for example, SQLite needs a suitable value conversion to order `DateTimeOffset`. The name from a bound request or `From(...)` is used for the corresponding page parameter; an explicit `pageName` or `cursorName` argument takes precedence.
 
