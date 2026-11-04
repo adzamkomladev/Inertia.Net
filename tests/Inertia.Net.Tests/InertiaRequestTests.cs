@@ -39,6 +39,15 @@ public class InertiaRequestTests
     }
 
     [Theory]
+    [InlineData(128, true)]
+    [InlineData(129, false)]
+    public void Socket_id_is_bounded_after_trimming(int length, bool accepted)
+    {
+        var value = new string('a', length);
+        Assert.Equal(accepted ? value : null, Parse(InertiaHeaders.SocketId, $"  {value}  ").SocketId);
+    }
+
+    [Theory]
     [InlineData("", null)]
     [InlineData(",", null)]
     [InlineData(" , ,", null)]
