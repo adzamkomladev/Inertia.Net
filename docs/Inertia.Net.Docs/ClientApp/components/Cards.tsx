@@ -18,7 +18,7 @@ const icons = {
 export type CardIcon = keyof typeof icons
 
 export function Cards({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('not-prose my-6 grid gap-3 sm:grid-cols-2', className)}>{children}</div>
+  return <div className={cn('not-prose my-7 grid gap-3 sm:grid-cols-2', className)}>{children}</div>
 }
 
 export function Card({ title, href, icon, children }: { title: string; href?: string; icon?: CardIcon; children?: ReactNode }) {
@@ -27,18 +27,21 @@ export function Card({ title, href, icon, children }: { title: string; href?: st
     <>
       <div className="flex items-start gap-3">
         {Icon && (
-          <Icon className="mt-0.5 size-[18px] shrink-0 text-muted-foreground" />
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-muted text-muted-foreground transition-colors duration-200 group-hover:border-primary/25 group-hover:bg-primary-soft group-hover:text-primary">
+            <Icon className="size-4" />
+          </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="font-semibold leading-6 tracking-tight">{title}</p>
+          <p className="font-semibold leading-6 tracking-tight text-foreground">{title}</p>
           {children && <div className="mt-1 text-[13px] leading-5 text-muted-foreground [&>p]:m-0">{children}</div>}
         </div>
-        {href && <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />}
+        {href && <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground/50 transition-[transform,color] duration-200 ease-[var(--ease-out)] group-hover:translate-x-1 group-hover:text-primary" />}
       </div>
     </>
   )
 
-  const className = 'group rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/30'
+  const className =
+    'group rounded-xl border border-border bg-card p-4 transition-[border-color,box-shadow,transform] duration-200 ease-[var(--ease-out)] hover:-translate-y-px hover:border-border-strong hover:shadow-lift'
 
   if (href?.startsWith('/')) {
     return (

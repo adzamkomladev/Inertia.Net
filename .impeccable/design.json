@@ -1,0 +1,636 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-03T10:52:37+00:00",
+  "title": "Design System: Inertia.Net Docs",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": ".NET Violet",
+        "canonical": "oklch(0.47 0.24 285)",
+        "dark": "oklch(0.74 0.14 285)",
+        "cssVar": "--primary",
+        "tonalRamp": [
+          "oklch(0.15 0.036 285)",
+          "oklch(0.26 0.096 285)",
+          "oklch(0.37 0.162 285)",
+          "oklch(0.48 0.228 285)",
+          "oklch(0.6 0.24 285)",
+          "oklch(0.72 0.168 285)",
+          "oklch(0.84 0.096 285)",
+          "oklch(0.95 0.036 285)"
+        ]
+      },
+      "primary-foreground": {
+        "role": "primary",
+        "displayName": "Violet Ink Contrast",
+        "canonical": "oklch(0.99 0 0)",
+        "dark": "oklch(0.16 0.01 286)",
+        "cssVar": "--primary-foreground",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.004 286)",
+          "oklch(0.37 0.007 286)",
+          "oklch(0.48 0.009 286)",
+          "oklch(0.6 0.01 286)",
+          "oklch(0.72 0.007 286)",
+          "oklch(0.84 0.004 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Violet Wash",
+        "canonical": "oklch(0.955 0.028 286)",
+        "dark": "oklch(0.25 0.05 286)",
+        "cssVar": "--primary-soft",
+        "tonalRamp": [
+          "oklch(0.15 0.009 286)",
+          "oklch(0.26 0.024 286)",
+          "oklch(0.37 0.041 286)",
+          "oklch(0.48 0.057 286)",
+          "oklch(0.6 0.06 286)",
+          "oklch(0.72 0.042 286)",
+          "oklch(0.84 0.024 286)",
+          "oklch(0.95 0.009 286)"
+        ]
+      },
+      "ring": {
+        "role": "primary",
+        "displayName": "Focus Violet",
+        "canonical": "oklch(0.55 0.2 285)",
+        "dark": "oklch(0.7 0.14 285)",
+        "cssVar": "--ring",
+        "tonalRamp": [
+          "oklch(0.15 0.03 285)",
+          "oklch(0.26 0.08 285)",
+          "oklch(0.37 0.135 285)",
+          "oklch(0.48 0.19 285)",
+          "oklch(0.6 0.2 285)",
+          "oklch(0.72 0.14 285)",
+          "oklch(0.84 0.08 285)",
+          "oklch(0.95 0.03 285)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Violet Paper",
+        "canonical": "oklch(0.993 0.002 286)",
+        "dark": "oklch(0.155 0.008 286)",
+        "cssVar": "--background",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.005 286)",
+          "oklch(0.37 0.008 286)",
+          "oklch(0.48 0.011 286)",
+          "oklch(0.6 0.012 286)",
+          "oklch(0.72 0.008 286)",
+          "oklch(0.84 0.005 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(0.21 0.012 286)",
+        "dark": "oklch(0.95 0.004 286)",
+        "cssVar": "--foreground",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.005 286)",
+          "oklch(0.37 0.008 286)",
+          "oklch(0.48 0.011 286)",
+          "oklch(0.6 0.012 286)",
+          "oklch(0.72 0.008 286)",
+          "oklch(0.84 0.005 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "oklch(1 0 0)",
+        "dark": "oklch(0.185 0.009 286)",
+        "cssVar": "--card",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.004 286)",
+          "oklch(0.37 0.007 286)",
+          "oklch(0.48 0.009 286)",
+          "oklch(0.6 0.01 286)",
+          "oklch(0.72 0.007 286)",
+          "oklch(0.84 0.004 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "popover": {
+        "role": "neutral",
+        "displayName": "Card White (popover)",
+        "canonical": "oklch(1 0 0)",
+        "dark": "oklch(0.195 0.01 286)",
+        "cssVar": "--popover",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.004 286)",
+          "oklch(0.37 0.007 286)",
+          "oklch(0.48 0.009 286)",
+          "oklch(0.6 0.01 286)",
+          "oklch(0.72 0.007 286)",
+          "oklch(0.84 0.004 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Mist",
+        "canonical": "oklch(0.967 0.004 286)",
+        "dark": "oklch(0.205 0.01 286)",
+        "cssVar": "--muted",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.005 286)",
+          "oklch(0.37 0.008 286)",
+          "oklch(0.48 0.011 286)",
+          "oklch(0.6 0.012 286)",
+          "oklch(0.72 0.008 286)",
+          "oklch(0.84 0.005 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Slate Violet",
+        "canonical": "oklch(0.47 0.014 286)",
+        "dark": "oklch(0.72 0.012 286)",
+        "cssVar": "--muted-foreground",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.006 286)",
+          "oklch(0.37 0.009 286)",
+          "oklch(0.48 0.013 286)",
+          "oklch(0.6 0.014 286)",
+          "oklch(0.72 0.01 286)",
+          "oklch(0.84 0.006 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "accent": {
+        "role": "neutral",
+        "displayName": "Hover Wash",
+        "canonical": "oklch(0.955 0.008 286)",
+        "dark": "oklch(0.235 0.014 286)",
+        "cssVar": "--accent",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.006 286)",
+          "oklch(0.37 0.009 286)",
+          "oklch(0.48 0.013 286)",
+          "oklch(0.6 0.014 286)",
+          "oklch(0.72 0.01 286)",
+          "oklch(0.84 0.006 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Mist (secondary)",
+        "canonical": "oklch(0.962 0.005 286)",
+        "dark": "oklch(0.215 0.01 286)",
+        "cssVar": "--secondary",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.005 286)",
+          "oklch(0.37 0.008 286)",
+          "oklch(0.48 0.011 286)",
+          "oklch(0.6 0.012 286)",
+          "oklch(0.72 0.008 286)",
+          "oklch(0.84 0.005 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(0.912 0.006 286)",
+        "dark": "oklch(0.265 0.012 286)",
+        "cssVar": "--border",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.005 286)",
+          "oklch(0.37 0.008 286)",
+          "oklch(0.48 0.011 286)",
+          "oklch(0.6 0.012 286)",
+          "oklch(0.72 0.008 286)",
+          "oklch(0.84 0.005 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Firm Hairline",
+        "canonical": "oklch(0.84 0.01 286)",
+        "dark": "oklch(0.34 0.014 286)",
+        "cssVar": "--border-strong",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.006 286)",
+          "oklch(0.37 0.009 286)",
+          "oklch(0.48 0.013 286)",
+          "oklch(0.6 0.014 286)",
+          "oklch(0.72 0.01 286)",
+          "oklch(0.84 0.006 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "code-bg": {
+        "role": "neutral",
+        "displayName": "Code Ground",
+        "canonical": "oklch(0.982 0.003 286)",
+        "dark": "oklch(0.175 0.009 286)",
+        "cssVar": "--code-bg",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.004 286)",
+          "oklch(0.37 0.007 286)",
+          "oklch(0.48 0.009 286)",
+          "oklch(0.6 0.01 286)",
+          "oklch(0.72 0.007 286)",
+          "oklch(0.84 0.004 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "header-bg": {
+        "role": "neutral",
+        "displayName": "Glass Header",
+        "canonical": "oklch(0.993 0.002 286 / 0.78)",
+        "dark": "oklch(0.155 0.008 286 / 0.72)",
+        "cssVar": "--header-bg",
+        "tonalRamp": [
+          "oklch(0.15 0.002 286)",
+          "oklch(0.26 0.004 286)",
+          "oklch(0.37 0.007 286)",
+          "oklch(0.48 0.009 286)",
+          "oklch(0.6 0.01 286)",
+          "oklch(0.72 0.007 286)",
+          "oklch(0.84 0.004 286)",
+          "oklch(0.95 0.002 286)"
+        ]
+      },
+      "success": {
+        "role": "status",
+        "displayName": "Success Green",
+        "canonical": "oklch(0.55 0.16 155)",
+        "dark": "oklch(0.72 0.15 155)",
+        "cssVar": "--success",
+        "tonalRamp": [
+          "oklch(0.15 0.024 155)",
+          "oklch(0.26 0.064 155)",
+          "oklch(0.37 0.108 155)",
+          "oklch(0.48 0.152 155)",
+          "oklch(0.6 0.16 155)",
+          "oklch(0.72 0.112 155)",
+          "oklch(0.84 0.064 155)",
+          "oklch(0.95 0.024 155)"
+        ]
+      },
+      "warning": {
+        "role": "status",
+        "displayName": "Warning Amber",
+        "canonical": "oklch(0.6 0.15 70)",
+        "dark": "oklch(0.8 0.14 78)",
+        "cssVar": "--warning",
+        "tonalRamp": [
+          "oklch(0.15 0.022 70)",
+          "oklch(0.26 0.06 70)",
+          "oklch(0.37 0.101 70)",
+          "oklch(0.48 0.142 70)",
+          "oklch(0.6 0.15 70)",
+          "oklch(0.72 0.105 70)",
+          "oklch(0.84 0.06 70)",
+          "oklch(0.95 0.022 70)"
+        ]
+      },
+      "danger": {
+        "role": "status",
+        "displayName": "Danger Red",
+        "canonical": "oklch(0.56 0.21 27)",
+        "dark": "oklch(0.71 0.18 25)",
+        "cssVar": "--danger",
+        "tonalRamp": [
+          "oklch(0.15 0.032 27)",
+          "oklch(0.26 0.084 27)",
+          "oklch(0.37 0.142 27)",
+          "oklch(0.48 0.199 27)",
+          "oklch(0.6 0.21 27)",
+          "oklch(0.72 0.147 27)",
+          "oklch(0.84 0.084 27)",
+          "oklch(0.95 0.032 27)"
+        ]
+      },
+      "info": {
+        "role": "status",
+        "displayName": "Info Blue",
+        "canonical": "oklch(0.55 0.15 245)",
+        "dark": "oklch(0.74 0.12 240)",
+        "cssVar": "--info",
+        "tonalRamp": [
+          "oklch(0.15 0.022 245)",
+          "oklch(0.26 0.06 245)",
+          "oklch(0.37 0.101 245)",
+          "oklch(0.48 0.142 245)",
+          "oklch(0.6 0.15 245)",
+          "oklch(0.72 0.105 245)",
+          "oklch(0.84 0.06 245)",
+          "oklch(0.95 0.022 245)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page title only; 2rem below sm, 2.5rem from sm; text-wrap balance."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Prose h2, opened by a hairline rule with 2rem padding (none when first)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Prose h3; h4 drops to 1rem."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Page description under the title, muted, max 60ch."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose at 88% foreground; running text held to a 38rem measure."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Breadcrumb, contents entries, card descriptions; sidebar links at 14px."
+      },
+      "label-section": {
+        "displayName": "Section Label",
+        "purpose": "Sidebar group titles, On this page, table headers; sentence case."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Code blocks; inline code at 0.84em weight 500; ligatures off."
+      },
+      "code-label": {
+        "displayName": "Code Label",
+        "purpose": "Language caption on code frames."
+      }
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "0 1px 2px oklch(0.2 0.02 286 / 0.06), 0 12px 32px -8px oklch(0.2 0.03 286 / 0.18)",
+        "dark": "0 1px 2px oklch(0 0 0 / 0.3), 0 16px 40px -8px oklch(0 0 0 / 0.55)",
+        "purpose": "Search dialog and mobile drawer."
+      },
+      {
+        "name": "lift",
+        "value": "0 1px 2px oklch(0.2 0.02 286 / 0.05), 0 6px 16px -6px oklch(0.2 0.03 286 / 0.14)",
+        "dark": "0 1px 2px oklch(0 0 0 / 0.25), 0 8px 20px -8px oklch(0 0 0 / 0.45)",
+        "purpose": "Hover state of link cards and previous/next cards, with a 1px rise."
+      },
+      {
+        "name": "rest-whisper",
+        "value": "0 1px 2px oklch(0.2 0.02 286 / 0.04)",
+        "purpose": "Code frames and the search trigger at rest."
+      },
+      {
+        "name": "header-scrolled",
+        "value": "0 1px 0 0 var(--border), 0 8px 24px -16px oklch(0.2 0.03 286 / 0.25)",
+        "purpose": "Sticky header after 4px of scroll."
+      },
+      {
+        "name": "focus-ring",
+        "value": "outline: 2px solid var(--ring); outline-offset: 2px",
+        "purpose": "Every focus-visible element."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Exponential ease-out for every enter and positional transition."
+      },
+      {
+        "name": "hover",
+        "value": "150ms",
+        "purpose": "Color and background state changes."
+      },
+      {
+        "name": "marker-slide",
+        "value": "300ms var(--ease-out)",
+        "purpose": "Contents marker and tab indicator sliding to the active item."
+      },
+      {
+        "name": "overlay",
+        "value": "in 200ms var(--ease-out), out 140ms ease-in",
+        "purpose": "Scrim fade."
+      },
+      {
+        "name": "dialog",
+        "value": "in 260ms var(--ease-out) from translateY(8px) scale(0.98) blur(2px), out 140ms ease-in",
+        "purpose": "Search dialog."
+      },
+      {
+        "name": "drawer",
+        "value": "in 320ms var(--ease-out) from translateX(-100%), out 180ms ease-in",
+        "purpose": "Mobile navigation drawer."
+      },
+      {
+        "name": "menu",
+        "value": "in 180ms var(--ease-out) from scale(0.96) translateY(-4px), out 120ms ease-in",
+        "purpose": "Dropdown menus (theme toggle)."
+      },
+      {
+        "name": "article-crossfade",
+        "value": "old 120ms ease-in fade-out, new 280ms var(--ease-out) from translateY(6px)",
+        "purpose": "View transition on page change; shell stays put."
+      },
+      {
+        "name": "heading-flash",
+        "value": "1600ms var(--ease-out), violet for the first 30%",
+        "purpose": "Anchor-jump target heading."
+      },
+      {
+        "name": "reading-progress",
+        "value": "scroll(root block) timeline, linear",
+        "purpose": "Header progress hairline; hidden without scroll-timeline support."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "durations collapse to 0.01ms; view transitions none",
+        "purpose": "prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ],
+    "themes": {
+      "strategy": "class",
+      "darkSelector": ".dark",
+      "source": "docs/Inertia.Net.Docs/ClientApp/app.css",
+      "note": "Every color token is redefined on .dark; colorMeta.<token>.dark holds the dark value."
+    }
+  },
+  "components": [
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "sidebar-link",
+      "description": "Grouped documentation links with a violet-wash pill for the current page.",
+      "html": "<nav class=\"ds-sidebar\"><p class=\"ds-sidebar-title\">Essentials</p><ul><li><a class=\"ds-sidebar-link\" href=\"#\">Pages and responses</a></li><li><a class=\"ds-sidebar-link\" aria-current=\"page\" href=\"#\">Props</a></li><li><a class=\"ds-sidebar-link\" href=\"#\">Shared data</a></li></ul></nav>",
+      "css": ".ds-sidebar { width: 240px; font-family: var(--font-sans, 'Inter Variable', system-ui, sans-serif); font-size: 14px; } .ds-sidebar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; } .ds-sidebar-title { margin: 0 0 6px; padding: 0 10px; font-size: 12px; font-weight: 600; color: var(--foreground); } .ds-sidebar-link { display: flex; padding: 5px 10px; line-height: 20px; border-radius: 8px; color: var(--muted-foreground); text-decoration: none; transition: background-color 150ms, color 150ms, transform 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-sidebar-link:hover { background: var(--accent); color: var(--foreground); } .ds-sidebar-link[aria-current=page] { background: var(--primary-soft); color: var(--primary); font-weight: 500; } .ds-sidebar-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "icon-button",
+      "description": "Unboxed 36px header control that gains a wash on hover.",
+      "html": "<button class=\"ds-icon-btn\" aria-label=\"Toggle theme\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z\"/></svg></button>",
+      "css": ".ds-icon-btn { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: transparent; color: var(--muted-foreground); cursor: pointer; transition: background-color 150ms, color 150ms, transform 150ms; } .ds-icon-btn:hover { background: var(--accent); color: var(--foreground); } .ds-icon-btn:active { transform: scale(0.95); } .ds-icon-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Trigger",
+      "kind": "input",
+      "refersTo": "search-trigger",
+      "description": "Wide header search button with a keycap shortcut; opens the search dialog.",
+      "html": "<button class=\"ds-search\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><span class=\"ds-search-label\">Search docs</span><kbd class=\"ds-kbd\">Ctrl K</kbd></button>",
+      "css": ".ds-search { display: flex; align-items: center; gap: 10px; width: 256px; height: 36px; padding: 0 6px 0 12px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in oklab, var(--card) 60%, transparent); color: var(--muted-foreground); font: 14px var(--font-sans, 'Inter Variable', system-ui, sans-serif); text-align: left; cursor: pointer; box-shadow: 0 1px 2px oklch(0.2 0.02 286 / 0.04); transition: border-color 150ms, background-color 150ms, color 150ms; } .ds-search:hover { border-color: var(--border-strong); background: var(--card); color: var(--foreground); } .ds-search:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; } .ds-search-label { flex: 1; } .ds-kbd { display: inline-flex; align-items: center; height: 24px; min-width: 44px; justify-content: center; padding: 0 6px; border: 1px solid var(--border); border-bottom-color: var(--border-strong); border-radius: 8px; background: var(--background); color: var(--muted-foreground); font: 500 11px var(--font-sans, 'Inter Variable', system-ui, sans-serif); box-shadow: 0 1px 0 var(--border); }"
+    },
+    {
+      "name": "Code Block",
+      "kind": "custom",
+      "refersTo": "code-block",
+      "description": "Signature code frame: caption bar with language and copy, mono body with violet line hover.",
+      "html": "<figure class=\"ds-code\"><figcaption class=\"ds-code-cap\"><span class=\"ds-code-lang\">C#</span><button class=\"ds-code-copy\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"8\" y=\"8\" width=\"14\" height=\"14\" rx=\"2\"/><path d=\"M4 16V4a2 2 0 0 1 2-2h12\"/></svg>Copy</button></figcaption><pre class=\"ds-code-pre\"><code><span class=\"ds-line\">app.MapGet(\"/\", () =&gt; Inertia.Render(\"Home\"));</span><span class=\"ds-line\">app.Run();</span></code></pre></figure>",
+      "css": ".ds-code { margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--code-bg); box-shadow: 0 1px 2px oklch(0.2 0.02 286 / 0.04); } .ds-code-cap { display: flex; height: 40px; align-items: center; justify-content: space-between; padding: 0 6px 0 16px; border-bottom: 1px solid var(--border); background: color-mix(in oklab, var(--muted) 50%, transparent); } .ds-code-lang { font: 500 11px var(--font-mono, 'JetBrains Mono Variable', ui-monospace, monospace); letter-spacing: 0.025em; color: var(--muted-foreground); } .ds-code-copy { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font: 500 11px var(--font-sans, 'Inter Variable', system-ui, sans-serif); cursor: pointer; transition: background-color 150ms, color 150ms, transform 150ms; } .ds-code-copy:hover { background: var(--accent); color: var(--foreground); } .ds-code-copy:active { transform: scale(0.95); } .ds-code-copy:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; } .ds-code-pre { margin: 0; padding: 16px 0; overflow-x: auto; font: 13px/1.75 var(--font-mono, 'JetBrains Mono Variable', ui-monospace, monospace); font-variant-ligatures: none; color: var(--foreground); } .ds-code-pre code { display: grid; } .ds-line { display: inline-block; min-height: 1.75em; padding-inline: 18px; transition: background-color 120ms ease-out; } .ds-line:hover { background: color-mix(in oklab, var(--primary) 6%, transparent); }"
+    },
+    {
+      "name": "Framework Tabs",
+      "kind": "custom",
+      "refersTo": "tab",
+      "description": "Tab group sharing the code frame; a 2px violet indicator slides to the selected framework.",
+      "html": "<div class=\"ds-tabs\"><div class=\"ds-tablist\" role=\"tablist\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">React</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Vue</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Svelte</button></div><p class=\"ds-tabpanel\">npm install @inertiajs/react</p></div>",
+      "css": ".ds-tabs { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--code-bg); } .ds-tablist { display: flex; gap: 4px; padding: 0 8px; border-bottom: 1px solid var(--border); background: color-mix(in oklab, var(--muted) 50%, transparent); } .ds-tab { position: relative; padding: 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font: 500 12px var(--font-sans, 'Inter Variable', system-ui, sans-serif); cursor: pointer; transition: color 150ms; } .ds-tab:hover { color: var(--foreground); } .ds-tab[aria-selected=true] { color: var(--foreground); } .ds-tab[aria-selected=true]::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 9999px; background: var(--primary); } .ds-tab:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; } .ds-tabpanel { margin: 0; padding: 12px 16px; font: 13px/1.75 var(--font-mono, 'JetBrains Mono Variable', ui-monospace, monospace); color: var(--foreground); }"
+    },
+    {
+      "name": "Link Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Hairline card that lifts 1px with the Lift shadow on hover; icon tile and arrow turn violet.",
+      "html": "<a class=\"ds-card\" href=\"#\"><span class=\"ds-card-icon\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M4 17l6-6-6-6\"/><path d=\"M12 19h8\"/></svg></span><span class=\"ds-card-body\"><span class=\"ds-card-title\">Quick start</span><span class=\"ds-card-text\">Render your first page in five minutes.</span></span><svg class=\"ds-card-arrow\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
+      "css": ".ds-card { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--foreground); text-decoration: none; font-family: var(--font-sans, 'Inter Variable', system-ui, sans-serif); transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-card:hover { transform: translateY(-1px); border-color: var(--border-strong); box-shadow: var(--shadow-lift, 0 1px 2px oklch(0.2 0.02 286 / 0.05), 0 6px 16px -6px oklch(0.2 0.03 286 / 0.14)); } .ds-card:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; } .ds-card-icon { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--muted); color: var(--muted-foreground); transition: all 200ms; } .ds-card:hover .ds-card-icon { border-color: color-mix(in oklab, var(--primary) 25%, transparent); background: var(--primary-soft); color: var(--primary); } .ds-card-body { flex: 1; min-width: 0; } .ds-card-title { display: block; font-weight: 600; line-height: 24px; letter-spacing: -0.01em; } .ds-card-text { display: block; margin-top: 4px; font-size: 13px; line-height: 20px; color: var(--muted-foreground); } .ds-card-arrow { margin-top: 4px; flex-shrink: 0; color: color-mix(in oklab, var(--muted-foreground) 50%, transparent); transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), color 200ms; } .ds-card:hover .ds-card-arrow { transform: translateX(4px); color: var(--primary); }"
+    },
+    {
+      "name": "Callout",
+      "kind": "custom",
+      "refersTo": "callout",
+      "description": "Status note whose ground, hairline and icon derive from one tone token.",
+      "html": "<div class=\"ds-callout\" style=\"--tone: var(--info)\"><svg class=\"ds-callout-icon\" viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4\"/><path d=\"M12 8h.01\"/></svg><div><p class=\"ds-callout-title\">Note</p><p class=\"ds-callout-text\">Deferred props load after the first render.</p></div></div>",
+      "css": ".ds-callout { display: flex; gap: 12px; padding: 14px 16px; border: 1px solid color-mix(in oklab, var(--tone) 28%, var(--border)); border-radius: 12px; background: color-mix(in oklab, var(--tone) 6%, var(--background)); font: 14px/24px var(--font-sans, 'Inter Variable', system-ui, sans-serif); color: var(--foreground); } .ds-callout-icon { margin-top: 3px; flex-shrink: 0; color: var(--tone); } .ds-callout p { margin: 0; } .ds-callout-title { margin-bottom: 2px; font-weight: 600; } .ds-callout-text { color: color-mix(in oklab, var(--foreground) 88%, var(--background)); }"
+    },
+    {
+      "name": "Contents Rail",
+      "kind": "nav",
+      "refersTo": "contents-rail",
+      "description": "On this page list on a 1px rail with a violet marker that slides to the active section.",
+      "html": "<aside class=\"ds-toc\"><p class=\"ds-toc-title\">On this page</p><ul class=\"ds-toc-list\"><span class=\"ds-toc-marker\"></span><li><a class=\"ds-toc-link\" aria-current=\"location\" href=\"#\">The prop factories</a></li><li><a class=\"ds-toc-link\" href=\"#\">Resolution order</a></li><li><a class=\"ds-toc-link ds-toc-sub\" href=\"#\">Parallel props</a></li></ul></aside>",
+      "css": ".ds-toc { width: 224px; font-family: var(--font-sans, 'Inter Variable', system-ui, sans-serif); } .ds-toc-title { margin: 0 0 12px; font-size: 12px; font-weight: 600; color: var(--foreground); } .ds-toc-list { position: relative; margin: 0; padding: 0; list-style: none; border-left: 1px solid var(--border); } .ds-toc-marker { position: absolute; left: -1px; top: 0; width: 1px; height: 28px; background: var(--primary); transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), height 300ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-toc-link { display: block; padding: 4px 0 4px 14px; font-size: 13px; line-height: 20px; color: var(--muted-foreground); text-decoration: none; transition: color 150ms; } .ds-toc-sub { padding-left: 24px; } .ds-toc-link:hover { color: var(--foreground); } .ds-toc-link[aria-current=location] { color: var(--primary); font-weight: 500; } .ds-toc-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }"
+    },
+    {
+      "name": "Previous / Next",
+      "kind": "card",
+      "refersTo": "pager-card",
+      "description": "Pagination cards at the foot of every page; arrow slides outward and title turns violet on hover.",
+      "html": "<a class=\"ds-pager\" href=\"#\"><span class=\"ds-pager-dir\">Next <svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></span><span class=\"ds-pager-title\">Shared data</span><span class=\"ds-pager-sec\">Essentials</span></a>",
+      "css": ".ds-pager { display: flex; flex-direction: column; gap: 4px; padding: 16px 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); text-align: right; text-decoration: none; font-family: var(--font-sans, 'Inter Variable', system-ui, sans-serif); transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-pager:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var(--primary) 40%, transparent); box-shadow: var(--shadow-lift, 0 1px 2px oklch(0.2 0.02 286 / 0.05), 0 6px 16px -6px oklch(0.2 0.03 286 / 0.14)); } .ds-pager:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; } .ds-pager-dir { display: flex; justify-content: flex-end; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); } .ds-pager-dir svg { transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-pager:hover .ds-pager-dir svg { transform: translateX(4px); } .ds-pager-title { font-weight: 600; color: var(--foreground); transition: color 150ms; } .ds-pager:hover .ds-pager-title { color: var(--primary); } .ds-pager-sec { font-size: 12px; color: var(--muted-foreground); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Exact Reference Desk",
+    "overview": "**Creative North Star: \"The Exact Reference Desk\"**\n\nThe category standard played straight: a quiet reading column set inside a crisp three-column shell (sidebar, article, contents rail), built for a developer with an editor and terminal open beside it. Code is the primary content, so code frames get the most deliberate chrome on the page and prose stays calm around them. Density is moderate: generous line height in prose, tight 13 to 14px wayfinding text in the rails.\n\nEvery neutral carries a faint violet tint (hue 286) so the single .NET violet accent reads as part of the page rather than pasted on. The accent marks location, links and focus, and nothing else. Depth is mostly tonal and hairline; real shadows are reserved for layers that float above the page. Motion is short, exponential ease-out, and exists to keep the reader oriented: the contents marker slides, the jumped-to heading flashes, the article crossfades on page change. All of it drops to none under reduced motion.\n\nThe build rejects the stock template look: flat gray neutrals, default borders, no motion, no wayfinding beyond the sidebar.",
+    "keyCharacteristics": [
+      "Violet-tinted neutrals with one violet accent, in light and dark themes.",
+      "Inter for UI and prose, JetBrains Mono for code, with ligatures off.",
+      "Hairline (1px) rules everywhere; 12px radii on code frames, cards, tables and callouts.",
+      "Translucent sticky 56px header with backdrop blur and a scroll-driven reading-progress hairline.",
+      "Wayfinding on every page: sidebar pill, breadcrumb, sliding contents marker, previous/next cards."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Violet is spent on location, links and focus. It never fills a large surface; the only solid violet fills are the brand tile and the 2px progress and tab indicators.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tinted Neutral Rule",
+        "body": "No pure gray. Every neutral sits at hue 286 with chroma between 0.002 and 0.014.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Tone Per Job Rule",
+        "body": "A callout derives its ground, hairline and icon from a single status token so both themes stay in step.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Labels and group headings are sentence case at normal tracking. No uppercase tracked labels.",
+        "section": "typography"
+      },
+      {
+        "name": "The Literal Code Rule",
+        "body": "Code ligatures are always off; what a reader sees is what they paste.",
+        "section": "typography"
+      },
+      {
+        "name": "The Float-Only Shadow Rule",
+        "body": "A visible shadow means the element sits above the page or is responding to the pointer. Static content containers never carry more than the rest whisper.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Glass Header Rule",
+        "body": "The header is translucent with a strong backdrop blur and saturation, so scrolling content stays faintly visible beneath it.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep every neutral on hue 286 at low chroma, and define both a light and a `.dark` value for any new token.",
+      "Do reserve violet for location, links and focus; mark the current place in every navigation element with it.",
+      "Do frame code, tables, tabs, callouts and cards with a 1px hairline and a 12px radius.",
+      "Do use the Float shadow only for dialogs and drawers and the Lift shadow only on hover of interactive cards.",
+      "Do animate with the exponential ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`) at 150 to 320ms on enter, faster ease-in on exit, and let `prefers-reduced-motion` collapse it to none.",
+      "Do keep running text at a 38rem measure and let code and tables use the full column.",
+      "Do give every copy action visible and announced feedback."
+    ],
+    "donts": [
+      "Don't use pure grays or untinted borders.",
+      "Don't add shadows to static content containers beyond the rest whisper.",
+      "Don't put uppercase tracked labels or small accent-coloured kickers above headings; group labels are 12px semibold sentence case.",
+      "Don't fill large surfaces with violet or introduce a second accent hue; status hues live only in callouts and feedback.",
+      "Don't enable code ligatures.",
+      "Don't exceed weight 600 in the docs surface."
+    ]
+  }
+}
