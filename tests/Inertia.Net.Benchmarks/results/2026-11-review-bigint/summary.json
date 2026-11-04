@@ -1,0 +1,247 @@
+{
+  "method": {
+    "warmupPerChild": 1000,
+    "iterationsPerSample": 5000,
+    "repetitionsPerChild": 3,
+    "alternatingOrderPairs": 4,
+    "safeIntegerTokensPerOperation": 500,
+    "allocationCounter": "GC.GetAllocatedBytesForCurrentThread",
+    "outputWriterAndBufferReused": true,
+    "beforeConverterSource": "79e83fd:src/Inertia.Net/BigIntegerConverters.cs",
+    "afterConverterSource": "3258666:src/Inertia.Net/BigIntegerConverters.cs"
+  },
+  "environment": {
+    "os": "Ubuntu 24.04.5 LTS",
+    "kernel": "6.8.0-147-generic",
+    "architecture": "x86_64",
+    "cpuModel": "AMD EPYC Processor (with IBPB)",
+    "logicalProcessors": 8,
+    "sdk": "10.0.403",
+    "installedRuntimes": [
+      "Microsoft.AspNetCore.App 10.0.0 [/root/.dotnet/shared/Microsoft.AspNetCore.App]",
+      "Microsoft.AspNetCore.App 10.0.14 [/root/.dotnet/shared/Microsoft.AspNetCore.App]",
+      "Microsoft.NETCore.App 10.0.0 [/root/.dotnet/shared/Microsoft.NETCore.App]",
+      "Microsoft.NETCore.App 10.0.14 [/root/.dotnet/shared/Microsoft.NETCore.App]"
+    ],
+    "processorCountOverride": null,
+    "serverGcEnvironmentOverride": null,
+    "cpuAffinityPinned": false
+  },
+  "assemblySha256": {
+    "before": {
+      "Inertia.Net.Benchmarks.dll": "f6d42d57800ed1c0a808a62dbe313cd721b0788defdea6fe6428976fe78fed8b",
+      "Inertia.Net.dll": "c5e50161760e931e4128c00cfff54d9260a71a4c3b8aa756b44e849e6bbe49f6"
+    },
+    "after": {
+      "Inertia.Net.Benchmarks.dll": "a90944c6f7e9d087ceb066b7e43656eb53d61799e06f3baf5aa6b36583332fb7",
+      "Inertia.Net.dll": "b18edf210cf2c3aba476ed6f4185c1393ed00b2cd9c492200b4a9500af93d131"
+    }
+  },
+  "summary": {
+    "before": {
+      "medianBytes": 15920.0,
+      "medianMicroseconds": 124.483
+    },
+    "after": {
+      "medianBytes": 0.0,
+      "medianMicroseconds": 31.8735
+    }
+  },
+  "medianPairedTimeChangePercent": -73.86922268554645,
+  "pairs": [
+    {
+      "pair": 1,
+      "beforeMedianMicroseconds": 122.684,
+      "afterMedianMicroseconds": 30.88,
+      "timeChangePercent": -74.82964363731213
+    },
+    {
+      "pair": 2,
+      "beforeMedianMicroseconds": 123.668,
+      "afterMedianMicroseconds": 34.137,
+      "timeChangePercent": -72.39625448782223
+    },
+    {
+      "pair": 3,
+      "beforeMedianMicroseconds": 114.432,
+      "afterMedianMicroseconds": 31.001,
+      "timeChangePercent": -72.90880173378076
+    },
+    {
+      "pair": 4,
+      "beforeMedianMicroseconds": 140.874,
+      "afterMedianMicroseconds": 32.746,
+      "timeChangePercent": -76.7551144994818
+    }
+  ],
+  "samples": [
+    {
+      "pair": 1,
+      "variant": "before",
+      "repetition": 1,
+      "allocatedBytes": 15920,
+      "microseconds": 122.684
+    },
+    {
+      "pair": 1,
+      "variant": "before",
+      "repetition": 2,
+      "allocatedBytes": 15920,
+      "microseconds": 135.418
+    },
+    {
+      "pair": 1,
+      "variant": "before",
+      "repetition": 3,
+      "allocatedBytes": 15920,
+      "microseconds": 114.475
+    },
+    {
+      "pair": 1,
+      "variant": "after",
+      "repetition": 1,
+      "allocatedBytes": 0,
+      "microseconds": 53.736
+    },
+    {
+      "pair": 1,
+      "variant": "after",
+      "repetition": 2,
+      "allocatedBytes": 0,
+      "microseconds": 30.88
+    },
+    {
+      "pair": 1,
+      "variant": "after",
+      "repetition": 3,
+      "allocatedBytes": 0,
+      "microseconds": 24.752
+    },
+    {
+      "pair": 2,
+      "variant": "after",
+      "repetition": 1,
+      "allocatedBytes": 0,
+      "microseconds": 52.546
+    },
+    {
+      "pair": 2,
+      "variant": "after",
+      "repetition": 2,
+      "allocatedBytes": 0,
+      "microseconds": 34.137
+    },
+    {
+      "pair": 2,
+      "variant": "after",
+      "repetition": 3,
+      "allocatedBytes": 0,
+      "microseconds": 25.589
+    },
+    {
+      "pair": 2,
+      "variant": "before",
+      "repetition": 1,
+      "allocatedBytes": 15920,
+      "microseconds": 144.001
+    },
+    {
+      "pair": 2,
+      "variant": "before",
+      "repetition": 2,
+      "allocatedBytes": 15920,
+      "microseconds": 123.668
+    },
+    {
+      "pair": 2,
+      "variant": "before",
+      "repetition": 3,
+      "allocatedBytes": 15920,
+      "microseconds": 116.607
+    },
+    {
+      "pair": 3,
+      "variant": "before",
+      "repetition": 1,
+      "allocatedBytes": 15920,
+      "microseconds": 125.298
+    },
+    {
+      "pair": 3,
+      "variant": "before",
+      "repetition": 2,
+      "allocatedBytes": 15920,
+      "microseconds": 114.432
+    },
+    {
+      "pair": 3,
+      "variant": "before",
+      "repetition": 3,
+      "allocatedBytes": 15920,
+      "microseconds": 103.941
+    },
+    {
+      "pair": 3,
+      "variant": "after",
+      "repetition": 1,
+      "allocatedBytes": 0,
+      "microseconds": 52.716
+    },
+    {
+      "pair": 3,
+      "variant": "after",
+      "repetition": 2,
+      "allocatedBytes": 0,
+      "microseconds": 31.001
+    },
+    {
+      "pair": 3,
+      "variant": "after",
+      "repetition": 3,
+      "allocatedBytes": 0,
+      "microseconds": 25.896
+    },
+    {
+      "pair": 4,
+      "variant": "after",
+      "repetition": 1,
+      "allocatedBytes": 0,
+      "microseconds": 54.582
+    },
+    {
+      "pair": 4,
+      "variant": "after",
+      "repetition": 2,
+      "allocatedBytes": 0,
+      "microseconds": 32.746
+    },
+    {
+      "pair": 4,
+      "variant": "after",
+      "repetition": 3,
+      "allocatedBytes": 0,
+      "microseconds": 25.597
+    },
+    {
+      "pair": 4,
+      "variant": "before",
+      "repetition": 1,
+      "allocatedBytes": 15920,
+      "microseconds": 140.874
+    },
+    {
+      "pair": 4,
+      "variant": "before",
+      "repetition": 2,
+      "allocatedBytes": 15920,
+      "microseconds": 179.279
+    },
+    {
+      "pair": 4,
+      "variant": "before",
+      "repetition": 3,
+      "allocatedBytes": 15920,
+      "microseconds": 137.304
+    }
+  ]
+}

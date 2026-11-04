@@ -1093,6 +1093,42 @@ The changes, in the order they were measured:
 What remains per request: the `InertiaResult`, the prop entry list, `Utf8JsonWriter`, the props walker, the `sharedProps` list,
 the metadata paths that the page actually emits, and boxed value-type results of lazy props.
 
+## Safe integer DOM serialization — 2026-11-04
+
+The standalone `--bigint-dom-probe` writes an already-parsed `JsonElement` array containing 500 safe integers through
+`BigIntegerConverters.WriteElement`. It reuses one 4 KiB output buffer and JSON writer, warms up for 1,000 operations, then
+records three samples of 5,000 operations per child process. Four before/after pairs alternate execution order, giving twelve
+samples per variant. Every sample verifies identical output. JSON parsing, buffer construction and reporting are outside the
+measurement; allocation uses the synchronous thread's `GC.GetAllocatedBytesForCurrentThread` counter.
+
+| Workload | Before B/op | After B/op | Before µs/op | After µs/op | Median paired time change |
+|---|---:|---:|---:|---:|---:|
+| 500 safe integer DOM tokens, reused writer | 15,920 | 0 | 124.483 | 31.874 | −73.9% |
+
+Times are absolute medians; the paired change is the median of the four within-pair ratios of each child's median. The shortcut
+avoids `GetRawText` and `BigInteger.TryParse` for safe `Int64` tokens, while still writing their original JSON token. Regression
+tests cover both safe boundaries, negative zero, unsafe integers, decimals and exponent notation. The optimized path leaves
+decimal and exponent tokens unchanged rather than rounding them through a `double`.
+
+These four pairs are a smaller check than the 32-round measurements elsewhere in this report, with no confidence interval and
+no CPU affinity. They establish the allocation saving for this reused-buffer DOM fixture, not a general rendering speed-up,
+HTTP throughput, cold-start allocation or performance for unsafe integers and typed numeric props. Builds, tests and other
+repository probes were paused during these timed pairs; virtual-host scheduling and frequency remain uncontrolled.
+
+Environment: Ubuntu 24.04.5, Linux 6.8.0-147, x64 virtual machine reporting an AMD EPYC processor and eight logical CPUs,
+SDK 10.0.403, net10.0 runtime configuration, no processor-count or GC environment overrides. The before converter source is
+`79e83fd:src/Inertia.Net/BigIntegerConverters.cs`; the after source is `3258666:src/Inertia.Net/BigIntegerConverters.cs`.
+Both builds use the same DOM probe source; other core and benchmark changes outside this isolated path are not exercised.
+The [raw samples and summary](results/2026-11-review-bigint) include assembly SHA-256 hashes, environment and all pair results.
+
+To reproduce one variant, build the current benchmark sources with the chosen converter source, then run from the repository
+root. Use separate output directories for the before and after builds, and alternate their processes for the paired comparison.
+
+```sh
+dotnet build tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj -c Release -warnaserror
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --bigint-dom-probe
+```
+
 ## Notes for apps
 
 Most per-request allocation in a real handler is the props themselves (see "Build 20 props"), not the render.
