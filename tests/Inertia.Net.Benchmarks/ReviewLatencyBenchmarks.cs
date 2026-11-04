@@ -12,6 +12,7 @@ public class ReviewLatencyBenchmarks
     private readonly CacheWriteBenchmarks _smallCache = new() { PayloadBytes = 1024 };
     private readonly CacheWriteBenchmarks _largeCache = new() { PayloadBytes = 1048576 };
     private readonly DictionaryPropsBenchmarks _dictionary = new() { Count = 1000 };
+    private readonly DictionaryPropsBenchmarks _guidDictionary = new() { Count = 500 };
     private readonly SemaphoreSlim _backend = new(4);
     private ServiceProvider _services = null!;
     private DefaultHttpContext _context = null!;
@@ -35,6 +36,7 @@ public class ReviewLatencyBenchmarks
         _smallCache.Setup();
         _largeCache.Setup();
         _dictionary.Setup();
+        _guidDictionary.Setup();
         _services = (ServiceProvider)BenchApp.CreateServices();
         _context = BenchApp.CreateContext(_services, "/users", (InertiaHeaders.Inertia, "true"));
         _nested20 = Nested(20);
@@ -59,6 +61,7 @@ public class ReviewLatencyBenchmarks
     [Benchmark] public void ReferenceSerialize() => _render.PlainSerialize();
     [Benchmark] public byte[] CacheWrite1KiB() => _smallCache.CreateEntry();
     [Benchmark] public byte[] CacheWrite1MiB() => _largeCache.CreateEntry();
+    [Benchmark] public Task GuidKeys500() => _guidDictionary.GuidKeys();
     [Benchmark] public Task IntegerKeys1000() => _dictionary.IntegerKeys();
     [Benchmark] public Task Nested20() => Execute(_nested20);
     [Benchmark] public Task Nested2000() => Execute(_nested2000);
@@ -162,6 +165,7 @@ public class ReviewLatencyBenchmarks
         _smallCache.Cleanup();
         _largeCache.Cleanup();
         _dictionary.Cleanup();
+        _guidDictionary.Cleanup();
         _backend.Dispose();
     }
 }

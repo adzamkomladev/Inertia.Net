@@ -11,7 +11,7 @@ internal static class PairedLatencyProbe
 {
     private static readonly string[] Methods =
     [
-        "Json20", "Partial2Of20", "Html20", "ReferenceSerialize", "CacheWrite1KiB", "CacheWrite1MiB", "IntegerKeys1000",
+        "Json20", "Partial2Of20", "Html20", "ReferenceSerialize", "CacheWrite1KiB", "CacheWrite1MiB", "IntegerKeys1000", "GuidKeys500",
         "ConstructProps", "Nested20", "Nested2000", "ParallelCacheHit1", "ParallelCacheHit32", "TinyParallel20", "YieldParallel3", "ColdBurst32",
     ];
 

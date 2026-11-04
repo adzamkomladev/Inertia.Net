@@ -36,6 +36,14 @@ public sealed class DictionaryKeyFormattingTests
         Check(harness, new Dictionary<KeyFlags, int> { [KeyFlags.First | KeyFlags.Second] = 1, [(KeyFlags)64] = 2 });
     }
 
+    [Fact]
+    public void A_declared_object_key_uses_its_configured_converter()
+    {
+        var harness = new Harness(configureServices: services => services.ConfigureHttpJsonOptions(options =>
+            options.SerializerOptions.Converters.Add(new ObjectKeyConverter())));
+        Check(harness, new ReadOnlyDictionary<object, int>(new Dictionary<object, int> { ["name"] = 1 }));
+    }
+
     private static void Check(Harness harness, IDictionary dictionary)
     {
         var writer = harness.Services.GetRequiredService<InertiaPageWriter>();
@@ -52,6 +60,13 @@ public sealed class DictionaryKeyFormattingTests
         public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetString();
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options) => writer.WriteStringValue(value);
         public override void WriteAsPropertyName(Utf8JsonWriter writer, string value, JsonSerializerOptions options) => writer.WritePropertyName("custom_" + value);
+    }
+
+    private sealed class ObjectKeyConverter : JsonConverter<object>
+    {
+        public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => throw new NotSupportedException();
+        public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options) => throw new NotSupportedException();
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, object value, JsonSerializerOptions options) => writer.WritePropertyName("object_" + value);
     }
 
     private sealed class GuidKeyConverter : JsonConverter<Guid>

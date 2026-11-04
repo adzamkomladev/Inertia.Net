@@ -185,6 +185,13 @@ inertia PUT /users/1
 status_is 303
 header_is Location /dashboard
 
+# Typed dictionaries retain key formatting through generated metadata, including read-only date keys.
+inertia GET /dictionary-keys
+status_is 200
+has '"00000000-0000-0000-0000-000000000000":{'
+has '"2026-11-04T00:00:00Z":{'
+has '"extra":2'
+
 # 9. Validation failure (AddValidation + WithInertiaValidation): redirect back, errors on the next page, consumed once.
 inertia POST /users -H 'Content-Type: application/json' -H "Referer: $BASE/users/create" --data '{"name":""}'
 status_is 302

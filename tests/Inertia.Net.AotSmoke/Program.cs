@@ -106,6 +106,13 @@ app.MapGet("/cursor", async (CursorRequest request, CancellationToken ct) =>
     return Render("Cursor", new InertiaProps { ["feed"] = Scroll(page) });
 });
 
+app.MapGet("/dictionary-keys", () => Render("DictionaryKeys", new InertiaProps
+{
+    ["guids"] = new Dictionary<Guid, SerializationRow> { [Guid.Empty] = new("guid", Prop(() => 1)) },
+    ["dates"] = new System.Collections.ObjectModel.ReadOnlyDictionary<DateTime, SerializationRow>(
+        new Dictionary<DateTime, SerializationRow> { [new(2026, 11, 4, 0, 0, 0, DateTimeKind.Utc)] = new("date", Prop(() => 2)) }),
+}));
+
 app.MapGet("/users/create", () => Render("Users/Create"));
 
 // Replacing and removing cached props.
@@ -227,6 +234,8 @@ public sealed class AliasItem
 }
 
 [JsonSerializable(typeof(AliasInput))]
+[JsonSerializable(typeof(Dictionary<Guid, SerializationRow>))]
+[JsonSerializable(typeof(System.Collections.ObjectModel.ReadOnlyDictionary<DateTime, SerializationRow>))]
 [JsonSerializable(typeof(HomePage))]
 [JsonSerializable(typeof(Stat))]
 [JsonSerializable(typeof(Stat[]))]

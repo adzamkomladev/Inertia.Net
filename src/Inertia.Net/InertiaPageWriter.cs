@@ -830,7 +830,10 @@ internal sealed class InertiaPageWriter
     {
         var keys = new string[dictionary.Count];
         var i = 0;
-        if (info.KeyType == typeof(string))
+        var keyType = info.KeyType;
+        var builtIn = keyType is not null
+            && SerializerOptions.GetTypeInfo(keyType).Converter.GetType().Assembly == typeof(JsonSerializer).Assembly;
+        if (builtIn && keyType == typeof(string))
         {
             var policy = SerializerOptions.DictionaryKeyPolicy;
             foreach (DictionaryEntry entry in dictionary)
@@ -842,28 +845,53 @@ internal sealed class InertiaPageWriter
             return keys;
         }
 
-        // Non-string keys (numbers, enums, Guids, ...) are formatted by the serializer itself: each key is written through a
-        // one-entry dictionary of the same type, so converters, enum names and the key policy all match a plain serialization.
-        var probe = info.CreateObject?.Invoke() as IDictionary;
-        var defaultValue = info.ElementType is { IsValueType: true } valueType && Nullable.GetUnderlyingType(valueType) is null
-            ? _defaultValues.GetOrAdd(valueType, CreateDefaultValue) : null;
+        if (builtIn && (keyType == typeof(int) || keyType == typeof(long) || keyType == typeof(Guid)))
+        {
+            foreach (DictionaryEntry entry in dictionary)
+            {
+                keys[i++] = entry.Key switch
+                {
+                    int number => number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    long number => number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    Guid guid => guid.ToString("D"),
+                    _ => throw new InvalidOperationException("The dictionary key does not match its JSON contract."),
+                };
+            }
+
+            return keys;
+        }
+
+        // The default object converter dispatches property names through the runtime key converter, preserving enum naming
+        // and custom converters without constructing a probe dictionary. This also supports read-only dictionaries.
+        var converter = (JsonConverter<object>)(keyType == typeof(object)
+            ? SerializerOptions.GetTypeInfo(typeof(object)) : InertiaJsonContext.Default.GetTypeInfo(typeof(object))!).Converter;
+        IDictionary? probe = null;
         using var buffer = new PooledBufferWriter(256);
         using var writer = new Utf8JsonWriter(buffer);
         foreach (DictionaryEntry entry in dictionary)
         {
-            if (probe is null)
-            {
-                keys[i++] = Convert.ToString(entry.Key, System.Globalization.CultureInfo.InvariantCulture) ?? "";
-                continue;
-            }
-
-            probe.Clear();
-            probe.Add(entry.Key, defaultValue);
             buffer.Reset();
             writer.Reset(buffer);
-            JsonSerializer.Serialize(writer, probe, info);
+            if (entry.Key.GetType() == keyType || keyType == typeof(object))
+            {
+                writer.WriteStartObject();
+                converter.WriteAsPropertyName(writer, entry.Key, SerializerOptions);
+                writer.WriteNullValue();
+                writer.WriteEndObject();
+            }
+            else
+            {
+                // A converter on a declared base key type must see that type, rather than the derived runtime key type.
+                probe ??= info.CreateObject?.Invoke() as IDictionary
+                    ?? throw new NotSupportedException("A dictionary without a mutable factory cannot traverse derived key types. Materialize a mutable dictionary before using nested props.");
+                var defaultValue = info.ElementType is { IsValueType: true } valueType && Nullable.GetUnderlyingType(valueType) is null
+                    ? _defaultValues.GetOrAdd(valueType, CreateDefaultValue) : null;
+                probe.Clear();
+                probe.Add(entry.Key, defaultValue);
+                JsonSerializer.Serialize(writer, probe, info);
+            }
+
             writer.Flush();
-            // The probe is {"key":value}: the second token is the key.
             var reader = new Utf8JsonReader(buffer.WrittenMemory.Span);
             reader.Read();
             reader.Read();
