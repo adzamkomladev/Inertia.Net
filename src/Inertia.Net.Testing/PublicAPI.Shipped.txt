@@ -1,0 +1,86 @@
+#nullable enable
+Inertia.Net.Testing.AssertableInertia
+Inertia.Net.Testing.AssertableInertia.AssertableInertia(Inertia.Net.Testing.InertiaPage! page) -> void
+Inertia.Net.Testing.AssertableInertia.Component(string! expected) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasDeferred(string! group, string! path) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasDeferred(string! path) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasError(string! field, string? message = null, string? bag = null) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasErrorBag(string! bag) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasErrors(string? bag = null) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasFlash(string! key) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasFlash(string! key, object? expected) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasLive(string! path) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasLive(string! path, string! channel, string! event) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasScroll(string! path) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.HasScroll(string! path, object? currentPage, object? nextPage) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.MissingFlash(string! key) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.Status(int expected) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.Url(string! expected) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableInertia.Version(string! expected) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableJson
+Inertia.Net.Testing.AssertableJsonBase<TSelf>
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Count(string! key, int expected) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.CountBetween(string! key, int min, int max) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Dump() -> string!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Each(System.Action<Inertia.Net.Testing.AssertableJson!>! scope) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Etc() -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.First(System.Action<Inertia.Net.Testing.AssertableJson!>! scope) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Has(string! key) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Has(string! key, System.Action<Inertia.Net.Testing.AssertableJson!>! scope) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Has(string! key, int count) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Has(string! key, int count, System.Action<Inertia.Net.Testing.AssertableJson!>! firstItemScope) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.HasAll(params string![]! keys) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.HasAny(params string![]! keys) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Interacted() -> void
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Missing(string! key) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.MissingAll(params string![]! keys) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Where(string! key, System.Func<System.Text.Json.Nodes.JsonNode?, bool>! predicate) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.Where(string! key, object? expected) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.WhereAllType(System.Collections.Generic.IReadOnlyDictionary<string!, string!>! types) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.WhereContains(string! key, params object?[]! expected) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.WhereNot(string! key, object? unexpected) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.WhereNotNull(string! key) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.WhereNull(string! key) -> TSelf!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.WhereType(string! key, string! types) -> TSelf!
+Inertia.Net.Testing.InertiaAssertionException
+Inertia.Net.Testing.InertiaAssertionException.InertiaAssertionException(string! message) -> void
+Inertia.Net.Testing.InertiaClientExtensions
+Inertia.Net.Testing.InertiaPage
+Inertia.Net.Testing.InertiaPage.ClearHistory.get -> bool
+Inertia.Net.Testing.InertiaPage.Component.get -> string!
+Inertia.Net.Testing.InertiaPage.DeepMergeProps.get -> string![]!
+Inertia.Net.Testing.InertiaPage.DeferredProps.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string![]!>!
+Inertia.Net.Testing.InertiaPage.EncryptHistory.get -> bool
+Inertia.Net.Testing.InertiaPage.Flash.get -> System.Text.Json.Nodes.JsonObject!
+Inertia.Net.Testing.InertiaPage.HasProp(string! dotPath) -> bool
+Inertia.Net.Testing.InertiaPage.LiveProps.get -> System.Text.Json.Nodes.JsonObject!
+Inertia.Net.Testing.InertiaPage.LoadDeferredPropsAsync(System.Net.Http.HttpClient! client, params string![]! groups) -> System.Threading.Tasks.Task<Inertia.Net.Testing.InertiaPage!>!
+Inertia.Net.Testing.InertiaPage.LoadNextPageAsync(System.Net.Http.HttpClient! client, string! path) -> System.Threading.Tasks.Task<Inertia.Net.Testing.InertiaPage!>!
+Inertia.Net.Testing.InertiaPage.LoadPreviousPageAsync(System.Net.Http.HttpClient! client, string! path) -> System.Threading.Tasks.Task<Inertia.Net.Testing.InertiaPage!>!
+Inertia.Net.Testing.InertiaPage.MatchPropsOn.get -> string![]!
+Inertia.Net.Testing.InertiaPage.MergeProps.get -> string![]!
+Inertia.Net.Testing.InertiaPage.OnceProps.get -> System.Text.Json.Nodes.JsonObject!
+Inertia.Net.Testing.InertiaPage.PrependProps.get -> string![]!
+Inertia.Net.Testing.InertiaPage.PreserveBigIntegers.get -> bool
+Inertia.Net.Testing.InertiaPage.PreserveFragment.get -> bool
+Inertia.Net.Testing.InertiaPage.Prop(string! dotPath) -> System.Text.Json.Nodes.JsonNode?
+Inertia.Net.Testing.InertiaPage.PropBigInteger(string! dotPath) -> System.Numerics.BigInteger
+Inertia.Net.Testing.InertiaPage.Props.get -> System.Text.Json.Nodes.JsonObject!
+Inertia.Net.Testing.InertiaPage.Raw.get -> System.Text.Json.Nodes.JsonObject!
+Inertia.Net.Testing.InertiaPage.ReloadExceptAsync(System.Net.Http.HttpClient! client, params string![]! except) -> System.Threading.Tasks.Task<Inertia.Net.Testing.InertiaPage!>!
+Inertia.Net.Testing.InertiaPage.ReloadOnlyAsync(System.Net.Http.HttpClient! client, params string![]! only) -> System.Threading.Tasks.Task<Inertia.Net.Testing.InertiaPage!>!
+Inertia.Net.Testing.InertiaPage.RescuedProps.get -> string![]!
+Inertia.Net.Testing.InertiaPage.ScrollProps.get -> System.Text.Json.Nodes.JsonObject!
+Inertia.Net.Testing.InertiaPage.SharedProps.get -> string![]!
+Inertia.Net.Testing.InertiaPage.StatusCode.get -> int
+Inertia.Net.Testing.InertiaPage.Url.get -> string!
+Inertia.Net.Testing.InertiaPage.Version.get -> string!
+Inertia.Net.Testing.InertiaXsrfExtensions
+static Inertia.Net.Testing.InertiaClientExtensions.AssertInertiaAsync(this System.Net.Http.HttpResponseMessage! response, System.Action<Inertia.Net.Testing.AssertableInertia!>? assert = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Inertia.Net.Testing.InertiaPage!>!
+static Inertia.Net.Testing.InertiaClientExtensions.GetInertiaPageAsync(this System.Net.Http.HttpResponseMessage! response, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Inertia.Net.Testing.InertiaPage!>!
+static Inertia.Net.Testing.InertiaClientExtensions.InertiaGetAsync(this System.Net.Http.HttpClient! client, string! url, string? version = null, System.Action<System.Net.Http.HttpRequestMessage!>? configure = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage!>!
+static Inertia.Net.Testing.InertiaClientExtensions.InertiaRequestAsync(this System.Net.Http.HttpClient! client, System.Net.Http.HttpMethod! method, string! url, System.Net.Http.HttpContent? content = null, string? version = null, System.Action<System.Net.Http.HttpRequestMessage!>? configure = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage!>!
+static Inertia.Net.Testing.InertiaPage.ParseAsync(System.Net.Http.HttpResponseMessage! response, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Inertia.Net.Testing.InertiaPage!>!
+static Inertia.Net.Testing.InertiaXsrfExtensions.GetXsrfToken(this System.Net.Http.HttpResponseMessage! response, string! cookieName = "XSRF-TOKEN") -> string!
+static Inertia.Net.Testing.InertiaXsrfExtensions.WithXsrfToken(this System.Net.Http.HttpRequestMessage! request, System.Net.Http.HttpResponseMessage! pageResponse, string! cookieName = "XSRF-TOKEN", string! headerName = "X-XSRF-TOKEN") -> System.Net.Http.HttpRequestMessage!
+static Inertia.Net.Testing.InertiaXsrfExtensions.WithXsrfToken(this System.Net.Http.HttpRequestMessage! request, string! token, string! headerName = "X-XSRF-TOKEN") -> System.Net.Http.HttpRequestMessage!

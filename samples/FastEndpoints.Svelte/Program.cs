@@ -45,7 +45,7 @@ app.MapInertiaDevTools();
 // Validation failures of Inertia requests become a redirect back with the errors (FluentValidation validators work as usual).
 app.UseFastEndpoints(c =>
 {
-    c.UseInertia(ep => ep.AllowAnonymous());
+    c.ConfigureInertia(ep => ep.AllowAnonymous());
     c.Serializer.Options.TypeInfoResolverChain.Insert(0, AppJsonContext.Default);
     c.Binding.ReflectionCache.AddFromFastEndpointsSvelte(); // source-generated request DTO binding data (no expression compilation)
 });

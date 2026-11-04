@@ -18,7 +18,7 @@ var app = builder.Build();
 app.UseStaticFiles();
 app.UseInertia();
 app.UseInertiaAntiforgery();   // CSRF: XSRF-TOKEN cookie, 419 for mutations without a valid token
-app.UseFastEndpoints(c => c.UseInertia(ep => ep.AllowAnonymous()));   // validation redirect + Precognition
+app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));   // validation redirect + Precognition
 ```
 
 ```csharp
@@ -31,7 +31,7 @@ public sealed class UsersEndpoint : EndpointWithoutRequest
 ```
 
 - An endpoint that implements `ExecuteAsync` can return `Render(...)`, `Back()` or `Location(...)` directly (`Endpoint<TReq, InertiaResult>`): FastEndpoints sends any `IResult`.
-- `c.UseInertia()` turns validation failures of Inertia requests (not GET) into a redirect back with the errors (JSON names, `X-Inertia-Error-Bag` honoured). Other requests keep the normal 400. It sets `c.Endpoints.Configurator`: pass your own configuration as the argument.
+- `c.ConfigureInertia()` turns validation failures of Inertia requests (not GET) into a redirect back with the errors (JSON names, `X-Inertia-Error-Bag` honoured). Other requests keep the normal 400. An existing `c.Endpoints.Configurator` runs first, followed by the Inertia setup and the optional callback.
 - It also answers Precognition requests (`Precognition: true`) with 204 or 422 `{ message, errors }`, without running the handler.
 - Native AOT: register endpoints with the FastEndpoints source generator, `AddFastEndpoints(new[] { DiscoveredTypes.All })`.
 

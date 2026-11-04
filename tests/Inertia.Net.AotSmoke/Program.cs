@@ -41,12 +41,16 @@ builder.Services.AddInertiaErrorPages();
 var app = builder.Build();
 app.UseInertiaErrorPages();
 app.UseInertia();
+var configuredFastEndpoints = 0;
 app.UseFastEndpoints(c =>
 {
-    c.UseInertia();
+    c.Endpoints.Configurator = _ => Interlocked.Increment(ref configuredFastEndpoints);
+    c.ConfigureInertia();
     c.Serializer.Options.TypeInfoResolverChain.Insert(0, AppJsonContext.Default);
     c.Binding.ReflectionCache.AddFromInertiaNetAotSmoke();
 });
+if (configuredFastEndpoints == 0)
+    throw new InvalidOperationException("The existing FastEndpoints configurator did not run.");
 
 app.MapGet("/throw", (Func<IResult>)(() => throw new InvalidOperationException("smoke")));
 app.MapGet("/healthz", () => "ok");

@@ -1,0 +1,36 @@
+#nullable enable
+Inertia.Net.Mvc.InertiaControllerExtensions
+Inertia.Net.Mvc.InertiaModelStateFilter
+Inertia.Net.Mvc.InertiaModelStateFilter.InertiaModelStateFilter() -> void
+Inertia.Net.Mvc.InertiaModelStateFilter.OnActionExecutionAsync(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext! context, Microsoft.AspNetCore.Mvc.Filters.ActionExecutionDelegate! next) -> System.Threading.Tasks.Task!
+Inertia.Net.Mvc.InertiaMvcExtensions
+Inertia.Net.Mvc.InertiaMvcOptions
+Inertia.Net.Mvc.InertiaMvcOptions.ComponentResolver.get -> System.Func<Microsoft.AspNetCore.Mvc.ControllerContext!, string!>?
+Inertia.Net.Mvc.InertiaMvcOptions.ComponentResolver.set -> void
+Inertia.Net.Mvc.InertiaMvcOptions.InertiaMvcOptions() -> void
+Inertia.Net.Mvc.InertiaMvcOptions.UseRazorRootView(string! view = "App") -> Inertia.Net.Mvc.InertiaMvcOptions!
+Inertia.Net.Mvc.InertiaMvcOptions.UseTempDataStateStore() -> Inertia.Net.Mvc.InertiaMvcOptions!
+Inertia.Net.Mvc.TagHelpers.InertiaHeadTagHelper
+Inertia.Net.Mvc.TagHelpers.InertiaHeadTagHelper.InertiaHeadTagHelper() -> void
+Inertia.Net.Mvc.TagHelpers.InertiaHeadTagHelper.ViewContext.get -> Microsoft.AspNetCore.Mvc.Rendering.ViewContext!
+Inertia.Net.Mvc.TagHelpers.InertiaHeadTagHelper.ViewContext.set -> void
+Inertia.Net.Mvc.TagHelpers.InertiaTagHelper
+Inertia.Net.Mvc.TagHelpers.InertiaTagHelper.InertiaTagHelper() -> void
+Inertia.Net.Mvc.TagHelpers.InertiaTagHelper.ViewContext.get -> Microsoft.AspNetCore.Mvc.Rendering.ViewContext!
+Inertia.Net.Mvc.TagHelpers.InertiaTagHelper.ViewContext.set -> void
+Inertia.Net.Mvc.TagHelpers.ViteReactRefreshTagHelper
+Inertia.Net.Mvc.TagHelpers.ViteReactRefreshTagHelper.ViewContext.get -> Microsoft.AspNetCore.Mvc.Rendering.ViewContext!
+Inertia.Net.Mvc.TagHelpers.ViteReactRefreshTagHelper.ViewContext.set -> void
+Inertia.Net.Mvc.TagHelpers.ViteReactRefreshTagHelper.ViteReactRefreshTagHelper(Inertia.Net.ViteAssets! vite) -> void
+Inertia.Net.Mvc.TagHelpers.ViteTagHelper
+Inertia.Net.Mvc.TagHelpers.ViteTagHelper.Entry.get -> string!
+Inertia.Net.Mvc.TagHelpers.ViteTagHelper.Entry.set -> void
+Inertia.Net.Mvc.TagHelpers.ViteTagHelper.ViewContext.get -> Microsoft.AspNetCore.Mvc.Rendering.ViewContext!
+Inertia.Net.Mvc.TagHelpers.ViteTagHelper.ViewContext.set -> void
+Inertia.Net.Mvc.TagHelpers.ViteTagHelper.ViteTagHelper(Inertia.Net.ViteAssets! vite) -> void
+override Inertia.Net.Mvc.TagHelpers.InertiaHeadTagHelper.ProcessAsync(Microsoft.AspNetCore.Razor.TagHelpers.TagHelperContext! context, Microsoft.AspNetCore.Razor.TagHelpers.TagHelperOutput! output) -> System.Threading.Tasks.Task!
+override Inertia.Net.Mvc.TagHelpers.InertiaTagHelper.ProcessAsync(Microsoft.AspNetCore.Razor.TagHelpers.TagHelperContext! context, Microsoft.AspNetCore.Razor.TagHelpers.TagHelperOutput! output) -> System.Threading.Tasks.Task!
+override Inertia.Net.Mvc.TagHelpers.ViteReactRefreshTagHelper.Process(Microsoft.AspNetCore.Razor.TagHelpers.TagHelperContext! context, Microsoft.AspNetCore.Razor.TagHelpers.TagHelperOutput! output) -> void
+override Inertia.Net.Mvc.TagHelpers.ViteTagHelper.Process(Microsoft.AspNetCore.Razor.TagHelpers.TagHelperContext! context, Microsoft.AspNetCore.Razor.TagHelpers.TagHelperOutput! output) -> void
+static Inertia.Net.Mvc.InertiaControllerExtensions.InertiaView(this Microsoft.AspNetCore.Mvc.ControllerBase! controller, object? props = null) -> Inertia.Net.InertiaResult!
+static Inertia.Net.Mvc.InertiaMvcExtensions.AddInertiaMvc(this Microsoft.Extensions.DependencyInjection.IMvcBuilder! builder, System.Action<Inertia.Net.Mvc.InertiaMvcOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IMvcBuilder!

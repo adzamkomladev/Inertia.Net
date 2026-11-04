@@ -59,7 +59,7 @@ public static class InertiaValidationEndpointExtensions
 }
 
 /// <summary>The endpoint filter behind <see cref="InertiaValidationEndpointExtensions.WithInertiaValidation"/>.</summary>
-internal static class InertiaValidationFilter
+internal static partial class InertiaValidationFilter
 {
     public static JsonNamingPolicy? NamingPolicy(IServiceProvider services) =>
         services.GetService<InertiaPageWriter>()?.SerializerOptions.PropertyNamingPolicy;
@@ -74,8 +74,11 @@ internal static class InertiaValidationFilter
                 throw new InvalidOperationException("WithInertiaValidation() needs services.AddValidation(). Add it at startup, or remove the call.");
             }
 
-            context.ApplicationServices.GetService<ILoggerFactory>()?.CreateLogger("Inertia.Net.InertiaValidation")
-                .LogDebug("No validatable parameters were found for endpoint {Endpoint}.", context.MethodInfo.Name);
+            var logger = context.ApplicationServices.GetService<ILoggerFactory>()?.CreateLogger("Inertia.Net.InertiaValidation");
+            if (logger?.IsEnabled(LogLevel.Debug) == true)
+            {
+                LogNoValidatableParameters(logger, context.MethodInfo.Name);
+            }
         }
         var naming = NamingPolicy(context.ApplicationServices);
         var schema = BodySchema(context.MethodInfo, context.ApplicationServices);
@@ -262,4 +265,7 @@ internal static class InertiaValidationFilter
 
         return validateContext?.ValidationErrors is { Count: > 0 } errors ? errors : null;
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "No validatable parameters were found for endpoint {Endpoint}.")]
+    private static partial void LogNoValidatableParameters(ILogger logger, string endpoint);
 }

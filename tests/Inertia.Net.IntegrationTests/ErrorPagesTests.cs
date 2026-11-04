@@ -297,6 +297,7 @@ public abstract class ErrorPagesTests<THost> where THost : IConformanceHost
 
 public sealed class MinimalApiErrorPagesTests : ErrorPagesTests<MinimalApiHost>;
 public sealed class MvcErrorPagesTests : ErrorPagesTests<MvcHost>;
+[Collection("FastEndpoints")]
 public sealed class FastEndpointsErrorPagesTests : ErrorPagesTests<FastEndpointsHost>;
 
 public sealed class ApiExceptionHandler : IExceptionHandler

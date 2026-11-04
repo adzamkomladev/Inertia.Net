@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace Inertia.Net;
 
 /// <summary>Bounded, host-owned refresh work. Response completion only enqueues; it never awaits a loader or renderer.</summary>
-internal sealed class InertiaRefreshQueue(InertiaMetrics metrics, ILogger<InertiaRefreshQueue> logger) : BackgroundService
+internal sealed partial class InertiaRefreshQueue(InertiaMetrics metrics, ILogger<InertiaRefreshQueue> logger) : BackgroundService
 {
     private readonly Channel<RefreshWork> _work = Channel.CreateBounded<RefreshWork>(new BoundedChannelOptions(64)
     {
@@ -25,7 +25,7 @@ internal sealed class InertiaRefreshQueue(InertiaMetrics metrics, ILogger<Inerti
             try
             {
                 metrics.RecordDroppedRefresh(work.Kind);
-                logger.LogWarning("Dropped an Inertia {Kind} cache refresh because the background queue is full or stopping.", work.Kind);
+                LogDropped(logger, work.Kind);
             }
             finally
             {
@@ -52,7 +52,7 @@ internal sealed class InertiaRefreshQueue(InertiaMetrics metrics, ILogger<Inerti
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "An Inertia {Kind} background cache refresh failed.", work.Kind);
+                    LogFailed(logger, ex, work.Kind);
                 }
                 finally
                 {
@@ -80,6 +80,12 @@ internal sealed class InertiaRefreshQueue(InertiaMetrics metrics, ILogger<Inerti
         _work.Writer.TryComplete();
         await base.StopAsync(cancellationToken);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Dropped an Inertia {Kind} cache refresh because the background queue is full or stopping.")]
+    private static partial void LogDropped(ILogger logger, string kind);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "An Inertia {Kind} background cache refresh failed.")]
+    private static partial void LogFailed(ILogger logger, Exception exception, string kind);
 }
 
 internal sealed record RefreshWork(Func<CancellationToken, Task> Run, Action Release, string Kind);

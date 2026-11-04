@@ -22,7 +22,7 @@ builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddInertia(o =>
 {
     o.Share("appName", "Inertia.Net");
-    o.Share("version", "1.6.2");
+    o.Share("version", "1.6.3");
     o.Share("baseUrl", ctx => $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}");
     o.Vite.Prefetch = VitePrefetch.Waterfall;
     o.Pages.Directory = "ClientApp/pages";

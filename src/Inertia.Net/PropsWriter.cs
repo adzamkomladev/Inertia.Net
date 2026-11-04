@@ -17,7 +17,7 @@ internal readonly record struct PropEntry(string Key, object? Value, Type Type, 
 /// writes the props to JSON and collects the page metadata. Used by one render at a time: the page writer pools instances, and
 /// <see cref="Begin"/> and <see cref="Clear"/> bracket each render.
 /// </summary>
-internal sealed class PropsWriter
+internal sealed partial class PropsWriter
 {
     private const int MaxRetainedPath = 1024;
 
@@ -55,7 +55,7 @@ internal sealed class PropsWriter
     /// Starts a render into <paramref name="buffer"/> and returns its JSON writer, kept for the next render with the same options. With
     /// <paramref name="plan"/> the walk starts the <see cref="InertiaProp.Parallel"/> loaders first.
     /// </summary>
-    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, CancellationToken cancellationToken, bool plan)
+    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, bool plan, CancellationToken cancellationToken)
     {
         var writer = htmlSafe
             ? _htmlWriter ??= new Utf8JsonWriter(buffer, _owner.HtmlWriterOptions)
@@ -807,7 +807,7 @@ internal sealed class PropsWriter
     private (bool Resolved, object? Value) Rescue(Exception exception)
     {
         var path = new string(Path);
-        _owner.Logger.LogError(exception, "Inertia prop '{Path}' failed to resolve and was rescued.", path);
+        LogRescued(_owner.Logger, exception, path);
         ((_uncommon ??= new()).Rescued ??= []).Add(path);
         _owner.Metrics.RecordRescued();
         return (false, null);
@@ -821,6 +821,9 @@ internal sealed class PropsWriter
             throw new OperationCanceledException("A parallel prop loader failed.");
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Inertia prop '{Path}' failed to resolve and was rescued.")]
+    private static partial void LogRescued(ILogger logger, Exception exception, string path);
 
     private enum Inclusion
     {

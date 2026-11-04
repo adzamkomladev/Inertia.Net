@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
@@ -91,8 +92,8 @@ public sealed partial class InertiaPage
     /// <summary>Reads a prop as <see cref="BigInteger"/>: decodes <c>{"$bigint":"..."}</c> or a plain JSON integer.</summary>
     public BigInteger PropBigInteger(string dotPath) => Prop(dotPath) switch
     {
-        JsonObject o when o["$bigint"] is JsonValue s && s.TryGetValue<string>(out var digits) => BigInteger.Parse(digits),
-        JsonValue v when v.GetValueKind() == JsonValueKind.Number => BigInteger.Parse(v.ToJsonString()),
+        JsonObject o when o["$bigint"] is JsonValue s && s.TryGetValue<string>(out var digits) => BigInteger.Parse(digits, CultureInfo.InvariantCulture),
+        JsonValue v when v.GetValueKind() == JsonValueKind.Number => BigInteger.Parse(v.ToJsonString(), CultureInfo.InvariantCulture),
         var other => throw new InertiaAssertionException($"Property [{dotPath}] is not an integer or $bigint: {Json.Show(other)}."),
     };
 

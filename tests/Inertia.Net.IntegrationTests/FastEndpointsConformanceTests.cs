@@ -71,7 +71,7 @@ public sealed class FastEndpointsTests
         public static void ConfigureServices(IServiceCollection services) => FastEndpointsHost.ConfigureServices(services);
         public static void MapRoutes(WebApplication app) => app.UseFastEndpoints(c =>
         {
-            c.UseInertia(ep => ep.AllowAnonymous());
+            c.ConfigureInertia(ep => ep.AllowAnonymous());
             c.Serializer.Options.PropertyNamingPolicy = Prefix ? new PrefixPolicy() : JsonNamingPolicy.SnakeCaseLower;
         });
     }

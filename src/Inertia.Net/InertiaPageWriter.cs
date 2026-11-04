@@ -147,7 +147,7 @@ internal sealed class InertiaPageWriter
 
             // A component runs the planning walk until a render shows it has no Parallel() props, and again once a render meets one.
             var plan = InertiaProp.ParallelUsed && hints?.UsesParallel != false;
-            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, httpContext.RequestAborted, plan);
+            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestAborted);
 
             writer.WriteStartObject();
             writer.WriteString("component", component);

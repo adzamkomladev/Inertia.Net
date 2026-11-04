@@ -56,8 +56,24 @@ Traversed read-only dictionary contracts with derived base-type key instances ne
 fail explicitly instead of silently emitting `ToString()` keys.
 
 Checks: Release build with zero warnings/errors; all 1,491 tests passed with none skipped; seven-package pack; AOT smoke
-(including GUID and read-only date keys), docs generation/client+SSR build, and three browser suites passed. React25 and
-Vue/Svelte14 each (11 framework-specific skips each). Two paired processes each ran32 rounds; integer keys allocate9,904 B
-less per1,000 entries and GUID keys408 B less per500 rows. Ordinary render allocation is unchanged. Parallel path reporting
-adds160 B per20 completed loaders; yielding loaders show net16 B less after the entry-loop optimization. Timings, intervals,
+(including GUID and read-only date keys), docs generation/client+SSR build, and three browser suites passed. React 25 and
+Vue/Svelte 14 each (11 framework-specific skips each). Two paired processes each ran 32 rounds; integer keys allocate 9,904 B
+less per 1,000 entries and GUID keys 408 B less per 500 rows. Ordinary render allocation is unchanged. Parallel path reporting
+adds 160 B per 20 completed loaders; yielding loaders show net 16 B less after the entry-loop optimization. Timings, intervals,
 raw samples, isolated DOM/small-allocation results and limitations are recorded in the benchmark RESULTS document.
+
+## Phase 4
+
+Enabled private PublicApiAnalyzers 5.6.0, recommended analysis and build-time style checks. Six assembly packages track 781
+canonical signatures; the content-only template package has no assembly surface. No compatibility baseline or obsolete
+forwarders were added. Existing hosted-service deduplication and the Testing framework reference remain intact, with a repeated
+registration regression. Culture-invariant testing helpers have a custom-negative-sign regression.
+
+Renamed FastEndpoints Config setup to `ConfigureInertia`, preserving the previous configurator before Inertia setup and the
+optional callback afterward. FastEndpoints 8.3's getter is internal; the narrow static accessor is verified by both the regression
+and an actual Native AOT startup assertion. FastEndpoints tests share their framework's required serialized collection.
+
+Version, template package pin, docs package pin and docs header are 1.6.3. Strict build passed with zero warnings/errors, all
+1,494 tests passed with none skipped, strict pack produced seven packages and six symbol packages without analyzer leakage,
+and actual Native AOT smoke passed without IL warnings. Docs generation/client+SSR build and browser suites passed:
+React 25; Vue/Svelte 14 each with 11 framework-specific skips each. Phase 3 PR #37 merged after all CI checks succeeded.
