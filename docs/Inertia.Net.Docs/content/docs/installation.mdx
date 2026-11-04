@@ -31,7 +31,7 @@ Use the same version for every Inertia.Net package. The package version and the 
 ## Requirements
 
 - .NET 10 SDK and an `Microsoft.NET.Sdk.Web` project.
-- Node.js and npm for the frontend. Node is only needed at runtime when SSR is enabled.
+- JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js at runtime.
 - An Inertia.js v3 client: `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte`.
 
 ## Start from the template
@@ -40,10 +40,21 @@ Use the same version for every Inertia.Net package. The package version and the 
 dotnet new install Inertia.Net.Templates::1.6.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
-npm install
 ```
 
 Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+
+Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Keep Vite running and start ASP.NET Core in another terminal with `dotnet watch`. For production, run your row's build command,
+then `dotnet publish -c Release`. Keep the lockfile for the package manager you choose.
 
 ## Namespace and global usings
 

@@ -12,17 +12,26 @@ Inertia.Net with MVC controllers, a Razor root view and a Vue 3 client (`@inerti
 
 ## Run (development, hot reload)
 
+Install dependencies and start Vite using npm, Bun, pnpm or Yarn:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Keep Vite running in one terminal. In a second terminal:
+
 ```bash
-npm install
-npm run dev          # Vite on http://localhost:5174
 dotnet run           # backend on http://localhost:5102 (Development, uses wwwroot/hot)
 ```
 
 ## Run (production build)
 
+Run the `build` script from your package-manager row above, then start the backend:
+
 ```bash
-npm install
-npm run build        # vue-tsc, then wwwroot/build + manifest
 dotnet run -c Release --no-launch-profile --urls http://localhost:5102
 ```
 
@@ -30,7 +39,9 @@ dotnet run -c Release --no-launch-profile --urls http://localhost:5102
 
 ## E2E
 
+These repository verification commands use the committed npm lockfile; they do not constrain your app's package manager.
+
 ```bash
-cd ../../tests/e2e && npm install && npx playwright install chromium
+cd ../../tests/e2e && npm ci && npx playwright install chromium
 SAMPLE=vue npx playwright test
 ```

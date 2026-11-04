@@ -9,23 +9,34 @@ Inertia.Net with Minimal APIs and a React 19 client (`@inertiajs/react` v3, `@in
 
 ## Run (development, hot reload)
 
+Install dependencies and start Vite using npm, Bun, pnpm or Yarn:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Keep Vite running in one terminal. In a second terminal:
+
 ```bash
-npm install
-npm run dev          # Vite on http://localhost:5173
 dotnet run           # backend on http://localhost:5101 (Development, uses wwwroot/hot)
 ```
 
 ## Run (production build)
 
+Run the `build` script from your package-manager row above, then start the backend:
+
 ```bash
-npm install
-npm run build        # wwwroot/build + manifest
 dotnet run -c Release --no-launch-profile --urls http://localhost:5101
 ```
 
 `dotnet build` never needs Node; build the frontend separately.
 
 ## Server-side rendering (optional)
+
+Set `INERTIA_SSR=1` for your build command (npm shown; Bun, pnpm and Yarn use the same environment variable):
 
 ```bash
 INERTIA_SSR=1 npm run build   # also builds ssr/ssr.js
@@ -37,7 +48,9 @@ If the SSR server is down the backend logs it and falls back to client rendering
 
 ## E2E
 
+These repository verification commands use the committed npm lockfile; they do not constrain your app's package manager.
+
 ```bash
-cd ../../tests/e2e && npm install && npx playwright install chromium
+cd ../../tests/e2e && npm ci && npx playwright install chromium
 SAMPLE=react npx playwright test            # add INERTIA_SSR=1 (after an SSR build) for the SSR spec
 ```

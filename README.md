@@ -81,7 +81,7 @@ The page name must match your client-side page resolver. The starter templates c
 
 ## Start a new app
 
-You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clients are not supported.
+You need the .NET 10 SDK and JavaScript frontend build tools. npm, Bun, pnpm and Yarn are supported; choose the package manager you use for your app. Use an Inertia v3 client; v2 clients are not supported.
 
 Create an app with the starter template:
 
@@ -89,16 +89,18 @@ Create an app with the starter template:
 dotnet new install Inertia.Net.Templates::1.6.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
-npm install
 ```
 
 Choose `--framework vue` or `--framework svelte` for another frontend. Each template uses Minimal APIs and includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
 
-Start Vite in one terminal, from `MyApp`:
+Install dependencies and start Vite in one terminal, from `MyApp`, using one row:
 
-```sh
-npm run dev
-```
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
 
 Start ASP.NET Core in another terminal, also from `MyApp`:
 
@@ -108,7 +110,7 @@ dotnet watch
 
 Open [http://localhost:5180](http://localhost:5180). Browse through ASP.NET Core; Vite supplies the frontend assets and hot reload.
 
-For a production build, run `npm run build`, then `dotnet publish -c Release`. Deploy the built frontend assets with the published app. SSR is optional and requires a Node server at runtime; ordinary client rendering does not.
+For a production build, run the build command from your row, then `dotnet publish -c Release`. Deploy the built frontend assets with the published app. SSR is optional and requires a Node server at runtime; ordinary client rendering does not.
 
 ## Sample apps
 
@@ -196,7 +198,7 @@ dotnet add package Inertia.Net.Testing --version 1.6.2 # test projects
 dotnet add package Inertia.Net.Live.SignalR --version 1.6.2 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.6.2` for all Inertia.Net packages. Inertia.Net 1.6.2 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.6.2` for all Inertia.Net packages. Inertia.Net 1.6.2 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -210,7 +212,7 @@ Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js
 
 Already using the starter template? Its services, middleware, root template and frontend are configured for you. The steps below are for adding Inertia to an existing app or building one manually. Choose one backend and one frontend.
 
-For a new project without the starter template, run `dotnet new web -n MyApp`, then `cd MyApp`, install the packages above, and run `npm init -y` before the client setup.
+For a new project without the starter template, run `dotnet new web -n MyApp`, then `cd MyApp`, install the packages above, and create a `package.json` before the client setup (`npm init -y`, `bun init -y`, `pnpm init` or `yarn init`).
 
 Every backend needs the same four things: `AddInertia()`, `UseInertia()`, a root template, and a frontend (see [Client setup](#client-setup)).
 Add CSRF protection from the start: `AddAntiforgery(...)` and `UseInertiaAntiforgery()`, as below (see [CSRF and antiforgery](#csrf-and-antiforgery)).
@@ -367,7 +369,16 @@ public sealed class HomeEndpoint : EndpointWithoutRequest<InertiaResult>
 
 ## Client setup
 
-Run the npm commands from the ASP.NET Core project directory (the directory containing your `.csproj`). Install only the row for your chosen framework, followed by the shared development dependencies.
+Run client setup commands from the ASP.NET Core project directory (the directory containing your `.csproj`). Install only the row for your chosen framework, followed by the shared development dependencies. The snippets use npm spelling; use the equivalent command for your package manager:
+
+| Package manager | Add packages | Add development packages |
+|---|---|---|
+| npm | `npm install <packages>` | `npm install -D <packages>` |
+| Bun | `bun add <packages>` | `bun add -D <packages>` |
+| pnpm | `pnpm add <packages>` | `pnpm add -D <packages>` |
+| Yarn | `yarn add <packages>` | `yarn add -D <packages>` |
+
+Replace `<packages>` with the package names and version ranges from your framework row.
 
 Inertia.Net speaks the v3 protocol: the initial page is the `<script data-page="app" type="application/json">` element, which the v3 clients read directly. Install the v3 client packages for your framework:
 
@@ -571,14 +582,15 @@ For the `GET /` endpoint above, create this page first:
 
 ### Development workflow
 
+Start Vite with `npm run dev`, `bun run dev`, `pnpm run dev` or `yarn run dev` in terminal 1. It writes `wwwroot/hot`. In terminal 2:
+
 ```sh
-npm run dev          # terminal 1: Vite on :5173, writes wwwroot/hot
-dotnet watch         # terminal 2: the app, ASPNETCORE_ENVIRONMENT=Development
+dotnet watch         # the app, ASPNETCORE_ENVIRONMENT=Development
 ```
 
 Open the ASP.NET Core URL printed by `dotnet watch`, rather than the Vite URL. The first visit to `/` should display "Hello from .NET". If you started with `dotnet new web`, ensure the launch profile sets `ASPNETCORE_ENVIRONMENT=Development` so the adapter reads the Vite hot file.
 
-For production, run `npm run build`, then `dotnet publish -c Release`. Deploy `wwwroot/build` and `app.html` with the published app. Node.js is needed to build the assets; it is only needed at runtime if you enable SSR. Samples for each framework live in [samples/](samples/).
+For production, run your package manager's `build` script (see [Start a new app](#start-a-new-app)), then `dotnet publish -c Release`. Deploy `wwwroot/build` and `app.html` with the published app. Node.js is needed to build the assets; it is only needed at runtime if you enable SSR. Samples for each framework live in [samples/](samples/).
 
 ---
 
@@ -777,9 +789,11 @@ the value as a prop of its type would be (a scroll value's paging metadata comes
 value gets it at once, and the loader runs after that response has been sent, to store a fresh value; requests in the meantime get the
 stale value too. Past `duration + staleFor` the loader runs during the request again, as without `staleFor`.
 
-- The refresh runs in the response's completion callbacks, which run before the request's services are disposed: a loader can keep
-  using the request's `DbContext` and other scoped services. It must not touch the `HttpContext` (the response is already sent).
-  On HTTP/1.1 the connection takes its next request once the refresh has finished.
+- Response completion enqueues the refresh on a bounded background worker, so an HTTP/1.1 connection can take its next request immediately.
+  Loaders using `staleFor` must use singleton dependencies or create an independent scope inside the loader (for example with
+  `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`). Do not capture request-scoped services or `HttpContext`.
+- The worker accepts 64 pending refreshes and stops with the host. A full queue drops the refresh, releases its claim and logs a warning;
+  the stale value keeps its existing expiration. Monitor `inertia.cache.refresh.dropped` with `inertia.cache.kind=prop|ssr`.
 - One refresh runs per key and app instance at a time, and the stale props of one response refresh one after another. A refresh
   that finds the value fresh again (another refresh, or another app instance sharing the store, stored one since) skips its loader.
 - A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
@@ -1703,6 +1717,7 @@ builder.Services.AddInertia(o =>
 {
     o.Ssr.Mode = SsrMode.Preferred;                  // Disabled (default), Preferred (fall back to the client) or Required (throw)
     o.Ssr.Urls.Add("http://127.0.0.1:13714");       // the default when empty; add more servers to spread the renders
+    o.Ssr.ConnectTimeout = TimeSpan.FromSeconds(5);  // connection establishment
     o.Ssr.Timeout = TimeSpan.FromSeconds(5);         // total deadline: the wait for a render slot plus the HTTP call
     o.Ssr.MaxPageBytes = 2 * 1024 * 1024;            // default; larger pages render on the client without a call
     o.Ssr.MaxResponseBytes = 16L * 1024 * 1024;     // default, for success and error responses
@@ -2374,6 +2389,7 @@ Most per-request allocation in a real handler is the props you build, not the re
 |---|---|---|
 | `Mode` | `Disabled` | `Disabled`, `Preferred` (fall back to client rendering on failure) or `Required` (throw `InertiaSsrException`). `Disabled` cannot be overridden per response. |
 | `Urls` | empty (`http://127.0.0.1:13714`) | SSR server base URLs (`/render`). Several spread the renders. Not used with `UseNodeProcess()`. |
+| `ConnectTimeout` | `5 s` | Connection establishment timeout, independent of the render deadline. Positive or `Timeout.InfiniteTimeSpan`. |
 | `Timeout` | `5 s` | Total deadline per render: the wait for a slot plus the HTTP call. `Timeout.InfiniteTimeSpan` disables it. |
 | `MaxResponseBytes` | `16 MiB` | Limit on actual response bytes, including errors and chunked responses. Oversized responses fall back, or throw with type `response-too-large`. |
 | `MaxPageBytes` | `2 MiB` | Pages whose JSON is larger render on the client without a call (type `page-too-large`). |

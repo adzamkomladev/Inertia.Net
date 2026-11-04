@@ -4,14 +4,23 @@ An ASP.NET Core Minimal API app with an Inertia.js v3 client, built on [Inertia.
 
 ## Run it
 
+Install dependencies and start Vite with the package manager you use for your app. npm, Bun, pnpm and Yarn are supported:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Keep Vite running in one terminal. Start ASP.NET Core in a second terminal:
+
 ```sh
-npm install
-npm run dev        # the Vite dev server (hot reload); keep it running
-dotnet watch       # the app, in a second terminal: http://localhost:5180
+dotnet watch       # http://localhost:5180
 ```
 
-While the Vite dev server runs it writes `wwwroot/hot`, and the app serves the pages through it. Without it the app uses the
-production build from `npm run build` (`wwwroot/build`).
+While Vite runs it writes `wwwroot/hot`, and the app serves the pages through it. For production, run the build command from
+your row to write `wwwroot/build`, then publish with `dotnet publish -c Release`.
 
 ## Where things are
 

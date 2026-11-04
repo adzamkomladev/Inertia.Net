@@ -70,10 +70,10 @@ With `.Parallel()` the planner (`src/Inertia.Net/PropsPlanner.cs:165-167`) does 
 `lazy.Apply(source)` receives a boxed `CachedProp`, which `CopyObject` turns into an empty object: the response is likely `{}` plus
 the dot keys. Confirm the parallel symptom with the test before deciding the fix shape.
 
-**Change.** Either exclude `Caching: not null` from the `ToTraversable` pattern (the prop is then copied like other special props
-and keeps going through `WriteCachedAsync`), or teach the `LazyDotObject` path to resolve through `WriteCachedAsync` and apply the
-dot keys to the deserialized value. Prefer the first unless it changes the documented deviation 7 semantics for cached props; if it
-does, document the choice in `docs/protocol.md`.
+**Change (reviewed implementation).** Keep `LazyDotObject`: excluding the prop from its pattern would send it to `CopyObject`,
+which discards the loader. Resolve cached parents through the cache path, apply dot keys to a copy of their cached JSON, and
+collect live listeners. Keep the non-cached deviation 7 path unchanged. Sequential and parallel regressions both failed on the
+baseline (repeat loading and loss of the parent value, respectively); the live listener regression failed too.
 
 **Tests.** `tests/Inertia.Net.Tests/PropsResolverTests.cs`: (a) sequential cached prop with a dot key below it stores on the first
 render and skips the loader on the second; (b) the same with `.Parallel()` produces the merged object, not `{}`; (c) a partial
@@ -94,6 +94,10 @@ and runs every stale prop loader (`PropRefreshes.RunAsync`, `:1103-1140`) inside
 singleton `Channel<RefreshWork>` drained by a hosted service registered in `AddInertia`, bounded (drop and log when full, since a
 stale render is still served), cancelled on host shutdown. Reuse the existing `_caching.TryBeginRefresh`/`EndRefresh` ownership so
 there is still one refresh per key per app instance. Record a metric for dropped refreshes on `InertiaMetrics`.
+
+**Approved lifetime requirement (2026-11-04).** Background loaders cannot reuse the disposed request scope. The maintainer
+approved requiring singleton dependencies or a scope created explicitly inside the loader. Replace the old scoped-service
+promise in public XML and documentation, and exercise an independently created scope in integration tests.
 
 **Tests.** `tests/Inertia.Net.Tests/SsrCacheTests.cs`: a stale hit returns before the refresh render starts (use the fake renderer
 with a gate), the refresh still runs exactly once, and a second stale hit during the refresh does not start another. An integration
@@ -142,12 +146,14 @@ has no resolvers; the filter then passes every request through with no log or ex
 
 **Change.** In `Create`, when `validatable is null` **and** `ValidationOptions` has no resolvers, throw
 `InvalidOperationException("WithInertiaValidation() needs services.AddValidation(). Add it at startup, or remove the call.")`
-at endpoint build time (the factory runs at startup, so it fails fast). When resolvers exist but no parameter is validatable, keep
+at endpoint build time. Routing can materialize endpoints lazily (including TestServer), so do not promise that
+`StartAsync()` alone runs the factory. When resolvers exist but no parameter is validatable, keep
 the pass-through (that is a legitimate endpoint without a body) but log once at Debug. Mirror the message style of
 `InertiaMiddleware.cs:215`.
 
 **Tests.** `tests/Inertia.Net.IntegrationTests`: an app without `AddValidation()` that maps a `WithInertiaValidation()` endpoint
-fails to start with that message; an app with it still passes the existing validation tests.
+throws with that message when its endpoint data source is materialized; an app with it still passes the existing validation
+tests. The TestServer regression explicitly enumerates the route builder's endpoint data sources to exercise construction.
 
 ### 1.6 Truncate `InertiaSsrException.Message` and keep internal URLs to logs (S, Sol medium)
 
@@ -155,8 +161,11 @@ fails to start with that message; an app with it still passes the existing valid
 `error`/`hint` text and `endpoint.DisplayUrl`; only the log text goes through `Truncate` (`:757`), and `attempt.Type` is not
 truncated at all. An app `IExceptionHandler` that echoes `ex.Message` leaks it.
 
-**Change.** Apply the same 2 KB truncation to the message and the type; put the endpoint URL in the log only (or keep it in
-`InertiaSsrException` as a property, not in `Message`). Document on the exception that `Message` is safe to show in an error page.
+**Change.** Public `Message` uses only a generic sentence and the adapter's known failure category, including skip paths.
+Truncation alone cannot make renderer-provided text safe: a structured error or type can repeat internal URLs, tokens or
+other details. Keep renderer detail in logs and bounded diagnostic `Type`/`Hint` properties (2 KB plus a marker), never in
+`Message`. Document on the exception that the adapter-emitted `Message` is safe to show in an error page and that diagnostic
+properties are not public-facing. Log internal endpoint details only.
 
 **Tests.** `tests/Inertia.Net.Tests` SSR gateway tests: a 4 KB renderer error yields an exception message of at most 2 KB plus a
 marker, and the message does not contain the renderer URL. Include the shipped `InertiaExceptionHandler` path: default error

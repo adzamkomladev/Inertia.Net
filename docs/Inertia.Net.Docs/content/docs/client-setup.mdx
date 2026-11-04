@@ -9,7 +9,18 @@ Inertia.Net speaks the Inertia.js v3 protocol. Install a v3 client package; v2 c
 
 ## Install the client
 
-Run the npm commands from the ASP.NET Core project directory (the one containing your `.csproj`).
+Run client setup commands from the ASP.NET Core project directory (the one containing your `.csproj`). npm, Bun, pnpm and
+Yarn are supported. The framework snippets use npm spelling; replace the command with the equivalent for your package manager:
+
+| Package manager | Add packages | Add development packages |
+|---|---|---|
+| npm | `npm install <packages>` | `npm install -D <packages>` |
+| Bun | `bun add <packages>` | `bun add -D <packages>` |
+| pnpm | `pnpm add <packages>` | `pnpm add -D <packages>` |
+| Yarn | `yarn add <packages>` | `yarn add -D <packages>` |
+
+Replace `<packages>` with the names and version ranges from your framework's snippet. If the project has no `package.json`,
+create one first with `npm init -y`, `bun init -y`, `pnpm init` or `yarn init`.
 
 <Tabs>
   <Tab label="React">

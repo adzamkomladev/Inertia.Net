@@ -86,7 +86,7 @@ The SSR health check is covered in [Server-side rendering](/docs/server-side-ren
 
 ## Deployment checklist
 
-- [ ] `npm run build` runs before `dotnet publish`, or `wwwroot/build` is copied into the publish output.
+- [ ] The client `build` script runs before `dotnet publish` (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`), or `wwwroot/build` is copied into the publish output.
 - [ ] `app.html` is copied to the publish output.
 - [ ] Forwarded headers are configured, or cookies are forced secure.
 - [ ] Data Protection keys are shared between instances.
