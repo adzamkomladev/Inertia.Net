@@ -1,0 +1,188 @@
+{
+  "rows": [
+    {
+      "run": 1,
+      "method": "Full",
+      "baselineMs": 0.0689267578125,
+      "baselineBytes": 1832.109375,
+      "currentMs": 0.072447265625,
+      "currentBytes": 1752.109375,
+      "latencyChangePercent": 4.1147136675899425,
+      "latency95PercentInterval": [
+        -1.2753888953748294,
+        9.045715614897732
+      ],
+      "allocationChangeBytes": -80.0
+    },
+    {
+      "run": 1,
+      "method": "PartialPrepend",
+      "baselineMs": 0.08285859375,
+      "baselineBytes": 1896.21875,
+      "currentMs": 0.0849791015625,
+      "currentBytes": 1816.21875,
+      "latencyChangePercent": 2.5787823162003676,
+      "latency95PercentInterval": [
+        -0.5534194126977199,
+        10.568145703938603
+      ],
+      "allocationChangeBytes": -80.0
+    },
+    {
+      "run": 1,
+      "method": "RequestValid",
+      "baselineMs": 0.0003581794738769531,
+      "baselineBytes": 32.0,
+      "currentMs": 0.00036278533935546876,
+      "currentBytes": 32.0,
+      "latencyChangePercent": 4.361207403149969,
+      "latency95PercentInterval": [
+        -3.608217661383173,
+        10.192521924933418
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "RequestGarbage",
+      "baselineMs": 8.597145080566406e-05,
+      "baselineBytes": 32.0,
+      "currentMs": 8.380622863769531e-05,
+      "currentBytes": 32.0,
+      "latencyChangePercent": -0.5505725785746984,
+      "latency95PercentInterval": [
+        -2.1510096575943827,
+        0.8034209173578999
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "CursorRoundTrip",
+      "baselineMs": 0.003174285888671875,
+      "baselineBytes": 312.0,
+      "currentMs": 0.0031322998046875,
+      "currentBytes": 312.0,
+      "latencyChangePercent": -0.33299320664574306,
+      "latency95PercentInterval": [
+        -2.0129595776633424,
+        3.8512164448581965
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "PlainSerialize",
+      "baselineMs": 0.01266591796875,
+      "baselineBytes": 32.0,
+      "currentMs": 0.01273544921875,
+      "currentBytes": 32.0,
+      "latencyChangePercent": 0.9051808705826336,
+      "latency95PercentInterval": [
+        -2.5546438727613197,
+        2.9634006260757184
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "Full",
+      "baselineMs": 0.07133173828125,
+      "baselineBytes": 1832.109375,
+      "currentMs": 0.0722189453125,
+      "currentBytes": 1752.109375,
+      "latencyChangePercent": -1.555547486028236,
+      "latency95PercentInterval": [
+        -5.529618331728548,
+        4.182424977589594
+      ],
+      "allocationChangeBytes": -80.0
+    },
+    {
+      "run": 2,
+      "method": "PartialPrepend",
+      "baselineMs": 0.08682890625,
+      "baselineBytes": 1896.21875,
+      "currentMs": 0.091666796875,
+      "currentBytes": 1816.21875,
+      "latencyChangePercent": 2.29090790535853,
+      "latency95PercentInterval": [
+        -0.32558575604932916,
+        5.258526686286147
+      ],
+      "allocationChangeBytes": -80.0
+    },
+    {
+      "run": 2,
+      "method": "RequestValid",
+      "baselineMs": 0.00037558135986328126,
+      "baselineBytes": 32.0,
+      "currentMs": 0.00038783798217773436,
+      "currentBytes": 32.0,
+      "latencyChangePercent": 3.556398711205444,
+      "latency95PercentInterval": [
+        -0.02638349250087546,
+        5.017979294500452
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "RequestGarbage",
+      "baselineMs": 8.549652099609376e-05,
+      "baselineBytes": 32.0,
+      "currentMs": 9.89837646484375e-05,
+      "currentBytes": 32.0,
+      "latencyChangePercent": -7.369609647052705,
+      "latency95PercentInterval": [
+        -16.83836387136015,
+        7.930847613781822
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "CursorRoundTrip",
+      "baselineMs": 0.002827923583984375,
+      "baselineBytes": 312.0,
+      "currentMs": 0.002811578369140625,
+      "currentBytes": 312.0,
+      "latencyChangePercent": -0.9043970437831339,
+      "latency95PercentInterval": [
+        -3.7998498584373377,
+        2.714969650215293
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "PlainSerialize",
+      "baselineMs": 0.00974488525390625,
+      "baselineBytes": 32.0,
+      "currentMs": 0.0099716552734375,
+      "currentBytes": 32.0,
+      "latencyChangePercent": 5.171703522879778,
+      "latency95PercentInterval": [
+        0.5031896335607522,
+        9.09755002616528
+      ],
+      "allocationChangeBytes": 0.0
+    }
+  ],
+  "acceptance": {
+    "render": true,
+    "garbageRequestBytes": [
+      32.0,
+      32.0
+    ],
+    "cursorRoundTripBytes": [
+      312.0,
+      312.0
+    ],
+    "allocationCountEvidence": {
+      "garbageRequest": "One PageRequest record; no other allocation in PageRequest.From (source inspection).",
+      "cursorRoundTrip": "Three objects: PooledBufferWriter, Utf8JsonWriter, base64url output string; warmed pooled byte array, stack decode and unboxed value types (source inspection).",
+      "limitation": "The probe measures allocated bytes, not runtime object counts; allocation counts are corroborated by source inspection."
+    }
+  }
+}

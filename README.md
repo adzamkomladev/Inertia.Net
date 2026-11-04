@@ -2131,6 +2131,8 @@ Flash and errors travel in a cookie across the redirect, so use a client that ke
 
 Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
 
+The [pagination helper comparison](tests/Inertia.Net.Benchmarks/RESULTS.md#pagination-helpers--2026-11-04) measures matched feed JSON, request parsing and two-key cursor allocation.
+
 v1.5.2 allocates less per render than v1.5.1 (exact allocation probes, same fixtures):
 
 | Workload | v1.5.1 | v1.5.2 |
