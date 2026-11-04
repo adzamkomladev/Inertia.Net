@@ -1129,6 +1129,43 @@ dotnet build tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj -c Relea
 dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --bigint-dom-probe
 ```
 
+## Small render allocation candidates — 2026-11-04
+
+These measurements isolate phase 3.4 against the tested phase 2 adapter (`6ab0a71`), excluding the other phase 3 changes.
+Two independent processes each run 32 alternating-order paired rounds after warmup. Both assembly contexts use a byte-identical
+benchmark DLL; only the adapter differs. Absolute medians below are from run 2, while time changes are medians of within-round
+ratios. They need not equal ratios of the displayed absolute medians.
+
+| Workload | Before B/op | After B/op | Before ms/op | After ms/op | Run 1 paired time change | Run 2 paired time change |
+|---|---:|---:|---:|---:|---:|---:|
+| JSON, 20 mixed props (control) | 1,736 | 1,736 | 0.100652 | 0.093232 | −2.9% | −3.6% |
+| One yielding sequential loader (control) | 1,576 | 1,536 | 0.042241 | 0.042242 | −1.0% | −3.7% |
+| Eight scroll props, append wrappers | 6,664 | 6,088 | 0.072809 | 0.069501 | −2.2% | −3.4% |
+| Eight scroll props, prepend wrappers | 6,880 | 6,112 | 0.032029 | 0.029354 | −6.2% | −5.4% |
+| Eight custom-converter properties | 408 | 152 | 0.012327 | 0.011163 | −9.3% | −10.5% |
+| Waiter attempts an already-owned fill | 96 | 0 | 0.000078 | 0.000026 | −63.5% | −66.3% |
+| 32 synchronous planned cache hits | 1,688 | 1,688 | 0.041720 | 0.041642 | −0.6% | −1.3% |
+
+Scroll metadata now passes its wrapper as a suffix instead of allocating a temporary list. Converter-bearing typed members
+carry serializer metadata in pooled entries instead of boxing a wrapper per member; converter options still preserve instance
+identity. The synchronous serializer helper and indexed entry loop avoid enlarging suspended loader state. A contending fill
+checks for the existing completion source before allocating a candidate. The ordinary mixed JSON control remains unchanged
+in allocated bytes. These targeted warm measurements do not establish a general rendering speed-up or HTTP throughput gain.
+Pooled entries grow from 24 to 32 bytes, so the member saving does not imply a smaller cold or concurrent pool footprint.
+
+The planned-hit memo candidate was rejected despite a measured 1,688 → 920 B saving for 32 hits. The default memory store boxes
+its prop key per lookup, but keeping the earlier hit ignores invalidation by a sequential loader before that prop is written.
+Both `RemovePropAsync` and `RemoveByTagAsync` regressions failed against the candidate; the final implementation preserves the
+second lookup. General converter deduplication by type was also left unchanged because instances can carry different settings.
+
+Environment: Ubuntu 24.04, Linux 6.8.0-147, x64 KVM virtual machine reporting an AMD EPYC processor and eight logical CPUs,
+SDK 10.0.403, .NET 10.0.14, workstation GC. Each process uses CPU 7 and `DOTNET_PROCESSOR_COUNT=1`. Repository builds, tests
+and other probes were paused during final pairs; idle docs/MCP servers remained. Virtual-host scheduling, frequency and unrelated
+host activity are uncontrolled. Allocation uses process-wide `GC.GetTotalAllocatedBytes(true)` with warmed pools and reused props.
+The [raw pairs, rejected-candidate evidence, environment and reproducible summary](results/2026-11-small-allocations) include DLL
+hashes and bootstrap intervals. The unchanged JSON control still moves in time; avoid treating these synthetic ratios as a
+production latency guarantee.
+
 ## Notes for apps
 
 Most per-request allocation in a real handler is the props themselves (see "Build 20 props"), not the render.

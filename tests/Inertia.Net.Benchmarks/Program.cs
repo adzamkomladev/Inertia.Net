@@ -18,6 +18,7 @@ if (args is ["--pagination-check"])
 if (args is ["--pagination-probe"]) { await PaginationProbe.RunAsync(); return; }
 if (args is ["--pagination-probe", var paginationOutput]) { await PaginationProbe.RunAsync(paginationOutput); return; }
 if (args is ["--allocation-probe"]) { await AllocationProbe.RunAsync(); return; }
+if (args is ["--small-allocation-probe", var smallDirectory, var smallOutput]) { await SmallAllocationProbe.RunAsync(smallDirectory, smallOutput); return; }
 if (args is ["--paired-latency", var variants, var pairedOutput]) { await PairedLatencyProbe.RunAsync(variants, pairedOutput); return; }
 if (args is ["--memory-comparison", var memoryDirectory, var memoryOutput]) { await PairedLatencyProbe.RunAsync(memoryDirectory, memoryOutput, memory: true); return; }
 if (args is ["--fix-comparison", var fixDirectory, var fixOutput]) { await PairedLatencyProbe.RunAsync(fixDirectory, fixOutput, memory: true, fixes: true); return; }

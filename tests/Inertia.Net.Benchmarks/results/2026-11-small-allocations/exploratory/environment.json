@@ -1,0 +1,25 @@
+{
+  "baselineCommit": "6ab0a714e79f20c4f7089695f6828a8e9fbcb7c4",
+  "sdk": "10.0.403",
+  "runtime": "10.0.14",
+  "os": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  8\nOn-line CPU(s) list:                     0-7\nVendor ID:                               AuthenticAMD\nBIOS Vendor ID:                          QEMU\nModel name:                              AMD EPYC Processor (with IBPB)\nBIOS Model name:                         pc-i440fx-9.0  CPU @ 2.0GHz\nBIOS CPU family:                         1\nCPU family:                              23\nModel:                                   1\nThread(s) per core:                      1\nCore(s) per socket:                      8\nSocket(s):                               1\nStepping:                                2\nBogoMIPS:                                5589.37\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm rep_good nopl cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext ssbd ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 rdseed adx smap clflushopt sha_ni xsaveopt xsavec xgetbv1 arat\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               256 KiB (8 instances)\nL1i cache:                               512 KiB (8 instances)\nL2 cache:                                4 MiB (8 instances)\nL3 cache:                                8 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-7\nVulnerability Gather data sampling:      Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Mitigation; untrained return thunk; SMT disabled\nVulnerability Spec rstack overflow:      Vulnerable: Safe RET, no microcode\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+  "affinity": "CPU 7 (taskset -c 7)",
+  "DOTNET_PROCESSOR_COUNT": "1",
+  "gc": "workstation",
+  "measurement": "Two separate processes; identical fixture source; two isolated AssemblyLoadContexts per process; 32 alternating-order paired rounds after warmup; calibrated iteration counts; process-wide GC.GetTotalAllocatedBytes(true).",
+  "limitations": "Task builds/tests paused during retained paired runs. Long-lived idle docs/MCP servers remained. KVM host scheduling/frequency and unrelated host activity are uncontrolled. These are in-process warm-allocation measurements, not production latency or cold-pool memory.",
+  "hashes": {
+    "baseline": {
+      "Inertia.Net.dll": "f668199c8d211c87c00ade7f966cc0298161622fb988c78208f8d03a3ecbf417",
+      "Inertia.Net.Benchmarks.dll": "630ffe1aaa6cce1df9554515b1f33ec5011c7825f6187f34c17422a31a79cefc"
+    },
+    "candidate": {
+      "Inertia.Net.dll": "05b30859ce2024f8a57020c8212636149b70b358fc253e9d8c1126d555bee899",
+      "Inertia.Net.Benchmarks.dll": "9230efbcfe2dba0878603508c7f5cee0b085af8751d63af94bea0d1065facc9f"
+    }
+  },
+  "commands": [
+    "DOTNET_PROCESSOR_COUNT=1 taskset -c 7 dotnet <fixture.dll> --small-allocation-probe <baseline-current-directory> <paired-N.json>"
+  ]
+}
