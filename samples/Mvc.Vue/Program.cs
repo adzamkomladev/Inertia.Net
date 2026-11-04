@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInertia(o =>
 {
+    o.State.RememberPreviousUrl = true;
     o.Share("appName", "Inertia.Net Sample");
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
     o.Pages.Directory = "ClientApp/pages"; // Development only: rendering a component without a page file fails fast

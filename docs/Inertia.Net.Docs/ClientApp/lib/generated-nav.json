@@ -419,6 +419,11 @@
           "depth": 2
         },
         {
+          "id": "previous-url",
+          "text": "Previous URL",
+          "depth": 2
+        },
+        {
           "id": "what-the-middleware-changes",
           "text": "What the middleware changes",
           "depth": 2

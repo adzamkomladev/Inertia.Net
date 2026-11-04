@@ -7,12 +7,16 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-04
+
 ### Added
 
 - Production Inertia error pages through `AddInertiaErrorPages()` and `UseInertiaErrorPages()`, with per-status components,
   shared props, optional extra props and Development opt-in. Inertia requests receive JSON pages; HTML navigations use the root
   template and SSR. API responses, existing bodies, redirects, protocol 409s and antiforgery 419s keep their existing handling.
 - Error pages in the React, Vue and Svelte samples and starter templates, plus non-success response status assertions in the testing helpers.
+- Opt-in `State.RememberPreviousUrl`: successful page GETs remember their relative URL in a session cookie, so `Back()` and empty-response redirects work without a `Referer`. Read the validated value with `HttpContext.Inertia().PreviousUrl`; customize the cookie with `State.PreviousUrlCookieName`.
+- An old-input recipe using explicitly sanitized flash data; Inertia forms already retain their input on validation redirects.
 
 ## [1.6.0] - 2026-11-03
 

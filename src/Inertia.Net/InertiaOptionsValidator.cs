@@ -11,6 +11,9 @@ internal sealed class InertiaOptionsValidator : IValidateOptions<InertiaOptions>
         Check(options.Props.MaxConcurrency > 0, "Props.MaxConcurrency must be positive.");
         Check(options.Vite.PrefetchConcurrency > 0, "Vite.PrefetchConcurrency must be positive.");
         Check(options.Pages.Extensions.All(e => e is ['.', _, ..]), "Pages.Extensions entries must start with '.', e.g. \".tsx\".");
+        Check(!string.IsNullOrWhiteSpace(options.State.PreviousUrlCookieName), "State.PreviousUrlCookieName must not be empty.");
+        Check(!string.Equals(options.State.PreviousUrlCookieName, options.State.CookieName, StringComparison.Ordinal),
+            "State.PreviousUrlCookieName must differ from State.CookieName.");
         var ssr = options.Ssr;
         Check(IsDeadline(ssr.Timeout, allowZero: false), "Ssr.Timeout must be positive and supported by CancellationTokenSource, or Timeout.InfiniteTimeSpan.");
         Check(ssr.MaxResponseBytes > 0, "Ssr.MaxResponseBytes must be positive.");

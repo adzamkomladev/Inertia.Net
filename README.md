@@ -2,7 +2,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.6.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.6.1** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -79,7 +79,7 @@ You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clie
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.0
+dotnet new install Inertia.Net.Templates::1.6.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -180,14 +180,14 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.6.0
-dotnet add package Inertia.Net.Mvc --version 1.6.0 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.6.0 # FastEndpoints only
-dotnet add package Inertia.Net.Testing --version 1.6.0 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.6.0 # live props over SignalR
+dotnet add package Inertia.Net --version 1.6.1
+dotnet add package Inertia.Net.Mvc --version 1.6.1 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.6.1 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.6.1 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.6.1 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.6.0` for all Inertia.Net packages. Inertia.Net 1.6.0 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.6.1` for all Inertia.Net packages. Inertia.Net 1.6.1 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -1324,6 +1324,8 @@ return Back().WithFlash("toast", "Saved");
 
 Read it on the client with `usePage().flash` (or the `onFlash` visit callback).
 
+Inertia forms keep their input on the client after `Back().WithErrors(...)`, so there is no `WithInput()` helper. For a full-page POST that needs old input, explicitly flash only sanitized fields: `Back().WithFlash("old", new InertiaProps { ["email"] = email })`, then read `usePage().flash.old`. Never flash passwords, tokens or other secrets.
+
 **Where state is kept.** Flash data, errors, `clearHistory` and `preserveFragment` set during a request that ends in a redirect (or a `Location()`/fragment `409`) are saved in an `IInertiaStateStore` and loaded at the start of the next request. If that request redirects again, the state is carried on (so `Back()` to a URL that itself redirects still shows the flash); otherwise its response consumes it. The state is also kept when the response is the version-mismatch `409`.
 
 - **Default: an encrypted cookie** (`.Inertia.State`). It is protected with ASP.NET Core Data Protection, HttpOnly, SameSite=Lax, and works without sessions and under Native AOT. Tampered or undecryptable cookies are ignored and deleted. It logs a warning above about 4 KB: browsers drop larger cookies.
@@ -1354,10 +1356,24 @@ What `UseInertia()` does for Inertia requests:
 | Redirect to another origin (scheme, host or port), and the request is not a prefetch | `409` with `X-Inertia-Location: <url>`: the client makes a full visit instead of following it with XHR, which the browser would block. Turn it off with `o.ConvertExternalRedirects = false`. |
 | Redirect whose `Location` contains `#`, and the request is not a prefetch | `409` with `X-Inertia-Redirect: <url>` (the client performs a full visit that keeps the fragment) |
 | `Location(url)` | `409` with `X-Inertia-Location: <url>` for Inertia requests, a plain `302` otherwise |
-| An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE), falling back to the app root (`PathBase/`) |
-| `Back()` | `302` to the `Referer` when it is an http(s) URL with the request's own host and port, otherwise to the fallback (default `~/`, the app root including `PathBase`) |
+| An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE), using the same previous-URL and app-root fallback as `Back()` |
+| `Back()` | `302` to the `Referer` when it is an http(s) URL with the request's own host and port, otherwise the opt-in previous URL, then the fallback (default `~/`, the app root including `PathBase`) |
 
 The same-origin rule on `Referer` exists so `Back()` cannot become an open redirect. The scheme is not compared, so it keeps working behind a TLS-terminating proxy. On an HTTPS request an `http` Referer is upgraded to `https`, so going back never downgrades the connection.
+
+### Previous URL
+
+Enable `o.State.RememberPreviousUrl = true` when a `Referrer-Policy: no-referrer` policy or the browser strips `Referer`:
+
+```csharp
+builder.Services.AddInertia(o => o.State.RememberPreviousUrl = true);
+```
+
+`Back()` and the middleware's empty-response redirect consult the same-host `Referer` first, then the remembered URL, then the fallback. `context.Inertia().PreviousUrl` reads the remembered URL, or returns `null` when disabled, absent or invalid; it is user-controlled input validated as a relative path.
+
+Only successful status-200 page GET renders are remembered, including initial HTML visits. Partial reloads, prefetches, Precognition, non-GET requests and error pages are excluded. The value is the relative `PathBase + Path + QueryString`, without scheme or host, in the plain `.Inertia.Previous` session cookie (`HttpOnly`, `SameSite=Lax`, `Path=/`, essential, with `Secure` following `o.State.CookieSecurePolicy`). The cookie is written only when the URL changes. Set `o.State.PreviousUrlCookieName` to change its name; it must differ from `o.State.CookieName`.
+
+This cookie is used with both cookie and session state stores. It is **per browser, not per tab**: the most recent page render wins across tabs. The `Referer` still takes precedence when available.
 
 `Vary: X-Inertia` is added to every response that passes through the middleware.
 
@@ -2293,7 +2309,9 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | Option | Default | Description |
 |---|---|---|
 | `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
-| `CookieSecurePolicy` | `SameAsRequest` | When the state cookie is `Secure`. `Always` behind a TLS-terminating proxy that does not forward the scheme. |
+| `RememberPreviousUrl` | `false` | Remember successful page GET URLs for `Back()` when Referer is unavailable. |
+| `PreviousUrlCookieName` | `".Inertia.Previous"` | Plain previous-URL cookie, with either state store; non-empty and different from `CookieName`. |
+| `CookieSecurePolicy` | `SameAsRequest` | When state and previous-URL cookies are `Secure`. `Always` behind a TLS-terminating proxy that does not forward the scheme. |
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. The session is only loaded when the request has a session cookie. |
 | `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData (cookie or session provider) instead of the encrypted cookie. Inertia.Net.Mvc package. |
 

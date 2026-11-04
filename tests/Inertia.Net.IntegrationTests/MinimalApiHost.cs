@@ -25,6 +25,9 @@ public sealed class MinimalApiHost : IConformanceHost
             return Render("Page", new InertiaProps { ["message"] = "hello" });
         });
 
+        app.MapGet("/users", () => Render("Users"));
+        app.MapMethods("/back-test", [HttpMethods.Post, HttpMethods.Put], () => Back());
+
         app.MapGet("/café", () => Render("Page"));
 
         app.MapGet("/live", (HttpContext context) =>

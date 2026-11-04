@@ -38,6 +38,8 @@ const { flash } = usePage()
 The TypeScript generator can write a `Flash` type for you. Call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript).
 </Callout>
 
+Inertia forms keep their input on the client after `Back().WithErrors(...)`, so there is no `WithInput()` helper. For a full-page POST that needs old input, explicitly flash only sanitized fields: `Back().WithFlash("old", new InertiaProps { ["email"] = email })`, then read `usePage().flash.old`. Never flash passwords, tokens or other secrets.
+
 ## Where state is kept
 
 Flash data, errors, `clearHistory` and `preserveFragment` set during a request that ends in a redirect (or a `Location()` / fragment `409`) are saved in an `IInertiaStateStore` and loaded at the start of the next request. If that request redirects again, the state is carried on, so `Back()` to a URL that itself redirects still shows the flash. Otherwise its response consumes it. The state is also kept when the response is the version-mismatch `409`.
