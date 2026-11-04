@@ -49,6 +49,23 @@ public static class FastEndpointsRoutes
         }
     }
 
+    public sealed class UsersEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Get("/users");
+        public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Users");
+    }
+
+    public sealed class BackTestEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure()
+        {
+            Verbs(Http.POST, Http.PUT);
+            Routes("/back-test");
+        }
+
+        public override Task HandleAsync(CancellationToken ct) => Send.InertiaBackAsync();
+    }
+
     public sealed class CafeEndpoint : EndpointWithoutRequest
     {
         public override void Configure() => Get("/café");

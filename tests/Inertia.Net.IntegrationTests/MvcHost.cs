@@ -24,6 +24,13 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
         return Render("Page", new InertiaProps { ["message"] = "hello" });
     }
 
+    [HttpGet("/users")]
+    public IResult Users() => Render("Users");
+
+    [AcceptVerbs("POST", "PUT")]
+    [Route("/back-test")]
+    public IResult BackTest() => Back();
+
     [HttpGet("/café")]
     public IResult Cafe() => Render("Page");
 

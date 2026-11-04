@@ -88,6 +88,7 @@ public readonly struct InertiaRequest
         ExceptOnceProps = ParseList(headers[InertiaHeaders.ExceptOnceProps]);
         MergeIntentPrepend = string.Equals(headers[InertiaHeaders.InfiniteScrollMergeIntent], "prepend", StringComparison.Ordinal);
         IsPrefetch = string.Equals(headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase);
+        IsPrecognition = string.Equals(headers[InertiaPrecognition.Header], "true", StringComparison.OrdinalIgnoreCase);
         SocketId = TrimmedOrNull(headers[InertiaHeaders.SocketId]);
     }
 
@@ -120,6 +121,9 @@ public readonly struct InertiaRequest
 
     /// <summary>The request is a prefetch (<c>Purpose: prefetch</c>).</summary>
     public bool IsPrefetch { get; }
+
+    /// <summary>The request asks for Precognition validation (<c>Precognition: true</c>).</summary>
+    public bool IsPrecognition { get; }
 
     /// <summary>
     /// The client's live-props connection id (<c>X-Socket-Id</c>), trimmed; null when absent or blank. Client-supplied: use it only to

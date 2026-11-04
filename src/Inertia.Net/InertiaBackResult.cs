@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
 /// <summary>
 /// Redirects back to the <c>Referer</c> (only when it has the request's own host, so it cannot become an open redirect),
-/// otherwise to the fallback. A 302; <c>UseInertia()</c> turns it into a 303 for PUT/PATCH/DELETE and carries the errors
+/// otherwise to the opt-in previous-URL cookie or the fallback. A 302; <c>UseInertia()</c> turns it into a 303 for PUT/PATCH/DELETE and carries the errors
 /// and flash data to the next request.
 /// </summary>
 public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
@@ -18,7 +20,7 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
         Fallback = fallback;
     }
 
-    /// <summary>Where to go when there is no usable <c>Referer</c>. A leading <c>~/</c> is the app root (<c>PathBase</c>).</summary>
+    /// <summary>Where to go when there is no usable <c>Referer</c> or remembered URL. A leading <c>~/</c> is the app root (<c>PathBase</c>).</summary>
     public string Fallback { get; }
 
     /// <summary>Always 302.</summary>
@@ -67,16 +69,16 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
         }
 
         httpContext.Response.StatusCode = StatusCodes.Status302Found;
-        httpContext.Response.Headers.Location = GetBackUrl(httpContext.Request, Fallback);
+        httpContext.Response.Headers.Location = GetBackUrl(httpContext.Request, Fallback, httpContext.RequestServices?.GetService<IOptions<InertiaOptions>>()?.Value.State);
         return Task.CompletedTask;
     }
 
     /// <summary>
     /// The <c>Referer</c> (absolute, so a <c>//host</c> path cannot turn it into a protocol-relative redirect) when it is an http(s) URL
-    /// with the request's host and port, otherwise <paramref name="fallback"/>, where a leading <c>~/</c> is replaced by <c>PathBase/</c>.
+    /// with the request's host and port, otherwise the validated previous-URL cookie when enabled, then <paramref name="fallback"/>, where a leading <c>~/</c> is replaced by <c>PathBase/</c>.
     /// An <c>http</c> Referer on an HTTPS request is upgraded to <c>https</c>, so going back never downgrades the connection.
     /// </summary>
-    internal static string GetBackUrl(HttpRequest request, string fallback)
+    internal static string GetBackUrl(HttpRequest request, string fallback, InertiaStateOptions? options)
     {
         // The scheme is not compared, so this keeps working behind a TLS-terminating proxy.
         if (Uri.TryCreate(request.Headers.Referer.ToString(), UriKind.Absolute, out var referer)
@@ -91,6 +93,8 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
 
             return referer.AbsoluteUri;
         }
+
+        if (PreviousUrlCookie.Read(request, options) is { } previous) return previous;
 
         return fallback.StartsWith("~/", StringComparison.Ordinal) ? request.PathBase.ToUriComponent() + fallback[1..] : fallback;
     }

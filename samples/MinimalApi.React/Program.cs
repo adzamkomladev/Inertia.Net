@@ -19,6 +19,7 @@ builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddResponseCompression(); // gzip and Brotli for the page JSON and HTML (see the README on HTTPS)
 builder.Services.AddInertia(o =>
 {
+    o.State.RememberPreviousUrl = true;
     o.Share("appName", "Inertia.Net Sample");
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
     o.Vite.Prefetch = VitePrefetch.Waterfall; // fetch the other pages' chunks after load, three at a time

@@ -7,6 +7,11 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in `State.RememberPreviousUrl`: successful page GETs remember their relative URL in a session cookie, so `Back()` and empty-response redirects work without a `Referer`. Read the validated value with `HttpContext.Inertia().PreviousUrl`; customize the cookie with `State.PreviousUrlCookieName`.
+- An old-input recipe using explicitly sanitized flash data; Inertia forms already retain their input on validation redirects.
+
 ## [1.6.0] - 2026-11-03
 
 ### Added

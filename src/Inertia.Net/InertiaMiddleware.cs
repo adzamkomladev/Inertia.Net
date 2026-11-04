@@ -74,7 +74,7 @@ internal sealed class InertiaMiddleware
                 && response.ContentLength is null or 0)
             {
                 response.StatusCode = IsPutPatchDelete(request.Method) ? StatusCodes.Status303SeeOther : StatusCodes.Status302Found;
-                response.Headers.Location = InertiaBackResult.GetBackUrl(request, "~/");
+                response.Headers.Location = InertiaBackResult.GetBackUrl(request, "~/", _pageWriter.Options.State);
             }
 
             // Finish while outer middleware such as UseSession is still active.
