@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Inertia.Net.IntegrationTests;
 
@@ -51,6 +52,42 @@ public sealed class LiveSignalRTests
         await using var client = await app.ConnectAsync();
         Assert.True(await client.SubscribeAsync(LiveChannel.Public(new string('a', 200))));
         Assert.False(await client.SubscribeAsync(LiveChannel.Public(new string('a', 201))));
+    }
+
+    [Fact]
+    public async Task Configured_limits_apply_and_unsubscribing_an_unknown_channel_does_not_free_capacity()
+    {
+        await using var app = await LiveApp.StartAsync(options =>
+        {
+            options.MaxSubscriptionsPerConnection = 2;
+            options.MaxChannelNameLength = 8;
+        });
+        await using var client = await app.ConnectAsync();
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public("too-long!")));
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel1")));
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel2")));
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel1")));
+        await client.Connection.InvokeAsync("Unsubscribe", "public", "unknown", Ct);
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public("channel3")));
+        await client.Connection.InvokeAsync("Unsubscribe", "public", "channel1", Ct);
+        await client.Connection.InvokeAsync("Unsubscribe", "public", "channel1", Ct);
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel3")));
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public("channel4")));
+    }
+
+    [Theory]
+    [InlineData(0, 200, "MaxSubscriptionsPerConnection")]
+    [InlineData(-1, 200, "MaxSubscriptionsPerConnection")]
+    [InlineData(64, 0, "MaxChannelNameLength")]
+    [InlineData(64, -1, "MaxChannelNameLength")]
+    public async Task Nonpositive_limits_are_rejected_at_startup(int subscriptions, int nameLength, string option)
+    {
+        var exception = await Assert.ThrowsAsync<OptionsValidationException>(() => LiveApp.StartAsync(options =>
+        {
+            options.MaxSubscriptionsPerConnection = subscriptions;
+            options.MaxChannelNameLength = nameLength;
+        }));
+        Assert.Contains(option, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -240,8 +277,16 @@ public sealed class LiveSignalRTests
             app.UseInertia();
             app.UseInertiaAntiforgery(); // the hub is exempt: its origin check stands in for the token
             app.MapInertiaLiveHub();
-            await app.StartAsync(Ct);
-            return new LiveApp(app);
+            try
+            {
+                await app.StartAsync(Ct);
+                return new LiveApp(app);
+            }
+            catch
+            {
+                await app.DisposeAsync();
+                throw;
+            }
         }
 
         public async Task<LiveClient> ConnectAsync(string query = "")
