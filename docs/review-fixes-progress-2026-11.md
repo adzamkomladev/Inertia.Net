@@ -108,3 +108,7 @@ The isolated slow-renderer browser trace and upstream protocol follow-up list ar
 18.4 ms and the next request 18.6 ms while a 4,004 ms real renderer refresh remained active. This is ordering evidence, not a
 throughput or general latency claim. Streaming remains excluded from 1.6.3 and belongs to the separate phase 7 follow-up.
 Phase 4 PR #38 merged after all CI checks succeeded.
+
+Phase 5 PR #39 merged after every CI check succeeded, including Linux/Windows tests, all three sample browser suites,
+all three starter templates, docs, Native AOT and CodeQL. GitHub’s reported Actions incident delayed final check statuses;
+merging waited for all checks to report success. The release branch now includes all five phase PRs; phase 6 evidence is committed.

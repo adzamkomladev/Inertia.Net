@@ -1,6 +1,6 @@
 # Security, performance and developer-experience fixes (review, November 2026)
 
-Status: phases 1–6 implemented and verified for **1.6.3**; release integration in progress.
+Status: phases 1–6 completed and verified for **1.6.3**. Phase 7 remains a separate follow-up.
 See [execution record](review-fixes-progress-2026-11.md) for evidence and reviewed corrections. Original review: 1.5.3 (`5d0fa8a`). **Corrected baseline: fetched `origin/main`
 at `2dd4a4b`, with GitHub release `v1.6.2` confirmed on 2026-11-04.** The earlier reassessment used the stale local checkout
 at `6bafde2` and incorrectly treated shipped features as future dependencies. This correction supersedes that assessment.
