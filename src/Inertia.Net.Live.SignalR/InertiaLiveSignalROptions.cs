@@ -10,6 +10,12 @@ public sealed class InertiaLiveSignalROptions
     /// <summary>Asks the <see cref="ILiveChannelAuthorizer"/> about public channels too. Off by default: anyone may join a public channel.</summary>
     public bool AuthorizePublicChannels { get; set; }
 
+    /// <summary>The maximum number of distinct channels a connection may subscribe to. Defaults to 64; must be positive.</summary>
+    public int MaxSubscriptionsPerConnection { get; set; } = 64;
+
+    /// <summary>The maximum channel name length in characters, excluding the channel type prefix. Defaults to 200; must be positive.</summary>
+    public int MaxChannelNameLength { get; set; } = 200;
+
     /// <summary>
     /// Origins (<c>https://app.example.com</c>) allowed to connect besides the app's own. A request with an <c>Origin</c> header that is
     /// neither is refused with 403: cookie-authenticated WebSockets are not protected by CORS.

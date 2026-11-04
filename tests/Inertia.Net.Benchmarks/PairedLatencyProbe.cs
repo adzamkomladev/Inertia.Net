@@ -11,15 +11,17 @@ internal static class PairedLatencyProbe
 {
     private static readonly string[] Methods =
     [
-        "Json20", "Partial2Of20", "Html20", "ReferenceSerialize", "CacheWrite1KiB", "CacheWrite1MiB", "IntegerKeys1000",
+        "Json20", "Partial2Of20", "Html20", "ReferenceSerialize", "CacheWrite1KiB", "CacheWrite1MiB", "IntegerKeys1000", "GuidKeys500",
         "ConstructProps", "Nested20", "Nested2000", "ParallelCacheHit1", "ParallelCacheHit32", "TinyParallel20", "YieldParallel3", "ColdBurst32",
     ];
 
     private static readonly string[] FixMethods = ["Json20", "Partial2Of20", "Html20", "ReferenceSerialize", "FailedPropBurst8", "RejectedSsrBurst8", "IgnoredBody1MiB"];
 
-    internal static async Task RunAsync(string directory, string output, bool memory = false, bool fixes = false)
+    private static readonly string[] ReviewMethods = ["Json20", "Partial2Of20", "Html20", "ReferenceSerialize", "IntegerKeys1000", "GuidKeys500", "TinyParallel20", "YieldParallel3"];
+
+    internal static async Task RunAsync(string directory, string output, bool memory = false, bool fixes = false, bool review = false)
     {
-        var methods = fixes ? FixMethods : Methods;
+        var methods = review ? ReviewMethods : fixes ? FixMethods : Methods;
         string[] names = memory ? ["baseline", "current"] : ["original", "current", "prune", "remember"];
         var variants = new List<Variant>();
         var rows = new List<Sample>();

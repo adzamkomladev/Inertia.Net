@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Inertia.Net.IntegrationTests;
 
@@ -23,6 +25,115 @@ public sealed class LiveSignalRTests
     private static readonly LiveEvent OrderUpdated = new("OrderUpdated", LiveChannel.Private("orders.1"));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task The_sixty_fifth_subscription_is_refused_and_unsubscribe_frees_a_slot()
+    {
+        await using var app = await LiveApp.StartAsync();
+        await using var client = await app.ConnectAsync();
+        for (var index = 0; index < 64; index++)
+        {
+            Assert.True(await client.SubscribeAsync(LiveChannel.Public($"channel-{index}")));
+        }
+
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel-0"))); // an existing group consumes no extra slot
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public("one-too-many")));
+        await client.Connection.InvokeAsync("Unsubscribe", "public", "channel-0", Ct);
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("replacement")));
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public("one-too-many")));
+        await using var other = await app.ConnectAsync();
+        Assert.True(await other.SubscribeAsync(LiveChannel.Public("one-too-many"))); // each connection has its own cap
+    }
+
+    [Fact]
+    public async Task Channel_names_are_limited_to_two_hundred_characters()
+    {
+        await using var app = await LiveApp.StartAsync();
+        await using var client = await app.ConnectAsync();
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public(new string('a', 200))));
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public(new string('a', 201))));
+    }
+
+    [Fact]
+    public async Task Configured_limits_apply_and_unsubscribing_an_unknown_channel_does_not_free_capacity()
+    {
+        await using var app = await LiveApp.StartAsync(options =>
+        {
+            options.MaxSubscriptionsPerConnection = 2;
+            options.MaxChannelNameLength = 8;
+        });
+        await using var client = await app.ConnectAsync();
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public("too-long!")));
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel1")));
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel2")));
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel1")));
+        await client.Connection.InvokeAsync("Unsubscribe", "public", "unknown", Ct);
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public("channel3")));
+        await client.Connection.InvokeAsync("Unsubscribe", "public", "channel1", Ct);
+        await client.Connection.InvokeAsync("Unsubscribe", "public", "channel1", Ct);
+        Assert.True(await client.SubscribeAsync(LiveChannel.Public("channel3")));
+        Assert.False(await client.SubscribeAsync(LiveChannel.Public("channel4")));
+    }
+
+    [Theory]
+    [InlineData(0, 200, "MaxSubscriptionsPerConnection")]
+    [InlineData(-1, 200, "MaxSubscriptionsPerConnection")]
+    [InlineData(64, 0, "MaxChannelNameLength")]
+    [InlineData(64, -1, "MaxChannelNameLength")]
+    public async Task Nonpositive_limits_are_rejected_at_startup(int subscriptions, int nameLength, string option)
+    {
+        var exception = await Assert.ThrowsAsync<OptionsValidationException>(() => LiveApp.StartAsync(options =>
+        {
+            options.MaxSubscriptionsPerConnection = subscriptions;
+            options.MaxChannelNameLength = nameLength;
+        }));
+        Assert.Contains(option, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Refused_subscriptions_do_not_consume_a_slot()
+    {
+        await using var app = await LiveApp.StartAsync();
+        await using var client = await app.ConnectAsync();
+        for (var index = 0; index < 65; index++)
+        {
+            Assert.False(await client.SubscribeAsync(LiveChannel.Private($"orders.{index}")));
+        }
+
+        Assert.True(await client.SubscribeAsync(StatsChanged.Channel));
+    }
+
+    [Fact]
+    public async Task Https_origin_on_http_with_the_same_host_warns_once_and_stays_forbidden()
+    {
+        using var logs = new LiveLogs();
+        await using var app = await LiveApp.StartAsync(logs: logs);
+        using var client = app.Server.CreateClient();
+        for (var index = 0; index < 2; index++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/inertia-live/negotiate?negotiateVersion=1");
+            request.Headers.Add("Origin", "https://localhost");
+            using var response = await client.SendAsync(request, Ct);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        var warning = Assert.Single(logs.Warnings);
+        Assert.Contains("UseForwardedHeaders()", warning, StringComparison.Ordinal);
+        Assert.Contains("AllowedOrigins", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_explicitly_allowed_https_origin_on_http_does_not_warn()
+    {
+        using var logs = new LiveLogs();
+        await using var app = await LiveApp.StartAsync(options => options.AllowedOrigins.Add("https://localhost"), logs);
+        using var client = app.Server.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/inertia-live/negotiate?negotiateVersion=1");
+        request.Headers.Add("Origin", "https://localhost");
+        using var response = await client.SendAsync(request, Ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(logs.Warnings);
+    }
 
     [Fact]
     public async Task A_public_subscriber_receives_published_events_with_values()
@@ -153,11 +264,12 @@ public sealed class LiveSignalRTests
 
         public IInertiaLive Live { get; } = app.Services.GetRequiredService<IInertiaLive>();
 
-        public static async Task<LiveApp> StartAsync(Action<InertiaLiveSignalROptions>? configure = null)
+        public static async Task<LiveApp> StartAsync(Action<InertiaLiveSignalROptions>? configure = null, LiveLogs? logs = null)
         {
             var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
             builder.WebHost.UseTestServer();
             builder.Logging.SetMinimumLevel(LogLevel.Warning);
+            if (logs is not null) builder.Logging.AddProvider(logs);
             builder.Services.AddInertia();
             builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
             builder.Services.AddInertiaLive().AddSignalR(configure);
@@ -165,8 +277,16 @@ public sealed class LiveSignalRTests
             app.UseInertia();
             app.UseInertiaAntiforgery(); // the hub is exempt: its origin check stands in for the token
             app.MapInertiaLiveHub();
-            await app.StartAsync(Ct);
-            return new LiveApp(app);
+            try
+            {
+                await app.StartAsync(Ct);
+                return new LiveApp(app);
+            }
+            catch
+            {
+                await app.DisposeAsync();
+                throw;
+            }
         }
 
         public async Task<LiveClient> ConnectAsync(string query = "")
@@ -212,5 +332,29 @@ public sealed class LiveSignalRTests
         }
 
         public ValueTask DisposeAsync() => Connection.DisposeAsync();
+    }
+
+    private sealed class LiveLogs : ILoggerProvider
+    {
+        public ConcurrentQueue<string> Warnings { get; } = new();
+
+        public ILogger CreateLogger(string categoryName) => new Logger(this, categoryName);
+
+        public void Dispose() { }
+
+        private sealed class Logger(LiveLogs owner, string category) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => logLevel == LogLevel.Warning;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                if (logLevel == LogLevel.Warning && category.StartsWith("Inertia.Net.Live.SignalR", StringComparison.Ordinal))
+                {
+                    owner.Warnings.Enqueue(formatter(state, exception));
+                }
+            }
+        }
     }
 }

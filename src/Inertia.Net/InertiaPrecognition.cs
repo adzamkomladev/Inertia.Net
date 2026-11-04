@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 
@@ -6,30 +7,40 @@ namespace Inertia.Net;
 
 /// <summary>
 /// Precognition (live validation) as the laravel-precognition client expects it: the request carries <c>Precognition: true</c> and
-/// optionally <c>Precognition-Validate-Only: a,b.c</c>; every response carries <c>Precognition: true</c> (the client throws without it)
+/// optionally <c>Precognition-Validate-Only: a,b.c</c>; precognitive responses carry <c>Precognition: true</c> (the client throws without it)
 /// and <c>Vary: Precognition</c>; valid is <c>204</c> + <c>Precognition-Success: true</c>, invalid is <c>422</c> with
 /// <c>{ "message", "errors": { field: [messages] } }</c>. The handler never runs.
 /// </summary>
-internal static class InertiaPrecognition
+public static class InertiaPrecognition
 {
+    /// <summary>The request and response header identifying a precognitive validation request.</summary>
     public const string Header = "Precognition";
+    /// <summary>The request header listing the client field paths whose errors should be returned.</summary>
     public const string ValidateOnlyHeader = "Precognition-Validate-Only";
+    /// <summary>The response header indicating that precognitive validation succeeded.</summary>
     public const string SuccessHeader = "Precognition-Success";
 
-    public static bool IsPrecognitive(HttpRequest request) =>
-        string.Equals(request.Headers[Header], "true", StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// Returns whether the request carries <c>Precognition: true</c>. For a separate validation rate-limit bucket, also check
+    /// the endpoint's <see cref="InertiaPrecognitionMetadata"/>; the header alone does not guarantee that the handler is skipped.
+    /// </summary>
+    public static bool IsPrecognitive(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return string.Equals(request.Headers[Header], "true", StringComparison.OrdinalIgnoreCase);
+    }
 
-    public static void AppendVary(IHeaderDictionary headers) => headers.Vary = StringValues.Concat(headers.Vary, Header);
+    internal static void AppendVary(IHeaderDictionary headers) => headers.Vary = StringValues.Concat(headers.Vary, Header);
 
     /// <summary>The response for a precognitive request; <paramref name="errors"/> use CLR member paths, keyed to JSON names here.</summary>
-    public static IResult Result(HttpContext httpContext, Dictionary<string, string[]>? errors, JsonNamingPolicy? naming)
+    internal static IResult Result(HttpContext httpContext, Dictionary<string, string[]>? errors, JsonNamingPolicy? naming, JsonTypeInfo? schema = null)
     {
         if (errors is not { Count: > 0 })
         {
             return new PrecognitionResult(null);
         }
 
-        errors = InertiaValidationFilter.ToClientKeys(errors, naming);
+        errors = InertiaValidationFilter.ToClientKeys(errors, naming, schema);
         var only = httpContext.Request.Headers[ValidateOnlyHeader].ToString();
         if (only.Length > 0)
         {

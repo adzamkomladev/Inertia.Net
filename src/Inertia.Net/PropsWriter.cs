@@ -9,15 +9,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Inertia.Net;
 
-/// <summary>A top-level prop with the declared type of its value.</summary>
-internal readonly record struct PropEntry(string Key, object? Value, Type Type);
+/// <summary>A prop entry with its declared value type and optional member serializer.</summary>
+internal readonly record struct PropEntry(string Key, object? Value, Type Type, JsonTypeInfo? Serializer = null);
 
 /// <summary>
 /// Port of inertia-laravel 3.x <c>PropsResolver</c> (docs/protocol.md §4): one walk that filters, resolves,
 /// writes the props to JSON and collects the page metadata. Used by one render at a time: the page writer pools instances, and
 /// <see cref="Begin"/> and <see cref="Clear"/> bracket each render.
 /// </summary>
-internal sealed class PropsWriter
+internal sealed partial class PropsWriter
 {
     private const int MaxRetainedPath = 1024;
 
@@ -55,7 +55,7 @@ internal sealed class PropsWriter
     /// Starts a render into <paramref name="buffer"/> and returns its JSON writer, kept for the next render with the same options. With
     /// <paramref name="plan"/> the walk starts the <see cref="InertiaProp.Parallel"/> loaders first.
     /// </summary>
-    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, CancellationToken cancellationToken, bool plan)
+    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, bool plan, CancellationToken cancellationToken)
     {
         var writer = htmlSafe
             ? _htmlWriter ??= new Utf8JsonWriter(buffer, _owner.HtmlWriterOptions)
@@ -130,9 +130,9 @@ internal sealed class PropsWriter
     private async ValueTask WriteEntriesAsync(List<PropEntry> props)
     {
         _writer.WriteStartObject();
-        foreach (var entry in props)
+        for (var index = 0; index < props.Count; index++)
         {
-            await WriteEntryAsync(entry.Key, -1, entry.Value, entry.Type, parentWasResolved: false);
+            await WriteEntryAsync(props[index], parentWasResolved: false);
         }
 
         _writer.WriteEndObject();
@@ -146,7 +146,7 @@ internal sealed class PropsWriter
         {
             foreach (var entry in props)
             {
-                PlanEntry(entry.Key, entry.Value, entry.Type);
+                if (entry.Serializer is null) PlanEntry(entry.Key, entry.Value, entry.Type);
             }
         }
         catch
@@ -168,7 +168,7 @@ internal sealed class PropsWriter
                 SawParallel |= prop.IsParallel;
                 if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    PlanLoad(prop);
+                    PlanLoad(prop, key);
                 }
 
                 return;
@@ -180,7 +180,7 @@ internal sealed class PropsWriter
                 SawParallel = true;
                 if (Decide(null, value, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    Prefetch(lazy.Source, lookup: null);
+                    PlanLoad(lazy.Source, key);
                 }
 
                 return;
@@ -224,14 +224,14 @@ internal sealed class PropsWriter
 
     // A cached prop's loader only starts on a miss. A store that answers at once (the memory store) is asked here, and a hit plans
     // nothing: the walk finds it again and writes it without a loader. Another store's answer is awaited by the started task first.
-    private void PlanLoad(InertiaProp prop)
+    private void PlanLoad(InertiaProp prop, string key)
     {
         if (prop.Caching is { } caching)
         {
             var lookup = _owner.Caching.GetPropAsync(caching, _cancellationToken);
             if (!lookup.IsCompletedSuccessfully)
             {
-                Prefetch(prop, lookup.AsTask());
+                Prefetch(prop, key, lookup.AsTask());
                 return;
             }
 
@@ -241,11 +241,11 @@ internal sealed class PropsWriter
             }
         }
 
-        Prefetch(prop, lookup: null);
+        Prefetch(prop, key, lookup: null);
     }
 
-    private void Prefetch(InertiaProp prop, Task<CachedProp?>? lookup) =>
-        (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, lookup);
+    private void Prefetch(InertiaProp prop, string key, Task<CachedProp?>? lookup) =>
+        (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, _pathLength == key.Length ? key : new string(Path), lookup);
 
     /// <summary>
     /// Writes sharedProps through liveProps, in protocol order, omitting empty ones. The shared keys are the first
@@ -433,6 +433,26 @@ internal sealed class PropsWriter
         }
     }
 
+    // Member serializers do not resolve loaders; keep them out of the asynchronous loader's state.
+    private ValueTask WriteEntryAsync(PropEntry entry, bool parentWasResolved)
+    {
+        if (entry.Serializer is null) return WriteEntryAsync(entry.Key, -1, entry.Value, entry.Type, parentWasResolved);
+        var mark = Push(entry.Key);
+        try
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfPlanFailed();
+            if (Decide(null, entry.Value, entry.Type, parentWasResolved, entry.Serializer) == Inclusion.Filtered) return default;
+            _writer.WritePropertyName(entry.Key);
+            JsonSerializer.Serialize(_writer, entry.Value, entry.Serializer);
+            return default;
+        }
+        finally
+        {
+            _pathLength = mark;
+        }
+    }
+
     // resolveProps loop body for one key (or array index).
     private async ValueTask WriteEntryAsync(string? key, int index, object? prop, Type declaredType, bool parentWasResolved)
     {
@@ -581,7 +601,12 @@ internal sealed class PropsWriter
     {
         if (_uncommon?.Refreshes is { } refreshes && refreshes.Claim())
         {
-            httpContext.Response.OnCompleted(static state => ((PropRefreshes)state).RunAsync(), refreshes);
+            httpContext.Response.OnCompleted(static state =>
+            {
+                var pending = (PropRefreshes)state;
+                pending.Schedule();
+                return Task.CompletedTask;
+            }, refreshes);
         }
     }
 
@@ -612,10 +637,7 @@ internal sealed class PropsWriter
                 _owner.WriteNode(_writer, node);
                 return;
             case InertiaPageWriter.LazyDotObject lazy:
-                // Deviation 7: the lazy prop under dot keys resolves only now that its path is part of the response. Plain props
-                // are never rescued, so it always resolves.
-                var (_, source) = await ResolveAsync(lazy.Source);
-                await WriteObjectAsync(lazy.Apply(source), parentWasResolved);
+                await WriteLazyDotAsync(lazy, parentWasResolved);
                 return;
             case Dictionary<string, object?> dictionary: // InertiaProps: struct enumerator, no boxing
                 await WriteObjectAsync(dictionary, parentWasResolved);
@@ -655,6 +677,35 @@ internal sealed class PropsWriter
         JsonSerializer.Serialize(_writer, value, info);
     }
 
+    private async ValueTask WriteLazyDotAsync(InertiaPageWriter.LazyDotObject lazy, bool parentWasResolved)
+    {
+        // Deviation 7: resolve only after inclusion, keeping cache ownership and live listeners on the parent.
+        if (lazy.Source.LiveSpec is not null) CollectLive(lazy.Source, parentWasResolved);
+        if (lazy.Source.Caching is { } caching)
+        {
+            var hit = _planner is not null && _planner.IsPlanned(lazy.Source)
+                ? null : await _owner.Caching.GetPropAsync(caching, _cancellationToken);
+            if (hit is null)
+            {
+                var (_, loaded) = await ResolveAsync(lazy.Source, cached: true);
+                hit = (CachedProp)loaded!;
+            }
+
+            if (hit.Value.IsStale && !_owner.Caching.IsRefreshing(caching.StoreKey))
+            {
+                ((_uncommon ??= new()).Refreshes ??= new PropRefreshes(_owner)).Add(lazy.Source, new string(Path));
+            }
+
+            using var document = JsonDocument.Parse(hit.Value.Json);
+            await WriteObjectAsync(lazy.ApplyCached(document.RootElement), parentWasResolved);
+        }
+        else
+        {
+            var (_, source) = await ResolveAsync(lazy.Source);
+            await WriteObjectAsync(lazy.Apply(source), parentWasResolved);
+        }
+    }
+
     private async ValueTask WriteObjectAsync(IEnumerable<KeyValuePair<string, object?>> entries, bool parentWasResolved)
     {
         _writer.WriteStartObject();
@@ -688,7 +739,7 @@ internal sealed class PropsWriter
         {
             for (var i = 0; i < count; i++)
             {
-                await WriteEntryAsync(entries[i].Key, -1, entries[i].Value, entries[i].Type, parentWasResolved);
+                await WriteEntryAsync(entries[i], parentWasResolved);
             }
         }
         finally
@@ -740,9 +791,10 @@ internal sealed class PropsWriter
         _cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            var cancellationToken = _planner?.Token ?? _cancellationToken;
             var value = await (_planner is not null && _planner.TryTake(prop, out var started)
                 ? new ValueTask<object?>(started)
-                : cached ? _owner.LoadCachedPropAsync(prop, _cancellationToken) : prop.ResolveAsync(_cancellationToken));
+                : cached ? _owner.LoadCachedPropAsync(prop, cancellationToken) : prop.ResolveAsync(cancellationToken));
             return value is InertiaPageWriter.RescuedCachedProp rescued ? Rescue(rescued.Exception) : (true, value);
         }
         catch (Exception ex) when (!cached && prop.ShouldRescue
@@ -755,7 +807,7 @@ internal sealed class PropsWriter
     private (bool Resolved, object? Value) Rescue(Exception exception)
     {
         var path = new string(Path);
-        _owner.Logger.LogError(exception, "Inertia prop '{Path}' failed to resolve and was rescued.", path);
+        LogRescued(_owner.Logger, exception, path);
         ((_uncommon ??= new()).Rescued ??= []).Add(path);
         _owner.Metrics.RecordRescued();
         return (false, null);
@@ -769,6 +821,9 @@ internal sealed class PropsWriter
             throw new OperationCanceledException("A parallel prop loader failed.");
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Inertia prop '{Path}' failed to resolve and was rescued.")]
+    private static partial void LogRescued(ILogger logger, Exception exception, string path);
 
     private enum Inclusion
     {
@@ -784,7 +839,7 @@ internal sealed class PropsWriter
 
     // Whether the prop (or plain value) at Path is part of this response, decided before any loader runs and without side effects,
     // so the parallel planner and the writer agree on which loaders run.
-    private Inclusion Decide(InertiaProp? p, object? prop, Type declaredType, bool parentWasResolved)
+    private Inclusion Decide(InertiaProp? p, object? prop, Type declaredType, bool parentWasResolved, JsonTypeInfo? serializer = null)
     {
         // Always props and the children of resolved values bypass partial filtering.
         if (_isPartial && !parentWasResolved && p is not { IsAlways: true })
@@ -794,7 +849,8 @@ internal sealed class PropsWriter
                 return Inclusion.Filtered;
             }
 
-            if (_request.Except is { } excluded && LeadsToAny(excluded, Path) && IsArray(prop, declaredType))
+            if (_request.Except is { } excluded && LeadsToAny(excluded, Path)
+                && (serializer is not null ? serializer.Kind == JsonTypeInfoKind.Enumerable : IsArray(prop, declaredType)))
             {
                 return Inclusion.Filtered;
             }
@@ -878,46 +934,39 @@ internal sealed class PropsWriter
 
         // Scroll merge intent. Deliberate deviation 2: applied before any metadata is collected,
         // so a deferred scroll prop reports "{path}.{wrapper}" just like a resolved one.
-        if (prop.ScrollWrapper is { } wrapper)
-        {
-            if (_request.MergeIntentPrepend)
-            {
-                prependPaths = [.. prependPaths ?? [], wrapper];
-            }
-            else
-            {
-                appendPaths = [.. appendPaths ?? [], wrapper];
-            }
-        }
+        var wrapper = prop.ScrollWrapper;
 
         if (prop.IsDeepMerge)
         {
             (_deepMergeProps ??= []).Add(path);
         }
-        else if (appendPaths is not { Count: > 0 } && prependPaths is not { Count: > 0 })
+        else if (wrapper is null && appendPaths is not { Count: > 0 } && prependPaths is not { Count: > 0 })
         {
             (prop.AppendAtRoot ? _mergeProps ??= [] : _prependProps ??= []).Add(path);
         }
         else
         {
-            AddPaths(ref _mergeProps, path, appendPaths);
-            AddPaths(ref _prependProps, path, prependPaths);
+            AddPaths(ref _mergeProps, path, appendPaths, _request.MergeIntentPrepend ? null : wrapper);
+            AddPaths(ref _prependProps, path, prependPaths, _request.MergeIntentPrepend ? wrapper : null);
         }
 
         AddPaths(ref _matchPropsOn, path, prop.MatchOnKeys);
     }
 
     // Adds "{path}.{suffix}" for each suffix. (A `suffixes ?? []` fallback would allocate an empty list per call.)
-    private static void AddPaths(ref List<string>? target, string path, List<string>? suffixes)
+    private static void AddPaths(ref List<string>? target, string path, List<string>? suffixes, string? extraSuffix = null)
     {
-        if (suffixes is null)
+        if (suffixes is not null)
         {
-            return;
+            foreach (var suffix in suffixes)
+            {
+                (target ??= []).Add($"{path}.{suffix}");
+            }
         }
 
-        foreach (var suffix in suffixes)
+        if (extraSuffix is not null)
         {
-            (target ??= []).Add($"{path}.{suffix}");
+            (target ??= []).Add($"{path}.{extraSuffix}");
         }
     }
 
@@ -1098,7 +1147,7 @@ internal sealed class PropsWriter
 
 /// <summary>
 /// Refreshes the stale cached props of a response once the response has been sent, one after another as the walk resolves loaders. The
-/// response's completion callbacks run before its request services are disposed, so the loaders can still use them.
+/// loaders run independently of the request's lifetime and must create their own scopes for scoped dependencies.
 /// </summary>
 internal sealed class PropRefreshes(InertiaPageWriter owner)
 {
@@ -1113,7 +1162,14 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
         return _props.Count > 0;
     }
 
-    public async Task RunAsync()
+    public void Schedule() => owner.Refreshes.Enqueue(new RefreshWork(RunAsync, Release, "prop"));
+
+    private void Release()
+    {
+        foreach (var (prop, _) in _props) owner.Caching.EndRefresh(prop.Caching!.StoreKey);
+    }
+
+    private async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var (prop, path) in _props)
         {
@@ -1122,22 +1178,22 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
             {
                 // The response read the value stale, but another refresh (this instance's, between that read and this response's
                 // claim, or another instance's in a shared store) may have stored a fresh one since: then there is nothing to do.
-                if (await owner.Caching.GetPropAsync(caching, CancellationToken.None) is { IsStale: false })
+                if (await owner.Caching.GetPropAsync(caching, cancellationToken) is { IsStale: false })
                 {
                     continue;
                 }
 
-                var value = await prop.ResolveAsync(CancellationToken.None);
+                var value = await prop.ResolveAsync(cancellationToken);
                 var entry = owner.CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, path, out _);
-                await owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, CancellationToken.None);
+                await owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 owner.Caching.LogRefreshFailure(ex, $"the prop '{path}'");
-            }
-            finally
-            {
-                owner.Caching.EndRefresh(caching.StoreKey);
             }
         }
     }

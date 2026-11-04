@@ -3,15 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using MvcJsonOptions = Microsoft.AspNetCore.Mvc.JsonOptions;
+using Microsoft.AspNetCore.Mvc.Controllers;
 
 namespace Inertia.Net.Mvc;
 
 /// <summary>
 /// For Inertia requests other than GET with an invalid <see cref="ControllerBase.ModelState"/>, short-circuits the action with a redirect
 /// back carrying the errors (bag from <c>X-Inertia-Error-Bag</c>, else <c>default</c>). Registered globally by <c>AddInertiaMvc()</c>.
-/// Keys are the model paths with each segment run through the MVC JSON naming policy (<c>Address.Street</c> becomes <c>address.street</c>).
+/// Keys are the model paths mapped through the page JSON contract (<c>Address.Street</c> becomes <c>address.street</c>).
 /// </summary>
 public sealed class InertiaModelStateFilter : IAsyncActionFilter
 {
@@ -22,15 +21,17 @@ public sealed class InertiaModelStateFilter : IAsyncActionFilter
         ArgumentNullException.ThrowIfNull(next);
         if (!context.ModelState.IsValid && InertiaValidationFilter.IsInertiaMutation(context.HttpContext))
         {
-            context.Result = new ResultAdapter(BackWithErrors(context.HttpContext, context.ModelState));
+            context.Result = new ResultAdapter(BackWithErrors(context));
             return Task.CompletedTask;
         }
 
         return next();
     }
 
-    internal static InertiaBackResult BackWithErrors(HttpContext httpContext, ModelStateDictionary modelState)
+    internal static InertiaBackResult BackWithErrors(ActionContext context)
     {
+        var httpContext = context.HttpContext;
+        var modelState = context.ModelState;
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
         foreach (var (key, entry) in modelState)
         {
@@ -41,8 +42,10 @@ public sealed class InertiaModelStateFilter : IAsyncActionFilter
             }
         }
 
-        var naming = httpContext.RequestServices.GetRequiredService<IOptions<MvcJsonOptions>>().Value.JsonSerializerOptions.PropertyNamingPolicy;
-        return InertiaValidationFilter.Back(httpContext, InertiaValidationFilter.ToClientKeys(errors, naming));
+        var naming = InertiaValidationFilter.NamingPolicy(httpContext.RequestServices);
+        var schema = context.ActionDescriptor is ControllerActionDescriptor action
+            ? InertiaValidationFilter.BodySchema(action.MethodInfo, httpContext.RequestServices) : null;
+        return InertiaValidationFilter.Back(httpContext, InertiaValidationFilter.ToClientKeys(errors, naming, schema));
     }
 }
 

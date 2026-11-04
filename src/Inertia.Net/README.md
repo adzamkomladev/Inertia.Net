@@ -1,7 +1,5 @@
 # Inertia.Net
 
-Version 1.6.2 adds pagination helpers for numbered and cursor pages. Version 1.6 adds [live props](https://github.com/adzamkomladev/Inertia.Net#live-props): props that refresh themselves when the server broadcasts an event. Version 1.5 lets you remove, replace and tag cached props and SSR renders (`IInertiaCache`), serve them stale while they refresh (`staleFor`), and keep them in a cache store of your choice (`IInertiaCacheStore`). Upgrading from 1.3 or earlier? Read the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md): one default changed (redirects to another origin become a full visit). The [changelog](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md) lists every release. Start a new app with `dotnet new install Inertia.Net.Templates` and `dotnet new inertia`.
-
 The core of Inertia.Net, a .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs (this package), MVC (`Inertia.Net.Mvc`) and FastEndpoints (`Inertia.Net.FastEndpoints`), with the React, Vue and Svelte clients, and is Native AOT and trim compatible.
 
 ```sh

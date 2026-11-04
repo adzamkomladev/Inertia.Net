@@ -25,6 +25,23 @@ public sealed class DeveloperExperienceTests : IDisposable
         new(o => o.Pages.Directory = "ClientApp/pages", contentRoot: _root.Path, environment: environment);
 
     [Fact]
+    public void Repeated_AddInertia_registers_each_hosted_service_once()
+    {
+        var harness = new Harness(configureServices: services =>
+        {
+            services.AddInertia();
+            services.AddInertia();
+        });
+
+        var hostedServices = harness.Services.GetServices<IHostedService>().ToArray();
+        Assert.Single(hostedServices.OfType<InertiaTypeScriptWriter>());
+        Assert.Same(harness.Services.GetRequiredService<InertiaRefreshQueue>(),
+            Assert.Single(hostedServices.OfType<InertiaRefreshQueue>()));
+        Assert.Same(harness.Services.GetRequiredService<SsrNodeProcess>(),
+            Assert.Single(hostedServices.OfType<SsrNodeProcess>()));
+    }
+
+    [Fact]
     public async Task Existing_components_render()
     {
         var harness = Pages();

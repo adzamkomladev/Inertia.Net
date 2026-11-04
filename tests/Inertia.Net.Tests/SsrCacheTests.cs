@@ -379,12 +379,49 @@ public sealed class SsrCacheTests
         Assert.Contains("render 1", await RenderAsync(harness, out var other), StringComparison.Ordinal);
         Assert.Equal(0, other.Pending);
 
-        await refresh.CompleteAsync();
+        await harness.CompleteRefreshAsync(refresh);
         Assert.Equal(2, handler.Calls);
         Assert.Contains("render 2", await RenderAsync(harness), StringComparison.Ordinal);
 
         time.Advance(TimeSpan.FromMinutes(10));
         Assert.Contains("render 3", await RenderAsync(harness), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_slow_refresh_does_not_hold_the_response_completion_callback()
+    {
+        var time = new FakeTimeProvider();
+        var (harness, handler) = Create(c =>
+        {
+            c.Duration = TimeSpan.FromMinutes(1);
+            c.StaleFor = TimeSpan.FromMinutes(5);
+        }, time);
+        var services = harness.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>().ToArray();
+        foreach (var service in services) await service.StartAsync(TestContext.Current.CancellationToken);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            await RenderAsync(harness);
+            time.Advance(TimeSpan.FromMinutes(2));
+            handler.BeforeSend = (_, ct) =>
+            {
+                started.TrySetResult();
+                return release.Task.WaitAsync(ct);
+            };
+            Assert.Contains("render 1", await RenderAsync(harness, out var refresh), StringComparison.Ordinal);
+            Assert.False(started.Task.IsCompleted);
+            await refresh.CompleteAsync().WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Contains("render 1", await RenderAsync(harness, out var other), StringComparison.Ordinal);
+            Assert.Equal(0, other.Pending);
+            Assert.Equal(2, handler.Calls);
+        }
+        finally
+        {
+            release.TrySetResult();
+            foreach (var service in services.Reverse()) await service.StopAsync(CancellationToken.None);
+        }
     }
 
     [Fact]
@@ -404,7 +441,7 @@ public sealed class SsrCacheTests
         // The page is rendered and stored fresh before the stale read's refresh runs.
         await harness.Services.GetRequiredService<IInertiaCache>().ClearSsrAsync(TestContext.Current.CancellationToken);
         Assert.Contains("render 2", await RenderAsync(harness), StringComparison.Ordinal);
-        await refresh.CompleteAsync();
+        await harness.CompleteRefreshAsync(refresh);
         Assert.Equal(2, handler.Calls);
     }
 

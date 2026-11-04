@@ -11,7 +11,11 @@ using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
-/// <summary>Thrown when server-side rendering fails and the page's SSR mode is <see cref="SsrMode.Required"/>.</summary>
+/// <summary>
+/// Thrown when server-side rendering fails and the page's SSR mode is <see cref="SsrMode.Required"/>.
+/// Exceptions emitted by the adapter have a generic message suitable for an error page. Renderer details remain in logs
+/// and the diagnostic properties, which must not be displayed to end users.
+/// </summary>
 public sealed class InertiaSsrException : Exception
 {
     /// <summary>Creates the exception.</summary>
@@ -25,10 +29,11 @@ public sealed class InertiaSsrException : Exception
     /// <summary>
     /// The failure kind: the SSR server's error <c>type</c>, or <c>startup</c>, <c>connection</c>, <c>timeout</c>, <c>http</c>, <c>response</c>,
     /// <c>response-too-large</c>, <c>overloaded</c>, <c>circuit-open</c>, <c>not-ready</c>, <c>page-too-large</c>, <c>bundle-missing</c> or <c>unknown</c>.
+    /// Renderer-supplied values are bounded to 2 KB plus a marker and may contain internal details; do not display them to end users.
     /// </summary>
     public string? Type { get; }
 
-    /// <summary>The SSR server's hint on how to fix the error, when it sent one.</summary>
+    /// <summary>The SSR server's diagnostic hint, bounded to 2 KB plus a marker. May contain internal details; do not display to end users.</summary>
     public string? Hint { get; }
 }
 
@@ -66,6 +71,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     private readonly SsrNodeProcess _nodeProcess;
     private readonly TimeProvider _timeProvider;
     private readonly InertiaMetrics _metrics;
+    private readonly InertiaRefreshQueue _refreshes;
     private readonly ILogger _logger;
     private readonly bool _managed;
     private readonly SsrEndpoint[] _endpoints;
@@ -90,6 +96,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         SsrNodeProcess nodeProcess,
         TimeProvider timeProvider,
         InertiaMetrics metrics,
+        InertiaRefreshQueue refreshes,
         InertiaCaching caching,
         ILogger<SsrGateway> logger)
     {
@@ -99,6 +106,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         _nodeProcess = nodeProcess;
         _timeProvider = timeProvider;
         _metrics = metrics;
+        _refreshes = refreshes;
         _logger = logger;
         _managed = _ssr.NodeProcess is not null;
         _bundles = new(static path => path, environment.IsDevelopment(), timeProvider);
@@ -301,32 +309,39 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     }
 
     // Its own method: the closure would otherwise be allocated on every stale hit, refresh or not.
-    private void OnCompleted(HttpContext http, InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor) =>
-        http.Response.OnCompleted(() => RefreshAsync(key, pageJson, duration, staleFor));
+    private void OnCompleted(HttpContext http, InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor)
+    {
+        var work = new RefreshWork(ct => RefreshAsync(key, pageJson, duration, staleFor, ct), () => _caching.EndRefresh(key), "ssr");
+        http.Response.OnCompleted(() =>
+        {
+            _refreshes.Enqueue(work);
+            return Task.CompletedTask;
+        });
+    }
 
-    private async Task RefreshAsync(InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor)
+    private async Task RefreshAsync(InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor, CancellationToken cancellationToken)
     {
         try
         {
             // As for props: a render stored fresh since this response read it stale needs no second render.
-            if (await _caching.GetRenderAsync(key, CancellationToken.None) is { IsStale: false })
+            if (await _caching.GetRenderAsync(key, cancellationToken) is { IsStale: false })
             {
                 return;
             }
 
             // Preferred: a failed refresh is logged like any fallback, and the stale render stays until it expires.
-            if (await RenderOnServersAsync(SsrMode.Preferred, pageJson, _endpoints, _managed, CancellationToken.None) is { } render)
+            if (await RenderOnServersAsync(SsrMode.Preferred, pageJson, _endpoints, _managed, cancellationToken) is { } render)
             {
-                (await StoreAsync(key, duration, staleFor, render, CancellationToken.None)).Dispose();
+                (await StoreAsync(key, duration, staleFor, render, cancellationToken)).Dispose();
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             _caching.LogRefreshFailure(ex, "an SSR render");
-        }
-        finally
-        {
-            _caching.EndRefresh(key);
         }
     }
 
@@ -547,6 +562,10 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         {
             return new Attempt(SsrFailure.ResponseTooLarge, "response-too-large", ex.Message, Inner: ex);
         }
+        catch (OperationCanceledException ex) when (!deadline.IsCancellationRequested)
+        {
+            return new Attempt(SsrFailure.Connection, "connection", $"Connecting to the SSR server at {endpoint.DisplayUrl} exceeded Ssr.ConnectTimeout.", Inner: ex, Retryable: true);
+        }
         catch (OperationCanceledException ex)
         {
             return new Attempt(SsrFailure.Timeout, "timeout", $"The SSR server at {endpoint.DisplayUrl} did not respond within {_ssr.Timeout}.", Inner: ex);
@@ -730,27 +749,26 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     private SsrRender? Skip(SsrMode mode, SsrFailure failure, string message, bool log = true)
     {
         _metrics.RecordOutcome(mode == SsrMode.Required ? "error" : "fallback", failure.Name());
-        if (mode == SsrMode.Required)
-        {
-            throw new InertiaSsrException($"Inertia SSR failed ({failure.Name()}): {message}", failure.Name());
-        }
-
         if (log && ShouldLogSkip(failure, out var suppressed))
         {
-            LogSkipped(_logger, failure.Name(), message, suppressed);
+            LogSkipped(_logger, failure.Name(), Truncate(message)!, suppressed);
         }
 
-        return null;
+        return mode == SsrMode.Required ? throw new InertiaSsrException(PublicFailureMessage(failure), failure.Name()) : null;
     }
 
     private SsrRender? Fail(SsrMode mode, SsrFailure failure, string type, string message, string? hint, Exception? inner)
     {
         _metrics.RecordOutcome(mode == SsrMode.Required ? "error" : "fallback", failure.Name());
-        return mode == SsrMode.Required ? throw new InertiaSsrException($"Inertia SSR failed ({type}): {message}", type, hint, inner) : null;
+        return mode == SsrMode.Required
+            ? throw new InertiaSsrException(PublicFailureMessage(failure), Truncate(type), Truncate(hint), inner)
+            : null;
     }
 
+    private static string PublicFailureMessage(SsrFailure failure) => $"Inertia SSR failed ({failure.Name()}). See application logs for details.";
+
     private void LogAttempt(Attempt attempt) =>
-        LogFailure(_logger, attempt.Inner, attempt.Type, Truncate(attempt.Message)!, Truncate(attempt.Hint),
+        LogFailure(_logger, attempt.Inner, Truncate(attempt.Type)!, Truncate(attempt.Message)!, Truncate(attempt.Hint),
             Truncate(attempt.Details?.BrowserApi?.ToString()), Truncate(attempt.Details?.SourceLocation?.ToString()));
 
     // SSR error text comes from the renderer and can be large (stack traces, serialized props): logs keep the first 2 KB.

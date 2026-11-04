@@ -2,7 +2,9 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Version>1.6.2</Version>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <Version>1.6.3</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Authors>Inertia.Net contributors</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -18,6 +20,8 @@
     <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Templates pack source files without a library API. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" Condition="'$(MSBuildProjectName)' != 'Inertia.Net.Templates'" />
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

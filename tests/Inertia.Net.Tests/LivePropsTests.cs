@@ -11,6 +11,19 @@ public class LivePropsTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    [Fact]
+    public async Task Live_dot_parent_keeps_its_listener()
+    {
+        var harness = new Harness();
+        var page = await harness.PageAsync(new InertiaProps
+        {
+            ["auth"] = Inertia.Prop(() => new InertiaProps { ["name"] = "Ada" }).Live(OrderUpdated),
+            ["auth.role"] = "admin",
+        });
+        Assert.NotNull(page["liveProps"]?["auth"]);
+        JsonAssert.Equal("""{"name":"Ada","role":"admin"}""", page["props"]!["auth"]);
+    }
+
     [Theory]
     [InlineData(LiveChannelType.Public, "public")]
     [InlineData(LiveChannelType.Private, "private")]

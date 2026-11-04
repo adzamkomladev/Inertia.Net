@@ -25,6 +25,12 @@ public static class InertiaLiveSignalRExtensions
             options.Configure(configure);
         }
 
+        options.Validate(o => o.MaxSubscriptionsPerConnection > 0,
+            "InertiaLiveSignalROptions.MaxSubscriptionsPerConnection must be positive.")
+            .Validate(o => o.MaxChannelNameLength > 0,
+                "InertiaLiveSignalROptions.MaxChannelNameLength must be positive.")
+            .ValidateOnStart();
+
         services.AddSignalR().AddJsonProtocol(o =>
         {
             if (!o.PayloadSerializerOptions.TypeInfoResolverChain.Contains(InertiaLiveJsonContext.Default))
@@ -33,6 +39,7 @@ public static class InertiaLiveSignalRExtensions
             }
         });
         services.TryAddSingleton<IInertiaLiveBroadcaster, SignalRLiveBroadcaster>();
+        services.TryAddSingleton<LiveOrigin>();
         services.TryAddScoped<ILiveChannelAuthorizer>(static sp =>
             sp.GetRequiredService<IOptions<InertiaLiveSignalROptions>>().Value.AuthorizerFactory?.Invoke(sp) ?? DenyingLiveChannelAuthorizer.Instance);
         return builder;
@@ -49,6 +56,7 @@ public static class InertiaLiveSignalRExtensions
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentException.ThrowIfNullOrEmpty(pattern);
         var options = endpoints.ServiceProvider.GetRequiredService<IOptions<InertiaLiveSignalROptions>>();
+        var origin = endpoints.ServiceProvider.GetRequiredService<LiveOrigin>();
         var builder = endpoints.MapHub<InertiaLiveHub>(pattern, o => o.CloseOnAuthenticationExpiration = true);
         builder.DisableAntiforgery();
         builder.Add(endpoint =>
@@ -56,7 +64,7 @@ public static class InertiaLiveSignalRExtensions
             var next = endpoint.RequestDelegate!;
             endpoint.RequestDelegate = context =>
             {
-                if (LiveOrigin.IsAllowed(context.Request, options.Value.AllowedOrigins))
+                if (origin.IsAllowed(context.Request, options.Value.AllowedOrigins))
                 {
                     return next(context);
                 }

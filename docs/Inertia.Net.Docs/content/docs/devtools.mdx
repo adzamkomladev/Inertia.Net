@@ -57,3 +57,5 @@ The development startup also writes TypeScript declarations when `o.TypeScript.O
 <Callout type="tip" title="Pair with the browser extension">
 Install the Inertia DevTools extension, open your app in Development, and use the extension's panel. The server entries are correlated by the `X-Inertia-Devtools-Id` header.
 </Callout>
+
+If recording is enabled outside Development without an `Authorize` callback, the app logs a warning and the read API returns 404. Map the reader with `MapInertiaDevTools()` and authorize its users. The recorder's process-wide latch remains active once used; parallel-prop planning also uses a process-wide latch after its first use.

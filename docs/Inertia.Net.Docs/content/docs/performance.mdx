@@ -62,3 +62,18 @@ Keep pages well under a megabyte:
 
 Most per-request allocation in a real handler is the props you build, not the render.
 
+## Paired render measurements
+
+Warm, in-process probes on .NET 10 compared 32 alternating rounds in two runs. Times are medians of within-round ratios; B/op values are from run 2.
+
+| Workload | Before B/op | After B/op | Run 1 paired time | Run 2 paired time |
+|---|---:|---:|---:|---:|
+| JSON, 20 mixed props | 1,736 | 1,736 | −1.6% | −0.6% |
+| Integer-key dictionary, 1,000 props | 176,592 | 166,688 | −52.2% | −53.7% |
+| GUID-key dictionary, 500 rows | 140,712 | 140,304 | −28.5% | −33.0% |
+| Eight scroll props, append wrappers | 6,664 | 6,088 | −2.2% | −3.4% |
+| Eight scroll props, prepend wrappers | 6,880 | 6,112 | −6.2% | −5.4% |
+
+These synthetic measurements do not establish HTTP throughput or general latency. Pooled entries grow from 24 to 32 bytes, so warm savings do not imply a smaller cold or concurrent pool footprint. Full methods, controls and rejected candidates are in [benchmark results](https://github.com/adzamkomladev/Inertia.Net/blob/main/tests/Inertia.Net.Benchmarks/RESULTS.md).
+
+Parallel prop planning and DevTools recording each use a process-wide latch that remains active after first use. Measure with the features used by your own app.

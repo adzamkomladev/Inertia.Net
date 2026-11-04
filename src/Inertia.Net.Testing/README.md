@@ -1,7 +1,5 @@
 # Inertia.Net.Testing
 
-Use the 1.6.2 packages together; from 1.3 or earlier, see the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md).
-
 Test helpers for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net): Laravel-style fluent assertions over Inertia responses, for any test framework. It parses JSON responses and the first-visit HTML `<script data-page>`, and throws `InertiaAssertionException` when an assertion fails.
 
 ```sh
@@ -24,6 +22,30 @@ var page = await response.GetInertiaPageAsync();
 var deferred = await page.LoadDeferredPropsAsync(client, "sidebar");
 var only = await page.ReloadOnlyAsync(client, "users");
 ```
+
+For form redirects, keep cookies and disable automatic redirects on the client. This example uses the sample's contact form:
+
+```csharp
+client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
+using var form = await client.GetAsync("/contacts/create");
+using var submitted = await client.InertiaRequestAsync(HttpMethod.Post, "/contacts",
+    JsonContent.Create(new { name = "", email = "" }), configure: request =>
+    {
+        request.Headers.Referrer = new Uri(client.BaseAddress!, "/contacts/create");
+        request.WithXsrfToken(form);
+    });
+Assert.Equal(HttpStatusCode.Redirect, submitted.StatusCode);
+using var followed = await client.GetAsync("/contacts/create");
+await followed.AssertInertiaAsync(p => p.HasErrors().HasError("name").HasError("email"));
+```
+
+This example uses `System.Net` and `System.Net.Http.Json`. `GetXsrfToken()` reads and URL-decodes the page's token;
+`WithXsrfToken()` accepts either that token or the page response, plus optional custom cookie/header names. The client's
+cookie container must retain the paired antiforgery cookie too.
+
+`HasErrors()` and `HasError(field, message)` accept an optional named bag; `HasErrorBag()` checks its presence.
+Pass client field names such as `items.0.email` directly. Assertions support string and array messages.
+Default-bag errors are flat (`errors.email`); a named bag is nested (`errors.createUser.email`).
 
 For infinite scroll, `new AssertableInertia(page).HasScroll("posts")` checks for scroll metadata; the overload with current and next page values checks those too.
 

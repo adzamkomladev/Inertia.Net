@@ -1,3 +1,4 @@
+using Inertia.Net.Testing;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Antiforgery;
@@ -18,8 +19,8 @@ public sealed class AntiforgeryTests
 
     private static async Task<string> TokenAsync(HttpClient client)
     {
-        var cookie = Xsrf(await client.InertiaGetAsync("/page"))!;
-        return Uri.UnescapeDataString(cookie["XSRF-TOKEN=".Length..cookie.IndexOf(';')]);
+        using var response = await client.InertiaGetAsync("/page");
+        return response.GetXsrfToken();
     }
 
     [Theory]
@@ -66,9 +67,9 @@ public sealed class AntiforgeryTests
         var client = app.CreateClient();
         var token = await TokenAsync(client);
 
-        Assert.Equal(HttpStatusCode.OK, (await client.InertiaAsync(HttpMethod.Post, "/json", configure: r => r.WithHeader(InertiaHeaders.XsrfToken, token))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.InertiaAsync(HttpMethod.Post, "/json", configure: r => r.WithXsrfToken(token))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.InertiaAsync(HttpMethod.Post, "/json")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.InertiaAsync(HttpMethod.Post, "/json", configure: r => r.WithHeader(InertiaHeaders.XsrfToken, "nope"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.InertiaAsync(HttpMethod.Post, "/json", configure: r => r.WithXsrfToken("nope"))).StatusCode);
     }
 
     [Fact]
@@ -80,7 +81,7 @@ public sealed class AntiforgeryTests
         static FormUrlEncodedContent Form() => new([new("name", "Ann")]);
 
         var ok = new HttpRequestMessage(HttpMethod.Post, "/form") { Content = Form() };
-        ok.WithHeader(InertiaHeaders.XsrfToken, token);
+        ok.WithXsrfToken(token);
         Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(ok, TestContext.Current.CancellationToken)).StatusCode);
 
         var missing = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/form") { Content = Form() }, TestContext.Current.CancellationToken);

@@ -59,6 +59,7 @@ internal sealed class InertiaPageWriter
         ILogger<InertiaPageWriter> logger,
         VersionProvider versionProvider,
         InertiaMetrics metrics,
+        InertiaRefreshQueue refreshes,
         InertiaCaching caching,
         PageComponentCheck pages)
     {
@@ -66,6 +67,7 @@ internal sealed class InertiaPageWriter
         TimeProvider = timeProvider;
         Logger = logger;
         Metrics = metrics;
+        Refreshes = refreshes;
         Caching = caching;
         Pages = pages.Enabled ? pages : null;
         _versionProvider = versionProvider;
@@ -107,6 +109,8 @@ internal sealed class InertiaPageWriter
 
     public InertiaMetrics Metrics { get; }
 
+    public InertiaRefreshQueue Refreshes { get; }
+
     /// <summary>The store access for <see cref="InertiaProp.Cache(string, TimeSpan)"/> values.</summary>
     public InertiaCaching Caching { get; }
 
@@ -143,7 +147,7 @@ internal sealed class InertiaPageWriter
 
             // A component runs the planning walk until a render shows it has no Parallel() props, and again once a render meets one.
             var plan = InertiaProp.ParallelUsed && hints?.UsesParallel != false;
-            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, httpContext.RequestAborted, plan);
+            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestAborted);
 
             writer.WriteStartObject();
             writer.WriteString("component", component);
@@ -385,10 +389,9 @@ internal sealed class InertiaPageWriter
             else
             {
                 var handling = property.NumberHandling ?? info.NumberHandling;
-                Add(ref entries, ref count, new(property.Name,
-                    value is not InertiaProp && (property.CustomConverter is not null || (handling is not null && !ContainsProps(property.PropertyType)))
-                        ? new PropertyValue(PropertyTypeInfo(property, handling), value) : value,
-                    property.PropertyType));
+                var serializer = value is not InertiaProp && (property.CustomConverter is not null || (handling is not null && !ContainsProps(property.PropertyType)))
+                    ? PropertyTypeInfo(property, handling) : null;
+                Add(ref entries, ref count, new(property.Name, value, property.PropertyType, serializer));
             }
         }
 
@@ -435,7 +438,7 @@ internal sealed class InertiaPageWriter
         var sharedCount = 0;
         var hasDotKey = false;
 
-        void Set(string key, object? value, Type type, bool shared)
+        void Set(string key, object? value, Type type, bool shared, JsonTypeInfo? serializer = null)
         {
             var position = -1;
             if (sharedPositions is not null)
@@ -456,11 +459,11 @@ internal sealed class InertiaPageWriter
 
             if (position >= 0)
             {
-                entries[position] = new PropEntry(key, value, type);
+                entries[position] = new PropEntry(key, value, type, serializer);
             }
             else
             {
-                entries.Add(new PropEntry(key, value, type));
+                entries.Add(new PropEntry(key, value, type, serializer));
                 if (shared)
                 {
                     sharedPositions?.Add(key, entries.Count - 1);
@@ -528,7 +531,7 @@ internal sealed class InertiaPageWriter
                 {
                     for (var i = 0; i < count; i++)
                     {
-                        Set(members[i].Key, members[i].Value, members[i].Type, shared: false);
+                        Set(members[i].Key, members[i].Value, members[i].Type, shared: false, members[i].Serializer);
                     }
                 }
                 finally
@@ -573,12 +576,15 @@ internal sealed class InertiaPageWriter
                 result.Add(new PropEntry(segments[0], null, typeof(object)));
             }
 
-            var top = ToTraversable(result[position].Value, owned);
+            var top = ToTraversable(DotValue(result[position]), owned);
             result[position] = new PropEntry(segments[0], top, typeof(object));
-            Assign(top, segments, 1, entry.Value, owned);
+            Assign(top, segments, 1, DotValue(entry), owned);
         }
 
         return result;
+
+        // Dotted paths keep the wrapper because dictionaries do not carry member serializer metadata.
+        static object? DotValue(PropEntry entry) => entry.Serializer is { } serializer ? new PropertyValue(serializer, entry.Value) : entry.Value;
     }
 
     // Laravel's Arr::set from segments[start], copying the objects on the way. Below a lazy object the rest of the path is
@@ -657,6 +663,23 @@ internal sealed class InertiaPageWriter
         public InertiaProp Source { get; } = source;
 
         public void Add(string[] segments, int start, object? value) => _assignments.Add((segments, start, value));
+
+        public InertiaProps ApplyCached(JsonElement value) => Apply(CopyCachedObject(value));
+
+        private static InertiaProps CopyCachedObject(JsonElement value)
+        {
+            var result = new InertiaProps();
+            if (value.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in value.EnumerateObject())
+                {
+                    result[property.Name] = property.Value.ValueKind == JsonValueKind.Object
+                        ? CopyCachedObject(property.Value) : property.Value.Clone();
+                }
+            }
+
+            return result;
+        }
 
         public InertiaProps Apply(object? value)
         {
@@ -809,7 +832,10 @@ internal sealed class InertiaPageWriter
     {
         var keys = new string[dictionary.Count];
         var i = 0;
-        if (info.KeyType == typeof(string))
+        var keyType = info.KeyType;
+        var builtIn = keyType is not null
+            && SerializerOptions.GetTypeInfo(keyType).Converter.GetType().Assembly == typeof(JsonSerializer).Assembly;
+        if (builtIn && keyType == typeof(string))
         {
             var policy = SerializerOptions.DictionaryKeyPolicy;
             foreach (DictionaryEntry entry in dictionary)
@@ -821,28 +847,53 @@ internal sealed class InertiaPageWriter
             return keys;
         }
 
-        // Non-string keys (numbers, enums, Guids, ...) are formatted by the serializer itself: each key is written through a
-        // one-entry dictionary of the same type, so converters, enum names and the key policy all match a plain serialization.
-        var probe = info.CreateObject?.Invoke() as IDictionary;
-        var defaultValue = info.ElementType is { IsValueType: true } valueType && Nullable.GetUnderlyingType(valueType) is null
-            ? _defaultValues.GetOrAdd(valueType, CreateDefaultValue) : null;
+        if (builtIn && (keyType == typeof(int) || keyType == typeof(long) || keyType == typeof(Guid)))
+        {
+            foreach (DictionaryEntry entry in dictionary)
+            {
+                keys[i++] = entry.Key switch
+                {
+                    int number => number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    long number => number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    Guid guid => guid.ToString("D"),
+                    _ => throw new InvalidOperationException("The dictionary key does not match its JSON contract."),
+                };
+            }
+
+            return keys;
+        }
+
+        // The default object converter dispatches property names through the runtime key converter, preserving enum naming
+        // and custom converters without constructing a probe dictionary. This also supports read-only dictionaries.
+        var converter = (JsonConverter<object>)(keyType == typeof(object)
+            ? SerializerOptions.GetTypeInfo(typeof(object)) : InertiaJsonContext.Default.GetTypeInfo(typeof(object))!).Converter;
+        IDictionary? probe = null;
         using var buffer = new PooledBufferWriter(256);
         using var writer = new Utf8JsonWriter(buffer);
         foreach (DictionaryEntry entry in dictionary)
         {
-            if (probe is null)
-            {
-                keys[i++] = Convert.ToString(entry.Key, System.Globalization.CultureInfo.InvariantCulture) ?? "";
-                continue;
-            }
-
-            probe.Clear();
-            probe.Add(entry.Key, defaultValue);
             buffer.Reset();
             writer.Reset(buffer);
-            JsonSerializer.Serialize(writer, probe, info);
+            if (entry.Key.GetType() == keyType || keyType == typeof(object))
+            {
+                writer.WriteStartObject();
+                converter.WriteAsPropertyName(writer, entry.Key, SerializerOptions);
+                writer.WriteNullValue();
+                writer.WriteEndObject();
+            }
+            else
+            {
+                // A converter on a declared base key type must see that type, rather than the derived runtime key type.
+                probe ??= info.CreateObject?.Invoke() as IDictionary
+                    ?? throw new NotSupportedException("A dictionary without a mutable factory cannot traverse derived key types. Materialize a mutable dictionary before using nested props.");
+                var defaultValue = info.ElementType is { IsValueType: true } valueType && Nullable.GetUnderlyingType(valueType) is null
+                    ? _defaultValues.GetOrAdd(valueType, CreateDefaultValue) : null;
+                probe.Clear();
+                probe.Add(entry.Key, defaultValue);
+                JsonSerializer.Serialize(writer, probe, info);
+            }
+
             writer.Flush();
-            // The probe is {"key":value}: the second token is the key.
             var reader = new Utf8JsonReader(buffer.WrittenMemory.Span);
             reader.Read();
             reader.Read();

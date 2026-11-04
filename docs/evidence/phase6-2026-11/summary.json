@@ -1,0 +1,205 @@
+{
+  "browser": "156.0.8078.4",
+  "capturedUtc": "2026-11-04T16:15:42.133Z",
+  "requests": [
+    {
+      "label": "cold SSR miss",
+      "url": "/",
+      "epochStartMs": 1793808931557,
+      "epochEndMs": 1793808935862,
+      "durationMs": 4305.0999999940395,
+      "status": 200,
+      "connection": "0HNPQHRCFCJU9",
+      "protocol": "HTTP/1.1",
+      "serverRendered": true,
+      "pong": false
+    },
+    {
+      "label": "stale SSR hit",
+      "url": "/",
+      "epochStartMs": 1793808937364,
+      "epochEndMs": 1793808937382,
+      "durationMs": 18.400000005960464,
+      "status": 200,
+      "connection": "0HNPQHRCFCJU9",
+      "protocol": "HTTP/1.1",
+      "serverRendered": true,
+      "pong": false
+    },
+    {
+      "label": "ping during refresh",
+      "url": "/phase6/ping",
+      "epochStartMs": 1793808937583,
+      "epochEndMs": 1793808937602,
+      "durationMs": 18.599999994039536,
+      "status": 200,
+      "connection": "0HNPQHRCFCJU9",
+      "protocol": "HTTP/1.1",
+      "serverRendered": false,
+      "pong": true
+    }
+  ],
+  "renderer": [
+    {
+      "call": 1,
+      "event": "start",
+      "epochMs": 1793808931734,
+      "component": "Home"
+    },
+    {
+      "call": 1,
+      "event": "end",
+      "epochMs": 1793808935753
+    },
+    {
+      "call": 2,
+      "event": "start",
+      "epochMs": 1793808937389,
+      "component": "Home"
+    },
+    {
+      "call": 2,
+      "event": "end",
+      "epochMs": 1793808941393
+    }
+  ],
+  "network": [
+    {
+      "requestId": "AF8CF0A99553287E0301DF94D819C82C",
+      "timestamp": 160936.815905,
+      "url": "http://127.0.0.1:5294/phase6",
+      "protocol": "http/1.1",
+      "connectionId": 21,
+      "connectionReused": false,
+      "timing": {
+        "requestTime": 160936.374583,
+        "proxyStart": -1,
+        "proxyEnd": -1,
+        "dnsStart": 0.569,
+        "dnsEnd": 0.777,
+        "connectStart": 0.777,
+        "connectEnd": 1.181,
+        "sslStart": -1,
+        "sslEnd": -1,
+        "workerStart": -1,
+        "workerReady": -1,
+        "workerFetchStart": -1,
+        "workerRespondWithSettled": -1,
+        "sendStart": 1.469,
+        "sendEnd": 1.713,
+        "pushStart": 0,
+        "pushEnd": 0,
+        "receiveHeadersStart": 399.188,
+        "receiveHeadersEnd": 399.511
+      },
+      "headers": {
+        "Content-Type": "text/html",
+        "X-Probe-Connection": "0HNPQHRCFCJU9",
+        "X-Probe-Protocol": "HTTP/1.1"
+      }
+    },
+    {
+      "requestId": "488807.2",
+      "timestamp": 160941.323649,
+      "url": "http://127.0.0.1:5294/",
+      "protocol": "http/1.1",
+      "connectionId": 21,
+      "connectionReused": true,
+      "timing": {
+        "requestTime": 160937.023613,
+        "proxyStart": -1,
+        "proxyEnd": -1,
+        "dnsStart": -1,
+        "dnsEnd": -1,
+        "connectStart": -1,
+        "connectEnd": -1,
+        "sslStart": -1,
+        "sslEnd": -1,
+        "workerStart": -1,
+        "workerReady": -1,
+        "workerFetchStart": -1,
+        "workerRespondWithSettled": -1,
+        "sendStart": 1.663,
+        "sendEnd": 1.853,
+        "pushStart": 0,
+        "pushEnd": 0,
+        "receiveHeadersStart": 4295.638,
+        "receiveHeadersEnd": 4296.218
+      },
+      "headers": {
+        "X-Probe-Protocol": "HTTP/1.1",
+        "X-Probe-Connection": "0HNPQHRCFCJU9",
+        "Content-Type": "text/html; charset=utf-8"
+      }
+    },
+    {
+      "requestId": "488807.3",
+      "timestamp": 160942.844155,
+      "url": "http://127.0.0.1:5294/",
+      "protocol": "http/1.1",
+      "connectionId": 21,
+      "connectionReused": true,
+      "timing": {
+        "requestTime": 160942.830185,
+        "proxyStart": -1,
+        "proxyEnd": -1,
+        "dnsStart": -1,
+        "dnsEnd": -1,
+        "connectStart": -1,
+        "connectEnd": -1,
+        "sslStart": -1,
+        "sslEnd": -1,
+        "workerStart": -1,
+        "workerReady": -1,
+        "workerFetchStart": -1,
+        "workerRespondWithSettled": -1,
+        "sendStart": 0.479,
+        "sendEnd": 0.738,
+        "pushStart": 0,
+        "pushEnd": 0,
+        "receiveHeadersStart": 12.148,
+        "receiveHeadersEnd": 12.32
+      },
+      "headers": {
+        "X-Probe-Protocol": "HTTP/1.1",
+        "X-Probe-Connection": "0HNPQHRCFCJU9",
+        "Content-Type": "text/html; charset=utf-8"
+      }
+    },
+    {
+      "requestId": "488807.4",
+      "timestamp": 160943.062606,
+      "url": "http://127.0.0.1:5294/phase6/ping",
+      "protocol": "http/1.1",
+      "connectionId": 21,
+      "connectionReused": true,
+      "timing": {
+        "requestTime": 160943.048381,
+        "proxyStart": -1,
+        "proxyEnd": -1,
+        "dnsStart": -1,
+        "dnsEnd": -1,
+        "connectStart": -1,
+        "connectEnd": -1,
+        "sslStart": -1,
+        "sslEnd": -1,
+        "workerStart": -1,
+        "workerReady": -1,
+        "workerFetchStart": -1,
+        "workerRespondWithSettled": -1,
+        "sendStart": 0.402,
+        "sendEnd": 0.608,
+        "pushStart": 0,
+        "pushEnd": 0,
+        "receiveHeadersStart": 11.504,
+        "receiveHeadersEnd": 11.671
+      },
+      "headers": {
+        "X-Probe-Protocol": "HTTP/1.1",
+        "X-Probe-Connection": "0HNPQHRCFCJU9",
+        "Content-Type": "text/plain; charset=utf-8"
+      }
+    }
+  ],
+  "assertion": "PASS: stale hit and ping reused the same HTTP/1.1 connection while SSR refresh call 2 was still running"
+}

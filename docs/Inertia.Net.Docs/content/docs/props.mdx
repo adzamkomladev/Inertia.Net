@@ -37,6 +37,8 @@ The token is `HttpContext.RequestAborted`. An `async` lambda always binds to the
 
 Fluent methods mutate and return the same instance: `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)` and `.Cache(key, duration, staleFor?, tags?)`.
 
+`Fresh()` makes a prop a once prop, and `WithGroup()` makes it deferred. Repeated `MatchOn()` calls add keys. Root `Append()` and `Prepend()` are mutually exclusive and combining them throws. Fluent methods mutate the prop, so create prop instances per request; do not share them across requests.
+
 ## Resolution order
 
 Loaders run sequentially by default, in prop order, and only when their prop is included in the response. That makes a scoped EF Core `DbContext` safe to use in several loaders.
@@ -180,7 +182,8 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 
 **Stale-while-revalidate.** `staleFor` keeps serving a value after its duration. The first request that reads a stale value gets it at once, and the loader runs after the response has been sent. Past `duration + staleFor` the loader runs during the request again.
 
-- The refresh runs in the response's completion callbacks, before the request's services are disposed, so it can keep using the request's scoped services. It must not touch `HttpContext`.
+- Response completion enqueues refreshes on a bounded background worker; it does not wait for the loader. Loaders using `staleFor` must use singleton dependencies or create an independent scope inside the loader with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`. Do not capture request-scoped services or `HttpContext`.
+- The worker accepts 64 pending refreshes and cancels on host shutdown. A full queue drops the refresh and logs a warning, leaving the stale value at its existing expiration. Monitor `inertia.cache.refresh.dropped`, tagged with `inertia.cache.kind=prop|ssr`.
 - One refresh runs per key and app instance at a time. A refresh that finds the value fresh again skips its loader.
 - A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
 
@@ -214,7 +217,7 @@ Register `UsersPage` and its value types in your `JsonSerializerContext` under N
 
 ## Dot keys
 
-A top-level key containing dots is unpacked. `["user.name"] = "Ann"` becomes `"user": { "name": "Ann" }`.
+Cached props under dot keys use the cache too. A top-level key containing dots is unpacked. `["user.name"] = "Ann"` becomes `"user": { "name": "Ann" }`.
 
 ## BigInteger safety
 

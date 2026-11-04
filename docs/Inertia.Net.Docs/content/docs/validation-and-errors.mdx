@@ -8,16 +8,24 @@ order: 4
 Inertia forms post, expect a redirect, and read validation errors from `props.errors` on the next page. Inertia.Net performs the redirect and carries the errors across it.
 
 - A field maps to its **first** message. With `o.WithAllErrors = true` it maps to an array of all messages (the client's `form.withAllErrors()` expects that).
-- Error keys are the JSON names of the model members, one naming-policy conversion per segment: `Address.Street` becomes `address.street`.
+- Error keys use dotted indices, for example `items.0.email`. Names use JSON member aliases when metadata exposes them and the applicable naming policy for other members. Dictionary keys are preserved. Minimal API and MVC use the page serializer’s HTTP JSON options; FastEndpoints uses its binding serializer policy. Custom resolvers that omit member metadata and paths without a model schema may fall back to naming-policy conversion; align field names and serializer settings.
 - **Error bags.** The client sends `X-Inertia-Error-Bag: createUser` when the form has `errorBag="createUser"`. Errors arrive as `errors: { createUser: { email: "..." } }`. Without the header, `errors` is the flat object `{ email: "..." }`. A bag stored under a name other than `default` is always nested by bag name.
 
 ```ts
 router.post('/users', data, { errorBag: 'createUser' })
 ```
 
+## Validation libraries
+
+| Backend | Validation |
+|---|---|
+| Minimal API | .NET 10 source-generated DataAnnotations through `AddValidation()`; `ValidationProblem` results; call FluentValidation `IValidator<T>` manually and return `WithErrors` |
+| MVC | MVC model validation and `ModelState` |
+| FastEndpoints | FastEndpoints validators, including FluentValidation |
+
 ## Minimal API
 
-`WithInertiaValidation()` for a route or a route group. It requires `services.AddValidation()` for attribute validation.
+`WithInertiaValidation()` applies to a route or route group and requires `services.AddValidation()`. Without validation resolvers, it throws `InvalidOperationException` when the endpoint is constructed. Routing may construct endpoints lazily, so this need not happen during application startup.
 
 ```csharp
 builder.Services.AddValidation();
@@ -50,7 +58,23 @@ app.MapPost("/login", (LoginInput input, SignInService auth) =>
         }));
 ```
 
-`Back().WithErrors(IDictionary<string, string[]> errors, string bag = "default")` also takes arrays of messages.
+`Back().WithErrors(IDictionary<string, string[]> errors, string bag = "default")` also takes arrays of messages. FluentValidation is not automatically integrated into Minimal API `AddValidation()`. Call a registered `IValidator<T>` yourself and map its failures:
+
+```csharp
+app.MapPost("/users", async (CreateUserInput input, IValidator<CreateUserInput> validator) =>
+{
+    var result = await validator.ValidateAsync(input);
+    if (!result.IsValid)
+    {
+        var errors = result.Errors.GroupBy(e => e.PropertyName)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+        return Back().WithErrors(errors);
+    }
+    return Results.Redirect("/users");
+});
+```
+
+Import `FluentValidation` and register your validator. Supply client JSON field names in the dictionary when they differ from its property names.
 
 ## MVC
 
@@ -70,7 +94,7 @@ Binding failures get the generic message `The value is invalid.`, because their 
 
 ## FastEndpoints
 
-`c.UseInertia()` adds a global pre-processor. A validation failure of an Inertia non-GET request becomes a redirect back with the errors; other requests keep FastEndpoints' 400 JSON. FluentValidation validators work as usual.
+`c.ConfigureInertia()` adds a global pre-processor. A validation failure of an Inertia non-GET request becomes a redirect back with the errors; other requests keep FastEndpoints' 400 JSON. FluentValidation validators work as usual.
 
 ```csharp
 public sealed class CreateUserValidator : Validator<CreateUserRequest>
@@ -78,35 +102,14 @@ public sealed class CreateUserValidator : Validator<CreateUserRequest>
     public CreateUserValidator() => RuleFor(x => x.Email).NotEmpty().EmailAddress();
 }
 
-app.UseFastEndpoints(c => c.UseInertia(ep => ep.AllowAnonymous()));
+app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));
 ```
 
-`c.UseInertia()` sets `c.Endpoints.Configurator`. Pass your own configuration as its argument instead of setting the configurator separately. The pre-processor runs after an endpoint's own pre-processors, so one that already answered (a 403, say) wins.
+`c.ConfigureInertia()` composes with an existing `c.Endpoints.Configurator`. Its optional callback runs after Inertia setup. The pre-processor runs after an endpoint's own pre-processors, so one that already answered (a 403, say) wins.
 
 ## Precognition (live validation)
 
-Precognition validates a form as the user types, without running the handler. A request with `Precognition: true` is validated and answered with:
-
-- `204` and `Precognition-Success: true` when valid;
-- `422` and `{ "message": "...", "errors": { "field": ["..."] } }` when not, limited to the fields in `Precognition-Validate-Only`;
-- `Precognition: true` and `Vary: Precognition` on every response.
-
-```csharp
-// Minimal API: use it instead of WithInertiaValidation(), not in addition.
-app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users"))
-   .WithInertiaPrecognition();
-
-// FastEndpoints: c.UseInertia() already answers Precognition requests.
-```
-
-`WithInertiaPrecognition()` is a superset of `WithInertiaValidation()`: normal Inertia validation redirects keep working. Any endpoint filter you add after it does not run for a precognitive request. In MVC, Precognition is not available.
-
-Client (Inertia v3 has it built in):
-
-```tsx
-const form = useForm({ name: '', email: '' }).withPrecognition('post', '/users')
-// <input onBlur={() => form.validate('email')} />
-```
+[Precognition](/docs/precognition) validates a request without running the handler. Minimal APIs use `.WithInertiaPrecognition()` instead of `.WithInertiaValidation()`; FastEndpoints enables it with `ConfigureInertia()`. MVC does not support it.
 
 ## Error bags in the client
 

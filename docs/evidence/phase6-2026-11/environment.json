@@ -1,0 +1,17 @@
+{
+  "checkoutCommit": "f618bee167206c7fe215ee3ecd9fe0144e719320",
+  "browser": "156.0.8078.4",
+  "dotnetSdk": "10.0.403",
+  "node": "26.13.0",
+  "os": "Ubuntu 24.04.5, Linux 6.8.0-147-generic x86_64",
+  "appPort": 5294,
+  "ssrPort": 13994,
+  "artificialRendererDelayMs": 4000,
+  "cacheDurationSeconds": 1,
+  "cacheStaleSeconds": 60,
+  "files": {
+    "samples/MinimalApi.React/ssr/ssr.js": "5f17b35c1f059b578db8c12cce5ff3242cdced21913df03d795da18b5d34bead",
+    "samples/MinimalApi.React/package-lock.json": "1882a3788e8ac4f2c65bf02da8907789929bb424f3bb6b01b1b171b01a612f95",
+    "samples/MinimalApi.React/bin/Release/net10.0/Inertia.Net.dll": "6759750059f3b897b1808e9b6ed1e2c49770f35481ea58c0320835a7365ebc67"
+  }
+}

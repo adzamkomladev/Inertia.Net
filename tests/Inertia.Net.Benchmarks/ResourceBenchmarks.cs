@@ -39,6 +39,7 @@ public class DictionaryPropsBenchmarks
     private DefaultHttpContext _context = null!;
     private InertiaProps _integers = null!;
     private InertiaProps _strings = null!;
+    private InertiaProps _guids = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -47,17 +48,21 @@ public class DictionaryPropsBenchmarks
         _context = BenchApp.CreateContext(_services, "/users", (InertiaHeaders.Inertia, "true"));
         var integers = new Dictionary<int, InertiaProp>(Count);
         var strings = new Dictionary<string, InertiaProp>(Count);
+        var guids = new Dictionary<Guid, BenchRow>(Count);
         for (var i = 0; i < Count; i++)
         {
             var prop = Prop(() => 1);
             integers[i] = prop;
+            guids[Guid.Parse($"00000000-0000-0000-0000-{i:x12}")] = new BenchRow("row", prop);
             strings[i.ToString(System.Globalization.CultureInfo.InvariantCulture)] = prop;
         }
 
         _integers = new InertiaProps { ["rows"] = integers };
         _strings = new InertiaProps { ["rows"] = strings };
+        _guids = new InertiaProps { ["rows"] = guids };
     }
 
+    [Benchmark] public Task GuidKeys() => Render(BenchApp.Component, _guids).ExecuteAsync(_context);
     [Benchmark] public Task IntegerKeys() => Render(BenchApp.Component, _integers).ExecuteAsync(_context);
     [Benchmark(Baseline = true)] public Task StringKeys() => Render(BenchApp.Component, _strings).ExecuteAsync(_context);
 

@@ -185,6 +185,13 @@ inertia PUT /users/1
 status_is 303
 header_is Location /dashboard
 
+# Typed dictionaries retain key formatting through generated metadata, including read-only date keys.
+inertia GET /dictionary-keys
+status_is 200
+has '"00000000-0000-0000-0000-000000000000":{'
+has '"2026-11-04T00:00:00Z":{'
+has '"extra":2'
+
 # 9. Validation failure (AddValidation + WithInertiaValidation): redirect back, errors on the next page, consumed once.
 inertia POST /users -H 'Content-Type: application/json' -H "Referer: $BASE/users/create" --data '{"name":""}'
 status_is 302
@@ -195,6 +202,12 @@ has '"errors":{"name":"'
 has '"email":"'
 inertia GET /users/create
 has '"errors":{}'
+
+# Generated CLR-to-JSON aliases and nested indices remain available under Native AOT.
+inertia POST /validation-alias -H 'Precognition: true' -H 'Content-Type: application/json' --data '{"mail":"","items":[{"mail":""}]}'
+status_is 422
+has '"mail":['
+has '"items.0.mail":['
 
 # Non-Inertia clients still get the 400 problem details.
 req POST /users -H 'Content-Type: application/json' --data '{"name":""}'

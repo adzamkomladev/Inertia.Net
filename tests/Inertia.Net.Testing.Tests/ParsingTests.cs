@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using System.Net;
 using System.Text;
@@ -125,6 +126,29 @@ public class ParsingTests
         Assert.Null(page.Prop("users.5.name"));
         Assert.True(page.HasProp("n"));
         Assert.False(page.HasProp("users.1"));
+    }
+
+    [Fact]
+    public async Task Decodes_negative_bigints_independently_of_the_current_culture()
+    {
+        var previousCulture = CultureInfo.CurrentCulture;
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.NegativeSign = "~";
+        try
+        {
+            CultureInfo.CurrentCulture = culture;
+            using var response = JsonResponse("""
+                {"component":"A","props":{"tagged":{"$bigint":"-9007199254740993"},"plain":-9007199254740993},"url":"/"}
+                """);
+            var page = await response.GetInertiaPageAsync();
+
+            Assert.Equal(new BigInteger(-9007199254740993L), page.PropBigInteger("tagged"));
+            Assert.Equal(new BigInteger(-9007199254740993L), page.PropBigInteger("plain"));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+        }
     }
 
     [Fact]

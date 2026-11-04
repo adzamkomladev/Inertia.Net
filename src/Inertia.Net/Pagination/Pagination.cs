@@ -96,7 +96,7 @@ public static class Pagination
 
     internal static void Validate(int page, int perPage)
     {
-        if (page < 1) throw new ArgumentOutOfRangeException(nameof(page));
+        ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         if (perPage < 1 || perPage == int.MaxValue) throw new ArgumentOutOfRangeException(nameof(perPage));
     }
 

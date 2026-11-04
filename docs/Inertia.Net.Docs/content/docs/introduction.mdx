@@ -61,8 +61,8 @@ Your .NET app still owns the request. The adapter adds the protocol middleware, 
 |---|:---:|:---:|:---:|
 | Package | `Inertia.Net` | `Inertia.Net` + `Inertia.Net.Mvc` | `Inertia.Net` + `Inertia.Net.FastEndpoints` |
 | Render / Back / Location | `Render(...)` returns `IResult` | same, return `IResult` from an action | `Send.InertiaAsync(...)` or return the result |
-| Validation redirect with errors | `.WithInertiaValidation()` | `ModelState` filter (global) | `c.UseInertia()` pre-processor |
-| Precognition | `.WithInertiaPrecognition()` | not available | `c.UseInertia()` |
+| Validation redirect with errors | `.WithInertiaValidation()` | `ModelState` filter (global) | `c.ConfigureInertia()` pre-processor |
+| Precognition | `.WithInertiaPrecognition()` | not available | `c.ConfigureInertia()` |
 | Razor root view | no (`app.html` template) | optional (tag helpers) | no (`app.html` template) |
 | Native AOT | yes | no (MVC itself is not AOT) | yes (with the FastEndpoints source generator) |
 
@@ -75,7 +75,7 @@ This site is an Inertia.Net app. The sidebar, search, docs pages and theme switc
 ## Requirements
 
 - .NET 10 SDK
-- Node.js and npm to build the frontend (at runtime only when SSR is enabled)
+- JavaScript frontend build tools with npm, Bun, pnpm or Yarn; managed SSR requires Node.js or Bun at runtime
 - An Inertia.js v3 client package for React, Vue or Svelte
 
 <Callout type="tip" title="Starting from scratch?">
@@ -84,6 +84,7 @@ Use the starter template: `dotnet new install Inertia.Net.Templates`, then `dotn
 
 ## Next steps
 
+- [First 10 minutes](/docs/first-10-minutes) takes you from the template to a form test.
 - [Install the packages](/docs/installation) in an existing app.
 - [Follow the quick start](/docs/quick-start) for a minimal end-to-end setup.
 - [Read the props reference](/docs/props) when you are ready to model page data.

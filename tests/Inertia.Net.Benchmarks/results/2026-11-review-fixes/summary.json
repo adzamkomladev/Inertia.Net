@@ -1,0 +1,228 @@
+{
+  "rows": [
+    {
+      "run": 1,
+      "method": "Json20",
+      "baselineMs": 0.0934603515625,
+      "baselineBytes": 1736.0,
+      "currentMs": 0.0921431640625,
+      "currentBytes": 1736.0,
+      "latencyChangePercent": -1.635939924058194,
+      "latency95PercentInterval": [
+        -6.937402704980078,
+        2.5558404899938325
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "Partial2Of20",
+      "baselineMs": 0.0411982421875,
+      "baselineBytes": 568.0,
+      "currentMs": 0.04446767578125,
+      "currentBytes": 568.0,
+      "latencyChangePercent": 4.343547031766226,
+      "latency95PercentInterval": [
+        -3.3335154329418137,
+        11.096652961449394
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "Html20",
+      "baselineMs": 0.100553125,
+      "baselineBytes": 1800.0,
+      "currentMs": 0.10254296875,
+      "currentBytes": 1800.0,
+      "latencyChangePercent": 0.8053756828820924,
+      "latency95PercentInterval": [
+        -3.234857394242235,
+        7.557103680998257
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "ReferenceSerialize",
+      "baselineMs": 0.095028515625,
+      "baselineBytes": 312.0,
+      "currentMs": 0.09568125,
+      "currentBytes": 312.0,
+      "latencyChangePercent": -0.397804683170605,
+      "latency95PercentInterval": [
+        -3.4457868596078134,
+        3.75276679924903
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 1,
+      "method": "IntegerKeys1000",
+      "baselineMs": 3.56694375,
+      "baselineBytes": 176592.0,
+      "currentMs": 1.5124875,
+      "currentBytes": 166688.0,
+      "latencyChangePercent": -52.178287885250924,
+      "latency95PercentInterval": [
+        -54.49631583882602,
+        -50.15461986086469
+      ],
+      "allocationChangeBytes": -9904.0
+    },
+    {
+      "run": 1,
+      "method": "GuidKeys500",
+      "baselineMs": 2.73919375,
+      "baselineBytes": 140712.0,
+      "currentMs": 1.9068125,
+      "currentBytes": 140304.0,
+      "latencyChangePercent": -28.502968400639276,
+      "latency95PercentInterval": [
+        -33.549057685229215,
+        -26.336237277622708
+      ],
+      "allocationChangeBytes": -408.0
+    },
+    {
+      "run": 1,
+      "method": "TinyParallel20",
+      "baselineMs": 0.0687619140625,
+      "baselineBytes": 3992.0,
+      "currentMs": 0.070975390625,
+      "currentBytes": 4152.0,
+      "latencyChangePercent": -0.4675798855356017,
+      "latency95PercentInterval": [
+        -6.427735916947819,
+        9.102939520216236
+      ],
+      "allocationChangeBytes": 160.0
+    },
+    {
+      "run": 1,
+      "method": "YieldParallel3",
+      "baselineMs": 0.0584298828125,
+      "baselineBytes": 3720.0,
+      "currentMs": 0.069298046875,
+      "currentBytes": 3704.0,
+      "latencyChangePercent": 1.1444229200781142,
+      "latency95PercentInterval": [
+        -3.5345072724354996,
+        16.751444596926813
+      ],
+      "allocationChangeBytes": -16.0
+    },
+    {
+      "run": 2,
+      "method": "Json20",
+      "baselineMs": 0.0898283203125,
+      "baselineBytes": 1736.0,
+      "currentMs": 0.088965234375,
+      "currentBytes": 1736.0,
+      "latencyChangePercent": -0.624367941091819,
+      "latency95PercentInterval": [
+        -2.903331100001716,
+        7.290865635578935
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "Partial2Of20",
+      "baselineMs": 0.037944189453125,
+      "baselineBytes": 568.0,
+      "currentMs": 0.0373234375,
+      "currentBytes": 568.0,
+      "latencyChangePercent": 2.714380536397365,
+      "latency95PercentInterval": [
+        -3.4766559546059392,
+        4.841801351311137
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "Html20",
+      "baselineMs": 0.1486654296875,
+      "baselineBytes": 1800.0,
+      "currentMs": 0.146546875,
+      "currentBytes": 1800.0,
+      "latencyChangePercent": -4.4208849640194785,
+      "latency95PercentInterval": [
+        -11.331746429466294,
+        1.641760112066304
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "ReferenceSerialize",
+      "baselineMs": 0.04336796875,
+      "baselineBytes": 312.0,
+      "currentMs": 0.03799765625,
+      "currentBytes": 312.0,
+      "latencyChangePercent": -3.3452976528359657,
+      "latency95PercentInterval": [
+        -7.977658601685489,
+        -0.8549705924544515
+      ],
+      "allocationChangeBytes": 0.0
+    },
+    {
+      "run": 2,
+      "method": "IntegerKeys1000",
+      "baselineMs": 2.48366875,
+      "baselineBytes": 176592.0,
+      "currentMs": 1.04338125,
+      "currentBytes": 166688.0,
+      "latencyChangePercent": -53.68540055481008,
+      "latency95PercentInterval": [
+        -60.496960826062946,
+        -51.62500542935325
+      ],
+      "allocationChangeBytes": -9904.0
+    },
+    {
+      "run": 2,
+      "method": "GuidKeys500",
+      "baselineMs": 1.81679375,
+      "baselineBytes": 140712.0,
+      "currentMs": 1.25456875,
+      "currentBytes": 140304.0,
+      "latencyChangePercent": -33.005558766484555,
+      "latency95PercentInterval": [
+        -40.40871732534556,
+        -27.63904827537742
+      ],
+      "allocationChangeBytes": -408.0
+    },
+    {
+      "run": 2,
+      "method": "TinyParallel20",
+      "baselineMs": 0.02763056640625,
+      "baselineBytes": 3992.0,
+      "currentMs": 0.028078662109375,
+      "currentBytes": 4152.0,
+      "latencyChangePercent": 1.0293613723422634,
+      "latency95PercentInterval": [
+        -4.482118324355222,
+        2.874708661132619
+      ],
+      "allocationChangeBytes": 160.0
+    },
+    {
+      "run": 2,
+      "method": "YieldParallel3",
+      "baselineMs": 0.04365185546875,
+      "baselineBytes": 3720.0,
+      "currentMs": 0.0397318359375,
+      "currentBytes": 3704.0,
+      "latencyChangePercent": -3.0949510108503997,
+      "latency95PercentInterval": [
+        -10.849957799376114,
+        1.6434124328033595
+      ],
+      "allocationChangeBytes": -16.0
+    }
+  ]
+}

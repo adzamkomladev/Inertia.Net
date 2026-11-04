@@ -40,6 +40,68 @@ public sealed class AssertableInertia : AssertableJsonBase<AssertableInertia>
         return this;
     }
 
+    /// <summary>
+    /// Asserts that validation errors contain at least one message. Without a bag name, checks both default fields and named
+    /// bags; a bag name selects that exact bag, including any literal dots in its name.
+    /// </summary>
+    public AssertableInertia HasErrors(string? bag = null)
+    {
+        var errors = ErrorFields(bag);
+        var found = errors.Any(error => HasMessages(error.Value)
+            || bag is null && error.Value is JsonObject fields && fields.Any(field => HasMessages(field.Value)));
+        if (!found) Fail(bag is null ? "No validation errors were found." : $"No validation errors were found in bag [{bag}].");
+        return this;
+    }
+
+    /// <summary>
+    /// Asserts that a field has a validation error and optionally an exact message, including any member of an all-errors
+    /// array. Field names are literal client keys such as <c>items.0.email</c>. Pass <paramref name="bag"/> for a named bag.
+    /// </summary>
+    public AssertableInertia HasError(string field, string? message = null, string? bag = null)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        var errors = ErrorFields(bag);
+        if (!errors.TryGetPropertyValue(field, out var value) || !HasMessages(value))
+            Fail($"Validation error [{field}] was not found{(bag is null ? "" : $" in bag [{bag}]")}.");
+        if (message is not null && !HasMessage(value, message))
+            Fail($"Validation error [{field}] does not contain message [{message}]{(bag is null ? "" : $" in bag [{bag}]")}.");
+        return this;
+    }
+
+    /// <summary>Asserts that the exact named validation error bag exists and contains at least one field message.</summary>
+    public AssertableInertia HasErrorBag(string bag)
+    {
+        ArgumentNullException.ThrowIfNull(bag);
+        var errors = ErrorFields(null);
+        if (errors[bag] is not JsonObject fields || !fields.Any(field => HasMessages(field.Value)))
+            Fail($"Validation error bag [{bag}] was not found or contains no errors.");
+        return this;
+    }
+
+    private JsonObject ErrorFields(string? bag)
+    {
+        Has("errors");
+        var errors = _page.Props["errors"] as JsonObject
+            ?? throw new InertiaAssertionException("Validation errors are not an object.");
+        if (bag is null) return errors;
+        HasErrorBag(bag);
+        return (JsonObject)errors[bag]!;
+    }
+
+    private static bool HasMessages(JsonNode? value) => value switch
+    {
+        JsonValue message => message.TryGetValue<string>(out _),
+        JsonArray messages => messages.Any(message => message is JsonValue item && item.TryGetValue<string>(out _)),
+        _ => false,
+    };
+
+    private static bool HasMessage(JsonNode? value, string expected) => value switch
+    {
+        JsonValue message => message.TryGetValue<string>(out var text) && text == expected,
+        JsonArray messages => messages.Any(message => message is JsonValue item && item.TryGetValue<string>(out var text) && text == expected),
+        _ => false,
+    };
+
     /// <summary>Asserts that flash data contains the key (dot path).</summary>
     public AssertableInertia HasFlash(string key)
     {

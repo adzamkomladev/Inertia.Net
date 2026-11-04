@@ -1093,6 +1093,121 @@ The changes, in the order they were measured:
 What remains per request: the `InertiaResult`, the prop entry list, `Utf8JsonWriter`, the props walker, the `sharedProps` list,
 the metadata paths that the page actually emits, and boxed value-type results of lazy props.
 
+## Safe integer DOM serialization — 2026-11-04
+
+The standalone `--bigint-dom-probe` writes an already-parsed `JsonElement` array containing 500 safe integers through
+`BigIntegerConverters.WriteElement`. It reuses one 4 KiB output buffer and JSON writer, warms up for 1,000 operations, then
+records three samples of 5,000 operations per child process. Four before/after pairs alternate execution order, giving twelve
+samples per variant. Every sample verifies identical output. JSON parsing, buffer construction and reporting are outside the
+measurement; allocation uses the synchronous thread's `GC.GetAllocatedBytesForCurrentThread` counter.
+
+| Workload | Before B/op | After B/op | Before µs/op | After µs/op | Median paired time change |
+|---|---:|---:|---:|---:|---:|
+| 500 safe integer DOM tokens, reused writer | 15,920 | 0 | 124.483 | 31.874 | −73.9% |
+
+Times are absolute medians; the paired change is the median of the four within-pair ratios of each child's median. The shortcut
+avoids `GetRawText` and `BigInteger.TryParse` for safe `Int64` tokens, while still writing their original JSON token. Regression
+tests cover both safe boundaries, negative zero, unsafe integers, decimals and exponent notation. The optimized path leaves
+decimal and exponent tokens unchanged rather than rounding them through a `double`.
+
+These four pairs are a smaller check than the 32-round measurements elsewhere in this report, with no confidence interval and
+no CPU affinity. They establish the allocation saving for this reused-buffer DOM fixture, not a general rendering speed-up,
+HTTP throughput, cold-start allocation or performance for unsafe integers and typed numeric props. Builds, tests and other
+repository probes were paused during these timed pairs; virtual-host scheduling and frequency remain uncontrolled.
+
+Environment: Ubuntu 24.04.5, Linux 6.8.0-147, x64 virtual machine reporting an AMD EPYC processor and eight logical CPUs,
+SDK 10.0.403, net10.0 runtime configuration, no processor-count or GC environment overrides. The before converter source is
+`79e83fd:src/Inertia.Net/BigIntegerConverters.cs`; the after source is `3258666:src/Inertia.Net/BigIntegerConverters.cs`.
+Both builds use the same DOM probe source; other core and benchmark changes outside this isolated path are not exercised.
+The [raw samples and summary](results/2026-11-review-bigint) include assembly SHA-256 hashes, environment and all pair results.
+
+To reproduce one variant, build the current benchmark sources with the chosen converter source, then run from the repository
+root. Use separate output directories for the before and after builds, and alternate their processes for the paired comparison.
+
+```sh
+dotnet build tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj -c Release -warnaserror
+dotnet tests/Inertia.Net.Benchmarks/bin/Release/net10.0/Inertia.Net.Benchmarks.dll --bigint-dom-probe
+```
+
+## Small render allocation candidates — 2026-11-04
+
+These measurements isolate phase 3.4 against the tested phase 2 adapter (`6ab0a71`), excluding the other phase 3 changes.
+Two independent processes each run 32 alternating-order paired rounds after warmup. Both assembly contexts use a byte-identical
+benchmark DLL; only the adapter differs. Absolute medians below are from run 2, while time changes are medians of within-round
+ratios. They need not equal ratios of the displayed absolute medians.
+
+| Workload | Before B/op | After B/op | Before ms/op | After ms/op | Run 1 paired time change | Run 2 paired time change |
+|---|---:|---:|---:|---:|---:|---:|
+| JSON, 20 mixed props (control) | 1,736 | 1,736 | 0.100652 | 0.093232 | −2.9% | −3.6% |
+| One yielding sequential loader (control) | 1,576 | 1,536 | 0.042241 | 0.042242 | −1.0% | −3.7% |
+| Eight scroll props, append wrappers | 6,664 | 6,088 | 0.072809 | 0.069501 | −2.2% | −3.4% |
+| Eight scroll props, prepend wrappers | 6,880 | 6,112 | 0.032029 | 0.029354 | −6.2% | −5.4% |
+| Eight custom-converter properties | 408 | 152 | 0.012327 | 0.011163 | −9.3% | −10.5% |
+| Waiter attempts an already-owned fill | 96 | 0 | 0.000078 | 0.000026 | −63.5% | −66.3% |
+| 32 synchronous planned cache hits | 1,688 | 1,688 | 0.041720 | 0.041642 | −0.6% | −1.3% |
+
+Scroll metadata now passes its wrapper as a suffix instead of allocating a temporary list. Converter-bearing typed members
+carry serializer metadata in pooled entries instead of boxing a wrapper per member; converter options still preserve instance
+identity. The synchronous serializer helper and indexed entry loop avoid enlarging suspended loader state. A contending fill
+checks for the existing completion source before allocating a candidate. The ordinary mixed JSON control remains unchanged
+in allocated bytes. These targeted warm measurements do not establish a general rendering speed-up or HTTP throughput gain.
+Pooled entries grow from 24 to 32 bytes, so the member saving does not imply a smaller cold or concurrent pool footprint.
+
+The planned-hit memo candidate was rejected despite a measured 1,688 → 920 B saving for 32 hits. The default memory store boxes
+its prop key per lookup, but keeping the earlier hit ignores invalidation by a sequential loader before that prop is written.
+Both `RemovePropAsync` and `RemoveByTagAsync` regressions failed against the candidate; the final implementation preserves the
+second lookup. General converter deduplication by type was also left unchanged because instances can carry different settings.
+
+Environment: Ubuntu 24.04, Linux 6.8.0-147, x64 KVM virtual machine reporting an AMD EPYC processor and eight logical CPUs,
+SDK 10.0.403, .NET 10.0.14, workstation GC. Each process uses CPU 7 and `DOTNET_PROCESSOR_COUNT=1`. Repository builds, tests
+and other probes were paused during final pairs; idle docs/MCP servers remained. Virtual-host scheduling, frequency and unrelated
+host activity are uncontrolled. Allocation uses process-wide `GC.GetTotalAllocatedBytes(true)` with warmed pools and reused props.
+The [raw pairs, rejected-candidate evidence, environment and reproducible summary](results/2026-11-small-allocations) include DLL
+hashes and bootstrap intervals. The unchanged JSON control still moves in time; avoid treating these synthetic ratios as a
+production latency guarantee.
+
 ## Notes for apps
 
 Most per-request allocation in a real handler is the props themselves (see "Build 20 props"), not the render.
+
+## Review fixes: dictionary keys and render controls — 2026-11-04
+
+Baseline is `2dd4a4b` (1.6.2); current contains phases 1–3. Both variants compile identical benchmark fixtures, including
+`Dictionary<Guid, BenchRow>` with 500 entries. Two independent processes warm each variant and run 32 alternating-order paired
+rounds. Task builds, tests and sample servers were stopped during measurement. CPU 7 was selected with `taskset -c 7` and
+`DOTNET_PROCESSOR_COUNT=1`; unrelated idle host services remained. Environment and core/fixture DLL hashes are retained with
+the samples. This is warm in-process rendering into `Stream.Null`, using reused contexts, not Kestrel throughput or production latency.
+
+Absolute medians below use run 2; time changes are medians of within-round ratios, which need not equal ratios of the absolute medians.
+
+| Workload | Before B/op | After B/op | Before ms/op | After ms/op | Run 1 paired time | Run 2 paired time |
+|---|---:|---:|---:|---:|---:|---:|
+| JSON, 20 mixed props | 1,736 | 1,736 | 0.089828 | 0.088965 | -1.6% | -0.6% |
+| Partial reload, 2 of 20 | 568 | 568 | 0.037944 | 0.037323 | +4.3% | +2.7% |
+| HTML + Vite, 20 props | 1,800 | 1,800 | 0.148665 | 0.146547 | +0.8% | -4.4% |
+| Plain STJ control | 312 | 312 | 0.043368 | 0.037998 | -0.4% | -3.3% |
+| Integer-key dictionary, 1,000 props | 176,592 | 166,688 | 2.483669 | 1.043381 | -52.2% | -53.7% |
+| GUID-key dictionary, 500 rows | 140,712 | 140,304 | 1.816794 | 1.254569 | -28.5% | -33.0% |
+| 20 immediately completed parallel loaders | 3,992 | 4,152 | 0.027631 | 0.028079 | -0.5% | +1.0% |
+| 3 yielding parallel loaders | 3,720 | 3,704 | 0.043652 | 0.039732 | +1.1% | -3.1% |
+
+The integer and GUID rows show consistent improvements in both runs. Their run 2 exploratory 95% bootstrap intervals are
+−60.5% to −51.6% and −40.4% to −27.6%, respectively. Ordinary render allocation is unchanged; ordinary-render and parallel
+timing intervals include zero. The untouched STJ control moves −3.3% in run 2, demonstrating host variation. These measurements
+do not establish a general rendering speed-up or rule out every small regression.
+
+Retaining failure paths adds 160 B per 20 immediately completed parallel loaders (8 B per planned entry); root path strings are
+reused. Three yielding loaders show a net 16 B reduction: 24 B of added planner state is offset by the 40 B entry-loop saving.
+Nested parallel paths may additionally allocate path strings and are not quantified by these rows. GUID names retain their exact
+STJ spelling; common integer formatting also benefits from the runtime's small-integer string cache. Key-converter and read-only
+date-format regressions compare names directly against STJ, and Native AOT smoke covers GUID and read-only date dictionaries.
+
+The earlier standalone SSR cached/stale probe remains 664 B/request before and after; it measures hits while a refresh claim is
+retained, not background execution. The gated HTTP/1.1 integration test establishes that response completion no longer waits for
+the refresh. No network latency improvement is inferred from the cache probe.
+
+Raw samples, deterministic 5,000-resample summary (seed 20261104), environment, and standalone render/cache probes:
+[results/2026-11-review-fixes](results/2026-11-review-fixes). Reproduce the paired run with `--review-comparison <variants> <output>`,
+where `<variants>/baseline` and `<variants>/current` contain the respective checkouts and identical fixtures, followed by
+`python3 tests/Inertia.Net.Benchmarks/results/2026-11-review-fixes/summarize.py`. See the dedicated DOM and small-allocation
+sections for their separately isolated measurements and rejected cache-hit memoization experiment.

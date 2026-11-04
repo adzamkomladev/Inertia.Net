@@ -6,7 +6,7 @@ namespace Inertia.Net;
 /// <summary>Names for collecting Inertia.Net telemetry, e.g. <c>.WithMetrics(m =&gt; m.AddMeter(InertiaDiagnostics.MeterName))</c> in OpenTelemetry.</summary>
 public static class InertiaDiagnostics
 {
-    /// <summary>The <see cref="Meter"/> name: <c>inertia.page.*</c>, <c>inertia.props.*</c> and <c>inertia.ssr.*</c> instruments.</summary>
+    /// <summary>The <see cref="Meter"/> name: <c>inertia.page.*</c>, <c>inertia.props.*</c>, <c>inertia.cache.*</c> and <c>inertia.ssr.*</c> instruments.</summary>
     public const string MeterName = "Inertia.Net";
 
     /// <summary>The <see cref="System.Diagnostics.ActivitySource"/> name: <c>inertia.render</c> and <c>inertia.ssr</c> activities.</summary>
@@ -31,6 +31,7 @@ internal sealed class InertiaMetrics
     private readonly Counter<long> _circuitTransitions;
     private readonly Counter<long> _processRestarts;
     private readonly Counter<long> _rescued;
+    private readonly Counter<long> _droppedRefreshes;
     private Func<IEnumerable<Measurement<int>>>? _circuitStates;
 
     public InertiaMetrics(IMeterFactory meterFactory)
@@ -46,6 +47,7 @@ internal sealed class InertiaMetrics
         _circuitTransitions = meter.CreateCounter<long>("inertia.ssr.circuit.transitions", "{transition}", "SSR circuit state changes.");
         _processRestarts = meter.CreateCounter<long>("inertia.ssr.process.restarts", "{restart}", "Managed Node SSR process restarts.");
         _rescued = meter.CreateCounter<long>("inertia.props.rescued", "{prop}", "Props whose loader failed and that were rescued (left out and listed in rescuedProps).");
+        _droppedRefreshes = meter.CreateCounter<long>("inertia.cache.refresh.dropped", "{refresh}", "Cache refreshes dropped because the background queue is full or stopping.");
         meter.CreateObservableGauge("inertia.ssr.circuit.state", () => _circuitStates?.Invoke() ?? [], "{state}", "SSR circuit state per server: 0 closed, 1 half-open, 2 open.");
     }
 
@@ -126,6 +128,14 @@ internal sealed class InertiaMetrics
         if (_rescued.Enabled)
         {
             _rescued.Add(1);
+        }
+    }
+
+    public void RecordDroppedRefresh(string kind)
+    {
+        if (_droppedRefreshes.Enabled)
+        {
+            _droppedRefreshes.Add(1, new KeyValuePair<string, object?>("inertia.cache.kind", kind));
         }
     }
 

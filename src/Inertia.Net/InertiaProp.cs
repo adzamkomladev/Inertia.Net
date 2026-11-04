@@ -6,6 +6,7 @@ namespace Inertia.Net;
 /// <summary>
 /// A page prop with Inertia loading behavior (lazy, optional, deferred, always, merge, once, scroll, rescue, parallel, cached, live).
 /// Create instances with the factories on <see cref="Inertia"/>; the fluent methods mutate and return the same instance.
+/// Do not share prop instances across requests.
 /// </summary>
 [JsonConverter(typeof(InertiaPropJsonConverter))]
 public abstract class InertiaProp
@@ -24,6 +25,7 @@ public abstract class InertiaProp
     internal bool IsMerge;
     internal bool IsDeepMerge;
     internal bool AppendAtRoot = true;
+    private bool _explicitRootMerge;
     internal List<string>? AppendPaths;
     internal List<string>? PrependPaths;
     internal List<string>? MatchOnKeys;
@@ -75,9 +77,10 @@ public abstract class InertiaProp
     /// <summary>Sets how long the client may keep a once prop (implies <see cref="Once"/>).</summary>
     public InertiaProp Until(TimeSpan ttl) => Once(until: ttl);
 
-    /// <summary>Forces a once prop to be sent even when the client already has it.</summary>
+    /// <summary>Forces a once prop to be sent even when the client already has it (implies <see cref="Once"/>).</summary>
     public InertiaProp Fresh(bool fresh = true)
     {
+        IsOnce = true;
         OnceFresh = fresh;
         return this;
     }
@@ -85,11 +88,13 @@ public abstract class InertiaProp
     /// <summary>Merges by appending, at the root (<paramref name="path"/> null) or at a nested path.</summary>
     /// <param name="path">Nested path to append at, relative to the prop.</param>
     /// <param name="matchOn">Key used to match items, relative to <paramref name="path"/>.</param>
+    /// <exception cref="InvalidOperationException">The prop is live, or a root <see cref="Prepend"/> was already requested.</exception>
     public InertiaProp Append(string? path = null, string? matchOn = null) => AddMergePath(append: true, path, matchOn);
 
     /// <summary>Merges by prepending, at the root (<paramref name="path"/> null) or at a nested path.</summary>
     /// <param name="path">Nested path to prepend at, relative to the prop.</param>
     /// <param name="matchOn">Key used to match items, relative to <paramref name="path"/>.</param>
+    /// <exception cref="InvalidOperationException">The prop is live, or a root <see cref="Append"/> was already requested.</exception>
     public InertiaProp Prepend(string? path = null, string? matchOn = null) => AddMergePath(append: false, path, matchOn);
 
     /// <summary>Deep merges the value into the client's existing value.</summary>
@@ -101,13 +106,13 @@ public abstract class InertiaProp
         return this;
     }
 
-    /// <summary>Replaces the keys used to match merged items (implies merge).</summary>
+    /// <summary>Adds keys used to match merged items (implies merge); repeated calls accumulate.</summary>
     public InertiaProp MatchOn(params string[] keys)
     {
         ArgumentNullException.ThrowIfNull(keys);
         ThrowIfLive();
         IsMerge = true;
-        MatchOnKeys = [.. keys];
+        (MatchOnKeys ??= []).AddRange(keys);
         return this;
     }
 
@@ -154,7 +159,8 @@ public abstract class InertiaProp
     /// <summary>
     /// Caches the value like <see cref="Cache(string, TimeSpan)"/>, and once <paramref name="duration"/> has passed keeps serving it for
     /// <paramref name="staleFor"/> more (stale-while-revalidate): a request that reads a stale value gets it at once, and the loader runs
-    /// after that response has been sent, with the request's services still available, to store a fresh value. One refresh runs per key
+    /// on a bounded background worker after that response has been sent, to store a fresh value. The loader must use singleton services
+    /// or create its own scope; request-scoped services and HttpContext cannot be used. One refresh runs per key
     /// and app instance at a time; a refresh that fails keeps the stale value. Past both times the loader runs during the request again.
     /// </summary>
     /// <param name="key">The cache key, unique to the value; keys live in their own space, apart from the app's cache keys.</param>
@@ -176,13 +182,8 @@ public abstract class InertiaProp
         return this;
     }
 
-    /// <summary>Sets the deferred group.</summary>
-    public InertiaProp WithGroup(string group)
-    {
-        ArgumentNullException.ThrowIfNull(group);
-        Group = group;
-        return this;
-    }
+    /// <summary>Sets the deferred group (implies <see cref="Defer"/>).</summary>
+    public InertiaProp WithGroup(string group) => Defer(group);
 
     /// <summary>
     /// Makes the prop live: when <paramref name="event"/> is broadcast, clients showing the page reload the prop, or apply the value the
@@ -267,9 +268,15 @@ public abstract class InertiaProp
     private InertiaProp AddMergePath(bool append, string? path, string? matchOn)
     {
         ThrowIfLive();
+        if (path is null && _explicitRootMerge && AppendAtRoot != append)
+        {
+            throw new InvalidOperationException("Append() and Prepend() cannot both be used at the root of a prop.");
+        }
+
         IsMerge = true;
         if (path is null)
         {
+            _explicitRootMerge = true;
             AppendAtRoot = append;
             if (matchOn is not null)
             {

@@ -10,6 +10,30 @@ public class RequestRegressionTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Validation_aliases_use_generated_member_metadata_with_or_without_naming(bool camelCase)
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = camelCase ? JsonNamingPolicy.CamelCase : null,
+            TypeInfoResolver = ValidationJsonContext.Default,
+        };
+        var schema = options.GetTypeInfo(typeof(AliasedValidationInput));
+        var errors = InertiaValidationFilter.ToClientKeys(new()
+        {
+            ["Email"] = ["first"],
+            ["mail"] = ["second"],
+            ["Items[0].Email"] = ["nested"],
+            ["Fields.KeepThis.Email"] = ["dictionary"],
+        }, options.PropertyNamingPolicy, schema);
+        Assert.Equal(["first", "second"], errors["mail"]);
+        Assert.Contains(camelCase ? "items.0.mail" : "Items.0.mail", errors.Keys);
+        Assert.Contains(camelCase ? "fields.KeepThis.mail" : "Fields.KeepThis.mail", errors.Keys);
+        Assert.Equal("mail", InertiaValidationFilter.ToClientPath("mail", options.PropertyNamingPolicy, schema));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Validation_schema_preserves_named_members_and_dictionary_keys(bool generated)
     {
         var naming = new PrefixNamingPolicy();
@@ -144,5 +168,12 @@ public sealed class ValidationInput
     public Dictionary<string, ValidationItem> Fields { get; init; } = [];
 }
 public sealed class ValidationItem { public string? Email { get; init; } }
+public sealed class AliasedValidationInput
+{
+    [JsonPropertyName("mail")] public string? Email { get; init; }
+    public List<AliasedValidationInput> Items { get; init; } = [];
+    public Dictionary<string, AliasedValidationInput> Fields { get; init; } = [];
+}
+[JsonSerializable(typeof(AliasedValidationInput))]
 [JsonSerializable(typeof(ValidationInput))]
 internal sealed partial class ValidationJsonContext : JsonSerializerContext;

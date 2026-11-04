@@ -11,7 +11,17 @@ All samples implement **exactly** the contract below, so the one Playwright suit
 `SAMPLE=react|vue|svelte npx playwright test`.
 
 The .NET project of a sample builds without Node (`dotnet build`); the frontend is built separately
-(`npm install && npm run build` inside the sample, which writes `wwwroot/build` with a Vite manifest).
+inside the sample, writing `wwwroot/build` with a Vite manifest. npm, Bun, pnpm and Yarn are supported:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Use the package manager and lockfile chosen for your app. Repository CI uses `npm ci` with the committed `package-lock.json`
+for reproducible sample and Playwright installs; that verification command is not an application requirement.
 
 ## Pages
 
@@ -60,6 +70,14 @@ channel authorizer allows the demo user's private channel `users.1` (the sample 
 When the page sets `window.__e2e = true` before the app starts (the spec does, with `addInitScript`), the app exposes its hub
 connection as `window.__inertiaLive`, so the spec can stop it and check that missed events are caught up on reconnect.
 
+## Login validation (React sample only)
+
+`GET /login` shows a dummy email/password form using Precognition on blur. Its POST endpoint has two bounded per-client
+rate-limit buckets: 30 sliding-window validations per minute and five fixed-window submissions per minute. Both reject with
+429; only validation responses carry `Precognition: true`. Accepted submissions update a demo counter without signing in.
+`specs/precognition.spec.ts` covers field errors, validation beyond the strict submission limit and both rejection paths.
+The E2E reset hook resets this counter and the rate-limit partitions too.
+
 ## CSRF
 
 Every sample registers `services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken)` and calls `app.UseInertiaAntiforgery()`
@@ -95,7 +113,7 @@ Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
 ## SSR (React sample only)
 
 Enabled with the environment variable `INERTIA_SSR=1`:
-- `npm run build` also builds the SSR bundle (`ssr/ssr.js`);
+- the `build` script (run with any package manager above) also builds the SSR bundle (`ssr/ssr.js`);
 - the backend starts and supervises its Node SSR child on `127.0.0.1:13714`, and falls back to client rendering while it is unavailable;
 - set `INERTIA_SSR_PORT` to the same free port during both the frontend build and backend run to avoid collisions; managed mode rejects an occupied endpoint and does not shut down another server;
 - the Vite configuration explicitly binds SSR to `127.0.0.1`; the backend stops a managed SSR server that also answers on another address. For intentional remote SSR, configure the listener host explicitly and use `o.Ssr.Urls` without `UseNodeProcess()` in .NET;

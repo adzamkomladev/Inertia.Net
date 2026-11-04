@@ -1,0 +1,29 @@
+[
+  {
+    "file": "requestParams.ts",
+    "commit": "845e7d7b4f772aa1f2967091339d1cbffbbc76e2",
+    "gitBlob": "d056c23a6688d92040b3221a5166d08f43d14819",
+    "sha256": "7a766fb9103e56a98d1765a13c1eb55a4f9cea206c360705d3f3b1cd690e60b2",
+    "url": "https://github.com/inertiajs/inertia/blob/845e7d7b4f772aa1f2967091339d1cbffbbc76e2/packages/core/src/requestParams.ts"
+  },
+  {
+    "file": "response.ts",
+    "commit": "845e7d7b4f772aa1f2967091339d1cbffbbc76e2",
+    "gitBlob": "f1e3602a60597b23758fba57b90f2f7bd785ede8",
+    "sha256": "916557dbc408de3b52d423d662322665f5ad66202c1b1df487f0ed1e612ba4c1",
+    "url": "https://github.com/inertiajs/inertia/blob/845e7d7b4f772aa1f2967091339d1cbffbbc76e2/packages/core/src/response.ts"
+  },
+  {
+    "file": "request.ts",
+    "commit": "845e7d7b4f772aa1f2967091339d1cbffbbc76e2",
+    "gitBlob": "76b1fef4b401768837278137156f077e799f2de6",
+    "sha256": "eb9751b0d3be8c295682106ff70a9e587bedffb28b350a1c7e12f0ddcdcadac6",
+    "url": "https://github.com/inertiajs/inertia/blob/845e7d7b4f772aa1f2967091339d1cbffbbc76e2/packages/core/src/request.ts"
+  },
+  {
+    "file": "devtools-protocol.md",
+    "url": "https://inertiajs.com/docs/v3/advanced/devtools-protocol.md",
+    "sha256": "420cce4a27549d4d980e7818c99c934cb0fa1dd01eace76cb3b8be98e2feb050",
+    "fetchedDate": "2026-11-04"
+  }
+]

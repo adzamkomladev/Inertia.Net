@@ -406,7 +406,7 @@ public class PropsWriterTests
         Assert.True(Inertia.Once(() => 1).Fresh().OnceFresh);
         Assert.False(Inertia.Once(() => 1).Fresh().Fresh(false).OnceFresh);
         Assert.True(Inertia.Defer(() => 1).Rescue().ShouldRescue);
-        Assert.Equal(["a", "b"], Inertia.Merge(1).MatchOn("x").MatchOn("a", "b").MatchOnKeys!);
+        Assert.Equal(["x", "a", "b"], Inertia.Merge(1).MatchOn("x").MatchOn("a", "b").MatchOnKeys!);
         var scroll = Inertia.Scroll(1, "items");
         Assert.True(scroll.IsMerge);
         Assert.Equal("items", scroll.ScrollWrapper);

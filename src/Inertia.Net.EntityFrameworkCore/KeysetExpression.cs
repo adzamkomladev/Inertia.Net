@@ -43,7 +43,7 @@ internal static class KeysetExpression
         return query;
     }
 
-    private static Expression Compare(Expression left, Expression right, bool greater)
+    private static BinaryExpression Compare(Expression left, Expression right, bool greater)
     {
         if (left.Type == typeof(bool))
         {

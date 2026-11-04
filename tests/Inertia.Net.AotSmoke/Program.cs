@@ -41,12 +41,16 @@ builder.Services.AddInertiaErrorPages();
 var app = builder.Build();
 app.UseInertiaErrorPages();
 app.UseInertia();
+var configuredFastEndpoints = 0;
 app.UseFastEndpoints(c =>
 {
-    c.UseInertia();
+    c.Endpoints.Configurator = _ => Interlocked.Increment(ref configuredFastEndpoints);
+    c.ConfigureInertia();
     c.Serializer.Options.TypeInfoResolverChain.Insert(0, AppJsonContext.Default);
     c.Binding.ReflectionCache.AddFromInertiaNetAotSmoke();
 });
+if (configuredFastEndpoints == 0)
+    throw new InvalidOperationException("The existing FastEndpoints configurator did not run.");
 
 app.MapGet("/throw", (Func<IResult>)(() => throw new InvalidOperationException("smoke")));
 app.MapGet("/healthz", () => "ok");
@@ -106,6 +110,13 @@ app.MapGet("/cursor", async (CursorRequest request, CancellationToken ct) =>
     return Render("Cursor", new InertiaProps { ["feed"] = Scroll(page) });
 });
 
+app.MapGet("/dictionary-keys", () => Render("DictionaryKeys", new InertiaProps
+{
+    ["guids"] = new Dictionary<Guid, SerializationRow> { [Guid.Empty] = new("guid", Prop(() => 1)) },
+    ["dates"] = new System.Collections.ObjectModel.ReadOnlyDictionary<DateTime, SerializationRow>(
+        new Dictionary<DateTime, SerializationRow> { [new(2026, 11, 4, 0, 0, 0, DateTimeKind.Utc)] = new("date", Prop(() => 2)) }),
+}));
+
 app.MapGet("/users/create", () => Render("Users/Create"));
 
 // Replacing and removing cached props.
@@ -122,6 +133,8 @@ app.MapPost("/users", (HttpContext context, [Required] UserInput input) =>
     context.Inertia().Flash("toast", $"Created {input.Name}");
     return Results.Redirect("/dashboard");
 }).WithInertiaValidation();
+
+app.MapPost("/validation-alias", (AliasInput input) => Results.Ok()).WithInertiaPrecognition();
 
 app.MapPut("/users/{id:int}", (int id) => Results.Redirect("/dashboard"));
 
@@ -214,6 +227,19 @@ public sealed class UserInput
     public string? Email { get; set; }
 }
 
+public sealed class AliasInput
+{
+    [Required, JsonPropertyName("mail")] public string? Email { get; set; }
+    public List<AliasItem> Items { get; set; } = [];
+}
+public sealed class AliasItem
+{
+    [Required, JsonPropertyName("mail")] public string? Email { get; set; }
+}
+
+[JsonSerializable(typeof(AliasInput))]
+[JsonSerializable(typeof(Dictionary<Guid, SerializationRow>))]
+[JsonSerializable(typeof(System.Collections.ObjectModel.ReadOnlyDictionary<DateTime, SerializationRow>))]
 [JsonSerializable(typeof(HomePage))]
 [JsonSerializable(typeof(Stat))]
 [JsonSerializable(typeof(Stat[]))]
