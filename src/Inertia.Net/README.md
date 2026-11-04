@@ -40,7 +40,11 @@ app.Run();
 
 `Render`, `Defer`, `Back()` and `Location(...)` are called unqualified: the package adds `global using Inertia.Net;` and `global using static Inertia.Net.Inertia;` when `ImplicitUsings` is enabled (`Inertia.Render` does not compile outside the `Inertia.Net` namespace). Opt out with `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>`.
 
+`o.State.RememberPreviousUrl = true` lets `Back()` use the last successful page URL when `Referer` is missing; read it with `context.Inertia().PreviousUrl`.
+
 What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll, live) with opt-in parallel loaders and cached props, partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR (several servers, a supervised Node process pool, circuit breakers, render slots, per-response modes, metrics and a health check), validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), CSRF protection (`UseInertiaAntiforgery()`), an encrypted-cookie state store, an SSR response cache, Vite chunk prefetching and CSP nonces, `MapInertia` page endpoints, TypeScript declarations from your C# page types, and the Inertia DevTools recorder (`AddInertiaDevTools()`).
+
+`AddInertiaErrorPages()` and `UseInertiaErrorPages()` render production error pages with shared props for Inertia requests and HTML navigations; see [Error pages](https://github.com/adzamkomladev/Inertia.Net#error-pages).
 
 Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
 - [Quick start](https://github.com/adzamkomladev/Inertia.Net#quick-start) and [client setup](https://github.com/adzamkomladev/Inertia.Net#client-setup)

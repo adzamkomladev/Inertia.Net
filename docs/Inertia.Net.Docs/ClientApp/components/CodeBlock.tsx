@@ -37,33 +37,58 @@ export function CodeBlock({ className, children, ...props }: ComponentProps<'pre
     if (codeLanguage) setLanguage(codeLanguage)
   }, [children])
 
+  // Fade the edge that hides more code so cut-off lines read as scrollable.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [overflow, setOverflow] = useState<'none' | 'start' | 'end' | 'both'>('none')
+  const measure = () => {
+    const element = scrollRef.current
+    if (!element) return
+    const start = element.scrollLeft > 2
+    const end = element.scrollLeft + element.clientWidth < element.scrollWidth - 2
+    setOverflow(start && end ? 'both' : start ? 'start' : end ? 'end' : 'none')
+  }
+
+  useEffect(() => {
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
   const copy = async () => {
     const text = ref.current?.querySelector('code')?.textContent ?? ''
     try {
       await navigator.clipboard.writeText(text.replace(/\n$/, ''))
       setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
+      window.setTimeout(() => setCopied(false), 1800)
     } catch {
       // Clipboard access can be denied; the code remains selectable.
     }
   }
 
   return (
-    <figure className="group/code my-6 overflow-hidden rounded-xl border border-border bg-[#fbfbfc] dark:bg-[#0d1117]">
-      <figcaption className="flex h-9 items-center justify-between border-b border-border/80 bg-muted/30 px-3.5">
-        <span className="font-mono text-[11px] font-medium text-muted-foreground">{labels[language] ?? language}</span>
+    <figure className="code-frame not-prose group/code my-7 overflow-hidden rounded-xl border border-border bg-code shadow-[0_1px_2px_oklch(0.2_0.02_286/0.04)]">
+      <figcaption className="flex h-10 items-center justify-between border-b border-border bg-muted/50 pl-4 pr-1.5">
+        <span className="font-mono text-[11px] font-medium tracking-wide text-muted-foreground">
+          {labels[language] ?? language}
+        </span>
         <button
           type="button"
           onClick={copy}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-muted-foreground opacity-100 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover/code:opacity-100"
+          className={cn(
+            'relative inline-flex h-7 items-center gap-1.5 overflow-hidden rounded-md px-2 text-[11px] font-medium transition-[color,background-color] duration-150 active:scale-95',
+            copied ? 'text-success' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+          )}
           aria-label={copied ? 'Copied' : 'Copy code'}
         >
-          {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
-          {copied ? 'Copied' : 'Copy'}
+          <span className="relative grid size-3.5 place-items-center">
+            <Copy className={cn('absolute size-3.5 transition-[opacity,transform] duration-200', copied ? 'scale-50 opacity-0' : 'scale-100 opacity-100')} />
+            <Check className={cn('absolute size-3.5 transition-[opacity,transform] duration-300 ease-[var(--ease-out)]', copied ? 'scale-100 opacity-100' : 'scale-50 opacity-0')} strokeWidth={2.5} />
+          </span>
+          <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </figcaption>
-      <div className="scrollbar-thin overflow-x-auto">
-        <pre ref={ref} className={cn(className, 'm-0 bg-transparent py-3.5')} {...props}>
+      <div ref={scrollRef} onScroll={measure} data-overflow={overflow} className="code-scroll scrollbar-thin overflow-x-auto">
+        <pre ref={ref} className={cn(className, 'm-0 rounded-none bg-transparent py-4')} {...props}>
           {children}
         </pre>
       </div>

@@ -52,6 +52,22 @@ has '"deferredProps":{"default":["stats"]}'
 VERSION=$(sed -n 's/.*"version":"\([0-9a-f]*\)".*/\1/p' "$T/b")
 [ ${#VERSION} -eq 32 ] || fail "expected a 32-char manifest hash version, got '$VERSION'"
 
+# Error pages use the ordinary page writer under Native AOT, for JSON and HTML.
+inertia GET /missing
+status_is 404
+header_is X-Inertia true
+has '"component":"Error"'
+has '"status":404'
+has '"appName":"AotSmoke"'
+req GET /missing -H 'Accept: text/html'
+status_is 404
+has '<script data-page="app" type="application/json">'
+has '"status":404'
+inertia GET /throw
+status_is 500
+header_is X-Inertia true
+has '"status":500'
+
 # 2. Inertia visit with typed POCO props: JSON, headers, $bigint, defer/once/merge metadata.
 inertia GET /
 status_is 200

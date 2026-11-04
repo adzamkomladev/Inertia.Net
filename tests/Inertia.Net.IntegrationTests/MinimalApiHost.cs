@@ -18,11 +18,15 @@ public sealed class MinimalApiHost : IConformanceHost
 
     public static void MapRoutes(WebApplication app)
     {
+        app.MapGet("/throw", (Func<IResult>)(() => throw new InvalidOperationException("failed")));
         app.MapGet("/page", (ConformanceCounters counters) =>
         {
             counters.HitPage();
             return Render("Page", new InertiaProps { ["message"] = "hello" });
         });
+
+        app.MapGet("/users", () => Render("Users"));
+        app.MapMethods("/back-test", [HttpMethods.Post, HttpMethods.Put], () => Back());
 
         app.MapGet("/café", () => Render("Page"));
 

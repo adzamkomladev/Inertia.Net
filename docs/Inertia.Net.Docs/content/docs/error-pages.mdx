@@ -1,0 +1,80 @@
+---
+title: Error pages
+description: Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.
+section: Essentials
+order: 7
+---
+
+Render routing failures, authorization failures and unhandled exceptions as Inertia pages in production:
+
+```csharp
+builder.Services.AddInertia();
+builder.Services.AddInertiaErrorPages(o =>
+{
+    o.Component = "Error";                         // default
+    o.Components[404] = "Errors/NotFound";          // optional per-status component
+    o.StatusCodes = [403, 404, 500, 503];           // default
+    o.Props = (context, status, exception) => new InertiaProps
+    {
+        ["requestId"] = context.TraceIdentifier,
+    };
+});
+
+var app = builder.Build();
+app.UseInertiaErrorPages();                        // before UseInertia and the endpoints
+app.UseInertia();
+```
+
+Create the named components in your client pages directory. Each receives `status`, the optional `Props` callback's values, and
+shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
+responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.
+
+For example, `ClientApp/pages/Error.tsx`:
+
+```tsx
+export default function Error({ status }: { status: number }) {
+  const title = status === 404 ? 'Page not found'
+    : status === 403 ? 'Access denied'
+    : status === 503 ? 'Service unavailable'
+    : 'Something went wrong'
+
+  return <main><h1>{status}: {title}</h1><a href="/">Return home</a></main>
+}
+```
+
+The handler answers requests with `X-Inertia` or an `Accept: text/html` navigation. It preserves the error status: XHR receives a
+JSON page with `X-Inertia: true`; the first visit receives the normal root template. Root views and SSR work as for any other
+render. An error component must also resolve in your SSR bundle when SSR is enabled.
+
+Only configured error statuses with an empty response are replaced. API clients, existing response bodies, redirects, Inertia's
+`409` responses and antiforgery's `419` responses are left to their existing handlers. Exceptions use the status selected by
+ASP.NET Core's exception middleware (500 by default). The default statuses are 403, 404, 500 and 503; extend `StatusCodes` to handle
+other error statuses. A page explicitly returned with `Render(...).WithStatusCode(404)` keeps its component and props.
+
+In Development, error pages are disabled so the developer exception page and Inertia debug modal stay available. Set
+`o.EnabledInDevelopment = true` to preview your error components. The Inertia client renders non-2xx Inertia responses by default;
+application `httpException` event handlers or `onHttpException` callbacks can cancel that rendering.
+
+## Already using `UseExceptionHandler()`
+ `AddInertiaErrorPages()` registers an `IExceptionHandler` in the existing chain. Register
+API-specific handlers first if they should take priority. Use one exception middleware, then install just the status-code part:
+
+```csharp
+app.UseExceptionHandler();
+app.UseInertiaErrorPages(useExceptionHandler: false);
+app.UseInertia();
+```
+
+ASP.NET Core 10 suppresses exception diagnostics by default when an `IExceptionHandler` handles the exception. The Inertia
+handler follows that policy and emits only a Debug message naming the rendered component. To keep the built-in exception logs
+and diagnostics, configure the exception middleware explicitly:
+
+```csharp
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ExceptionHandlerOptions>(o =>
+    o.SuppressDiagnosticsCallback = _ => false);
+```
+
+`AddInertiaErrorPages()` also registers the built-in ProblemDetails service as the exception middleware’s fallback. The Inertia
+exception handler declines requests that do not ask for an Inertia page or HTML, so API exceptions use the host’s ProblemDetails
+fallback and content negotiation. Existing ProblemDetails configuration and earlier application handlers still apply; empty
+status-code responses remain unchanged. Loaded flash and validation state is consumed when an error page renders, as on any other page response.
