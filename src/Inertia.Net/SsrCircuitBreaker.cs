@@ -21,7 +21,7 @@ internal sealed class SsrCircuitBreaker(SsrCircuitBreakerOptions options, TimePr
     private readonly TimeSpan _breakDuration = options.BreakDuration;
     private volatile int _state;
     private int _failures;
-    private long _openUntil;
+    private long _openedAt;
 
     public SsrCircuitState State => (SsrCircuitState)_state;
 
@@ -30,14 +30,14 @@ internal sealed class SsrCircuitBreaker(SsrCircuitBreakerOptions options, TimePr
     /// <summary>Takes the probe when the circuit is open and the break has elapsed. The caller must report the probe's result.</summary>
     public bool TryBeginProbe()
     {
-        if (_state != (int)SsrCircuitState.Open || timeProvider.GetUtcNow().UtcTicks < Volatile.Read(ref _openUntil))
+        if (_state != (int)SsrCircuitState.Open || timeProvider.GetElapsedTime(Volatile.Read(ref _openedAt)) < _breakDuration)
         {
             return false;
         }
 
         lock (_gate)
         {
-            if (_state != (int)SsrCircuitState.Open || timeProvider.GetUtcNow().UtcTicks < _openUntil)
+            if (_state != (int)SsrCircuitState.Open || timeProvider.GetElapsedTime(_openedAt) < _breakDuration)
             {
                 return false;
             }
@@ -79,7 +79,7 @@ internal sealed class SsrCircuitBreaker(SsrCircuitBreakerOptions options, TimePr
         {
             if ((probe || ++_failures >= _threshold) && _state != (int)SsrCircuitState.Open)
             {
-                Volatile.Write(ref _openUntil, timeProvider.GetUtcNow().UtcTicks + _breakDuration.Ticks);
+                Volatile.Write(ref _openedAt, timeProvider.GetTimestamp());
                 Transition(SsrCircuitState.Open);
             }
         }
