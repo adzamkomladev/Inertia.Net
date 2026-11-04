@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -35,7 +36,7 @@ internal static class Json
     public static IEnumerable<string> Keys(JsonNode? n) => n switch
     {
         JsonObject o => o.Select(p => p.Key),
-        JsonArray a => Enumerable.Range(0, a.Count).Select(i => i.ToString()),
+        JsonArray a => Enumerable.Range(0, a.Count).Select(i => i.ToString(CultureInfo.InvariantCulture)),
         _ => [],
     };
 

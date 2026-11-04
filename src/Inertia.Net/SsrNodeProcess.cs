@@ -472,7 +472,11 @@ internal sealed partial class SsrNodeProcess(
         instance.Process?.Dispose();
         instance.Process = process;
         instance.Ready = false;
-        LogSpawned(_logger, process.Id, startInfo.FileName, string.Join(' ', startInfo.ArgumentList));
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            var arguments = string.Join(' ', startInfo.ArgumentList);
+            LogSpawned(_logger, process.Id, startInfo.FileName, arguments);
+        }
         return true;
     }
 

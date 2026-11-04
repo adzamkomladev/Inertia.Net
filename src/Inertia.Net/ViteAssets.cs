@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -18,6 +19,7 @@ namespace Inertia.Net;
 public sealed class ViteAssets
 {
     private const int MaxCachedTagSets = 256;
+    private static readonly SearchValues<char> InvalidOriginCharacters = SearchValues.Create("'\"<>\\ ");
 
     // Marks where a nonce attribute goes in a cached tag set. Never produced by the encoded URLs around it.
     private const char NonceMarker = '\u0001';
@@ -303,7 +305,7 @@ public sealed class ViteAssets
         origin = origin.TrimEnd('/');
         if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-            || origin.AsSpan().IndexOfAny("'\"<>\\ ") >= 0)
+            || origin.AsSpan().IndexOfAny(InvalidOriginCharacters) >= 0)
         {
             throw new InvalidOperationException($"'{origin}' is not a valid Vite dev server URL. Expected something like http://localhost:5173.");
         }

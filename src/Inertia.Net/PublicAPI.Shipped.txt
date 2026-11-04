@@ -1,0 +1,631 @@
+#nullable enable
+Inertia.Net.Cursor<TKey>
+Inertia.Net.Cursor<TKey>.Cursor() -> void
+Inertia.Net.Cursor<TKey>.Cursor(Inertia.Net.CursorDirection Direction, TKey Value) -> void
+Inertia.Net.Cursor<TKey>.Deconstruct(out Inertia.Net.CursorDirection Direction, out TKey Value) -> void
+Inertia.Net.Cursor<TKey>.Direction.get -> Inertia.Net.CursorDirection
+Inertia.Net.Cursor<TKey>.Direction.init -> void
+Inertia.Net.Cursor<TKey>.Equals(Inertia.Net.Cursor<TKey> other) -> bool
+Inertia.Net.Cursor<TKey>.Value.get -> TKey
+Inertia.Net.Cursor<TKey>.Value.init -> void
+Inertia.Net.CursorDirection
+Inertia.Net.CursorDirection.After = 0 -> Inertia.Net.CursorDirection
+Inertia.Net.CursorDirection.Before = 1 -> Inertia.Net.CursorDirection
+Inertia.Net.CursorPage<T>
+Inertia.Net.CursorPage<T>.<Clone>$() -> Inertia.Net.CursorPage<T>!
+Inertia.Net.CursorPage<T>.CurrentCursor.get -> string?
+Inertia.Net.CursorPage<T>.CurrentCursor.init -> void
+Inertia.Net.CursorPage<T>.CursorName.get -> string!
+Inertia.Net.CursorPage<T>.CursorName.init -> void
+Inertia.Net.CursorPage<T>.CursorPage(System.Collections.Generic.IReadOnlyList<T>! data, int perPage, string? nextCursor, string? previousCursor, bool hasMore, string! cursorName = "cursor", string? currentCursor = null) -> void
+Inertia.Net.CursorPage<T>.Data.get -> System.Collections.Generic.IReadOnlyList<T>!
+Inertia.Net.CursorPage<T>.Data.init -> void
+Inertia.Net.CursorPage<T>.Equals(Inertia.Net.CursorPage<T>? other) -> bool
+Inertia.Net.CursorPage<T>.GetScrollMetadata() -> Inertia.Net.ScrollMetadata!
+Inertia.Net.CursorPage<T>.HasMore.get -> bool
+Inertia.Net.CursorPage<T>.HasMore.init -> void
+Inertia.Net.CursorPage<T>.NextCursor.get -> string?
+Inertia.Net.CursorPage<T>.NextCursor.init -> void
+Inertia.Net.CursorPage<T>.PerPage.get -> int
+Inertia.Net.CursorPage<T>.PerPage.init -> void
+Inertia.Net.CursorPage<T>.PreviousCursor.get -> string?
+Inertia.Net.CursorPage<T>.PreviousCursor.init -> void
+Inertia.Net.CursorRequest
+Inertia.Net.CursorRequest.<Clone>$() -> Inertia.Net.CursorRequest!
+Inertia.Net.CursorRequest.Cursor.get -> string?
+Inertia.Net.CursorRequest.Cursor.init -> void
+Inertia.Net.CursorRequest.CursorRequest(string? Cursor = null, int PerPage = 20) -> void
+Inertia.Net.CursorRequest.Deconstruct(out string? Cursor, out int PerPage) -> void
+Inertia.Net.CursorRequest.Equals(Inertia.Net.CursorRequest? other) -> bool
+Inertia.Net.CursorRequest.Logger.get -> Microsoft.Extensions.Logging.ILogger?
+Inertia.Net.CursorRequest.Logger.init -> void
+Inertia.Net.CursorRequest.PerPage.get -> int
+Inertia.Net.CursorRequest.PerPage.init -> void
+Inertia.Net.IInertiaCache
+Inertia.Net.IInertiaCache.ClearPropsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaCache.ClearSsrAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaCache.RemoveByTagAsync(string! tag, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaCache.RemovePropAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaCache.SetPropAsync<T>(string! key, T value, System.TimeSpan duration, System.TimeSpan? staleFor = null, System.Collections.Generic.IEnumerable<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaCacheStore
+Inertia.Net.IInertiaCacheStore.GetAsync(Inertia.Net.InertiaCacheKey key, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<byte[]?>
+Inertia.Net.IInertiaCacheStore.RemoveAsync(Inertia.Net.InertiaCacheKey key, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaCacheStore.RemoveByTagAsync(string! tag, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaCacheStore.SetAsync(Inertia.Net.InertiaCacheKey key, byte[]! value, Inertia.Net.InertiaCacheEntryOptions options, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaLive
+Inertia.Net.IInertiaLive.PublishAsync(Inertia.Net.LiveEvent! event, string? exceptSocketId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaLive.PublishAsync<TProps>(Inertia.Net.LiveEvent! event, TProps props, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TProps>! propsTypeInfo, string? exceptSocketId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaLive.PublishAsync<TProps>(Inertia.Net.LiveEvent! event, TProps props, string? exceptSocketId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaLiveBroadcaster
+Inertia.Net.IInertiaLiveBroadcaster.PublishAsync(Inertia.Net.LiveMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaLiveBuilder
+Inertia.Net.IInertiaLiveBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Inertia.Net.IInertiaRootView
+Inertia.Net.IInertiaRootView.RenderAsync(Inertia.Net.InertiaRootViewContext! context) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaStateStore
+Inertia.Net.IInertiaStateStore.ClearAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaStateStore.LoadAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext) -> System.Threading.Tasks.ValueTask<byte[]?>
+Inertia.Net.IInertiaStateStore.SaveAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext, byte[]! state) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IProvidesScrollMetadata
+Inertia.Net.IProvidesScrollMetadata.GetScrollMetadata() -> Inertia.Net.ScrollMetadata!
+Inertia.Net.Inertia
+Inertia.Net.InertiaAntiforgeryApplicationBuilderExtensions
+Inertia.Net.InertiaAntiforgeryOptions
+Inertia.Net.InertiaAntiforgeryOptions.CookieName.get -> string!
+Inertia.Net.InertiaAntiforgeryOptions.CookieName.set -> void
+Inertia.Net.InertiaAntiforgeryOptions.CookieRefresh.get -> Inertia.Net.XsrfCookieRefresh
+Inertia.Net.InertiaAntiforgeryOptions.CookieRefresh.set -> void
+Inertia.Net.InertiaAntiforgeryOptions.InertiaAntiforgeryOptions() -> void
+Inertia.Net.InertiaAntiforgeryOptions.OnRejected.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException!, Microsoft.AspNetCore.Http.IResult!>?
+Inertia.Net.InertiaAntiforgeryOptions.OnRejected.set -> void
+Inertia.Net.InertiaAntiforgeryOptions.SecurePolicy.get -> Microsoft.AspNetCore.Http.CookieSecurePolicy
+Inertia.Net.InertiaAntiforgeryOptions.SecurePolicy.set -> void
+Inertia.Net.InertiaAntiforgeryOptions.ShouldValidate.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, bool>?
+Inertia.Net.InertiaAntiforgeryOptions.ShouldValidate.set -> void
+Inertia.Net.InertiaApplicationBuilderExtensions
+Inertia.Net.InertiaBackResult
+Inertia.Net.InertiaBackResult.ExecuteAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext) -> System.Threading.Tasks.Task!
+Inertia.Net.InertiaBackResult.Fallback.get -> string!
+Inertia.Net.InertiaBackResult.StatusCode.get -> int?
+Inertia.Net.InertiaBackResult.WithErrors(System.Collections.Generic.IDictionary<string!, string!>! errors, string! bag = "default") -> Inertia.Net.InertiaBackResult!
+Inertia.Net.InertiaBackResult.WithErrors(System.Collections.Generic.IDictionary<string!, string![]!>! errors, string! bag = "default") -> Inertia.Net.InertiaBackResult!
+Inertia.Net.InertiaBackResult.WithFlash(string! key, object? value) -> Inertia.Net.InertiaBackResult!
+Inertia.Net.InertiaCacheEntryKind
+Inertia.Net.InertiaCacheEntryKind.Prop = 0 -> Inertia.Net.InertiaCacheEntryKind
+Inertia.Net.InertiaCacheEntryKind.Ssr = 1 -> Inertia.Net.InertiaCacheEntryKind
+Inertia.Net.InertiaCacheEntryOptions
+Inertia.Net.InertiaCacheEntryOptions.Expiration.get -> System.TimeSpan
+Inertia.Net.InertiaCacheEntryOptions.InertiaCacheEntryOptions() -> void
+Inertia.Net.InertiaCacheEntryOptions.InertiaCacheEntryOptions(System.TimeSpan expiration, System.Collections.Generic.IReadOnlyList<string!>! tags) -> void
+Inertia.Net.InertiaCacheEntryOptions.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Inertia.Net.InertiaCacheKey
+Inertia.Net.InertiaCacheKey.Deconstruct(out Inertia.Net.InertiaCacheEntryKind Kind, out string! Value) -> void
+Inertia.Net.InertiaCacheKey.Equals(Inertia.Net.InertiaCacheKey other) -> bool
+Inertia.Net.InertiaCacheKey.InertiaCacheKey() -> void
+Inertia.Net.InertiaCacheKey.InertiaCacheKey(Inertia.Net.InertiaCacheEntryKind Kind, string! Value) -> void
+Inertia.Net.InertiaCacheKey.Kind.get -> Inertia.Net.InertiaCacheEntryKind
+Inertia.Net.InertiaCacheKey.Kind.init -> void
+Inertia.Net.InertiaCacheKey.Value.get -> string!
+Inertia.Net.InertiaCacheKey.Value.init -> void
+Inertia.Net.InertiaCacheTags
+Inertia.Net.InertiaDevToolsExtensions
+Inertia.Net.InertiaDevToolsOptions
+Inertia.Net.InertiaDevToolsOptions.Authorize.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, bool>?
+Inertia.Net.InertiaDevToolsOptions.Authorize.set -> void
+Inertia.Net.InertiaDevToolsOptions.Enabled.get -> bool?
+Inertia.Net.InertiaDevToolsOptions.Enabled.set -> void
+Inertia.Net.InertiaDevToolsOptions.InertiaDevToolsOptions() -> void
+Inertia.Net.InertiaDevToolsOptions.MaxAge.get -> System.TimeSpan
+Inertia.Net.InertiaDevToolsOptions.MaxAge.set -> void
+Inertia.Net.InertiaDevToolsOptions.MaxBodyBytes.get -> int
+Inertia.Net.InertiaDevToolsOptions.MaxBodyBytes.set -> void
+Inertia.Net.InertiaDevToolsOptions.MaxEntries.get -> int
+Inertia.Net.InertiaDevToolsOptions.MaxEntries.set -> void
+Inertia.Net.InertiaDevToolsOptions.MaxEntriesPerTab.get -> int
+Inertia.Net.InertiaDevToolsOptions.MaxEntriesPerTab.set -> void
+Inertia.Net.InertiaDevToolsOptions.RedactedKeys.get -> System.Collections.Generic.ISet<string!>!
+Inertia.Net.InertiaDiagnostics
+Inertia.Net.InertiaEndpointRouteBuilderExtensions
+Inertia.Net.InertiaErrorPagesOptions
+Inertia.Net.InertiaErrorPagesOptions.Component.get -> string!
+Inertia.Net.InertiaErrorPagesOptions.Component.set -> void
+Inertia.Net.InertiaErrorPagesOptions.Components.get -> System.Collections.Generic.Dictionary<int, string!>!
+Inertia.Net.InertiaErrorPagesOptions.EnabledInDevelopment.get -> bool
+Inertia.Net.InertiaErrorPagesOptions.EnabledInDevelopment.set -> void
+Inertia.Net.InertiaErrorPagesOptions.InertiaErrorPagesOptions() -> void
+Inertia.Net.InertiaErrorPagesOptions.Props.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, int, System.Exception?, Inertia.Net.InertiaProps!>?
+Inertia.Net.InertiaErrorPagesOptions.Props.set -> void
+Inertia.Net.InertiaErrorPagesOptions.StatusCodes.get -> System.Collections.Generic.HashSet<int>!
+Inertia.Net.InertiaErrorPagesOptions.StatusCodes.set -> void
+Inertia.Net.InertiaFeature
+Inertia.Net.InertiaFeature.ClearHistory() -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaFeature.EncryptHistory(bool encrypt = true) -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaFeature.Flash(string! key, object? value) -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaFeature.InertiaFeature() -> void
+Inertia.Net.InertiaFeature.PreserveFragment() -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaFeature.PreviousUrl.get -> string?
+Inertia.Net.InertiaFeature.Share(string! key, object? value) -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaFeature.WithErrors(System.Collections.Generic.IDictionary<string!, string!>! errors, string! bag = "default") -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaFeature.WithErrors(System.Collections.Generic.IDictionary<string!, string![]!>! errors, string! bag = "default") -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaHeaders
+Inertia.Net.InertiaHttpContextExtensions
+Inertia.Net.InertiaLocationResult
+Inertia.Net.InertiaLocationResult.ExecuteAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext) -> System.Threading.Tasks.Task!
+Inertia.Net.InertiaLocationResult.Url.get -> string!
+Inertia.Net.InertiaOptions
+Inertia.Net.InertiaOptions.ConvertExternalRedirects.get -> bool
+Inertia.Net.InertiaOptions.ConvertExternalRedirects.set -> void
+Inertia.Net.InertiaOptions.CspNonce.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, string?>?
+Inertia.Net.InertiaOptions.CspNonce.set -> void
+Inertia.Net.InertiaOptions.EncryptHistory.get -> bool
+Inertia.Net.InertiaOptions.EncryptHistory.set -> void
+Inertia.Net.InertiaOptions.ExposeSharedPropKeys.get -> bool
+Inertia.Net.InertiaOptions.ExposeSharedPropKeys.set -> void
+Inertia.Net.InertiaOptions.InertiaOptions() -> void
+Inertia.Net.InertiaOptions.Pages.get -> Inertia.Net.InertiaPagesOptions!
+Inertia.Net.InertiaOptions.Pagination.get -> Inertia.Net.PaginationOptions!
+Inertia.Net.InertiaOptions.PreserveBigIntegers.get -> bool
+Inertia.Net.InertiaOptions.PreserveBigIntegers.set -> void
+Inertia.Net.InertiaOptions.Props.get -> Inertia.Net.InertiaPropsOptions!
+Inertia.Net.InertiaOptions.RootElementId.get -> string!
+Inertia.Net.InertiaOptions.RootElementId.set -> void
+Inertia.Net.InertiaOptions.RootView.get -> string!
+Inertia.Net.InertiaOptions.RootView.set -> void
+Inertia.Net.InertiaOptions.Share(string! key, System.Func<Microsoft.AspNetCore.Http.HttpContext!, object?>! factory) -> Inertia.Net.InertiaOptions!
+Inertia.Net.InertiaOptions.Share(string! key, object? value) -> Inertia.Net.InertiaOptions!
+Inertia.Net.InertiaOptions.Ssr.get -> Inertia.Net.SsrOptions!
+Inertia.Net.InertiaOptions.State.get -> Inertia.Net.InertiaStateOptions!
+Inertia.Net.InertiaOptions.TypeScript.get -> Inertia.Net.InertiaTypeScriptOptions!
+Inertia.Net.InertiaOptions.UrlResolver.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, string!>?
+Inertia.Net.InertiaOptions.UrlResolver.set -> void
+Inertia.Net.InertiaOptions.Version.get -> string?
+Inertia.Net.InertiaOptions.Version.set -> void
+Inertia.Net.InertiaOptions.VersionResolver.get -> System.Func<Microsoft.AspNetCore.Http.HttpContext!, string?>?
+Inertia.Net.InertiaOptions.VersionResolver.set -> void
+Inertia.Net.InertiaOptions.Vite.get -> Inertia.Net.ViteOptions!
+Inertia.Net.InertiaOptions.WithAllErrors.get -> bool
+Inertia.Net.InertiaOptions.WithAllErrors.set -> void
+Inertia.Net.InertiaPagesOptions
+Inertia.Net.InertiaPagesOptions.Directory.get -> string?
+Inertia.Net.InertiaPagesOptions.Directory.set -> void
+Inertia.Net.InertiaPagesOptions.Extensions.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.InertiaPagesOptions.InertiaPagesOptions() -> void
+Inertia.Net.InertiaPrecognition
+Inertia.Net.InertiaPrecognitionMetadata
+Inertia.Net.InertiaPrecognitionMetadata.InertiaPrecognitionMetadata() -> void
+Inertia.Net.InertiaProp
+Inertia.Net.InertiaProp.Append(string? path = null, string? matchOn = null) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.As(string! key) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Cache(string! key, System.TimeSpan duration) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Cache(string! key, System.TimeSpan duration, System.TimeSpan? staleFor = null, System.Collections.Generic.IEnumerable<string!>? tags = null) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.DeepMerge() -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Defer(string! group = "default") -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Fresh(bool fresh = true) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Live(Inertia.Net.LiveChannel channel, params string![]! events) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Live(Inertia.Net.LiveEvent! event) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.MatchOn(params string![]! keys) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Once(string? key = null, System.TimeSpan? until = null) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Parallel() -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Prepend(string? path = null, string? matchOn = null) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Rescue(bool rescue = true) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Throttle(System.TimeSpan window) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.Until(System.TimeSpan ttl) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaProp.WithGroup(string! group) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaPropJsonConverter
+Inertia.Net.InertiaPropJsonConverter.InertiaPropJsonConverter() -> void
+Inertia.Net.InertiaPropTypeAttribute
+Inertia.Net.InertiaPropTypeAttribute.InertiaPropTypeAttribute(System.Type! valueType) -> void
+Inertia.Net.InertiaPropTypeAttribute.ValueType.get -> System.Type!
+Inertia.Net.InertiaProps
+Inertia.Net.InertiaProps.InertiaProps() -> void
+Inertia.Net.InertiaProps.InertiaProps(int capacity) -> void
+Inertia.Net.InertiaPropsOptions
+Inertia.Net.InertiaPropsOptions.InertiaPropsOptions() -> void
+Inertia.Net.InertiaPropsOptions.MaxConcurrency.get -> int
+Inertia.Net.InertiaPropsOptions.MaxConcurrency.set -> void
+Inertia.Net.InertiaRequest
+Inertia.Net.InertiaRequest.ErrorBag.get -> string?
+Inertia.Net.InertiaRequest.Except.get -> string![]?
+Inertia.Net.InertiaRequest.ExceptOnceProps.get -> string![]?
+Inertia.Net.InertiaRequest.InertiaRequest() -> void
+Inertia.Net.InertiaRequest.InertiaRequest(Microsoft.AspNetCore.Http.IHeaderDictionary! headers) -> void
+Inertia.Net.InertiaRequest.IsInertia.get -> bool
+Inertia.Net.InertiaRequest.IsPrecognition.get -> bool
+Inertia.Net.InertiaRequest.IsPrefetch.get -> bool
+Inertia.Net.InertiaRequest.MergeIntentPrepend.get -> bool
+Inertia.Net.InertiaRequest.Only.get -> string![]?
+Inertia.Net.InertiaRequest.PartialComponent.get -> string?
+Inertia.Net.InertiaRequest.Reset.get -> string![]?
+Inertia.Net.InertiaRequest.SocketId.get -> string?
+Inertia.Net.InertiaRequest.Version.get -> string?
+Inertia.Net.InertiaResult
+Inertia.Net.InertiaResult.Component.get -> string!
+Inertia.Net.InertiaResult.ContentType.get -> string?
+Inertia.Net.InertiaResult.ExecuteAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext) -> System.Threading.Tasks.Task!
+Inertia.Net.InertiaResult.Props.get -> object?
+Inertia.Net.InertiaResult.StatusCode.get -> int?
+Inertia.Net.InertiaResult.WithRootView(string! rootView) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaResult.WithSsr(Inertia.Net.SsrMode mode) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaResult.WithSsrCache(System.TimeSpan duration) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaResult.WithSsrCache(System.TimeSpan duration, System.TimeSpan staleFor) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaResult.WithStatusCode(int statusCode) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaResult.WithViewData(string! key, object? value) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaResult.WithoutSsr() -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaRootViewContext
+Inertia.Net.InertiaRootViewContext.Component.get -> string!
+Inertia.Net.InertiaRootViewContext.CspNonce.get -> string?
+Inertia.Net.InertiaRootViewContext.GetBodyHtml() -> string!
+Inertia.Net.InertiaRootViewContext.HttpContext.get -> Microsoft.AspNetCore.Http.HttpContext!
+Inertia.Net.InertiaRootViewContext.PageJson.get -> System.ReadOnlyMemory<byte>
+Inertia.Net.InertiaRootViewContext.RootElementId.get -> string!
+Inertia.Net.InertiaRootViewContext.RootView.get -> string!
+Inertia.Net.InertiaRootViewContext.SsrMode.get -> Inertia.Net.SsrMode?
+Inertia.Net.InertiaRootViewContext.ViewData.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Inertia.Net.InertiaRootViewContext.WriteBody(System.Buffers.IBufferWriter<byte>! writer) -> void
+Inertia.Net.InertiaServiceCollectionExtensions
+Inertia.Net.InertiaSsr
+Inertia.Net.InertiaSsrException
+Inertia.Net.InertiaSsrException.Hint.get -> string?
+Inertia.Net.InertiaSsrException.InertiaSsrException(string! message, string? type = null, string? hint = null, System.Exception? innerException = null) -> void
+Inertia.Net.InertiaSsrException.Type.get -> string?
+Inertia.Net.InertiaSsrHealthCheck
+Inertia.Net.InertiaSsrHealthCheck.CheckHealthAsync(Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult>!
+Inertia.Net.InertiaSsrHealthChecksBuilderExtensions
+Inertia.Net.InertiaStateOptions
+Inertia.Net.InertiaStateOptions.CookieName.get -> string!
+Inertia.Net.InertiaStateOptions.CookieName.set -> void
+Inertia.Net.InertiaStateOptions.CookieSecurePolicy.get -> Microsoft.AspNetCore.Http.CookieSecurePolicy
+Inertia.Net.InertiaStateOptions.CookieSecurePolicy.set -> void
+Inertia.Net.InertiaStateOptions.InertiaStateOptions() -> void
+Inertia.Net.InertiaStateOptions.PreviousUrlCookieName.get -> string!
+Inertia.Net.InertiaStateOptions.PreviousUrlCookieName.set -> void
+Inertia.Net.InertiaStateOptions.RememberPreviousUrl.get -> bool
+Inertia.Net.InertiaStateOptions.RememberPreviousUrl.set -> void
+Inertia.Net.InertiaStateOptions.UseSession() -> Inertia.Net.InertiaStateOptions!
+Inertia.Net.InertiaTypeScriptOptions
+Inertia.Net.InertiaTypeScriptOptions.FlashData<TFlash>() -> Inertia.Net.InertiaTypeScriptOptions!
+Inertia.Net.InertiaTypeScriptOptions.InertiaTypeScriptOptions() -> void
+Inertia.Net.InertiaTypeScriptOptions.OutputPath.get -> string?
+Inertia.Net.InertiaTypeScriptOptions.OutputPath.set -> void
+Inertia.Net.InertiaTypeScriptOptions.Page<TProps>(string! component) -> Inertia.Net.InertiaTypeScriptOptions!
+Inertia.Net.InertiaTypeScriptOptions.SharedProps<TShared>() -> Inertia.Net.InertiaTypeScriptOptions!
+Inertia.Net.InertiaValidationEndpointExtensions
+Inertia.Net.LiveChannel
+Inertia.Net.LiveChannel.Equals(Inertia.Net.LiveChannel other) -> bool
+Inertia.Net.LiveChannel.Key.get -> string!
+Inertia.Net.LiveChannel.LiveChannel() -> void
+Inertia.Net.LiveChannel.LiveChannel(string! name, Inertia.Net.LiveChannelType type) -> void
+Inertia.Net.LiveChannel.Name.get -> string!
+Inertia.Net.LiveChannel.Type.get -> Inertia.Net.LiveChannelType
+Inertia.Net.LiveChannel.TypeName.get -> string!
+Inertia.Net.LiveChannelType
+Inertia.Net.LiveChannelType.EncryptedPrivate = 3 -> Inertia.Net.LiveChannelType
+Inertia.Net.LiveChannelType.Presence = 2 -> Inertia.Net.LiveChannelType
+Inertia.Net.LiveChannelType.Private = 1 -> Inertia.Net.LiveChannelType
+Inertia.Net.LiveChannelType.Public = 0 -> Inertia.Net.LiveChannelType
+Inertia.Net.LiveEvent
+Inertia.Net.LiveEvent.<Clone>$() -> Inertia.Net.LiveEvent!
+Inertia.Net.LiveEvent.Channel.get -> Inertia.Net.LiveChannel
+Inertia.Net.LiveEvent.Equals(Inertia.Net.LiveEvent? other) -> bool
+Inertia.Net.LiveEvent.LiveEvent(string! name, Inertia.Net.LiveChannel channel) -> void
+Inertia.Net.LiveEvent.Name.get -> string!
+Inertia.Net.LiveMessage
+Inertia.Net.LiveMessage.Channel.get -> Inertia.Net.LiveChannel
+Inertia.Net.LiveMessage.Event.get -> string!
+Inertia.Net.LiveMessage.ExceptSocketId.get -> string?
+Inertia.Net.LiveMessage.LiveMessage(Inertia.Net.LiveEvent! event, System.Text.Json.JsonElement payload, string? exceptSocketId = null) -> void
+Inertia.Net.LiveMessage.Payload.get -> System.Text.Json.JsonElement
+Inertia.Net.Page<T>
+Inertia.Net.Page<T>.<Clone>$() -> Inertia.Net.Page<T>!
+Inertia.Net.Page<T>.CurrentPage.get -> int
+Inertia.Net.Page<T>.CurrentPage.init -> void
+Inertia.Net.Page<T>.Data.get -> System.Collections.Generic.IReadOnlyList<T>!
+Inertia.Net.Page<T>.Data.init -> void
+Inertia.Net.Page<T>.Equals(Inertia.Net.Page<T>? other) -> bool
+Inertia.Net.Page<T>.From.get -> long?
+Inertia.Net.Page<T>.GetScrollMetadata() -> Inertia.Net.ScrollMetadata!
+Inertia.Net.Page<T>.HasMore.get -> bool
+Inertia.Net.Page<T>.HasMore.init -> void
+Inertia.Net.Page<T>.LastPage.get -> long?
+Inertia.Net.Page<T>.Page(System.Collections.Generic.IReadOnlyList<T>! data, int currentPage, int perPage, long? total, bool hasMore, string! pageName = "page") -> void
+Inertia.Net.Page<T>.PageName.get -> string!
+Inertia.Net.Page<T>.PageName.init -> void
+Inertia.Net.Page<T>.PerPage.get -> int
+Inertia.Net.Page<T>.PerPage.init -> void
+Inertia.Net.Page<T>.To.get -> long?
+Inertia.Net.Page<T>.Total.get -> long?
+Inertia.Net.Page<T>.Total.init -> void
+Inertia.Net.PageRequest
+Inertia.Net.PageRequest.<Clone>$() -> Inertia.Net.PageRequest!
+Inertia.Net.PageRequest.Deconstruct(out int Page, out int PerPage) -> void
+Inertia.Net.PageRequest.Equals(Inertia.Net.PageRequest? other) -> bool
+Inertia.Net.PageRequest.Page.get -> int
+Inertia.Net.PageRequest.Page.init -> void
+Inertia.Net.PageRequest.PageRequest(int Page = 1, int PerPage = 20) -> void
+Inertia.Net.PageRequest.PerPage.get -> int
+Inertia.Net.PageRequest.PerPage.init -> void
+Inertia.Net.Pagination
+Inertia.Net.PaginationOptions
+Inertia.Net.PaginationOptions.CursorName.get -> string!
+Inertia.Net.PaginationOptions.CursorName.set -> void
+Inertia.Net.PaginationOptions.DefaultPerPage.get -> int
+Inertia.Net.PaginationOptions.DefaultPerPage.set -> void
+Inertia.Net.PaginationOptions.MaxPerPage.get -> int
+Inertia.Net.PaginationOptions.MaxPerPage.set -> void
+Inertia.Net.PaginationOptions.PageName.get -> string!
+Inertia.Net.PaginationOptions.PageName.set -> void
+Inertia.Net.PaginationOptions.PaginationOptions() -> void
+Inertia.Net.PaginationOptions.PerPageName.get -> string!
+Inertia.Net.PaginationOptions.PerPageName.set -> void
+Inertia.Net.ScrollMetadata
+Inertia.Net.ScrollMetadata.<Clone>$() -> Inertia.Net.ScrollMetadata!
+Inertia.Net.ScrollMetadata.CurrentPage.get -> object?
+Inertia.Net.ScrollMetadata.CurrentPage.init -> void
+Inertia.Net.ScrollMetadata.Deconstruct(out string! PageName, out object? PreviousPage, out object? NextPage, out object? CurrentPage) -> void
+Inertia.Net.ScrollMetadata.Equals(Inertia.Net.ScrollMetadata? other) -> bool
+Inertia.Net.ScrollMetadata.NextPage.get -> object?
+Inertia.Net.ScrollMetadata.NextPage.init -> void
+Inertia.Net.ScrollMetadata.PageName.get -> string!
+Inertia.Net.ScrollMetadata.PageName.init -> void
+Inertia.Net.ScrollMetadata.PreviousPage.get -> object?
+Inertia.Net.ScrollMetadata.PreviousPage.init -> void
+Inertia.Net.ScrollMetadata.ScrollMetadata(string! PageName = "page", object? PreviousPage = null, object? NextPage = null, object? CurrentPage = null) -> void
+Inertia.Net.SsrCacheOptions
+Inertia.Net.SsrCacheOptions.Duration.get -> System.TimeSpan
+Inertia.Net.SsrCacheOptions.Duration.set -> void
+Inertia.Net.SsrCacheOptions.MaxBytes.get -> long
+Inertia.Net.SsrCacheOptions.MaxBytes.set -> void
+Inertia.Net.SsrCacheOptions.SsrCacheOptions() -> void
+Inertia.Net.SsrCacheOptions.StaleFor.get -> System.TimeSpan
+Inertia.Net.SsrCacheOptions.StaleFor.set -> void
+Inertia.Net.SsrCircuitBreakerOptions
+Inertia.Net.SsrCircuitBreakerOptions.BreakDuration.get -> System.TimeSpan
+Inertia.Net.SsrCircuitBreakerOptions.BreakDuration.set -> void
+Inertia.Net.SsrCircuitBreakerOptions.Enabled.get -> bool
+Inertia.Net.SsrCircuitBreakerOptions.Enabled.set -> void
+Inertia.Net.SsrCircuitBreakerOptions.FailureThreshold.get -> int
+Inertia.Net.SsrCircuitBreakerOptions.FailureThreshold.set -> void
+Inertia.Net.SsrCircuitBreakerOptions.SsrCircuitBreakerOptions() -> void
+Inertia.Net.SsrConcurrencyOptions
+Inertia.Net.SsrConcurrencyOptions.MaxActive.get -> int
+Inertia.Net.SsrConcurrencyOptions.MaxActive.set -> void
+Inertia.Net.SsrConcurrencyOptions.MaxQueued.get -> int
+Inertia.Net.SsrConcurrencyOptions.MaxQueued.set -> void
+Inertia.Net.SsrConcurrencyOptions.QueueTimeout.get -> System.TimeSpan
+Inertia.Net.SsrConcurrencyOptions.QueueTimeout.set -> void
+Inertia.Net.SsrConcurrencyOptions.SsrConcurrencyOptions() -> void
+Inertia.Net.SsrMode
+Inertia.Net.SsrMode.Disabled = 0 -> Inertia.Net.SsrMode
+Inertia.Net.SsrMode.Preferred = 1 -> Inertia.Net.SsrMode
+Inertia.Net.SsrMode.Required = 2 -> Inertia.Net.SsrMode
+Inertia.Net.SsrNodeProcessOptions
+Inertia.Net.SsrNodeProcessOptions.AllowNetworkExposure.get -> bool
+Inertia.Net.SsrNodeProcessOptions.AllowNetworkExposure.set -> void
+Inertia.Net.SsrNodeProcessOptions.Arguments.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.SsrNodeProcessOptions.BasePort.get -> int
+Inertia.Net.SsrNodeProcessOptions.BasePort.set -> void
+Inertia.Net.SsrNodeProcessOptions.BundlePath.get -> string?
+Inertia.Net.SsrNodeProcessOptions.BundlePath.set -> void
+Inertia.Net.SsrNodeProcessOptions.Environment.get -> System.Collections.Generic.IDictionary<string!, string?>!
+Inertia.Net.SsrNodeProcessOptions.Executable.get -> string!
+Inertia.Net.SsrNodeProcessOptions.Executable.set -> void
+Inertia.Net.SsrNodeProcessOptions.Instances.get -> int
+Inertia.Net.SsrNodeProcessOptions.Instances.set -> void
+Inertia.Net.SsrNodeProcessOptions.LivenessFailureThreshold.get -> int
+Inertia.Net.SsrNodeProcessOptions.LivenessFailureThreshold.set -> void
+Inertia.Net.SsrNodeProcessOptions.LivenessInterval.get -> System.TimeSpan
+Inertia.Net.SsrNodeProcessOptions.LivenessInterval.set -> void
+Inertia.Net.SsrNodeProcessOptions.RestartOnExit.get -> bool
+Inertia.Net.SsrNodeProcessOptions.RestartOnExit.set -> void
+Inertia.Net.SsrNodeProcessOptions.SsrNodeProcessOptions() -> void
+Inertia.Net.SsrNodeProcessOptions.StartupTimeout.get -> System.TimeSpan
+Inertia.Net.SsrNodeProcessOptions.StartupTimeout.set -> void
+Inertia.Net.SsrNodeProcessOptions.WorkingDirectory.get -> string?
+Inertia.Net.SsrNodeProcessOptions.WorkingDirectory.set -> void
+Inertia.Net.SsrOptions
+Inertia.Net.SsrOptions.BundlePath.get -> string?
+Inertia.Net.SsrOptions.BundlePath.set -> void
+Inertia.Net.SsrOptions.Cache.get -> Inertia.Net.SsrCacheOptions!
+Inertia.Net.SsrOptions.CircuitBreaker.get -> Inertia.Net.SsrCircuitBreakerOptions!
+Inertia.Net.SsrOptions.Concurrency.get -> Inertia.Net.SsrConcurrencyOptions!
+Inertia.Net.SsrOptions.ConnectTimeout.get -> System.TimeSpan
+Inertia.Net.SsrOptions.ConnectTimeout.set -> void
+Inertia.Net.SsrOptions.ExcludePaths.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.SsrOptions.MaxPageBytes.get -> long
+Inertia.Net.SsrOptions.MaxPageBytes.set -> void
+Inertia.Net.SsrOptions.MaxResponseBytes.get -> long
+Inertia.Net.SsrOptions.MaxResponseBytes.set -> void
+Inertia.Net.SsrOptions.Mode.get -> Inertia.Net.SsrMode
+Inertia.Net.SsrOptions.Mode.set -> void
+Inertia.Net.SsrOptions.NodeProcess.get -> Inertia.Net.SsrNodeProcessOptions?
+Inertia.Net.SsrOptions.SsrOptions() -> void
+Inertia.Net.SsrOptions.Timeout.get -> System.TimeSpan
+Inertia.Net.SsrOptions.Timeout.set -> void
+Inertia.Net.SsrOptions.Urls.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.SsrOptions.UseNodeProcess(System.Action<Inertia.Net.SsrNodeProcessOptions!>? configure = null) -> Inertia.Net.SsrOptions!
+Inertia.Net.ViteAssets
+Inertia.Net.ViteAssets.IsDevServerRunning.get -> bool
+Inertia.Net.ViteAssets.RenderReactRefresh(Microsoft.AspNetCore.Http.HttpContext! context) -> string!
+Inertia.Net.ViteAssets.RenderTags(Microsoft.AspNetCore.Http.HttpContext! context, params string![]! entries) -> string!
+Inertia.Net.ViteAssets.ViteAssets(Microsoft.Extensions.Options.IOptions<Inertia.Net.InertiaOptions!>! options, Microsoft.Extensions.Hosting.IHostEnvironment! environment, System.TimeProvider! timeProvider) -> void
+Inertia.Net.ViteOptions
+Inertia.Net.ViteOptions.AssetBaseUrl.get -> string?
+Inertia.Net.ViteOptions.AssetBaseUrl.set -> void
+Inertia.Net.ViteOptions.BuildDirectory.get -> string!
+Inertia.Net.ViteOptions.BuildDirectory.set -> void
+Inertia.Net.ViteOptions.DevServerUrl.get -> string?
+Inertia.Net.ViteOptions.DevServerUrl.set -> void
+Inertia.Net.ViteOptions.HotFilePath.get -> string?
+Inertia.Net.ViteOptions.HotFilePath.set -> void
+Inertia.Net.ViteOptions.ManifestPath.get -> string?
+Inertia.Net.ViteOptions.ManifestPath.set -> void
+Inertia.Net.ViteOptions.Prefetch.get -> Inertia.Net.VitePrefetch
+Inertia.Net.ViteOptions.Prefetch.set -> void
+Inertia.Net.ViteOptions.PrefetchConcurrency.get -> int
+Inertia.Net.ViteOptions.PrefetchConcurrency.set -> void
+Inertia.Net.ViteOptions.PublicDirectory.get -> string!
+Inertia.Net.ViteOptions.PublicDirectory.set -> void
+Inertia.Net.ViteOptions.ViteOptions() -> void
+Inertia.Net.VitePrefetch
+Inertia.Net.VitePrefetch.Aggressive = 2 -> Inertia.Net.VitePrefetch
+Inertia.Net.VitePrefetch.None = 0 -> Inertia.Net.VitePrefetch
+Inertia.Net.VitePrefetch.Waterfall = 1 -> Inertia.Net.VitePrefetch
+Inertia.Net.XsrfCookieRefresh
+Inertia.Net.XsrfCookieRefresh.Always = 0 -> Inertia.Net.XsrfCookieRefresh
+Inertia.Net.XsrfCookieRefresh.Lazy = 1 -> Inertia.Net.XsrfCookieRefresh
+const Inertia.Net.InertiaCacheTags.Props = "inertia:props" -> string!
+const Inertia.Net.InertiaCacheTags.Ssr = "inertia:ssr" -> string!
+const Inertia.Net.InertiaDevToolsExtensions.PathPrefix = "/_inertia/devtools" -> string!
+const Inertia.Net.InertiaDiagnostics.ActivitySourceName = "Inertia.Net" -> string!
+const Inertia.Net.InertiaDiagnostics.MeterName = "Inertia.Net" -> string!
+const Inertia.Net.InertiaHeaders.ErrorBag = "X-Inertia-Error-Bag" -> string!
+const Inertia.Net.InertiaHeaders.ExceptOnceProps = "X-Inertia-Except-Once-Props" -> string!
+const Inertia.Net.InertiaHeaders.Inertia = "X-Inertia" -> string!
+const Inertia.Net.InertiaHeaders.InfiniteScrollMergeIntent = "X-Inertia-Infinite-Scroll-Merge-Intent" -> string!
+const Inertia.Net.InertiaHeaders.Location = "X-Inertia-Location" -> string!
+const Inertia.Net.InertiaHeaders.PartialComponent = "X-Inertia-Partial-Component" -> string!
+const Inertia.Net.InertiaHeaders.PartialData = "X-Inertia-Partial-Data" -> string!
+const Inertia.Net.InertiaHeaders.PartialExcept = "X-Inertia-Partial-Except" -> string!
+const Inertia.Net.InertiaHeaders.Purpose = "Purpose" -> string!
+const Inertia.Net.InertiaHeaders.Redirect = "X-Inertia-Redirect" -> string!
+const Inertia.Net.InertiaHeaders.Reset = "X-Inertia-Reset" -> string!
+const Inertia.Net.InertiaHeaders.SocketId = "X-Socket-Id" -> string!
+const Inertia.Net.InertiaHeaders.Version = "X-Inertia-Version" -> string!
+const Inertia.Net.InertiaHeaders.XsrfToken = "X-XSRF-TOKEN" -> string!
+const Inertia.Net.InertiaPrecognition.Header = "Precognition" -> string!
+const Inertia.Net.InertiaPrecognition.SuccessHeader = "Precognition-Success" -> string!
+const Inertia.Net.InertiaPrecognition.ValidateOnlyHeader = "Precognition-Validate-Only" -> string!
+const Inertia.Net.InertiaSsr.HttpClientName = "Inertia.Net.Ssr" -> string!
+const Inertia.Net.SsrOptions.DefaultUrl = "http://127.0.0.1:13714" -> string!
+override Inertia.Net.Cursor<TKey>.GetHashCode() -> int
+override Inertia.Net.CursorPage<T>.Equals(object? obj) -> bool
+override Inertia.Net.CursorPage<T>.GetHashCode() -> int
+override Inertia.Net.CursorPage<T>.ToString() -> string!
+override Inertia.Net.CursorRequest.Equals(object? obj) -> bool
+override Inertia.Net.CursorRequest.GetHashCode() -> int
+override Inertia.Net.CursorRequest.ToString() -> string!
+override Inertia.Net.InertiaCacheKey.GetHashCode() -> int
+override Inertia.Net.InertiaCacheKey.ToString() -> string!
+override Inertia.Net.InertiaPropJsonConverter.CanConvert(System.Type! typeToConvert) -> bool
+override Inertia.Net.InertiaPropJsonConverter.Read(ref System.Text.Json.Utf8JsonReader reader, System.Type! typeToConvert, System.Text.Json.JsonSerializerOptions! options) -> Inertia.Net.InertiaProp!
+override Inertia.Net.InertiaPropJsonConverter.Write(System.Text.Json.Utf8JsonWriter! writer, Inertia.Net.InertiaProp! value, System.Text.Json.JsonSerializerOptions! options) -> void
+override Inertia.Net.LiveChannel.GetHashCode() -> int
+override Inertia.Net.LiveChannel.ToString() -> string!
+override Inertia.Net.LiveEvent.Equals(object? obj) -> bool
+override Inertia.Net.LiveEvent.GetHashCode() -> int
+override Inertia.Net.LiveEvent.ToString() -> string!
+override Inertia.Net.Page<T>.Equals(object? obj) -> bool
+override Inertia.Net.Page<T>.GetHashCode() -> int
+override Inertia.Net.Page<T>.ToString() -> string!
+override Inertia.Net.PageRequest.Equals(object? obj) -> bool
+override Inertia.Net.PageRequest.GetHashCode() -> int
+override Inertia.Net.PageRequest.ToString() -> string!
+override Inertia.Net.ScrollMetadata.Equals(object? obj) -> bool
+override Inertia.Net.ScrollMetadata.GetHashCode() -> int
+override Inertia.Net.ScrollMetadata.ToString() -> string!
+static Inertia.Net.Cursor<TKey>.operator !=(Inertia.Net.Cursor<TKey> left, Inertia.Net.Cursor<TKey> right) -> bool
+static Inertia.Net.Cursor<TKey>.operator ==(Inertia.Net.Cursor<TKey> left, Inertia.Net.Cursor<TKey> right) -> bool
+static Inertia.Net.CursorPage<T>.operator !=(Inertia.Net.CursorPage<T>? left, Inertia.Net.CursorPage<T>? right) -> bool
+static Inertia.Net.CursorPage<T>.operator ==(Inertia.Net.CursorPage<T>? left, Inertia.Net.CursorPage<T>? right) -> bool
+static Inertia.Net.CursorRequest.BindAsync(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Threading.Tasks.ValueTask<Inertia.Net.CursorRequest?>
+static Inertia.Net.CursorRequest.From(Microsoft.AspNetCore.Http.HttpContext! context, int? defaultPerPage = null, int? maxPerPage = null, string? cursorName = null, string? perPageName = null) -> Inertia.Net.CursorRequest!
+static Inertia.Net.CursorRequest.From(Microsoft.AspNetCore.Http.IQueryCollection! query, int defaultPerPage = 20, int maxPerPage = 100, string! cursorName = "cursor", string! perPageName = "perPage") -> Inertia.Net.CursorRequest!
+static Inertia.Net.CursorRequest.operator !=(Inertia.Net.CursorRequest? left, Inertia.Net.CursorRequest? right) -> bool
+static Inertia.Net.CursorRequest.operator ==(Inertia.Net.CursorRequest? left, Inertia.Net.CursorRequest? right) -> bool
+static Inertia.Net.Inertia.Always(object? value) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Always<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Always<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Always<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Always<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Always<T>(System.Func<T>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Back(string! fallback = "~/") -> Inertia.Net.InertiaBackResult!
+static Inertia.Net.Inertia.DeepMerge<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.DeepMerge<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.DeepMerge<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.DeepMerge<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.DeepMerge<T>(System.Func<T>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.DeepMerge<T>(T value) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Defer<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader, string! group = "default") -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Defer<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader, string! group = "default") -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Defer<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader, string! group = "default") -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Defer<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader, string! group = "default") -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Defer<T>(System.Func<T>! loader, string! group = "default") -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Live<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader, Inertia.Net.LiveEvent! event) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Live<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader, Inertia.Net.LiveEvent! event) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Live<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader, Inertia.Net.LiveEvent! event) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Live<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader, Inertia.Net.LiveEvent! event) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Live<T>(System.Func<T>! loader, Inertia.Net.LiveEvent! event) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Live<T>(T value, Inertia.Net.LiveEvent! event) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Location(string! url) -> Inertia.Net.InertiaLocationResult!
+static Inertia.Net.Inertia.Merge<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Merge<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Merge<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Merge<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Merge<T>(System.Func<T>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Merge<T>(T value) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Once<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Once<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Once<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Once<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Once<T>(System.Func<T>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Optional<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Optional<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Optional<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Optional<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Optional<T>(System.Func<T>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Prop<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Prop<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Prop<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Prop<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Prop<T>(System.Func<T>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Render(string! component, object? props = null) -> Inertia.Net.InertiaResult!
+static Inertia.Net.Inertia.Scroll<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader, string! wrapper = "data", Inertia.Net.ScrollMetadata? metadata = null) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Scroll<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader, string! wrapper = "data", Inertia.Net.ScrollMetadata? metadata = null) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Scroll<T>(System.Func<System.Threading.Tasks.Task<T>!>! loader, string! wrapper = "data", Inertia.Net.ScrollMetadata? metadata = null) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Scroll<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! loader, string! wrapper = "data", Inertia.Net.ScrollMetadata? metadata = null) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Scroll<T>(System.Func<T>! loader, string! wrapper = "data", Inertia.Net.ScrollMetadata? metadata = null) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Scroll<T>(T value, string! wrapper = "data", Inertia.Net.ScrollMetadata? metadata = null) -> Inertia.Net.InertiaProp!
+static Inertia.Net.InertiaAntiforgeryApplicationBuilderExtensions.UseInertiaAntiforgery(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, System.Action<Inertia.Net.InertiaAntiforgeryOptions!>? configure = null) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static Inertia.Net.InertiaAntiforgeryApplicationBuilderExtensions.UseInertiaAntiforgeryCookie(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, string! cookieName = "XSRF-TOKEN") -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static Inertia.Net.InertiaApplicationBuilderExtensions.UseInertia(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static Inertia.Net.InertiaApplicationBuilderExtensions.UseInertiaErrorPages(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, bool useExceptionHandler = true) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static Inertia.Net.InertiaCacheKey.operator !=(Inertia.Net.InertiaCacheKey left, Inertia.Net.InertiaCacheKey right) -> bool
+static Inertia.Net.InertiaCacheKey.operator ==(Inertia.Net.InertiaCacheKey left, Inertia.Net.InertiaCacheKey right) -> bool
+static Inertia.Net.InertiaDevToolsExtensions.AddInertiaDevTools(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Inertia.Net.InertiaDevToolsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Inertia.Net.InertiaDevToolsExtensions.MapInertiaDevTools(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Builder.IEndpointConventionBuilder!
+static Inertia.Net.InertiaEndpointRouteBuilderExtensions.MapInertia(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! pattern, string! component, object? props = null) -> Microsoft.AspNetCore.Builder.IEndpointConventionBuilder!
+static Inertia.Net.InertiaHttpContextExtensions.Inertia(this Microsoft.AspNetCore.Http.HttpContext! httpContext) -> Inertia.Net.InertiaFeature!
+static Inertia.Net.InertiaHttpContextExtensions.InertiaRequest(this Microsoft.AspNetCore.Http.HttpContext! httpContext) -> Inertia.Net.InertiaRequest
+static Inertia.Net.InertiaPrecognition.IsPrecognitive(Microsoft.AspNetCore.Http.HttpRequest! request) -> bool
+static Inertia.Net.InertiaServiceCollectionExtensions.AddInertia(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Inertia.Net.InertiaOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Inertia.Net.InertiaServiceCollectionExtensions.AddInertiaErrorPages(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Inertia.Net.InertiaErrorPagesOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Inertia.Net.InertiaServiceCollectionExtensions.AddInertiaLive(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Inertia.Net.IInertiaLiveBuilder!
+static Inertia.Net.InertiaSsrHealthChecksBuilderExtensions.AddInertiaSsr(this Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder! builder, string! name = "inertia-ssr", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus? failureStatus = null, System.Collections.Generic.IEnumerable<string!>? tags = null, System.TimeSpan? timeout = null) -> Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder!
+static Inertia.Net.InertiaValidationEndpointExtensions.WithInertiaPrecognition<TBuilder>(this TBuilder builder) -> TBuilder
+static Inertia.Net.InertiaValidationEndpointExtensions.WithInertiaValidation<TBuilder>(this TBuilder builder) -> TBuilder
+static Inertia.Net.LiveChannel.EncryptedPrivate(string! name) -> Inertia.Net.LiveChannel
+static Inertia.Net.LiveChannel.Presence(string! name) -> Inertia.Net.LiveChannel
+static Inertia.Net.LiveChannel.Private(string! name) -> Inertia.Net.LiveChannel
+static Inertia.Net.LiveChannel.Public(string! name) -> Inertia.Net.LiveChannel
+static Inertia.Net.LiveChannel.TryParseType(string? value, out Inertia.Net.LiveChannelType type) -> bool
+static Inertia.Net.LiveChannel.operator !=(Inertia.Net.LiveChannel left, Inertia.Net.LiveChannel right) -> bool
+static Inertia.Net.LiveChannel.operator ==(Inertia.Net.LiveChannel left, Inertia.Net.LiveChannel right) -> bool
+static Inertia.Net.LiveEvent.operator !=(Inertia.Net.LiveEvent? left, Inertia.Net.LiveEvent? right) -> bool
+static Inertia.Net.LiveEvent.operator ==(Inertia.Net.LiveEvent? left, Inertia.Net.LiveEvent? right) -> bool
+static Inertia.Net.Page<T>.operator !=(Inertia.Net.Page<T>? left, Inertia.Net.Page<T>? right) -> bool
+static Inertia.Net.Page<T>.operator ==(Inertia.Net.Page<T>? left, Inertia.Net.Page<T>? right) -> bool
+static Inertia.Net.PageRequest.BindAsync(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Threading.Tasks.ValueTask<Inertia.Net.PageRequest?>
+static Inertia.Net.PageRequest.From(Microsoft.AspNetCore.Http.IQueryCollection! query, int defaultPerPage = 20, int maxPerPage = 100, string! pageName = "page", string! perPageName = "perPage") -> Inertia.Net.PageRequest!
+static Inertia.Net.PageRequest.operator !=(Inertia.Net.PageRequest? left, Inertia.Net.PageRequest? right) -> bool
+static Inertia.Net.PageRequest.operator ==(Inertia.Net.PageRequest? left, Inertia.Net.PageRequest? right) -> bool
+static Inertia.Net.Pagination.Paginate<T>(System.Collections.Generic.IReadOnlyList<T>! source, Inertia.Net.PageRequest! request, string? pageName = null) -> Inertia.Net.Page<T>!
+static Inertia.Net.Pagination.PaginateAsync<T, TKey>(Inertia.Net.CursorRequest! request, System.Func<T, TKey>! key, System.Func<Inertia.Net.Cursor<TKey>?, int, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<T>!>!>! fetch, string? cursorName = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Inertia.Net.CursorPage<T>!>!
+static Inertia.Net.Pagination.PaginateAsync<T>(Inertia.Net.PageRequest! request, System.Func<int, int, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<T>!>!>! fetch, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<long>!>? count = null, string? pageName = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Inertia.Net.Page<T>!>!
+static Inertia.Net.ScrollMetadata.FromCursor(string? current, string? previous, string? next, string! cursorName = "cursor") -> Inertia.Net.ScrollMetadata!
+static Inertia.Net.ScrollMetadata.FromPage(int currentPage, bool hasMore, string! pageName = "page") -> Inertia.Net.ScrollMetadata!
+static Inertia.Net.ScrollMetadata.operator !=(Inertia.Net.ScrollMetadata? left, Inertia.Net.ScrollMetadata? right) -> bool
+static Inertia.Net.ScrollMetadata.operator ==(Inertia.Net.ScrollMetadata? left, Inertia.Net.ScrollMetadata? right) -> bool
+~override Inertia.Net.Cursor<TKey>.Equals(object obj) -> bool
+~override Inertia.Net.Cursor<TKey>.ToString() -> string
+~override Inertia.Net.InertiaCacheKey.Equals(object obj) -> bool
+~override Inertia.Net.LiveChannel.Equals(object obj) -> bool

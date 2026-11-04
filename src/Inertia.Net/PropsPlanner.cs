@@ -12,7 +12,7 @@ namespace Inertia.Net;
 /// A render plans a handful of props, so they are found by a scan of the planned list (only parallel props are ever planned), and the
 /// concurrency gate exists only when more props are planned than may run at once.
 /// </remarks>
-internal sealed class PropsPlanner : IDisposable
+internal sealed partial class PropsPlanner : IDisposable
 {
     private readonly CancellationTokenSource _cancellation;
     private readonly InertiaPageWriter _owner;
@@ -127,11 +127,14 @@ internal sealed class PropsPlanner : IDisposable
                 _ = task.Exception; // observed: the walk reports failures itself
                 if (planned.Failure is { } failure)
                 {
-                    _owner.Logger.LogWarning(failure.SourceException, "Parallel Inertia prop '{Path}' failed to resolve.", planned.Path);
+                    LogFailed(_owner.Logger, failure.SourceException, planned.Path);
                 }
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Parallel Inertia prop '{Path}' failed to resolve.")]
+    private static partial void LogFailed(ILogger logger, Exception exception, string path);
 
     /// <summary>The failure of the first planned prop, in protocol order, that failed without being rescued.</summary>
     public ExceptionDispatchInfo? FirstFailure()

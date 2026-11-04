@@ -1,0 +1,22 @@
+#nullable enable
+Inertia.Net.InertiaLiveSignalRExtensions
+Inertia.Net.Live.SignalR.ILiveChannelAuthorizer
+Inertia.Net.Live.SignalR.ILiveChannelAuthorizer.AuthorizeAsync(Microsoft.AspNetCore.SignalR.HubCallerContext! context, Inertia.Net.LiveChannel channel, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
+Inertia.Net.Live.SignalR.InertiaLiveHub
+Inertia.Net.Live.SignalR.InertiaLiveHub.InertiaLiveHub(Inertia.Net.Live.SignalR.ILiveChannelAuthorizer! authorizer, Microsoft.Extensions.Options.IOptions<Inertia.Net.Live.SignalR.InertiaLiveSignalROptions!>! options, Microsoft.Extensions.Logging.ILogger<Inertia.Net.Live.SignalR.InertiaLiveHub!>! logger) -> void
+Inertia.Net.Live.SignalR.InertiaLiveHub.Subscribe(string! type, string! name) -> System.Threading.Tasks.Task<bool>!
+Inertia.Net.Live.SignalR.InertiaLiveHub.Unsubscribe(string! type, string! name) -> System.Threading.Tasks.Task!
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.AllowedOrigins.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.Authorize(System.Func<Microsoft.AspNetCore.SignalR.HubCallerContext!, Inertia.Net.LiveChannel, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<bool>>! authorize) -> Inertia.Net.Live.SignalR.InertiaLiveSignalROptions!
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.Authorize<TAuthorizer>() -> Inertia.Net.Live.SignalR.InertiaLiveSignalROptions!
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.AuthorizePublicChannels.get -> bool
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.AuthorizePublicChannels.set -> void
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.InertiaLiveSignalROptions() -> void
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.MaxChannelNameLength.get -> int
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.MaxChannelNameLength.set -> void
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.MaxSubscriptionsPerConnection.get -> int
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.MaxSubscriptionsPerConnection.set -> void
+const Inertia.Net.Live.SignalR.InertiaLiveHub.ClientMethod = "inertia" -> string!
+static Inertia.Net.InertiaLiveSignalRExtensions.AddSignalR(this Inertia.Net.IInertiaLiveBuilder! builder, System.Action<Inertia.Net.Live.SignalR.InertiaLiveSignalROptions!>? configure = null) -> Inertia.Net.IInertiaLiveBuilder!
+static Inertia.Net.InertiaLiveSignalRExtensions.MapInertiaLiveHub(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! pattern = "/inertia-live") -> Microsoft.AspNetCore.Builder.HubEndpointConventionBuilder!

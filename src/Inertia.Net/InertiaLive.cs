@@ -8,6 +8,7 @@ namespace Inertia.Net;
 /// Publishes live-prop events (see <see cref="InertiaProp.Live(LiveEvent)"/>). Registered by <c>services.AddInertiaLive()</c>; a transport
 /// package (or the app) registers the <see cref="IInertiaLiveBroadcaster"/> that delivers the messages.
 /// </summary>
+#pragma warning disable CA1716 // Keep the documented event parameter name for named-argument callers.
 public interface IInertiaLive
 {
     /// <summary>
@@ -39,6 +40,8 @@ public interface IInertiaLive
     /// <inheritdoc cref="PublishAsync{TProps}(LiveEvent, TProps, JsonTypeInfo{TProps}, string?, CancellationToken)"/>
     ValueTask PublishAsync<TProps>(LiveEvent @event, TProps props, string? exceptSocketId = null, CancellationToken cancellationToken = default);
 }
+
+#pragma warning restore CA1716
 
 /// <summary>Delivers live messages to subscribed clients. Implemented by a transport package such as <c>Inertia.Net.Live.SignalR</c>.</summary>
 public interface IInertiaLiveBroadcaster

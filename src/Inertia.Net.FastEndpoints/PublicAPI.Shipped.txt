@@ -1,0 +1,7 @@
+#nullable enable
+Inertia.Net.FastEndpoints.InertiaFastEndpointsConfig
+Inertia.Net.FastEndpoints.InertiaSendExtensions
+static Inertia.Net.FastEndpoints.InertiaFastEndpointsConfig.ConfigureInertia(this FastEndpoints.Config! config, System.Action<FastEndpoints.EndpointDefinition!>? configure = null) -> FastEndpoints.Config!
+static Inertia.Net.FastEndpoints.InertiaSendExtensions.InertiaAsync<TRequest, TResponse>(this FastEndpoints.ResponseSender<TRequest, TResponse> send, string! component, object? props = null) -> System.Threading.Tasks.Task<FastEndpoints.Void!>!
+static Inertia.Net.FastEndpoints.InertiaSendExtensions.InertiaBackAsync<TRequest, TResponse>(this FastEndpoints.ResponseSender<TRequest, TResponse> send, string! fallback = "~/") -> System.Threading.Tasks.Task<FastEndpoints.Void!>!
+static Inertia.Net.FastEndpoints.InertiaSendExtensions.InertiaLocationAsync<TRequest, TResponse>(this FastEndpoints.ResponseSender<TRequest, TResponse> send, string! url) -> System.Threading.Tasks.Task<FastEndpoints.Void!>!
