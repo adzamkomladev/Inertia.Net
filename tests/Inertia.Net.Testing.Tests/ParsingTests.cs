@@ -145,6 +145,7 @@ public class ParsingTests
         Assert.Equal(["a.id"], p.MatchPropsOn);
         Assert.Equal(["d"], p.RescuedProps);
         Assert.True(p.ScrollProps.ContainsKey("feed"));
+        new AssertableInertia(p).HasScroll("feed");
         Assert.True(p.OnceProps.ContainsKey("plans"));
         Assert.Equal(500, (int)p.LiveProps["order"]!["throttle"]!);
         Assert.True(p.EncryptHistory && p.ClearHistory && p.PreserveFragment);

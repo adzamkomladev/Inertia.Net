@@ -22,7 +22,7 @@ When this document and the Laravel adapter disagree, Laravel wins. The exception
 | `matchPropsOn` | string[] | `"path.field"`, only when non-empty |
 | `deferredProps` | `{group: string[]}` | only when non-empty |
 | `rescuedProps` | string[] | only when non-empty |
-| `scrollProps` | `{path: {pageName, previousPage, nextPage, currentPage, reset}}` | only when non-empty. Page values are int, string or null |
+| `scrollProps` | `{path: {pageName, previousPage, nextPage, currentPage, reset}}` | only when non-empty. Page values are int, string or null; for example `nextPage` can be an encoded cursor string such as `"eyJ..."` |
 | `onceProps` | `{key: {prop: path, expiresAt: msEpoch or null}}` | only when non-empty |
 | `liveProps` | `{path: {listeners: [{channel: {name, type}, events: string[]}], throttle?: int}}` | only when non-empty. `type` is `public`, `private`, `presence` or `encrypted-private`; names are unprefixed; `throttle` (ms) only when set. A partial response carries entries only for the props it includes, and the client merges them over its current set |
 | `preserveBigIntegers` | `true` | only when true |
@@ -183,6 +183,9 @@ isIncludedInPartialMetadata(p) = (only == null or matchesOnly(p)) and (except ==
 | `Live(event)` / `.Live(channel, events...)` | live = true; any non-merge prop (merge, deep-merge and scroll throw). Repeatable. `Throttle(window)` |
 
 **Semantics worth remembering:**
+
+`Page<T>` and `CursorPage<T>` are pagination helpers over `Scroll`, not additional prop kinds.
+
 - Partial reloads skip initial-load exclusion entirely. Once props are re-sent on a partial reload even if the client already has them.
 - `deferredProps` is only produced on non-partial renders.
 - Nested filtering only applies inside **literal** objects (`InertiaProps`/dictionaries). The children of a value produced by a loader are not filtered.

@@ -12,8 +12,6 @@ public sealed record Plans(List<Plan> Items, int ResolvedCount);
 
 public sealed record Post(int Id, string Title);
 
-public sealed record PostPage(List<Post> Data);
-
 public sealed class ContactForm
 {
     [Required]
@@ -37,6 +35,9 @@ internal static class AppState
     private static int _plansCount;
 
     public static List<User> Users { get; } = Seed();
+
+    public static IReadOnlyList<Post> Posts { get; } = Enumerable.Range(1, PageSize * FeedPages)
+        .Select(id => new Post(id, $"Post {id}")).ToArray();
 
     /// <summary>The asset version override; null means the hash of the Vite manifest.</summary>
     public static string? Version { get; set; }

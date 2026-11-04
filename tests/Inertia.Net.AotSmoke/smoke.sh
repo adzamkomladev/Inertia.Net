@@ -91,7 +91,7 @@ status_is 200
 has '"component":"Dashboard"'
 has '"url":"/dashboard"'
 has '"user":{"name":"Ada","roles":["admin"]}'
-has '"feed":{"data":[{"name":"post-1","value":1}],"page":1,"hasMore":true}'
+has '"feed":{"data":[{"name":"post-1","value":1}],"currentPage":1,"perPage":1,"total":3,"lastPage":3,"from":1,"to":1,"hasMore":true,"pageName":"page"}'
 has '"appName":"AotSmoke"'
 has '"auth":{"user":null}'
 has '"requestShared":true'
@@ -104,6 +104,28 @@ has '"countries":["BE","FR"]'
 has '"today":{"name":"today","value":7}'
 lacks '"lazy":'
 lacks '"flash":'
+
+# Cursor request binding, generic cursor metadata and source-generated pages under Native AOT.
+inertia GET /cursor
+status_is 200
+has '"feed":{"data":[{"name":"post-1","value":1}],"perPage":1,"nextCursor":"'
+has '"scrollProps":{"feed":{"pageName":"cursor","previousPage":null,"nextPage":"'
+has '"currentPage":1,"reset":false}}'
+NEXT_CURSOR=$(sed -n 's/.*"nextCursor":"\([A-Za-z0-9_-]*\)".*/\1/p' "$T/b")
+[ -n "$NEXT_CURSOR" ] || fail "cursor page has no next cursor"
+inertia GET "/cursor?cursor=$NEXT_CURSOR"
+status_is 200
+has '"data":[{"name":"post-2","value":2}]'
+has "\"currentPage\":\"$NEXT_CURSOR\""
+PREVIOUS_CURSOR=$(sed -n 's/.*"previousCursor":"\([A-Za-z0-9_-]*\)".*/\1/p' "$T/b")
+[ -n "$PREVIOUS_CURSOR" ] || fail "cursor page has no previous cursor"
+inertia GET "/cursor?cursor=$PREVIOUS_CURSOR" -H 'X-Inertia-Infinite-Scroll-Merge-Intent: prepend'
+status_is 200
+has '"data":[{"name":"post-1","value":1}]'
+has '"prependProps":["feed.data"]'
+inertia GET '/cursor?cursor=%25%25%25'
+status_is 200
+has '"data":[{"name":"post-1","value":1}]'
 
 # 4. Partial reload: only the requested props, plus always props.
 inertia GET /dashboard -H 'X-Inertia-Partial-Component: Dashboard' -H 'X-Inertia-Partial-Data: stats,lazy'

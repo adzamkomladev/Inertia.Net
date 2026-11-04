@@ -7,6 +7,10 @@ namespace Inertia.Net;
 /// <param name="CurrentPage">The current page.</param>
 public sealed record ScrollMetadata(string PageName = "page", object? PreviousPage = null, object? NextPage = null, object? CurrentPage = null)
 {
+    /// <summary>Metadata for cursor pages, using page 1 when no current cursor is supplied.</summary>
+    public static ScrollMetadata FromCursor(string? current, string? previous, string? next, string cursorName = "cursor") =>
+        new(cursorName, previous, next, (object?)current ?? 1);
+
     /// <summary>Metadata for numbered pages starting at 1.</summary>
     public static ScrollMetadata FromPage(int currentPage, bool hasMore, string pageName = "page") =>
         new(pageName, currentPage > 1 ? currentPage - 1 : null, hasMore ? currentPage + 1 : null, currentPage);

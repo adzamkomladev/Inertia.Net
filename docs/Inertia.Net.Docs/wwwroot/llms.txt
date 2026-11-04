@@ -28,6 +28,7 @@ Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt
 - [Merging props](https://inertia-dotnet.yebi.africa/docs/merging-props): Append, prepend, deep merge and match items instead of replacing the client's value.
 - [Once props](https://inertia-dotnet.yebi.africa/docs/once-props): Remember expensive values on the client and skip them on later visits.
 - [Infinite scroll](https://inertia-dotnet.yebi.africa/docs/infinite-scroll): Merge pages of items and report paging metadata to the InfiniteScroll client component.
+- [Pagination](https://inertia-dotnet.yebi.africa/docs/pagination): Create numbered and cursor pages for pagers and infinite scroll.
 - [Live props](https://inertia-dotnet.yebi.africa/docs/live-props): Props that refresh themselves when the server broadcasts an event.
 
 ## Production

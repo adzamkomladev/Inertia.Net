@@ -14,5 +14,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\Inertia.Net.Testing\Inertia.Net.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
   </ItemGroup>
 </Project>

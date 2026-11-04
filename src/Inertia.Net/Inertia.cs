@@ -264,6 +264,8 @@ public static class Inertia
     private static InertiaProp WithScroll(InertiaProp prop, string wrapper, ScrollMetadata? metadata)
     {
         ArgumentNullException.ThrowIfNull(wrapper);
+        if (typeof(IPaginatedValue).IsAssignableFrom(prop.ValueType) && wrapper != "data")
+            throw new ArgumentException("Page<T> always wraps under data.", nameof(wrapper));
         prop.IsMerge = true;
         prop.ScrollWrapper = wrapper;
         prop.ScrollMetadata = metadata;

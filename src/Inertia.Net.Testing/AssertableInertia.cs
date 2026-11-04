@@ -72,6 +72,25 @@ public sealed class AssertableInertia : AssertableJsonBase<AssertableInertia>
         return this;
     }
 
+    /// <summary>Asserts that <paramref name="path"/> has infinite-scroll metadata.</summary>
+    public AssertableInertia HasScroll(string path)
+    {
+        if (_page.ScrollProps[path] is not JsonObject) Fail($"Scroll prop [{path}] was not found.");
+        return this;
+    }
+
+    /// <summary>Asserts the current and next page values in the infinite-scroll metadata.</summary>
+    public AssertableInertia HasScroll(string path, object? currentPage, object? nextPage)
+    {
+        HasScroll(path);
+        var metadata = _page.ScrollProps[path]!;
+        if (!JsonNode.DeepEquals(metadata["currentPage"], Json.ToNode(currentPage)))
+            Fail($"Scroll prop [{path}] current page expected to be {Json.Show(Json.ToNode(currentPage))} but was {Json.Show(metadata["currentPage"])}.");
+        if (!JsonNode.DeepEquals(metadata["nextPage"], Json.ToNode(nextPage)))
+            Fail($"Scroll prop [{path}] next page expected to be {Json.Show(Json.ToNode(nextPage))} but was {Json.Show(metadata["nextPage"])}.");
+        return this;
+    }
+
     /// <summary>Asserts that <paramref name="path"/> is listed as a live prop.</summary>
     public AssertableInertia HasLive(string path)
     {

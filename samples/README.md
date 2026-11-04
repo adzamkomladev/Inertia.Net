@@ -24,10 +24,20 @@ The layout (used by every page) shows:
 | Route | Component | Contract |
 |---|---|---|
 | `GET /` | `Home` | `data-testid="home-title"`. |
-| `GET /users` | `Users/Index` | `users`: array of `{id, name}`; each row `data-testid="user-row"` with a button `data-testid="delete-user-{id}"` that calls `router.delete('/users/{id}')`. `stats`: `Defer` (default group), the server sleeps about 300 ms; rendered with `<Deferred data="stats">`: `data-testid="stats-loading"` first, then `data-testid="stats"` containing `stats.total` (the number of users). `plans`: `Once` prop `{items: [...], resolvedCount}`; `data-testid="plans"` with `resolvedCount` in `data-testid="plans-count"`. The server increments a counter each time the loader really runs and sends it as `resolvedCount`, so the E2E can tell the prop was not re-resolved when the page is visited again. A button `data-testid="users-refresh"` calls `router.visit('/users')` (the client only sends `X-Inertia-Except-Once-Props` for once props held by the page it is currently on, so the test needs a Users to Users visit). |
+| `GET /users` | `Users/Index` | `users`: array of `{id, name}` (React uses the `Page<User>` shape with items under `data`); each row `data-testid="user-row"` with a button `data-testid="delete-user-{id}"` that calls `router.delete('/users/{id}')`. `stats`: `Defer` (default group), the server sleeps about 300 ms; rendered with `<Deferred data="stats">`: `data-testid="stats-loading"` first, then `data-testid="stats"` containing `stats.total` (the number of users). `plans`: `Once` prop `{items: [...], resolvedCount}`; `data-testid="plans"` with `resolvedCount` in `data-testid="plans-count"`. The server increments a counter each time the loader really runs and sends it as `resolvedCount`, so the E2E can tell the prop was not re-resolved when the page is visited again. A button `data-testid="users-refresh"` calls `router.visit('/users')` (the client only sends `X-Inertia-Except-Once-Props` for once props held by the page it is currently on, so the test needs a Users to Users visit). |
 | `DELETE /users/{id}` | n/a | Removes the user from an in-memory list and returns `Back()` with flash `success` = `User deleted`. Must reach the client as a **303**. |
 | `GET /contacts/create` | `Contacts/Create` | Form 1 (`useForm`): inputs `data-testid="name"`, `data-testid="email"`, button `data-testid="submit"`, error slots `data-testid="error-name"`, `data-testid="error-email"` (empty element when no error). `POST /contacts` validates a record with `[Required] Name` and `[Required][EmailAddress] Email` using the framework's validation plus the adapter's validation glue; on failure it redirects back with errors, on success it redirects to `/` with flash `success` = `Contact created`. Form 2, error bag `newsletter`: input `data-testid="newsletter-email"`, button `data-testid="newsletter-submit"`, error slot `data-testid="error-newsletter-email"` showing `errors.newsletter.email`; `POST /newsletter` (`[Required][EmailAddress] Email`, sent with `X-Inertia-Error-Bag: newsletter`), success redirects to `/contacts/create` with flash `success` = `Subscribed`. |
 | `GET /feed` | `Feed/Index` | `posts`: a `Scroll` prop (wrapper key `data`), 10 items per page, 5 pages, page number in query `page`. Rendered with `<InfiniteScroll data="posts">`; every item `data-testid="post"`. Items must be tall enough (about 160 px) that 10 of them overflow a normal viewport. |
+
+## Pagination (React sample only)
+
+| Route | Component | Contract |
+|---|---|---|
+| `GET /feed/cursor` | `Feed/Cursor` | 50 posts ordered by descending `id`, 10 per cursor page. `<InfiniteScroll data="posts">` renders `data-testid="post"`. The delegate fetches keyset rows and the paginator supplies opaque cursors. |
+| `GET /users?page=` | `Users/Index` | Classic `Page<User>`, five users per page. `data-testid="pager"` contains `page-{n}` buttons that call `router.get` with `only: ['users']` and `preserveState`. |
+
+`specs/pagination.spec.ts` runs with `SAMPLE=react`. It seeds twelve users using the E2E-only
+`POST /__e2e/pagination/seed-users` hook after resetting; other specs keep the three standard users.
 
 ## Live props (React sample only)
 

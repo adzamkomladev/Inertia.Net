@@ -66,6 +66,9 @@ public sealed class InertiaOptions
     /// <summary>Where flash data, errors and history flags are kept across redirects.</summary>
     public InertiaStateOptions State { get; } = new();
 
+    /// <summary>Defaults for pagination request binding.</summary>
+    public PaginationOptions Pagination { get; } = new();
+
     /// <summary>Prop resolution settings.</summary>
     public InertiaPropsOptions Props { get; } = new();
 

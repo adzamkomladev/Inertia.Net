@@ -606,12 +606,37 @@
       ]
     },
     {
+      "slug": "pagination",
+      "url": "/docs/pagination",
+      "title": "Pagination",
+      "description": "Create numbered and cursor pages for pagers and infinite scroll.",
+      "section": "Loading data",
+      "order": 6,
+      "headings": [
+        {
+          "id": "cursors",
+          "text": "Cursors",
+          "depth": 2
+        },
+        {
+          "id": "with-ef-core",
+          "text": "With EF Core",
+          "depth": 2
+        },
+        {
+          "id": "native-aot",
+          "text": "Native AOT",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "live-props",
       "url": "/docs/live-props",
       "title": "Live props",
       "description": "Props that refresh themselves when the server broadcasts an event.",
       "section": "Loading data",
-      "order": 6,
+      "order": 7,
       "headings": [
         {
           "id": "define-each-event-once",
@@ -951,6 +976,11 @@
         {
           "id": "addinertiao---inertiaoptions",
           "text": "AddInertia(o => ...): InertiaOptions",
+          "depth": 2
+        },
+        {
+          "id": "opagination-paginationoptions",
+          "text": "o.Pagination: PaginationOptions",
           "depth": 2
         },
         {

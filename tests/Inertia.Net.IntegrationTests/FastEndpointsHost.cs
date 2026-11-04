@@ -56,6 +56,27 @@ public static class FastEndpointsRoutes
         public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Page");
     }
 
+    public sealed class PagedEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Get("/paged");
+        public override async Task HandleAsync(CancellationToken ct) => await Send.InertiaAsync("Paged",
+            await PagedPage.OffsetAsync(PageRequest.From(HttpContext.Request.Query, defaultPerPage: 10), false, ct));
+    }
+
+    public sealed class PagedScrollEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Get("/paged/scroll");
+        public override async Task HandleAsync(CancellationToken ct) => await Send.InertiaAsync("Paged",
+            await PagedPage.OffsetAsync(PageRequest.From(HttpContext.Request.Query, defaultPerPage: 10), true, ct));
+    }
+
+    public sealed class PagedCursorEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Get("/paged/cursor");
+        public override async Task HandleAsync(CancellationToken ct) => await Send.InertiaAsync("Paged",
+            await PagedPage.CursorAsync(CursorRequest.From(HttpContext.Request.Query, defaultPerPage: 10), ct));
+    }
+
     public sealed class LiveEndpoint : EndpointWithoutRequest
     {
         public override void Configure() => Get("/live");

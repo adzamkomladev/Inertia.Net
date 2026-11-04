@@ -15,6 +15,8 @@ namespace Inertia.Net.IntegrationTests;
 /// <item><term>GET /page</term><description><c>counters.HitPage()</c>; render <c>Page</c> with <c>{ message: "hello" }</c>.</description></item>
 /// <item><term>GET /café</term><description>render <c>Page</c> (no props).</description></item>
 /// <item><term>GET /partial</term><description>render <c>Partial</c> with <c>{ a: 1, b: Prop(() =&gt; 2), c: Always(3), d: Optional(() =&gt; 4) }</c>.</description></item>
+/// <item><term>GET /paged, /paged/scroll, /paged/cursor</term><description><c>Paged</c> with 25 numbered items,
+/// ten per page, through the core delegate paginators. The latter two wrap their values with <c>Scroll</c>.</description></item>
 /// <item><term>GET /live</term><description>share <c>bell = LivePage.Bell()</c>; render <c>Live</c> with
 /// <c>LivePage.Props(InertiaRequest.SocketId)</c>.</description></item>
 /// <item><term>GET /deferred</term><description>render <c>Deferred</c> with <c>{ a: 1, b: Defer(() =&gt; "b"), c: Defer(() =&gt; "c", "other") }</c>.</description></item>
@@ -42,6 +44,92 @@ public abstract class ProtocolConformanceTests<THost>
     private const string Base = "http://localhost";
 
     protected static Task<ConformanceApp> StartAsync(ConformanceSetup? setup = null) => ConformanceApp.StartAsync<THost>(setup);
+
+    [Theory]
+    [InlineData("/paged")]
+    [InlineData("/paged/scroll")]
+    public async Task Pagination_responses_cover_html_visits_and_scroll_reload_metadata(string route)
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        var html = await (await client.GetAsync(route, TestContext.Current.CancellationToken)).PageAsync();
+        Assert.Equal("Paged", (string?)html["component"]);
+        JsonAssert.Equal("[1,2,3,4,5,6,7,8,9,10]", html["props"]!["posts"]!["data"]);
+        if (route == "/paged/scroll")
+        {
+            Assert.Equal("[\"posts.data\"]", html["mergeProps"]!.ToJsonString());
+        }
+        else
+        {
+            Assert.Null(html["scrollProps"]);
+            Assert.Null(html["mergeProps"]);
+        }
+
+        for (var page = 1; page <= 4; page++)
+        {
+            var response = await (await client.InertiaGetAsync($"{route}?page={page}")).PageAsync();
+            var rows = string.Join(',', Enumerable.Range((page - 1) * 10 + 1, page < 3 ? 10 : page == 3 ? 5 : 0));
+            var from = page <= 3 ? ((page - 1) * 10 + 1).ToString() : "null";
+            var to = page <= 3 ? Math.Min(page * 10, 25).ToString() : "null";
+            var more = page < 3 ? "true" : "false";
+            Assert.Equal($"{{\"data\":[{rows}],\"currentPage\":{page},\"perPage\":10,\"total\":25,\"lastPage\":3,\"from\":{from},\"to\":{to},\"hasMore\":{more},\"pageName\":\"page\"}}", response["props"]!["posts"]!.ToJsonString());
+        }
+
+        var append = await (await client.InertiaGetAsync("/paged/scroll?page=2", r =>
+        {
+            r.WithHeader(InertiaHeaders.PartialComponent, "Paged");
+            r.WithHeader(InertiaHeaders.PartialData, "posts");
+        })).PageAsync();
+        Assert.Null(append["props"]!["other"]);
+        Assert.Equal("[11,12,13,14,15,16,17,18,19,20]", append["props"]!["posts"]!["data"]!.ToJsonString());
+        Assert.Equal("[\"posts.data\"]", append["mergeProps"]!.ToJsonString());
+        Assert.Equal("{\"posts\":{\"pageName\":\"page\",\"previousPage\":1,\"nextPage\":3,\"currentPage\":2,\"reset\":false}}", append["scrollProps"]!.ToJsonString());
+
+        var partial = await (await client.InertiaGetAsync("/paged/scroll?page=2", r =>
+        {
+            r.WithHeader(InertiaHeaders.PartialComponent, "Paged");
+            r.WithHeader(InertiaHeaders.PartialData, "posts");
+            r.WithHeader(InertiaHeaders.InfiniteScrollMergeIntent, "prepend");
+        })).PageAsync();
+        JsonAssert.Equal("[\"posts.data\"]", partial["prependProps"]);
+        JsonAssert.Equal("{\"posts\":{\"pageName\":\"page\",\"previousPage\":1,\"nextPage\":3,\"currentPage\":2,\"reset\":false}}", partial["scrollProps"]);
+        var reset = await (await client.InertiaGetAsync("/paged/scroll?page=2", r => r.WithHeader(InertiaHeaders.Reset, "posts"))).PageAsync();
+        Assert.Null(reset["mergeProps"]);
+        Assert.True((bool)reset["scrollProps"]!["posts"]!["reset"]!);
+    }
+
+    [Fact]
+    public async Task Cursor_scroll_follows_next_and_previous_in_display_order()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        var initial = await (await client.GetAsync("/paged/cursor", TestContext.Current.CancellationToken)).PageAsync();
+        Assert.Equal("[1,2,3,4,5,6,7,8,9,10]", initial["props"]!["posts"]!["data"]!.ToJsonString());
+        var first = await (await client.InertiaGetAsync("/paged/cursor")).PageAsync();
+        Assert.Equal(1, (int)first["scrollProps"]!["posts"]!["currentPage"]!);
+        var next = (string)first["props"]!["posts"]!["nextCursor"]!;
+        Assert.Equal($"{{\"data\":[1,2,3,4,5,6,7,8,9,10],\"perPage\":10,\"nextCursor\":\"{next}\",\"previousCursor\":null,\"hasMore\":true,\"cursorName\":\"cursor\"}}",
+            first["props"]!["posts"]!.ToJsonString());
+        Assert.Equal($"{{\"posts\":{{\"pageName\":\"cursor\",\"previousPage\":null,\"nextPage\":\"{next}\",\"currentPage\":1,\"reset\":false}}}}",
+            first["scrollProps"]!.ToJsonString());
+        var second = await (await client.InertiaGetAsync("/paged/cursor?cursor=" + Uri.EscapeDataString(next))).PageAsync();
+        JsonAssert.Equal("[11,12,13,14,15,16,17,18,19,20]", second["props"]!["posts"]!["data"]);
+        Assert.Equal(next, (string?)second["scrollProps"]!["posts"]!["currentPage"]);
+        var previous = (string)second["props"]!["posts"]!["previousCursor"]!;
+        var thirdCursor = (string)second["props"]!["posts"]!["nextCursor"]!;
+        var third = await (await client.InertiaGetAsync("/paged/cursor?cursor=" + Uri.EscapeDataString(thirdCursor))).PageAsync();
+        Assert.Equal("[21,22,23,24,25]", third["props"]!["posts"]!["data"]!.ToJsonString());
+        Assert.Null(third["props"]!["posts"]!["nextCursor"]);
+        var back = await (await client.InertiaGetAsync("/paged/cursor?cursor=" + Uri.EscapeDataString(previous), r =>
+        {
+            r.WithHeader(InertiaHeaders.PartialComponent, "Paged");
+            r.WithHeader(InertiaHeaders.PartialData, "posts");
+            r.WithHeader(InertiaHeaders.InfiniteScrollMergeIntent, "prepend");
+        })).PageAsync();
+        Assert.Equal(first["props"]!["posts"]!["data"]!.ToJsonString(), back["props"]!["posts"]!["data"]!.ToJsonString());
+        Assert.Null(back["props"]!["posts"]!["previousCursor"]);
+        Assert.Equal("[\"posts.data\"]", back["prependProps"]!.ToJsonString());
+    }
 
     [Fact]
     public async Task Deferred_array_index_reload_preserves_both_rows_and_their_siblings()

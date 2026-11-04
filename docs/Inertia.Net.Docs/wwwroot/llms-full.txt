@@ -1844,20 +1844,10 @@ URL: https://inertia-dotnet.yebi.africa/docs/infinite-scroll
 `Scroll(...)` merges the items inside a value (the *wrapper*, `"data"` by default) and reports paging metadata to the `<InfiniteScroll>` client component.
 
 ```csharp
-public sealed record FeedPage(IReadOnlyList<PostDto> Data, int Page, bool HasMore) : IProvidesScrollMetadata
+app.MapGet("/feed", (PageRequest request) => Render("Feed", new InertiaProps
 {
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);   // pageName defaults to "page"
-}
-
-app.MapGet("/feed", async (int? page, AppDb db, CancellationToken ct) =>
-{
-    var p = page ?? 1;
-    var items = await db.Posts.OrderByDescending(x => x.Id).Skip((p - 1) * 20).Take(21).ToListAsync(ct);
-    return Render("Feed", new InertiaProps
-    {
-        ["posts"] = Scroll(new FeedPage(items.Take(20).ToList(), p, items.Count > 20)),
-    });
-});
+    ["posts"] = Scroll(Pagination.Paginate(AppState.Posts, request)),
+}));
 ```
 
 ```json
@@ -1869,6 +1859,8 @@ app.MapGet("/feed", async (int? page, AppDb db, CancellationToken ct) =>
   }
 }
 ```
+
+See [Pagination](/docs/pagination) for numbered and cursor pages, query binding and data-source delegates.
 
 ## The client
 
@@ -1907,6 +1899,80 @@ A deferred scroll prop reports `"posts.data"` just like a resolved one. This is 
 <Callout type="tip" title="Keep pages small">
 Infinite scroll is also a payload-size tool. Load 10 to 20 items per page instead of sending an unbounded list on the first request.
 </Callout>
+
+---
+
+# Pagination
+
+URL: https://inertia-dotnet.yebi.africa/docs/pagination
+
+> Create numbered and cursor pages for pagers and infinite scroll.
+
+`Pagination` creates page values; `Scroll` adds infinite-scroll metadata and merging. Use a page directly for a classic pager.
+
+| You write | You get |
+|---|---|
+| `Pagination.Paginate(posts, request)` | A numbered `Page<T>` for a pager |
+| `Scroll(Pagination.Paginate(posts, request))` | Numbered infinite scroll |
+| `Scroll(await Pagination.PaginateAsync(request, key, fetch, ct: ct))` | Cursor-based infinite scroll using your data source |
+| `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` | A deferred page; other prop modifiers also work |
+
+Minimal API handlers can take `PageRequest` or `CursorRequest` directly, as in [Infinite scroll](/docs/infinite-scroll). MVC and FastEndpoints can call `PageRequest.From(Request.Query)` or `CursorRequest.From(Request.Query)`. Page numbers below 1 become 1; invalid page sizes use the default and sizes above the maximum are clamped. Set defaults and parameter names with `o.Pagination` in `AddInertia`. `From` and `BindAsync` retain the query parameter name for the returned page. An explicit paginator name overrides it.
+
+`Pagination.Paginate` slices an already materialized `IReadOnlyList<T>`. For a database, search SDK or HTTP API, `Pagination.PaginateAsync` accepts a `fetch(skip, take, ct)` delegate and an optional count delegate. It requests one extra item to determine `hasMore`; without a count, `total` and `lastPage` are null. Delegate offsets above `int.MaxValue` return an empty page without calling `fetch`; the optional count still runs. Supply a stable, fully unique ordering to your data source. For a classic pager, use `currentPage`, `lastPage`, and `pageName` to build links; pages do not contain URL links.
+
+```json
+{ "data": [ { "id": 21 } ], "currentPage": 2, "perPage": 20, "total": 95, "lastPage": 5, "from": 21, "to": 40, "hasMore": true, "pageName": "page" }
+```
+
+`from` and `to` are one-based and null on an empty page. The examples abbreviate the data array.
+
+For example, a data source can implement numbered pages without exposing `IQueryable`:
+
+```csharp
+var page = await Pagination.PaginateAsync(
+    request,
+    (skip, take, ct) => store.FetchPostsAsync(skip, take, ct),
+    ct => store.CountPostsAsync(ct),
+    ct: cancellationToken);
+```
+
+For a React pager, use Inertia links and preserve any other filters your app needs:
+
+```tsx
+import { Link } from '@inertiajs/react'
+
+{page.lastPage != null && Array.from({ length: page.lastPage }, (_, i) => i + 1).map((n) => (
+  <Link key={n} href={`?${page.pageName}=${n}`} aria-current={n === page.currentPage ? 'page' : undefined}>
+    {n}
+  </Link>
+))}
+```
+
+## Cursors
+
+The cursor overload of `PaginateAsync` takes a key selector and a fetch delegate. The delegate receives a decoded cursor with `Direction` (`After` or `Before`) and `Value`, a take count, and a cancellation token. Return rows in the requested direction, including up to one extra; the helper trims and reverses `Before` results to display order. Choose a stable unique non-null key. `hasMore` indicates more rows in the requested direction.
+
+```json
+{ "data": [ { "id": 21 } ], "perPage": 20, "nextCursor": "eyJ...", "previousCursor": null, "hasMore": true, "cursorName": "cursor" }
+```
+
+Cursors are URL-safe base64 of a compact JSON array: direction (`"a"` or `"b"`) followed by the key values. Supported keys are `int`, `long`, `Guid`, `string`, `DateTime`, `DateTimeOffset`, `decimal`, `double`, and `bool`. Invalid cursors start at the first page. Cursors are **not tamper-proof**; apps that need tamper protection should wrap them with `IDataProtector`.
+
+## With EF Core
+
+An `Inertia.Net.EntityFrameworkCore` package with queryable helpers is planned for a later phase. Until then, use the delegate overload with your own queries.
+
+## Native AOT
+
+Register each closed page type in your app's `JsonSerializerContext` along with the item types:
+
+```csharp
+[JsonSerializable(typeof(Page<PostDto>))]
+[JsonSerializable(typeof(CursorPage<PostDto>))]
+```
+
+See [Native AOT](/docs/native-aot).
 
 ---
 
@@ -2749,6 +2815,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 
 [JsonSerializable(typeof(UsersPage))]               // typed page props
+[JsonSerializable(typeof(Page<UserDto>))]           // closed pagination types you return
 [JsonSerializable(typeof(UserDto))]
 [JsonSerializable(typeof(List<UserDto>))]           // closed collection types you return
 [JsonSerializable(typeof(UserDto[]))]
@@ -2921,6 +2988,16 @@ All configuration is passed to `AddInertia`. Options marked â€œDevelopment onlyâ
 | `Pages.Directory` / `Pages.Extensions` | `null` / `.tsx .jsx .ts .js .vue .svelte` | Development check that a rendered component has a page file. |
 | `TypeScript.OutputPath`, `.Page<T>(component)`, `.SharedProps<T>()`, `.FlashData<T>()` | `null` | TypeScript declarations, written in Development. |
 | `Share(key, value)` / `Share(key, Func<HttpContext, object?>)` | none | Shared props. |
+
+## `o.Pagination`: `PaginationOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `DefaultPerPage` | `20` | Default page size. |
+| `MaxPerPage` | `100` | Maximum page size (below `int.MaxValue` to allow over-fetching); the default must be between 1 and this value. |
+| `PageName` | `"page"` | Numbered-page query parameter. |
+| `PerPageName` | `"perPage"` | Page-size query parameter. |
+| `CursorName` | `"cursor"` | Cursor query parameter. |
 
 ## `o.Vite`: `ViteOptions`
 
@@ -3153,9 +3230,15 @@ new AssertableInertia(page).HasDeferred("sidebar", "stats").Missing("stats");
 var loaded = await page.LoadDeferredPropsAsync(_client, "sidebar");     // all groups when none are named
 new AssertableInertia(loaded).Has("stats");
 
+new AssertableInertia(page).HasScroll("posts");
+var next = await page.LoadNextPageAsync(_client, "posts");
+var previous = await next.LoadPreviousPageAsync(_client, "posts");
+
 var only = await page.ReloadOnlyAsync(_client, "users");
 var except = await page.ReloadExceptAsync(_client, "users");
 ```
+
+`HasScroll(path)` asserts scroll metadata; `HasScroll(path, currentPage, nextPage)` also checks the page values. The page helpers use the metadata and send the appropriate append or prepend intent.
 
 `ReloadOnlyAsync` asserts that `"users"` is in the result; `ReloadExceptAsync` asserts that it is missing.
 
