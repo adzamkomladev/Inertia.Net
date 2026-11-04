@@ -17,14 +17,14 @@ internal sealed class FakeServer : IAsyncDisposable
 
     private FakeServer(WebApplication app) { _app = app; Client = app.GetTestClient(); }
 
-    public static async Task<FakeServer> StartAsync()
+    public static async Task<FakeServer> StartAsync(Func<HttpContext, Task>? handle = null)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
         var app = builder.Build();
         FakeServer? self = null;
         app.Run(c => { self!.Requests.Add(new(c.Request.Method, c.Request.Path + c.Request.QueryString.Value,
-            c.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString(), StringComparer.OrdinalIgnoreCase))); return Handle(c); });
+            c.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString(), StringComparer.OrdinalIgnoreCase))); return handle is null ? Handle(c) : handle(c); });
         await app.StartAsync();
         return self = new FakeServer(app);
     }
