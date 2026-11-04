@@ -28,7 +28,26 @@ app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
 }).WithInertiaValidation();
 ```
 
-`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The client form uses `useForm` and displays `form.errors.title`.
+`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The React template's `ClientApp/pages/Todos/Index.tsx` uses `useForm` to submit and display the error:
+
+```tsx
+import { useForm } from '@inertiajs/react'
+import type { FormEvent } from 'react'
+
+// Inside the page component:
+const form = useForm({ title: '' })
+const submit = (e: FormEvent) => {
+  e.preventDefault()
+  form.post('/todos', { onSuccess: () => form.reset() })
+}
+
+// Inside its return:
+<form onSubmit={submit}>
+  <input placeholder="What needs doing?" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
+  <button type="submit" disabled={form.processing}>Add</button>
+  {form.errors.title && <div style={{ color: 'crimson' }}>{form.errors.title}</div>}
+</form>
+```
 
 To test the round trip, add `Inertia.Net.Testing` and `Microsoft.AspNetCore.Mvc.Testing` to a test project, expose `public partial class Program;` in the app, and create a cookie-preserving `WebApplicationFactory<Program>` client with `AllowAutoRedirect = false`:
 
@@ -37,7 +56,8 @@ using System.Net;
 using System.Net.Http.Json;
 using Inertia.Net.Testing;
 
-using var page = await client.InertiaGetAsync("/todos");
+client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
+using var page = await client.GetAsync("/todos");
 using var request = new HttpRequestMessage(HttpMethod.Post, "/todos")
 {
     Content = JsonContent.Create(new { title = "" }),
@@ -48,7 +68,7 @@ request.Headers.Referrer = new Uri(client.BaseAddress!, "/todos");
 request.WithXsrfToken(page);
 using var response = await client.SendAsync(request);
 Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-using var redirected = await client.InertiaGetAsync("/todos");
+using var redirected = await client.GetAsync("/todos");
 await redirected.AssertInertiaAsync(p => p.HasErrors().HasError("title"));
 ```
 

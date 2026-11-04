@@ -212,7 +212,26 @@ app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
 }).WithInertiaValidation();
 ```
 
-`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The client form uses `useForm` and displays `form.errors.title`.
+`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The React template's `ClientApp/pages/Todos/Index.tsx` uses `useForm` to submit and display the error:
+
+```tsx
+import { useForm } from '@inertiajs/react'
+import type { FormEvent } from 'react'
+
+// Inside the page component:
+const form = useForm({ title: '' })
+const submit = (e: FormEvent) => {
+  e.preventDefault()
+  form.post('/todos', { onSuccess: () => form.reset() })
+}
+
+// Inside its return:
+<form onSubmit={submit}>
+  <input placeholder="What needs doing?" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
+  <button type="submit" disabled={form.processing}>Add</button>
+  {form.errors.title && <div style={{ color: 'crimson' }}>{form.errors.title}</div>}
+</form>
+```
 
 To test the round trip, add `Inertia.Net.Testing` and `Microsoft.AspNetCore.Mvc.Testing` to a test project, expose `public partial class Program;` in the app, and create a cookie-preserving `WebApplicationFactory<Program>` client with `AllowAutoRedirect = false`:
 
@@ -221,7 +240,8 @@ using System.Net;
 using System.Net.Http.Json;
 using Inertia.Net.Testing;
 
-using var page = await client.InertiaGetAsync("/todos");
+client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
+using var page = await client.GetAsync("/todos");
 using var request = new HttpRequestMessage(HttpMethod.Post, "/todos")
 {
     Content = JsonContent.Create(new { title = "" }),
@@ -232,7 +252,7 @@ request.Headers.Referrer = new Uri(client.BaseAddress!, "/todos");
 request.WithXsrfToken(page);
 using var response = await client.SendAsync(request);
 Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-using var redirected = await client.InertiaGetAsync("/todos");
+using var redirected = await client.GetAsync("/todos");
 await redirected.AssertInertiaAsync(p => p.HasErrors().HasError("title"));
 ```
 
@@ -2517,32 +2537,45 @@ URL: https://inertia-dotnet.yebi.africa/docs/precognition
 
 > Validate a form before submission without running its handler.
 
-Precognition sends the same POST as the form with `Precognition: true`. The server validates it and returns without running the handler:
+The [Minimal API React sample](https://github.com/adzamkomladev/Inertia.Net/tree/main/samples/MinimalApi.React) includes a login validation demo. It accepts dummy values and does not create an authentication session. Precognition sends the same POST as the form with `Precognition: true`. The server validates it and returns without running the handler:
 
 ```http
-POST /users HTTP/1.1
+POST /login HTTP/1.1
 Precognition: true
 Precognition-Validate-Only: email
 Content-Type: application/json
 
-{"email":"invalid"}
+{"email":"invalid","password":"password123"}
 
 HTTP/1.1 422 Unprocessable Entity
 Precognition: true
 Vary: Precognition
 Content-Type: application/json
 
-{"message":"The email field is not a valid e-mail address.","errors":{"email":["The email field is not a valid e-mail address."]}}
+{"message":"The Email field is not a valid e-mail address.","errors":{"email":["The Email field is not a valid e-mail address."]}}
 ```
 
-A valid request returns `204` and `Precognition-Success: true`. For Minimal APIs register `AddValidation()` and use:
+The `message` is the first returned error. A valid request returns `204` and `Precognition-Success: true`. For Minimal APIs register `AddValidation()` and use:
 
 ```csharp
-app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users"))
+app.MapPost("/login", (LoginForm input) => Back().WithFlash("success", "Demo form submitted"))
    .WithInertiaPrecognition();
 ```
 
-This replaces `.WithInertiaValidation()`; do not use both. It also handles normal validation redirects. Filters added after it do not run on precognitive requests. FastEndpoints enables this through `c.ConfigureInertia()`; MVC does not support Precognition.
+The sample's input model is:
+
+```csharp
+public sealed class LoginForm
+{
+    [Required, EmailAddress]
+    public string? Email { get; set; }
+
+    [Required, MinLength(8)]
+    public string? Password { get; set; }
+}
+```
+
+Import `System.ComponentModel.DataAnnotations`. This replaces `.WithInertiaValidation()`; do not use both. It also handles normal validation redirects. Filters added after it do not run on precognitive requests. FastEndpoints enables this through `c.ConfigureInertia()`; MVC does not support Precognition.
 
 ## Client setup
 
@@ -2555,13 +2588,16 @@ Inertia 3 includes Precognition in its form integration. Each example validates 
 import { useForm } from '@inertiajs/react'
 import { useEffect } from 'react'
 
-export default function UserForm() {
-  const form = useForm({ email: '' }).withPrecognition('post', '/users')
+export default function LoginForm() {
+  const form = useForm({ email: '', password: '' }).withPrecognition('post', '/login')
   useEffect(() => { form.setValidationTimeout(3000) }, [])
   return (
-    <form onSubmit={e => { e.preventDefault(); form.post('/users') }}>
+    <form onSubmit={e => { e.preventDefault(); form.post('/login') }}>
       <input value={form.data.email} onChange={e => form.setData('email', e.target.value)}
         onBlur={() => form.validate('email')} />
+      <input type="password" value={form.data.password} onChange={e => form.setData('password', e.target.value)}
+        onBlur={() => form.validate('password')} />
+      {form.errors.password && <p>{form.errors.password}</p>}
       {form.validating && <span>Validating…</span>}
       {form.errors.email && <p>{form.errors.email}</p>}
       <button type="submit">Save</button>
@@ -2576,11 +2612,16 @@ export default function UserForm() {
 ```vue
 <script setup>
 import { useForm } from '@inertiajs/vue3'
-const form = useForm({ email: '' }).withPrecognition('post', '/users')
+const form = useForm({ email: '', password: '' }).withPrecognition('post', '/login')
 form.setValidationTimeout(3000)
 </script>
 <template>
+  <form @submit.prevent="form.post('/login')">
   <input v-model="form.email" @blur="form.validate('email')" />
+  <input v-model="form.password" type="password" @blur="form.validate('password')" />
+  <p v-if="form.errors.password">{{ form.errors.password }}</p>
+  <button type="submit">Submit demo</button>
+  </form>
   <span v-if="form.validating">Validating…</span>
   <p v-if="form.errors.email">{{ form.errors.email }}</p>
 </template>
@@ -2592,10 +2633,15 @@ form.setValidationTimeout(3000)
 ```svelte
 <script>
   import { useForm } from '@inertiajs/svelte'
-  const form = useForm({ email: '' }).withPrecognition('post', '/users')
+  const form = useForm({ email: '', password: '' }).withPrecognition('post', '/login')
   form.setValidationTimeout(3000)
 </script>
-<input bind:value={form.email} onblur={() => form.validate('email')} />
+<form onsubmit={(event) => { event.preventDefault(); form.post('/login') }}>
+  <input bind:value={form.email} onblur={() => form.validate('email')} />
+  <input type="password" bind:value={form.password} onblur={() => form.validate('password')} />
+  {#if form.errors.password}<p>{form.errors.password}</p>{/if}
+  <button type="submit">Submit demo</button>
+</form>
 {#if form.validating}<span>Validating…</span>{/if}
 {#if form.errors.email}<p>{form.errors.email}</p>{/if}
 ```
@@ -2706,12 +2752,13 @@ The sample partitions by remote IP for demonstration; configure trusted forwarde
 With an `Inertia.Net.Testing` client that retains cookies, load the form page and attach its XSRF token. For an endpoint that validates `email`:
 
 ```csharp
-using var page = await client.InertiaGetAsync("/users/create");
+client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
+using var page = await client.GetAsync("/login");
 async Task<HttpResponseMessage> ValidateAsync(string email)
 {
-    using var request = new HttpRequestMessage(HttpMethod.Post, "/users")
+    using var request = new HttpRequestMessage(HttpMethod.Post, "/login")
     {
-        Content = JsonContent.Create(new { email }),
+        Content = JsonContent.Create(new { email, password = "password123" }),
     };
     request.WithXsrfToken(page);
     request.Headers.Add(InertiaPrecognition.Header, "true");
