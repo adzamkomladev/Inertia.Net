@@ -10,7 +10,7 @@ T=$(mktemp -d)
 JAR="$T/jar"
 FAILURES=0
 
-ASPNETCORE_URLS="$BASE" "$BIN" >"$T/app.log" 2>&1 &
+ASPNETCORE_URLS="$BASE" "$BIN" --Logging:LogLevel:Inertia.Net.Pagination=Debug >"$T/app.log" 2>&1 &
 PID=$!
 trap 'kill $PID 2>/dev/null; wait $PID 2>/dev/null; rm -rf "$T"' EXIT
 
@@ -126,6 +126,14 @@ has '"prependProps":["feed.data"]'
 inertia GET '/cursor?cursor=%25%25%25'
 status_is 200
 has '"data":[{"name":"post-1","value":1}]'
+cursor_logged() {
+  grep -A1 -F 'dbug: Inertia.Net.Pagination[' "$T/app.log" | grep -qF -- 'Ignoring an invalid pagination cursor; loading the first page.'
+}
+for _ in $(seq 1 20); do
+  cursor_logged && break
+  sleep 0.1
+done
+cursor_logged || fail "Debug cursor diagnostic missing from the pagination logger"
 
 # 4. Partial reload: only the requested props, plus always props.
 inertia GET /dashboard -H 'X-Inertia-Partial-Component: Dashboard' -H 'X-Inertia-Partial-Data: stats,lazy'

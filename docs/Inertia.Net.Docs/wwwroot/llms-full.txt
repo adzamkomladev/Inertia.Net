@@ -1917,7 +1917,7 @@ URL: https://inertia-dotnet.yebi.africa/docs/pagination
 | `Scroll(await Pagination.PaginateAsync(request, key, fetch, ct: ct))` | Cursor-based infinite scroll using your data source |
 | `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` | A deferred page; other prop modifiers also work |
 
-Minimal API handlers can take `PageRequest` or `CursorRequest` directly, as in [Infinite scroll](/docs/infinite-scroll). MVC and FastEndpoints can call `PageRequest.From(Request.Query)` or `CursorRequest.From(Request.Query)`. Page numbers below 1 become 1; invalid page sizes use the default and sizes above the maximum are clamped. Set defaults and parameter names with `o.Pagination` in `AddInertia`. `From` and `BindAsync` retain the query parameter name for the returned page. An explicit paginator name overrides it.
+Minimal API handlers can take `PageRequest` or `CursorRequest` directly, as in [Infinite scroll](/docs/infinite-scroll). MVC and FastEndpoints can call `PageRequest.From(Request.Query)` and `CursorRequest.From(HttpContext)`. Page numbers below 1 become 1; invalid page sizes use the default and sizes above the maximum are clamped. Set defaults and parameter names with `o.Pagination` in `AddInertia`. `From` and `BindAsync` retain the query parameter name for the returned page. An explicit paginator name overrides it.
 
 `Pagination.Paginate` slices an already materialized `IReadOnlyList<T>`. For a database, search SDK or HTTP API, `Pagination.PaginateAsync` accepts a `fetch(skip, take, ct)` delegate and an optional count delegate. It requests one extra item to determine `hasMore`; without a count, `total` and `lastPage` are null. Delegate offsets above `int.MaxValue` return an empty page without calling `fetch`; the optional count still runs. Supply a stable, fully unique ordering to your data source. For a classic pager, use `currentPage`, `lastPage`, and `pageName` to build links; pages do not contain URL links.
 
@@ -1957,7 +1957,15 @@ The cursor overload of `PaginateAsync` takes a key selector and a fetch delegate
 { "data": [ { "id": 21 } ], "perPage": 20, "nextCursor": "eyJ...", "previousCursor": null, "hasMore": true, "cursorName": "cursor" }
 ```
 
-Cursors are URL-safe base64 of a compact JSON array: direction (`"a"` or `"b"`) followed by the key values. Supported keys are `int`, `long`, `Guid`, `string`, `DateTime`, `DateTimeOffset`, `decimal`, `double`, and `bool`. Invalid cursors start at the first page. Cursors are **not tamper-proof**; apps that need tamper protection should wrap them with `IDataProtector`.
+Cursors are URL-safe base64 of a compact JSON array: direction (`"a"` or `"b"`) followed by the key values. Supported keys are `int`, `long`, `Guid`, `string`, `DateTime`, `DateTimeOffset`, `decimal`, `double`, and `bool`. Cursors are **not tamper-proof**; apps that need tamper protection should wrap them with `IDataProtector`.
+
+A malformed or foreign nonempty cursor falls back to the first page. When `CursorRequest.Logger` is set, the paginator logs this at Debug without cursor values or exception details. Minimal API binding uses configured pagination options and supplies a logger in the `Inertia.Net.Pagination` category when a logger factory is available. In MVC or FastEndpoints, `CursorRequest.From(HttpContext)` does the same; optional arguments override the configured defaults and parameter names. For a query-only request or a request created outside HTTP, supply an app logger explicitly:
+
+```csharp
+var request = CursorRequest.From(query) with { Logger = logger };
+```
+
+`Logger` is ignored by JSON serialization and does not affect request equality.
 
 ## With EF Core
 
