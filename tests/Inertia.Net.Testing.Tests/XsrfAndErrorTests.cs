@@ -9,7 +9,7 @@ public sealed class XsrfAndErrorTests
     {
         await using var server = await FakeServer.StartAsync(context =>
         {
-            context.Response.Headers.SetCookie = ["other=one; Expires=Wed, 09 Jun 2027 10:18:14 GMT; Path=/", "XSRF-TOKEN=a%2Bb%2Fc%3D; Path=/"];
+            context.Response.Headers.SetCookie = new[] {"other=one; Expires=Wed, 09 Jun 2027 10:18:14 GMT; Path=/", "XSRF-TOKEN=a%2Bb%2Fc%3D; Path=/" };
             return Task.CompletedTask;
         });
         using var response = await server.Client.GetAsync("/");
@@ -28,7 +28,7 @@ public sealed class XsrfAndErrorTests
     {
         await using var server = await FakeServer.StartAsync(context =>
         {
-            context.Response.Headers.SetCookie = ["XSRF-TOKEN=default; Path=/", "CSRF=custom%3D; Path=/"];
+            context.Response.Headers.SetCookie = new[] {"XSRF-TOKEN=default; Path=/", "CSRF=custom%3D; Path=/" };
             return Task.CompletedTask;
         });
         using var response = await server.Client.GetAsync("/");
