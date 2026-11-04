@@ -107,7 +107,7 @@ app.MapGet("/feed", (HttpContext http) => Render("Feed/Index", new InertiaProps
 
 app.MapGet("/feed/cursor", async (HttpContext http, CancellationToken ct) =>
 {
-    var request = CursorRequest.From(http.Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize);
+    var request = CursorRequest.From(http, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize);
     var posts = await Pagination.PaginateAsync<Post, int>(request, post => post.Id, (cursor, take, token) =>
     {
         token.ThrowIfCancellationRequested();

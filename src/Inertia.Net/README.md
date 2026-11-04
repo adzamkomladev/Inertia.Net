@@ -55,6 +55,8 @@ Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
 
 Pass the resulting `Page<T>` or `CursorPage<T>` to `Scroll(...)` for infinite scroll, or use `Page<T>` directly for a classic pager. Cursor values are opaque and not tamper-proof. Register closed page types in your JSON context for Native AOT. See [Pagination](https://github.com/adzamkomladev/Inertia.Net#pagination).
 
+Malformed or foreign nonempty cursors fall back to the first page and log at Debug when the request has a logger; cursor values and exception details are omitted. Minimal API binding and `CursorRequest.From(HttpContext)` use configured options and supply a logger when a logger factory is available. For query-only or non-HTTP requests, set `Logger` explicitly, for example `CursorRequest.From(query) with { Logger = logger }`. See [Pagination](https://github.com/adzamkomladev/Inertia.Net#cursors).
+
 ## Live props
 
 `Prop(...).Live(event)` (or `Live(() => ..., event)`) lists the prop in the page's `liveProps`: the client subscribes to the event's
