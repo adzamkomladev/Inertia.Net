@@ -56,6 +56,19 @@ public sealed class MinimalApiValidationTests
     private static Task<ConformanceApp> StartAsync() => ConformanceApp.StartAsync<Host>();
 
     [Fact]
+    public async Task Missing_validation_services_fail_at_endpoint_build_time()
+    {
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => ConformanceApp.StartAsync<MissingValidationHost>());
+        Assert.Equal("WithInertiaValidation() needs services.AddValidation(). Add it at startup, or remove the call.", exception.Message);
+    }
+
+    public sealed class MissingValidationHost : IConformanceHost
+    {
+        public static void ConfigureServices(IServiceCollection services) { }
+        public static void MapRoutes(WebApplication app) => app.MapPost("/form", () => Results.Ok()).WithInertiaValidation();
+    }
+
+    [Fact]
     public async Task Built_in_validation_still_answers_400_problem_details_without_x_inertia()
     {
         await using var app = await StartAsync();

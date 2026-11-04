@@ -256,6 +256,38 @@ public sealed class SsrGatewayTests
     }
 
     [Fact]
+    public async Task Required_failure_message_and_type_are_bounded()
+    {
+        var text = new string('x', 4096);
+        var handler = new FakeHandler((_, _) => Task.FromResult(Json(HttpStatusCode.InternalServerError,
+            $$"""{"error":"{{text}}","type":"{{text}}","hint":"{{text}}"}""")));
+        var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(Create(handler, s => s.Mode = SsrMode.Required)));
+        Assert.True(exception.Message.Length <= 2049);
+        Assert.True(exception.Type!.Length <= 2049);
+        Assert.True(exception.Hint!.Length <= 2049);
+    }
+
+    [Fact]
+    public async Task Required_connection_failure_keeps_renderer_address_in_logs_only()
+    {
+        const string endpoint = "http://internal-renderer.test:1234";
+        var harness = Create(new FakeHandler((_, _) => throw new HttpRequestException("connection refused")),
+            s => { s.Mode = SsrMode.Required; s.Urls.Add(endpoint); });
+        var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(harness));
+        Assert.DoesNotContain(endpoint, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(harness.Logs.Entries, e => e.Message.Contains(endpoint, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Default_primary_handler_bounds_connection_establishment()
+    {
+        var harness = new Harness();
+        var handler = harness.Services.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(SsrGateway.HttpClientName);
+        while (handler is DelegatingHandler delegating) handler = delegating.InnerHandler!;
+        Assert.Equal(TimeSpan.FromSeconds(5), Assert.IsType<SocketsHttpHandler>(handler).ConnectTimeout);
+    }
+
+    [Fact]
     public async Task Exclude_paths_match_exactly_or_by_prefix_wildcard()
     {
         var handler = Ok();
