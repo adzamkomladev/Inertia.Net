@@ -389,10 +389,9 @@ internal sealed class InertiaPageWriter
             else
             {
                 var handling = property.NumberHandling ?? info.NumberHandling;
-                Add(ref entries, ref count, new(property.Name,
-                    value is not InertiaProp && (property.CustomConverter is not null || (handling is not null && !ContainsProps(property.PropertyType)))
-                        ? new PropertyValue(PropertyTypeInfo(property, handling), value) : value,
-                    property.PropertyType));
+                var serializer = value is not InertiaProp && (property.CustomConverter is not null || (handling is not null && !ContainsProps(property.PropertyType)))
+                    ? PropertyTypeInfo(property, handling) : null;
+                Add(ref entries, ref count, new(property.Name, value, property.PropertyType, serializer));
             }
         }
 
@@ -439,7 +438,7 @@ internal sealed class InertiaPageWriter
         var sharedCount = 0;
         var hasDotKey = false;
 
-        void Set(string key, object? value, Type type, bool shared)
+        void Set(string key, object? value, Type type, bool shared, JsonTypeInfo? serializer = null)
         {
             var position = -1;
             if (sharedPositions is not null)
@@ -460,11 +459,11 @@ internal sealed class InertiaPageWriter
 
             if (position >= 0)
             {
-                entries[position] = new PropEntry(key, value, type);
+                entries[position] = new PropEntry(key, value, type, serializer);
             }
             else
             {
-                entries.Add(new PropEntry(key, value, type));
+                entries.Add(new PropEntry(key, value, type, serializer));
                 if (shared)
                 {
                     sharedPositions?.Add(key, entries.Count - 1);
@@ -532,7 +531,7 @@ internal sealed class InertiaPageWriter
                 {
                     for (var i = 0; i < count; i++)
                     {
-                        Set(members[i].Key, members[i].Value, members[i].Type, shared: false);
+                        Set(members[i].Key, members[i].Value, members[i].Type, shared: false, members[i].Serializer);
                     }
                 }
                 finally
@@ -577,12 +576,15 @@ internal sealed class InertiaPageWriter
                 result.Add(new PropEntry(segments[0], null, typeof(object)));
             }
 
-            var top = ToTraversable(result[position].Value, owned);
+            var top = ToTraversable(DotValue(result[position]), owned);
             result[position] = new PropEntry(segments[0], top, typeof(object));
-            Assign(top, segments, 1, entry.Value, owned);
+            Assign(top, segments, 1, DotValue(entry), owned);
         }
 
         return result;
+
+        // Dotted paths keep the wrapper because dictionaries do not carry member serializer metadata.
+        static object? DotValue(PropEntry entry) => entry.Serializer is { } serializer ? new PropertyValue(serializer, entry.Value) : entry.Value;
     }
 
     // Laravel's Arr::set from segments[start], copying the objects on the way. Below a lazy object the rest of the path is
