@@ -44,25 +44,33 @@ internal sealed class MemoryInertiaCacheStore : IInertiaCacheStore, IDisposable
         var tags = options.Tags;
         lock (_lock)
         {
-            foreach (var tag in tags)
+            var cache = Cache(key);
+            var cacheKey = CacheKey(key);
+            using (var entry = cache.CreateEntry(cacheKey))
             {
-                if (!_tags.TryGetValue(tag, out var entries))
+                entry.Value = value;
+                entry.Size = value.Length;
+                if (options.Expiration < MaxExpiration)
                 {
-                    _tags[tag] = entries = [];
+                    entry.AbsoluteExpirationRelativeToNow = options.Expiration;
                 }
 
-                entries[key] = value;
+                entry.RegisterPostEvictionCallback(_evicted, tags);
             }
 
-            using var entry = Cache(key).CreateEntry(CacheKey(key));
-            entry.Value = value;
-            entry.Size = value.Length;
-            if (options.Expiration < MaxExpiration)
+            // A bounded cache may refuse a write. Publish tags only for the value that was committed.
+            if (cache.TryGetValue(cacheKey, out byte[]? current) && ReferenceEquals(current, value))
             {
-                entry.AbsoluteExpirationRelativeToNow = options.Expiration;
-            }
+                foreach (var tag in tags)
+                {
+                    if (!_tags.TryGetValue(tag, out var entries))
+                    {
+                        _tags[tag] = entries = [];
+                    }
 
-            entry.RegisterPostEvictionCallback(_evicted, tags);
+                    entries[key] = value;
+                }
+            }
         }
 
         return default;
