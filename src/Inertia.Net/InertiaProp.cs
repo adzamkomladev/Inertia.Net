@@ -154,7 +154,8 @@ public abstract class InertiaProp
     /// <summary>
     /// Caches the value like <see cref="Cache(string, TimeSpan)"/>, and once <paramref name="duration"/> has passed keeps serving it for
     /// <paramref name="staleFor"/> more (stale-while-revalidate): a request that reads a stale value gets it at once, and the loader runs
-    /// after that response has been sent, with the request's services still available, to store a fresh value. One refresh runs per key
+    /// on a bounded background worker after that response has been sent, to store a fresh value. The loader must use singleton services
+    /// or create its own scope; request-scoped services and HttpContext cannot be used. One refresh runs per key
     /// and app instance at a time; a refresh that fails keeps the stale value. Past both times the loader runs during the request again.
     /// </summary>
     /// <param name="key">The cache key, unique to the value; keys live in their own space, apart from the app's cache keys.</param>

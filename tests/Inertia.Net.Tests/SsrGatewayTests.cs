@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using static Inertia.Net.Inertia;
 
 namespace Inertia.Net.Tests;
@@ -105,6 +107,50 @@ public sealed class SsrGatewayTests
         Assert.Throws<Microsoft.Extensions.Options.OptionsValidationException>(() => invalid.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<InertiaOptions>>().Value);
         var infinite = new Harness(o => o.Ssr.Timeout = Timeout.InfiniteTimeSpan);
         Assert.Equal(Timeout.InfiniteTimeSpan, infinite.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<InertiaOptions>>().Value.Ssr.Timeout);
+    }
+
+    [Fact]
+    public async Task Connect_timeout_bounds_an_unreachable_renderer_with_infinite_render_deadline()
+    {
+        var harness = new Harness(o =>
+        {
+            o.Ssr.Mode = SsrMode.Required;
+            o.Ssr.Timeout = Timeout.InfiniteTimeSpan;
+            o.Ssr.ConnectTimeout = TimeSpan.FromMilliseconds(50);
+            o.Ssr.Urls.Add("http://10.255.255.1:9");
+        }, configureServices: services => services.PostConfigure<HttpClientFactoryOptions>(SsrGateway.HttpClientName,
+            options => options.HttpMessageHandlerBuilderActions.Add(builder =>
+                // Make connection establishment deterministic even on hosts that immediately refuse this address.
+                ((SocketsHttpHandler)builder.PrimaryHandler).ConnectCallback = async (_, cancellationToken) =>
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    return Stream.Null;
+                })));
+        var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(harness)
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.Equal("connection", exception.Type);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-2)]
+    [InlineData(2147483648)]
+    public void Connect_timeout_rejects_unsupported_values(double milliseconds)
+    {
+        var harness = new Harness(o => o.Ssr.ConnectTimeout = TimeSpan.FromMilliseconds(milliseconds));
+        Assert.Throws<OptionsValidationException>(() => harness.Services.GetRequiredService<IOptions<InertiaOptions>>().Value);
+    }
+
+    [Fact]
+    public void Connect_timeout_may_be_disabled_or_configured()
+    {
+        foreach (var timeout in new[] { Timeout.InfiniteTimeSpan, TimeSpan.FromSeconds(1) })
+        {
+            var harness = new Harness(o => o.Ssr.ConnectTimeout = timeout);
+            var handler = harness.Services.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(SsrGateway.HttpClientName);
+            while (handler is DelegatingHandler delegating) handler = delegating.InnerHandler!;
+            Assert.Equal(timeout, Assert.IsType<SocketsHttpHandler>(handler).ConnectTimeout);
+        }
     }
 
     private sealed class NonSeekableStream(byte[] bytes) : MemoryStream(bytes)
@@ -276,6 +322,29 @@ public sealed class SsrGatewayTests
         var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(harness));
         Assert.DoesNotContain(endpoint, exception.Message, StringComparison.Ordinal);
         Assert.Contains(harness.Logs.Entries, e => e.Message.Contains(endpoint, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Required_renderer_error_does_not_echo_internal_details_in_public_message()
+    {
+        const string endpoint = "http://internal-renderer.test:1234";
+        var handler = new FakeHandler((_, _) => Task.FromResult(Json(HttpStatusCode.InternalServerError,
+            $$"""{"error":"Failed at {{endpoint}} token=secret","type":"{{endpoint}}","hint":"{{endpoint}}"}""")));
+        var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(Create(handler, s => s.Mode = SsrMode.Required)));
+        Assert.DoesNotContain(endpoint, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("token=secret", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Required_missing_bundle_does_not_echo_internal_path_in_public_message()
+    {
+        const string bundle = "/private/deployment/ssr/missing.mjs";
+        var exception = await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(Create(Ok(), s =>
+        {
+            s.Mode = SsrMode.Required;
+            s.BundlePath = bundle;
+        })));
+        Assert.DoesNotContain(bundle, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.IntegrationTests;
@@ -58,7 +59,10 @@ public sealed class MinimalApiValidationTests
     [Fact]
     public async Task Missing_validation_services_fail_at_endpoint_build_time()
     {
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => ConformanceApp.StartAsync<MissingValidationHost>());
+        await using var app = await ConformanceApp.StartAsync<MissingValidationHost>();
+        // TestServer initializes routing lazily; materialize endpoints to invoke the filter factory.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ((IEndpointRouteBuilder)app.App).DataSources.SelectMany(source => source.Endpoints).ToArray());
         Assert.Equal("WithInertiaValidation() needs services.AddValidation(). Add it at startup, or remove the call.", exception.Message);
     }
 

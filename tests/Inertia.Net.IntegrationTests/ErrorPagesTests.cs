@@ -57,6 +57,56 @@ public abstract class ErrorPagesTests<THost> where THost : IConformanceHost
         Assert.IsType<InvalidOperationException>(received);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Required_ssr_failure_renders_configured_error_page_with_a_safe_message(bool connection)
+    {
+        const string endpoint = "http://internal-renderer.test:1234";
+        InertiaSsrException? received = null;
+        await using var app = await StartAsync(configure: options =>
+        {
+            options.Components[500] = "Errors/Server";
+            options.Props = (_, _, exception) =>
+            {
+                received = Assert.IsType<InertiaSsrException>(exception);
+                return new InertiaProps { ["message"] = exception.Message };
+            };
+        }, services: services =>
+        {
+            services.Configure<InertiaOptions>(options =>
+            {
+                options.Ssr.Mode = SsrMode.Preferred;
+                options.Ssr.Urls.Add(endpoint);
+            });
+            services.AddHttpClient(InertiaSsr.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => new FailedRenderer(connection));
+        });
+        using var client = app.GetTestClient();
+        using var response = await SendAsync(client, "/error-pages/ssr-required", false);
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        var page = await response.GetInertiaPageAsync(TestContext.Current.CancellationToken);
+        var assertions = new AssertableInertia(page);
+        assertions.Status(500).Component("Errors/Server");
+        Assert.NotNull(received);
+        Assert.True(received.Message.Length <= 2049);
+        Assert.DoesNotContain(endpoint, received.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("token=secret", received.Message, StringComparison.Ordinal);
+        Assert.Equal(received.Message, (string?)page.Props["message"]);
+    }
+
+    private sealed class FailedRenderer(bool connection) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (connection) throw new HttpRequestException("connection refused");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                Content = new StringContent("{\"error\":\"" + "http://internal-renderer.test:1234 token=secret " + new string('x', 4096) + "\",\"type\":\"render\"}"),
+            });
+        }
+    }
+
     [Fact]
     public async Task Api_clients_are_untouched()
     {
@@ -200,7 +250,8 @@ public abstract class ErrorPagesTests<THost> where THost : IConformanceHost
     }
 
     private static async Task<WebApplication> StartAsync(string environment = "Production",
-        Action<InertiaErrorPagesOptions>? configure = null, bool existingHandler = false, bool statusSelector = false)
+        Action<InertiaErrorPagesOptions>? configure = null, bool existingHandler = false, bool statusSelector = false,
+        Action<IServiceCollection>? services = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "inertia-error-pages-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -210,6 +261,7 @@ public abstract class ErrorPagesTests<THost> where THost : IConformanceHost
         builder.Services.AddSingleton<ConformanceCounters>();
         builder.Services.AddInertia(o => o.Share("app", "shared"));
         THost.ConfigureServices(builder.Services);
+        services?.Invoke(builder.Services);
         if (existingHandler) builder.Services.AddExceptionHandler<ApiExceptionHandler>();
         builder.Services.AddInertiaErrorPages(configure);
         var app = builder.Build();
@@ -228,6 +280,7 @@ public abstract class ErrorPagesTests<THost> where THost : IConformanceHost
             await next(context);
         });
         THost.MapRoutes(app);
+        app.MapGet("/error-pages/ssr-required", () => Render("Page").WithSsr(SsrMode.Required));
         app.MapGet("/plain-redirect", () => Results.Redirect("/page"));
         app.MapGet("/forbidden", () => Results.StatusCode(403));
         app.MapGet("/unauthorized", () => Results.StatusCode(401));

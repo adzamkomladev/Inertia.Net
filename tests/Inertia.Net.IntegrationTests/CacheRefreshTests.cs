@@ -8,11 +8,11 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace Inertia.Net.IntegrationTests;
 
-/// <summary>Stale-while-revalidate through the real request pipeline: the refresh runs after the response, with the request's services.</summary>
+/// <summary>Stale-while-revalidate through the real request pipeline: the refresh runs after the response with an independently owned service scope.</summary>
 public sealed class CacheRefreshTests
 {
     [Fact]
-    public async Task A_stale_prop_is_refreshed_after_its_response_with_the_request_services_alive()
+    public async Task A_stale_prop_is_refreshed_after_its_response_with_an_independent_service_scope()
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
         builder.WebHost.UseTestServer();
@@ -22,9 +22,13 @@ public sealed class CacheRefreshTests
         builder.Services.AddSingleton<Loads>();
         builder.Services.AddScoped<RequestDb>();
         await using var app = builder.Build();
-        app.MapGet("/stats", (RequestDb db) => Render("Stats", new InertiaProps
+        app.MapGet("/stats", (IServiceScopeFactory scopes) => Render("Stats", new InertiaProps
         {
-            ["n"] = Prop(ct => db.LoadAsync()).Cache("stats", TimeSpan.FromMinutes(1), staleFor: TimeSpan.FromMinutes(5)),
+            ["n"] = Prop(async ct =>
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                return await scope.ServiceProvider.GetRequiredService<RequestDb>().LoadAsync(ct);
+            }).Cache("stats", TimeSpan.FromMinutes(1), staleFor: TimeSpan.FromMinutes(5)),
         }));
         await app.StartAsync(TestContext.Current.CancellationToken);
         var client = app.GetTestClient();
@@ -72,12 +76,12 @@ public sealed class CacheRefreshTests
     {
         private bool _disposed;
 
-        public async Task<int> LoadAsync()
+        public async Task<int> LoadAsync(CancellationToken cancellationToken)
         {
             var n = Interlocked.Increment(ref loads.Count);
             if (n > 1)
             {
-                await loads.Gate.Task;
+                await loads.Gate.Task.WaitAsync(cancellationToken);
             }
 
             ObjectDisposedException.ThrowIf(_disposed, this);

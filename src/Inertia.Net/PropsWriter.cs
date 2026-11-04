@@ -180,7 +180,7 @@ internal sealed class PropsWriter
                 SawParallel = true;
                 if (Decide(null, value, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    Prefetch(lazy.Source, lookup: null);
+                    PlanLoad(lazy.Source);
                 }
 
                 return;
@@ -581,7 +581,12 @@ internal sealed class PropsWriter
     {
         if (_uncommon?.Refreshes is { } refreshes && refreshes.Claim())
         {
-            httpContext.Response.OnCompleted(static state => ((PropRefreshes)state).RunAsync(), refreshes);
+            httpContext.Response.OnCompleted(static state =>
+            {
+                var pending = (PropRefreshes)state;
+                pending.Schedule();
+                return Task.CompletedTask;
+            }, refreshes);
         }
     }
 
@@ -612,10 +617,7 @@ internal sealed class PropsWriter
                 _owner.WriteNode(_writer, node);
                 return;
             case InertiaPageWriter.LazyDotObject lazy:
-                // Deviation 7: the lazy prop under dot keys resolves only now that its path is part of the response. Plain props
-                // are never rescued, so it always resolves.
-                var (_, source) = await ResolveAsync(lazy.Source);
-                await WriteObjectAsync(lazy.Apply(source), parentWasResolved);
+                await WriteLazyDotAsync(lazy, parentWasResolved);
                 return;
             case Dictionary<string, object?> dictionary: // InertiaProps: struct enumerator, no boxing
                 await WriteObjectAsync(dictionary, parentWasResolved);
@@ -653,6 +655,35 @@ internal sealed class PropsWriter
         }
 
         JsonSerializer.Serialize(_writer, value, info);
+    }
+
+    private async ValueTask WriteLazyDotAsync(InertiaPageWriter.LazyDotObject lazy, bool parentWasResolved)
+    {
+        // Deviation 7: resolve only after inclusion, keeping cache ownership and live listeners on the parent.
+        if (lazy.Source.LiveSpec is not null) CollectLive(lazy.Source, parentWasResolved);
+        if (lazy.Source.Caching is { } caching)
+        {
+            var hit = _planner is not null && _planner.IsPlanned(lazy.Source)
+                ? null : await _owner.Caching.GetPropAsync(caching, _cancellationToken);
+            if (hit is null)
+            {
+                var (_, loaded) = await ResolveAsync(lazy.Source, cached: true);
+                hit = (CachedProp)loaded!;
+            }
+
+            if (hit.Value.IsStale && !_owner.Caching.IsRefreshing(caching.StoreKey))
+            {
+                ((_uncommon ??= new()).Refreshes ??= new PropRefreshes(_owner)).Add(lazy.Source, new string(Path));
+            }
+
+            using var document = JsonDocument.Parse(hit.Value.Json);
+            await WriteObjectAsync(lazy.ApplyCached(document.RootElement), parentWasResolved);
+        }
+        else
+        {
+            var (_, source) = await ResolveAsync(lazy.Source);
+            await WriteObjectAsync(lazy.Apply(source), parentWasResolved);
+        }
     }
 
     private async ValueTask WriteObjectAsync(IEnumerable<KeyValuePair<string, object?>> entries, bool parentWasResolved)
@@ -1098,7 +1129,7 @@ internal sealed class PropsWriter
 
 /// <summary>
 /// Refreshes the stale cached props of a response once the response has been sent, one after another as the walk resolves loaders. The
-/// response's completion callbacks run before its request services are disposed, so the loaders can still use them.
+/// loaders run independently of the request's lifetime and must create their own scopes for scoped dependencies.
 /// </summary>
 internal sealed class PropRefreshes(InertiaPageWriter owner)
 {
@@ -1113,7 +1144,14 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
         return _props.Count > 0;
     }
 
-    public async Task RunAsync()
+    public void Schedule() => owner.Refreshes.Enqueue(new RefreshWork(RunAsync, Release, "prop"));
+
+    private void Release()
+    {
+        foreach (var (prop, _) in _props) owner.Caching.EndRefresh(prop.Caching!.StoreKey);
+    }
+
+    private async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var (prop, path) in _props)
         {
@@ -1122,22 +1160,22 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
             {
                 // The response read the value stale, but another refresh (this instance's, between that read and this response's
                 // claim, or another instance's in a shared store) may have stored a fresh one since: then there is nothing to do.
-                if (await owner.Caching.GetPropAsync(caching, CancellationToken.None) is { IsStale: false })
+                if (await owner.Caching.GetPropAsync(caching, cancellationToken) is { IsStale: false })
                 {
                     continue;
                 }
 
-                var value = await prop.ResolveAsync(CancellationToken.None);
+                var value = await prop.ResolveAsync(cancellationToken);
                 var entry = owner.CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, path, out _);
-                await owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, CancellationToken.None);
+                await owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 owner.Caching.LogRefreshFailure(ex, $"the prop '{path}'");
-            }
-            finally
-            {
-                owner.Caching.EndRefresh(caching.StoreKey);
             }
         }
     }

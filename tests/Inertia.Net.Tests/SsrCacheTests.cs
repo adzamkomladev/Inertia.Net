@@ -379,7 +379,7 @@ public sealed class SsrCacheTests
         Assert.Contains("render 1", await RenderAsync(harness, out var other), StringComparison.Ordinal);
         Assert.Equal(0, other.Pending);
 
-        await refresh.CompleteAsync();
+        await harness.CompleteRefreshAsync(refresh);
         Assert.Equal(2, handler.Calls);
         Assert.Contains("render 2", await RenderAsync(harness), StringComparison.Ordinal);
 
@@ -441,7 +441,7 @@ public sealed class SsrCacheTests
         // The page is rendered and stored fresh before the stale read's refresh runs.
         await harness.Services.GetRequiredService<IInertiaCache>().ClearSsrAsync(TestContext.Current.CancellationToken);
         Assert.Contains("render 2", await RenderAsync(harness), StringComparison.Ordinal);
-        await refresh.CompleteAsync();
+        await harness.CompleteRefreshAsync(refresh);
         Assert.Equal(2, handler.Calls);
     }
 

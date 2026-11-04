@@ -448,7 +448,7 @@ public sealed class CachedPropsTests
         Assert.Equal("load 1", (string?)again["props"]!["feed"]);
         Assert.Equal(0, other.Pending);
 
-        await refresh.CompleteAsync();
+        await harness.CompleteRefreshAsync(refresh);
         Assert.Equal(2, _loads);
         var (fresh, _) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
         Assert.Equal("load 2", (string?)fresh["props"]!["feed"]);
@@ -457,6 +457,51 @@ public sealed class CachedPropsTests
         time.Advance(TimeSpan.FromMinutes(10));
         var (expired, _) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
         Assert.Equal("load 3", (string?)expired["props"]!["feed"]);
+    }
+
+    [Fact]
+    public async Task A_slow_prop_refresh_does_not_hold_the_response_completion_callback()
+    {
+        var time = new FakeTimeProvider();
+        var harness = new Harness(timeProvider: time);
+        var worker = harness.Services.GetRequiredService<InertiaRefreshQueue>();
+        await worker.StartAsync(TestContext.Current.CancellationToken);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        InertiaProp Feed() => Prop(async ct =>
+        {
+            var count = Interlocked.Increment(ref _loads);
+            if (count > 1)
+            {
+                started.TrySetResult();
+                await release.Task.WaitAsync(ct);
+            }
+
+            return count;
+        }).Cache("feed", TimeSpan.FromMinutes(1), staleFor: TimeSpan.FromMinutes(5));
+        try
+        {
+            await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
+            time.Advance(TimeSpan.FromMinutes(2));
+            var (page, completion) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
+            Assert.Equal(1, (int?)page["props"]!["feed"]);
+            Assert.False(started.Task.IsCompleted);
+            await completion.CompleteAsync().WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            var (again, other) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
+            Assert.Equal(1, (int?)again["props"]!["feed"]);
+            Assert.Equal(0, other.Pending);
+            Assert.Equal(2, _loads);
+            release.TrySetResult();
+            await harness.CompleteRefreshAsync(completion);
+            var (fresh, _) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
+            Assert.Equal(2, (int?)fresh["props"]!["feed"]);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await worker.StopAsync(CancellationToken.None);
+        }
     }
 
     [Fact]
@@ -472,7 +517,7 @@ public sealed class CachedPropsTests
 
         // Another refresh (or another app instance sharing the store) stores a fresh value before this response's refresh runs.
         await harness.Services.GetRequiredService<IInertiaCache>().SetPropAsync("feed", "saved", TimeSpan.FromMinutes(1), cancellationToken: TestContext.Current.CancellationToken);
-        await refresh.CompleteAsync();
+        await harness.CompleteRefreshAsync(refresh);
         Assert.Equal(1, _loads);
         var (page, _) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
         Assert.Equal("saved", (string?)page["props"]!["feed"]);
@@ -491,14 +536,14 @@ public sealed class CachedPropsTests
         time.Advance(TimeSpan.FromMinutes(2));
         fail = true;
         var (_, refresh) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
-        await refresh.CompleteAsync();
+        await harness.CompleteRefreshAsync(refresh);
         Assert.Contains(harness.Logs.Entries, e => e.Level == LogLevel.Warning && e.Exception?.Message == "db down");
 
         // The next stale read tries again.
         fail = false;
         var (page, retry) = await RenderAsync(harness, new InertiaProps { ["feed"] = Feed() });
         Assert.Equal("load 1", (string?)page["props"]!["feed"]);
-        await retry.CompleteAsync();
+        await harness.CompleteRefreshAsync(retry);
         Assert.Equal(2, _loads);
     }
 
@@ -523,7 +568,7 @@ public sealed class CachedPropsTests
         Assert.Equal(1, refresh.Pending);
         Assert.Equal(2, _loads);
         overlapped = false;
-        await refresh.CompleteAsync();
+        await harness.CompleteRefreshAsync(refresh);
         Assert.Equal(4, _loads);
         Assert.False(overlapped);
     }

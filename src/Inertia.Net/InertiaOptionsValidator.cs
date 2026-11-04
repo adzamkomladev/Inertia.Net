@@ -18,6 +18,8 @@ internal sealed class InertiaOptionsValidator : IValidateOptions<InertiaOptions>
             "State.PreviousUrlCookieName must differ from State.CookieName.");
         var ssr = options.Ssr;
         Check(IsDeadline(ssr.Timeout, allowZero: false), "Ssr.Timeout must be positive and supported by CancellationTokenSource, or Timeout.InfiniteTimeSpan.");
+        Check(ssr.ConnectTimeout == Timeout.InfiniteTimeSpan || (ssr.ConnectTimeout > TimeSpan.Zero && ssr.ConnectTimeout.TotalMilliseconds <= int.MaxValue),
+            "Ssr.ConnectTimeout must be positive and supported by SocketsHttpHandler, or Timeout.InfiniteTimeSpan.");
         Check(ssr.MaxResponseBytes > 0, "Ssr.MaxResponseBytes must be positive.");
         Check(ssr.MaxPageBytes > 0, "Ssr.MaxPageBytes must be positive.");
         Check(ssr.Cache.Duration >= TimeSpan.Zero, "Ssr.Cache.Duration must not be negative.");
