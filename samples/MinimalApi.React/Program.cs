@@ -67,9 +67,9 @@ app.MapInertiaDevTools();
 app.MapInertiaLiveHub(); // /inertia-live
 app.MapInertia("/", "Home");
 
-app.MapGet("/users", () => Render("Users/Index", new InertiaProps
+app.MapGet("/users", (HttpContext http) => Render("Users/Index", new InertiaProps
 {
-    ["users"] = AppState.Users.ToList(),
+    ["users"] = Pagination.Paginate(AppState.Users, PageRequest.From(http.Request.Query, defaultPerPage: 5, maxPerPage: 5)),
     ["stats"] = Defer(async ct =>
     {
         await Task.Delay(300, ct);
@@ -103,14 +103,31 @@ app.MapPost("/newsletter", (HttpContext http, [FromBody] NewsletterForm form) =>
     return Results.Redirect("/contacts/create");
 }).WithInertiaValidation();
 
-app.MapGet("/feed", (int page = 1) =>
+app.MapGet("/feed", (HttpContext http) => Render("Feed/Index", new InertiaProps
 {
-    page = Math.Clamp(page, 1, AppState.FeedPages);
-    var posts = Enumerable.Range((page - 1) * AppState.PageSize + 1, AppState.PageSize).Select(i => new Post(i, $"Post {i}")).ToList();
-    return Render("Feed/Index", new InertiaProps
+    ["posts"] = Scroll(Pagination.Paginate(AppState.Posts,
+        PageRequest.From(http.Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize))),
+}));
+
+app.MapGet("/feed/cursor", async (HttpContext http, CancellationToken ct) =>
+{
+    var request = CursorRequest.From(http, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize);
+    var posts = await Pagination.PaginateAsync<Post, int>(request, post => post.Id, (cursor, take, token) =>
     {
-        ["posts"] = Scroll(new PostPage(posts), metadata: ScrollMetadata.FromPage(page, page < AppState.FeedPages)),
-    });
+        token.ThrowIfCancellationRequested();
+        IEnumerable<Post> rows = AppState.Posts.Reverse();
+        if (cursor is { Direction: CursorDirection.After } after)
+        {
+            rows = rows.Where(post => post.Id < after.Value);
+        }
+        else if (cursor is { Direction: CursorDirection.Before } before)
+        {
+            rows = rows.Where(post => post.Id > before.Value).Reverse();
+        }
+
+        return Task.FromResult<IReadOnlyList<Post>>(rows.Take(take).ToArray());
+    }, ct: ct);
+    return Render("Feed/Cursor", new InertiaProps { ["posts"] = Scroll(posts) });
 });
 
 if (e2e)
@@ -119,6 +136,11 @@ if (e2e)
     // Test hooks called by the E2E runner, not by a browser page: exempt from CSRF validation.
     app.MapPost("/__e2e/bump-version", () => AppState.Version = Guid.NewGuid().ToString("N")).DisableAntiforgery();
     app.MapPost("/__e2e/reset", AppState.Reset).DisableAntiforgery();
+    app.MapPost("/__e2e/pagination/seed-users", () =>
+    {
+        AppState.Users.AddRange(Enumerable.Range(4, 9).Select(id => new User(id, $"User {id}")));
+        return Results.NoContent();
+    }).DisableAntiforgery();
     // Live props: publish as another user would (no socket to leave out).
     app.MapPost("/__e2e/live/increment", async (IInertiaLive live) =>
     {
@@ -159,8 +181,6 @@ namespace MinimalApi.React
 
     public sealed record Post(int Id, string Title);
 
-    public sealed record PostPage(List<Post> Data);
-
     public sealed record DeferredRow(string Name, InertiaProp Extra);
 
     public sealed record Counter(int Value);
@@ -200,7 +220,9 @@ namespace MinimalApi.React
     [JsonSerializable(typeof(List<User>))]
     [JsonSerializable(typeof(Stats))]
     [JsonSerializable(typeof(Plans))]
-    [JsonSerializable(typeof(PostPage))]
+    [JsonSerializable(typeof(Page<Post>))]
+    [JsonSerializable(typeof(CursorPage<Post>))]
+    [JsonSerializable(typeof(Page<User>))]
     [JsonSerializable(typeof(ContactForm))]
     [JsonSerializable(typeof(NewsletterForm))]
     [JsonSerializable(typeof(List<DeferredRow>))]
@@ -218,6 +240,9 @@ namespace MinimalApi.React
         private static int _plansCount, _counter, _unread;
 
         public static List<User> Users { get; } = Seed();
+
+        public static IReadOnlyList<Post> Posts { get; } = Enumerable.Range(1, PageSize * FeedPages)
+            .Select(id => new Post(id, $"Post {id}")).ToArray();
 
         /// <summary>The asset version override; null means the hash of the Vite manifest.</summary>
         public static string? Version { get; set; }

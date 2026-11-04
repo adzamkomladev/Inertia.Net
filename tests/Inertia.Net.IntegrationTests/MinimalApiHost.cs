@@ -30,6 +30,13 @@ public sealed class MinimalApiHost : IConformanceHost
 
         app.MapGet("/café", () => Render("Page"));
 
+        app.MapGet("/paged", async (PageRequest request, CancellationToken ct) =>
+            Render("Paged", await PagedPage.OffsetAsync(request, false, ct)));
+        app.MapGet("/paged/scroll", async (PageRequest request, CancellationToken ct) =>
+            Render("Paged", await PagedPage.OffsetAsync(request, true, ct)));
+        app.MapGet("/paged/cursor", async (CursorRequest request, CancellationToken ct) =>
+            Render("Paged", await PagedPage.CursorAsync(request, ct)));
+
         app.MapGet("/live", (HttpContext context) =>
         {
             context.Inertia().Share("bell", LivePage.Bell());

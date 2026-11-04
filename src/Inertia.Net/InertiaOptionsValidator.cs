@@ -8,6 +8,8 @@ internal sealed class InertiaOptionsValidator : IValidateOptions<InertiaOptions>
     public ValidateOptionsResult Validate(string? name, InertiaOptions options)
     {
         List<string>? failures = null;
+        Check(options.Pagination.DefaultPerPage >= 1 && options.Pagination.DefaultPerPage <= options.Pagination.MaxPerPage, "Pagination requires 1 <= DefaultPerPage <= MaxPerPage.");
+        Check(options.Pagination.MaxPerPage < int.MaxValue, "Pagination.MaxPerPage must be less than Int32.MaxValue to allow over-fetching.");
         Check(options.Props.MaxConcurrency > 0, "Props.MaxConcurrency must be positive.");
         Check(options.Vite.PrefetchConcurrency > 0, "Vite.PrefetchConcurrency must be positive.");
         Check(options.Pages.Extensions.All(e => e is ['.', _, ..]), "Pages.Extensions entries must start with '.', e.g. \".tsx\".");

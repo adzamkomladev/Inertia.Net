@@ -37,6 +37,13 @@ public class UsersTests(WebApplicationFactory<Program> factory) : IClassFixture<
 
 Add `public partial class Program;` to your app when it uses top-level statements.
 
+To check that an error page keeps its HTTP status, use `Status` with the response's page assertion:
+
+```csharp
+using var response = await _client.InertiaGetAsync("/missing");
+await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
+```
+
 ## Request helpers
 
 | Helper | Purpose |
@@ -70,9 +77,15 @@ new AssertableInertia(page).HasDeferred("sidebar", "stats").Missing("stats");
 var loaded = await page.LoadDeferredPropsAsync(_client, "sidebar");     // all groups when none are named
 new AssertableInertia(loaded).Has("stats");
 
+new AssertableInertia(page).HasScroll("posts");
+var next = await page.LoadNextPageAsync(_client, "posts");
+var previous = await next.LoadPreviousPageAsync(_client, "posts");
+
 var only = await page.ReloadOnlyAsync(_client, "users");
 var except = await page.ReloadExceptAsync(_client, "users");
 ```
+
+`HasScroll(path)` asserts scroll metadata; `HasScroll(path, currentPage, nextPage)` also checks the page values. The page helpers use the metadata and send the appropriate append or prepend intent.
 
 `ReloadOnlyAsync` asserts that `"users"` is in the result; `ReloadExceptAsync` asserts that it is missing.
 

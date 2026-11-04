@@ -113,14 +113,14 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.6.1
-dotnet add package Inertia.Net.Mvc --version 1.6.1            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.6.1  # FastEndpoints only
-dotnet add package Inertia.Net.Testing --version 1.6.1        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.6.1   # live props over SignalR
+dotnet add package Inertia.Net --version 1.6.2
+dotnet add package Inertia.Net.Mvc --version 1.6.2            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.6.2  # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.6.2        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.6.2   # live props over SignalR
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.6.1 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.6.2 implements Inertia.js v3.
 
 ## Requirements
 
@@ -131,7 +131,7 @@ Use the same version for every Inertia.Net package. The package version and the 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.1
+dotnet new install Inertia.Net.Templates::1.6.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -644,6 +644,68 @@ export default defineConfig({
 ```
 
 Keep the SSR listener on loopback: the renderer trusts its output and has no authentication. The [SSR guide](/docs/server-side-rendering) covers the full setup.
+
+---
+
+# What's new in 1.6.1 and 1.6.2
+
+URL: https://inertia-dotnet.yebi.africa/docs/whats-new
+
+> A practical guide to error pages, safer redirects and pagination.
+
+These releases help you show useful error pages and split long lists into smaller pages. Use the same version of each Inertia.Net package in your app; see [Installation](/docs/installation).
+
+## 1.6.1: show an error page
+
+A visitor who opens a missing URL can see your app's `Error` page while the response still has status 404. In `Program.cs`, add the services and middleware:
+
+```csharp
+builder.Services.AddInertia();
+builder.Services.AddInertiaErrorPages();
+
+var app = builder.Build();
+app.UseInertiaErrorPages();
+app.UseInertia();
+```
+
+Create an `Error` component in your client pages directory. It receives a `status` prop. Error pages are off in Development by default, so you can see developer diagnostics there. See [Error pages](/docs/error-pages) for a component example and how to preview it.
+
+You can check the status and component in a test using `Inertia.Net.Testing`:
+
+```csharp
+using var response = await client.InertiaGetAsync("/missing");
+await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
+```
+
+## 1.6.1: return to the previous page
+
+After a form submission, `Back()` normally uses the browser's `Referer` header. Some browser policies omit it. Enable the following in `Program.cs` to remember the last successfully rendered page and use it as a fallback:
+
+```csharp
+builder.Services.AddInertia(o => o.State.RememberPreviousUrl = true);
+```
+
+The remembered address is shared across tabs in the same browser. See [Previous URL](/docs/redirects-and-history#previous-url) for the fallback order and cookie details.
+
+Inertia forms already retain their input after validation errors. If a full-page form needs to refill a field after a redirect, flash only the safe values you choose; never include passwords or tokens. The [flash data recipe](/docs/flash-data) shows how.
+
+## 1.6.2: send a list one page at a time
+
+For a list already in memory, a Minimal API can bind the requested page and return a numbered result:
+
+```csharp
+// posts is an IReadOnlyList<PostDto> in a stable order.
+app.MapGet("/posts", (PageRequest request) => Render("Posts/Index", new InertiaProps
+{
+    ["posts"] = Pagination.Paginate(posts, request),
+}));
+```
+
+Open `/posts?page=2&perPage=5` to request the second group of five. The result's `data` contains that group; `currentPage` and `lastPage` help build page links. The default size is 20, with a maximum of 100; [pagination options](/docs/configuration#opagination-paginationoptions) can change these limits and query names.
+
+To load more as the reader scrolls, wrap the page in `Scroll(...)` and use the client `InfiniteScroll` component. For data from a database or API, the delegate overload fetches each group on demand. It also supports **cursor pages**: a cursor is a marker used to fetch the next or previous group. Pages can be deferred or cached, and test helpers can load the next or previous scroll page. Follow [Pagination](/docs/pagination), [Infinite scroll](/docs/infinite-scroll), and [Testing](/docs/testing) for examples.
+
+Treat cursor strings as opaque. They are not tamper-proof; protect them with `IDataProtector` if your app requires tamper protection. An invalid nonempty cursor starts at the first page. When a logger is available, a Debug message records that fallback without the cursor value or exception details; see [Cursors](/docs/pagination#cursors).
 
 ---
 
@@ -1372,7 +1434,13 @@ const { flash } = usePage()
 The TypeScript generator can write a `Flash` type for you. Call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript).
 </Callout>
 
-Inertia forms keep their input on the client after `Back().WithErrors(...)`, so there is no `WithInput()` helper. For a full-page POST that needs old input, explicitly flash only sanitized fields: `Back().WithFlash("old", new InertiaProps { ["email"] = email })`, then read `usePage().flash.old`. Never flash passwords, tokens or other secrets.
+Inertia forms keep their input on the client after `Back().WithErrors(...)`; they do not need a `WithInput()` helper. For a full-page form submission, choose only safe fields to flash before redirecting:
+
+```csharp
+return Back().WithFlash("old", new InertiaProps { ["email"] = email });
+```
+
+On the next page, read `usePage().flash.old` and use the email to refill the field. Never flash passwords, tokens or other secrets.
 
 ## Where state is kept
 
@@ -1467,13 +1535,13 @@ return Location("https://billing.example.com");    // leave the SPA
 
 ## Previous URL
 
-Enable `o.State.RememberPreviousUrl = true` when a `Referrer-Policy: no-referrer` policy or the browser strips `Referer`:
+If a form returns `Back()` but the browser does not send its previous address (`Referer`), enable this option. For example, it helps when your site uses `Referrer-Policy: no-referrer`:
 
 ```csharp
 builder.Services.AddInertia(o => o.State.RememberPreviousUrl = true);
 ```
 
-`Back()` and the middleware's empty-response redirect consult the same-host `Referer` first, then the remembered URL, then the fallback. `context.Inertia().PreviousUrl` reads the remembered URL, or returns `null` when disabled, absent or invalid; it is user-controlled input validated as a relative path.
+After a successful page visit, a later `Back()` can use that saved address. `Back()` and the middleware's empty-response redirect consult the same-host `Referer` first, then the remembered URL, then the fallback. `context.Inertia().PreviousUrl` reads the remembered URL, or returns `null` when disabled, absent or invalid; it is user-controlled input validated as a relative path.
 
 Only successful status-200 page GET renders are remembered, including initial HTML visits. Partial reloads, prefetches, Precognition, non-GET requests and error pages are excluded. The value is the relative `PathBase + Path + QueryString`, without scheme or host, in the plain `.Inertia.Previous` session cookie (`HttpOnly`, `SameSite=Lax`, `Path=/`, essential, with `Secure` following `o.State.CookieSecurePolicy`). The cookie is written only when the URL changes. Set `o.State.PreviousUrlCookieName` to change its name; it must differ from `o.State.CookieName`.
 
@@ -1553,7 +1621,7 @@ URL: https://inertia-dotnet.yebi.africa/docs/error-pages
 
 > Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.
 
-Render routing failures, authorization failures and unhandled exceptions as Inertia pages in production:
+When someone visits a missing page or the server encounters an error, you can show a page from your app instead of a blank response. Add this setup in `Program.cs` for production:
 
 ```csharp
 builder.Services.AddInertia();
@@ -1939,23 +2007,13 @@ URL: https://inertia-dotnet.yebi.africa/docs/infinite-scroll
 
 > Merge pages of items and report paging metadata to the InfiniteScroll client component.
 
-`Scroll(...)` merges the items inside a value (the *wrapper*, `"data"` by default) and reports paging metadata to the `<InfiniteScroll>` client component.
+Use infinite scroll when a reader should see more items as they reach the end of a list. `Scroll(...)` merges the items inside a value (the *wrapper*, `"data"` by default) and reports paging metadata to the `<InfiniteScroll>` client component.
 
 ```csharp
-public sealed record FeedPage(IReadOnlyList<PostDto> Data, int Page, bool HasMore) : IProvidesScrollMetadata
+app.MapGet("/feed", (PageRequest request) => Render("Feed", new InertiaProps
 {
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);   // pageName defaults to "page"
-}
-
-app.MapGet("/feed", async (int? page, AppDb db, CancellationToken ct) =>
-{
-    var p = page ?? 1;
-    var items = await db.Posts.OrderByDescending(x => x.Id).Skip((p - 1) * 20).Take(21).ToListAsync(ct);
-    return Render("Feed", new InertiaProps
-    {
-        ["posts"] = Scroll(new FeedPage(items.Take(20).ToList(), p, items.Count > 20)),
-    });
-});
+    ["posts"] = Scroll(Pagination.Paginate(AppState.Posts, request)),
+}));
 ```
 
 ```json
@@ -1967,6 +2025,8 @@ app.MapGet("/feed", async (int? page, AppDb db, CancellationToken ct) =>
   }
 }
 ```
+
+See [Pagination](/docs/pagination) for numbered and cursor pages, query binding and data-source delegates.
 
 ## The client
 
@@ -2005,6 +2065,108 @@ A deferred scroll prop reports `"posts.data"` just like a resolved one. This is 
 <Callout type="tip" title="Keep pages small">
 Infinite scroll is also a payload-size tool. Load 10 to 20 items per page instead of sending an unbounded list on the first request.
 </Callout>
+
+---
+
+# Pagination
+
+URL: https://inertia-dotnet.yebi.africa/docs/pagination
+
+> Create numbered and cursor pages for pagers and infinite scroll.
+
+A long list is easier to browse when the server sends a small group of items at a time. A numbered page lets readers choose a page; a cursor page uses a marker to fetch the next or previous group. Start with a list already in memory:
+
+```csharp
+builder.Services.AddInertia();
+var app = builder.Build();
+app.UseInertia();
+
+// posts is an IReadOnlyList<PostDto> in a stable order.
+app.MapGet("/posts", (PageRequest request) => Render("Posts/Index", new InertiaProps
+{
+    ["posts"] = Pagination.Paginate(posts, request),
+}));
+```
+
+Visiting `/posts?page=2&perPage=5` returns the second group in `posts.data`. The default page size is 20 and the maximum is 100; configure both in [Pagination options](/docs/configuration#opagination-paginationoptions). For infinite scroll, wrap that value in `Scroll(...)` and render it with `InfiniteScroll` as shown in [Infinite scroll](/docs/infinite-scroll).
+
+`Pagination` creates page values; `Scroll` adds infinite-scroll metadata and merging. Use a page directly for a classic pager.
+
+| You write | You get |
+|---|---|
+| `Pagination.Paginate(posts, request)` | A numbered `Page<T>` for a pager |
+| `Scroll(Pagination.Paginate(posts, request))` | Numbered infinite scroll |
+| `Scroll(await Pagination.PaginateAsync(request, key, fetch, ct: ct))` | Cursor-based infinite scroll using your data source |
+| `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` | A deferred page; other prop modifiers also work |
+
+Minimal API handlers can take `PageRequest` or `CursorRequest` directly, as in [Infinite scroll](/docs/infinite-scroll). MVC and FastEndpoints can call `PageRequest.From(Request.Query)` and `CursorRequest.From(HttpContext)`. Page numbers below 1 become 1; invalid page sizes use the default and sizes above the maximum are clamped. Set defaults and parameter names with `o.Pagination` in `AddInertia`. `From` and `BindAsync` retain the query parameter name for the returned page. An explicit paginator name overrides it.
+
+`Pagination.Paginate` slices an already materialized `IReadOnlyList<T>`. For a database, search SDK or HTTP API, `Pagination.PaginateAsync` accepts a `fetch(skip, take, ct)` delegate and an optional count delegate. It requests one extra item to determine `hasMore`; without a count, `total` and `lastPage` are null. Delegate offsets above `int.MaxValue` return an empty page without calling `fetch`; the optional count still runs. Supply a stable, fully unique ordering to your data source. For a classic pager, use `currentPage`, `lastPage`, and `pageName` to build links; pages do not contain URL links.
+
+```json
+{ "data": [ { "id": 21 } ], "currentPage": 2, "perPage": 20, "total": 95, "lastPage": 5, "from": 21, "to": 40, "hasMore": true, "pageName": "page" }
+```
+
+`from` and `to` are one-based and null on an empty page. The examples abbreviate the data array.
+
+For example, a data source can implement numbered pages without exposing `IQueryable`:
+
+```csharp
+var page = await Pagination.PaginateAsync(
+    request,
+    (skip, take, ct) => store.FetchPostsAsync(skip, take, ct),
+    ct => store.CountPostsAsync(ct),
+    ct: cancellationToken);
+```
+
+For a React pager, use Inertia links and preserve any other filters your app needs:
+
+```tsx
+import { Link } from '@inertiajs/react'
+
+{page.lastPage != null && Array.from({ length: page.lastPage }, (_, i) => i + 1).map((n) => (
+  <Link key={n} href={`?${page.pageName}=${n}`} aria-current={n === page.currentPage ? 'page' : undefined}>
+    {n}
+  </Link>
+))}
+```
+
+## Cursors
+
+A cursor is a marker for the position of an item, useful when readers move forward and backward rather than jump to page numbers. The cursor overload of `PaginateAsync` takes a key selector and a fetch delegate. The delegate receives a decoded cursor with `Direction` (`After` or `Before`) and `Value`, a take count, and a cancellation token. Return rows in the requested direction, including up to one extra; the helper trims and reverses `Before` results to display order. Choose a stable unique non-null key. `hasMore` indicates more rows in the requested direction.
+
+```json
+{ "data": [ { "id": 21 } ], "perPage": 20, "nextCursor": "eyJ...", "previousCursor": null, "hasMore": true, "cursorName": "cursor" }
+```
+
+Cursors are URL-safe base64 of a compact JSON array: direction (`"a"` or `"b"`) followed by the key values. Supported keys are `int`, `long`, `Guid`, `string`, `DateTime`, `DateTimeOffset`, `decimal`, `double`, and `bool`. Cursors are **not tamper-proof**; apps that need tamper protection should wrap them with `IDataProtector`.
+
+A malformed or foreign nonempty cursor falls back to the first page. When `CursorRequest.Logger` is set, the paginator logs this at Debug without cursor values or exception details. Minimal API binding uses configured pagination options and supplies a logger in the `Inertia.Net.Pagination` category when a logger factory is available. In MVC or FastEndpoints, `CursorRequest.From(HttpContext)` does the same; optional arguments override the configured defaults and parameter names. For a query-only request or a request created outside HTTP, supply an app logger explicitly:
+
+```csharp
+var request = CursorRequest.From(query) with { Logger = logger };
+```
+
+`Logger` is ignored by JSON serialization and does not affect request equality.
+
+## Defer or cache a page
+
+A page can use the same prop modifiers as other values. For example, `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` loads it after the first response; a lazy prop can also use `.Cache(...)`. See [Deferred props](/docs/deferred-props) and [Props](/docs/props) for loader and cache options.
+
+## With EF Core
+
+An `Inertia.Net.EntityFrameworkCore` package with queryable helpers is planned for a later phase. Until then, use the delegate overload with your own queries.
+
+## Native AOT
+
+Register each closed page type in your app's `JsonSerializerContext` along with the item types:
+
+```csharp
+[JsonSerializable(typeof(Page<PostDto>))]
+[JsonSerializable(typeof(CursorPage<PostDto>))]
+```
+
+See [Native AOT](/docs/native-aot).
 
 ---
 
@@ -2847,6 +3009,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 
 [JsonSerializable(typeof(UsersPage))]               // typed page props
+[JsonSerializable(typeof(Page<UserDto>))]           // closed pagination types you return
 [JsonSerializable(typeof(UserDto))]
 [JsonSerializable(typeof(List<UserDto>))]           // closed collection types you return
 [JsonSerializable(typeof(UserDto[]))]
@@ -3019,6 +3182,16 @@ Core configuration is passed to `AddInertia`; error page options use `AddInertia
 | `Pages.Directory` / `Pages.Extensions` | `null` / `.tsx .jsx .ts .js .vue .svelte` | Development check that a rendered component has a page file. |
 | `TypeScript.OutputPath`, `.Page<T>(component)`, `.SharedProps<T>()`, `.FlashData<T>()` | `null` | TypeScript declarations, written in Development. |
 | `Share(key, value)` / `Share(key, Func<HttpContext, object?>)` | none | Shared props. |
+
+## `o.Pagination`: `PaginationOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `DefaultPerPage` | `20` | Default page size. |
+| `MaxPerPage` | `100` | Maximum page size (below `int.MaxValue` to allow over-fetching); the default must be between 1 and this value. |
+| `PageName` | `"page"` | Numbered-page query parameter. |
+| `PerPageName` | `"perPage"` | Page-size query parameter. |
+| `CursorName` | `"cursor"` | Cursor query parameter. |
 
 ## `o.Vite`: `ViteOptions`
 
@@ -3233,6 +3406,13 @@ public class UsersTests(WebApplicationFactory<Program> factory) : IClassFixture<
 
 Add `public partial class Program;` to your app when it uses top-level statements.
 
+To check that an error page keeps its HTTP status, use `Status` with the response's page assertion:
+
+```csharp
+using var response = await _client.InertiaGetAsync("/missing");
+await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
+```
+
 ## Request helpers
 
 | Helper | Purpose |
@@ -3266,9 +3446,15 @@ new AssertableInertia(page).HasDeferred("sidebar", "stats").Missing("stats");
 var loaded = await page.LoadDeferredPropsAsync(_client, "sidebar");     // all groups when none are named
 new AssertableInertia(loaded).Has("stats");
 
+new AssertableInertia(page).HasScroll("posts");
+var next = await page.LoadNextPageAsync(_client, "posts");
+var previous = await next.LoadPreviousPageAsync(_client, "posts");
+
 var only = await page.ReloadOnlyAsync(_client, "users");
 var except = await page.ReloadExceptAsync(_client, "users");
 ```
+
+`HasScroll(path)` asserts scroll metadata; `HasScroll(path, currentPage, nextPage)` also checks the page values. The page helpers use the metadata and send the appropriate append or prepend intent.
 
 `ReloadOnlyAsync` asserts that `"users"` is in the result; `ReloadExceptAsync` asserts that it is missing.
 
@@ -3553,7 +3739,7 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.1
+dotnet new install Inertia.Net.Templates::1.6.2
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install

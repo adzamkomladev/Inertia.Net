@@ -21,6 +21,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddInertia(o =>
 {
     o.PreserveBigIntegers = true;
+    o.Pagination.DefaultPerPage = 1;
     o.Share("appName", "AotSmoke");
     o.Share("auth", ctx => new AuthInfo(ctx.Request.Headers["X-User"].ToString() is { Length: > 0 } user ? user : null));
     o.CspNonce = ctx => ctx.Request.Headers["X-Nonce"].ToString();
@@ -63,10 +64,9 @@ app.MapGet("/", () => Render("Home", new HomePage
     Feed = Merge(new[] { new Stat("item", 1) }),
 }).WithViewData("title", "Smoke & Mirrors"));
 
-app.MapGet("/dashboard", (HttpContext context) =>
+app.MapGet("/dashboard", (HttpContext context, PageRequest request) =>
 {
     context.Inertia().Share("requestShared", true);
-    var page = int.TryParse(context.Request.Query["page"], out var p) ? p : 1;
     return Render("Dashboard", new InertiaProps
     {
         ["title"] = "Dashboard",
@@ -76,7 +76,7 @@ app.MapGet("/dashboard", (HttpContext context) =>
         ["stats"] = Defer(ct => ValueTask.FromResult(new Stat("visits", 1234))).Parallel(),
         ["chart"] = Defer(() => new[] { 1, 2, 3 }, "charts"),
         ["countries"] = Once(() => new[] { "BE", "FR" }).Until(TimeSpan.FromHours(1)),
-        ["feed"] = Scroll(() => new FeedPage([new Stat($"post-{page}", page)], page, page < 3)),
+        ["feed"] = Scroll(() => Pagination.Paginate(SmokeData.Stats, request)),
         ["filters"] = Always(() => "all"),
         ["lazy"] = Optional(() => "loaded"),
         ["cached"] = Prop(() => new Stat("cached", 5)).Cache("smoke-cached", TimeSpan.FromMinutes(5)),
@@ -89,6 +89,21 @@ app.MapGet("/dashboard", (HttpContext context) =>
             return new Stat("today", 7);
         }).Parallel(),
     });
+});
+
+app.MapGet("/cursor", async (CursorRequest request, CancellationToken ct) =>
+{
+    var page = await Pagination.PaginateAsync<Stat, int>(request, stat => stat.Value, (cursor, take, _) =>
+    {
+        IEnumerable<Stat> rows = SmokeData.Stats;
+        if (cursor is { } position)
+        {
+            rows = rows.Where(stat => position.Direction == CursorDirection.After ? stat.Value > position.Value : stat.Value < position.Value);
+            if (position.Direction == CursorDirection.Before) rows = rows.Reverse();
+        }
+        return Task.FromResult<IReadOnlyList<Stat>>(rows.Take(take).ToArray());
+    }, ct: ct);
+    return Render("Cursor", new InertiaProps { ["feed"] = Scroll(page) });
 });
 
 app.MapGet("/users/create", () => Render("Users/Create"));
@@ -182,9 +197,9 @@ internal static class SmokeCounters
 
 internal sealed record AuthInfo([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? User);
 
-internal sealed record FeedPage(Stat[] Data, int Page, bool HasMore) : IProvidesScrollMetadata
+internal static class SmokeData
 {
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);
+    public static readonly Stat[] Stats = [new("post-1", 1), new("post-2", 2), new("post-3", 3)];
 }
 
 // Must be public: the AddValidation() source generator skips internal types (and validation then silently does nothing).
@@ -203,7 +218,8 @@ public sealed class UserInput
 [JsonSerializable(typeof(Stat))]
 [JsonSerializable(typeof(Stat[]))]
 [JsonSerializable(typeof(AuthInfo))]
-[JsonSerializable(typeof(FeedPage))]
+[JsonSerializable(typeof(Page<Stat>))]
+[JsonSerializable(typeof(CursorPage<Stat>))]
 [JsonSerializable(typeof(UserInput))]
 [JsonSerializable(typeof(ContactRequest))]
 [JsonSerializable(typeof(SerializationPage))]

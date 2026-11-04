@@ -5,23 +5,13 @@ section: Loading data
 order: 5
 ---
 
-`Scroll(...)` merges the items inside a value (the *wrapper*, `"data"` by default) and reports paging metadata to the `<InfiniteScroll>` client component.
+Use infinite scroll when a reader should see more items as they reach the end of a list. `Scroll(...)` merges the items inside a value (the *wrapper*, `"data"` by default) and reports paging metadata to the `<InfiniteScroll>` client component.
 
 ```csharp
-public sealed record FeedPage(IReadOnlyList<PostDto> Data, int Page, bool HasMore) : IProvidesScrollMetadata
+app.MapGet("/feed", (PageRequest request) => Render("Feed", new InertiaProps
 {
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);   // pageName defaults to "page"
-}
-
-app.MapGet("/feed", async (int? page, AppDb db, CancellationToken ct) =>
-{
-    var p = page ?? 1;
-    var items = await db.Posts.OrderByDescending(x => x.Id).Skip((p - 1) * 20).Take(21).ToListAsync(ct);
-    return Render("Feed", new InertiaProps
-    {
-        ["posts"] = Scroll(new FeedPage(items.Take(20).ToList(), p, items.Count > 20)),
-    });
-});
+    ["posts"] = Scroll(Pagination.Paginate(AppState.Posts, request)),
+}));
 ```
 
 ```json
@@ -33,6 +23,8 @@ app.MapGet("/feed", async (int? page, AppDb db, CancellationToken ct) =>
   }
 }
 ```
+
+See [Pagination](/docs/pagination) for numbered and cursor pages, query binding and data-source delegates.
 
 ## The client
 

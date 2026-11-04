@@ -38,7 +38,13 @@ const { flash } = usePage()
 The TypeScript generator can write a `Flash` type for you. Call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript).
 </Callout>
 
-Inertia forms keep their input on the client after `Back().WithErrors(...)`, so there is no `WithInput()` helper. For a full-page POST that needs old input, explicitly flash only sanitized fields: `Back().WithFlash("old", new InertiaProps { ["email"] = email })`, then read `usePage().flash.old`. Never flash passwords, tokens or other secrets.
+Inertia forms keep their input on the client after `Back().WithErrors(...)`; they do not need a `WithInput()` helper. For a full-page form submission, choose only safe fields to flash before redirecting:
+
+```csharp
+return Back().WithFlash("old", new InertiaProps { ["email"] = email });
+```
+
+On the next page, read `usePage().flash.old` and use the email to refill the field. Never flash passwords, tokens or other secrets.
 
 ## Where state is kept
 

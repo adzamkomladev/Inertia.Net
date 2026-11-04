@@ -2,7 +2,13 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.6.1** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.6.2** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+
+## What's new
+
+Version 1.6.1 added [production error pages](#error-pages), a [remembered previous URL](#previous-url) for `Back()` when the browser omits `Referer`, and HTTP status assertions for tests. Inertia forms keep their input after validation; the [flash recipe](#flash-data) shows how to return selected safe fields for a full-page form.
+
+Version 1.6.2 adds [pagination](#pagination): return numbered pages for a pager, or use cursor pages and [infinite scroll](#infinite-scroll) to load more as the reader scrolls. The [step-by-step release guide](docs/Inertia.Net.Docs/content/docs/whats-new.mdx) explains both releases.
 
 ## Contents
 
@@ -23,24 +29,25 @@ Inertia.Net **1.6.1** is a .NET 10 server adapter for the **Inertia.js v3** prot
 10. [Merging props](#merging-props)
 11. [Once props](#once-props)
 12. [Infinite scroll](#infinite-scroll)
-13. [Live props](#live-props)
-14. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
-15. [Flash data](#flash-data)
-16. [Redirects, Location and Back](#redirects-location-and-back), [Error pages](#error-pages)
-17. [History encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
-18. [Asset versioning](#asset-versioning)
-19. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
-20. [Vite integration](#vite-integration)
-21. [CSRF and antiforgery](#csrf-and-antiforgery)
-22. [Deploying behind a proxy](#deploying-behind-a-proxy)
-23. [Native AOT](#native-aot)
-24. [TypeScript types](#typescript-types), [DevTools](#devtools) and [development checks](#development-checks)
-25. [Testing](#testing)
-26. [Performance](#performance)
-27. [Configuration reference](#configuration-reference)
-28. [Migrating from other .NET adapters](#migrating-from-other-net-adapters)
-29. [Troubleshooting and FAQ](#troubleshooting-and-faq)
-30. [Contributing and license](#contributing-and-license)
+13. [Pagination](#pagination)
+14. [Live props](#live-props)
+15. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
+16. [Flash data](#flash-data)
+17. [Redirects, Location and Back](#redirects-location-and-back), [Error pages](#error-pages)
+18. [History encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
+19. [Asset versioning](#asset-versioning)
+20. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
+21. [Vite integration](#vite-integration)
+22. [CSRF and antiforgery](#csrf-and-antiforgery)
+23. [Deploying behind a proxy](#deploying-behind-a-proxy)
+24. [Native AOT](#native-aot)
+25. [TypeScript types](#typescript-types), [DevTools](#devtools) and [development checks](#development-checks)
+26. [Testing](#testing)
+27. [Performance](#performance)
+28. [Configuration reference](#configuration-reference)
+29. [Migrating from other .NET adapters](#migrating-from-other-net-adapters)
+30. [Troubleshooting and FAQ](#troubleshooting-and-faq)
+31. [Contributing and license](#contributing-and-license)
 
 ---
 
@@ -79,7 +86,7 @@ You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clie
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.1
+dotnet new install Inertia.Net.Templates::1.6.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -151,7 +158,7 @@ The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself 
 - [x] Deferred props with groups (`deferredProps`)
 - [x] Merge props: append, prepend, deep merge, `matchPropsOn`, reset (`mergeProps`, `prependProps`, `deepMergeProps`)
 - [x] Once props with keys, expiry and `fresh` (`onceProps`, `X-Inertia-Except-Once-Props`)
-- [x] Infinite scroll (`scrollProps`, merge intent header)
+- [x] Infinite scroll (`scrollProps`, merge intent header; `Page<T>` and `CursorPage<T>` from `Pagination`)
 - [x] Rescued props (`rescuedProps`)
 - [x] Live props (`liveProps`, `X-Socket-Id`, broadcast envelope, `IInertiaLive`), delivered over SignalR by `Inertia.Net.Live.SignalR`
   or by your own broadcaster: see [Live props](#live-props)
@@ -180,14 +187,14 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.6.1
-dotnet add package Inertia.Net.Mvc --version 1.6.1 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.6.1 # FastEndpoints only
-dotnet add package Inertia.Net.Testing --version 1.6.1 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.6.1 # live props over SignalR
+dotnet add package Inertia.Net --version 1.6.2
+dotnet add package Inertia.Net.Mvc --version 1.6.2 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.6.2 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.6.2 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.6.2 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.6.1` for all Inertia.Net packages. Inertia.Net 1.6.1 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.6.2` for all Inertia.Net packages. Inertia.Net 1.6.2 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -673,7 +680,7 @@ Every page has an `errors` prop (an empty object when there are no errors). Key 
 | `Merge(value)` | The client appends the new value to its current one. Chain `.Prepend()`, `.Append(path, matchOn)`, `.MatchOn(...)`. |
 | `DeepMerge(value)` | The client deep merges the value. |
 | `Once(() => ...)` | Resolved once and remembered by the client. Chain `.Until(ttl)`, `.As(key)`, `.Fresh()`. |
-| `Scroll(page, wrapper: "data", metadata)` | An infinite-scroll prop: merged at `{path}.{wrapper}` plus paging metadata. |
+| `Scroll(page, wrapper: "data", metadata)` | An infinite-scroll prop: merged at `{path}.{wrapper}` plus paging metadata. `Page<T>` and `CursorPage<T>` supply metadata and use `data` as their wrapper. |
 | `Live(() => ..., LiveEvent)` | Reloaded (or updated in place) when the event is broadcast. Chain `.Live(...)` on any non-merge prop, `.Throttle(window)`. See [Live props](#live-props). |
 
 Every lazy factory (`Prop`, `Always`, `Optional`, `Defer`, `Merge`, `DeepMerge`, `Once`, `Scroll`, `Live`) accepts five loader shapes:
@@ -1051,20 +1058,10 @@ Once props are expensive values that rarely change. The client remembers them ac
 `Scroll(...)` merges the items inside the value (the *wrapper*, `"data"` by default) and reports paging metadata to the `<InfiniteScroll>` client component.
 
 ```csharp
-public sealed record FeedPage(IReadOnlyList<PostDto> Data, int Page, bool HasMore) : IProvidesScrollMetadata
+app.MapGet("/feed", (PageRequest request) => Render("Feed", new InertiaProps
 {
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);   // pageName defaults to "page"
-}
-
-app.MapGet("/feed", async (int? page, AppDb db, CancellationToken ct) =>
-{
-    var p = page ?? 1;
-    var items = await db.Posts.OrderByDescending(x => x.Id).Skip((p - 1) * 20).Take(21).ToListAsync(ct);
-    return Render("Feed", new InertiaProps
-    {
-        ["posts"] = Scroll(new FeedPage(items.Take(20).ToList(), p, items.Count > 20)),
-    });
-});
+    ["posts"] = Scroll(Pagination.Paginate(AppState.Posts, request)),
+}));
 ```
 
 - `ScrollMetadata(PageName, PreviousPage, NextPage, CurrentPage)` is a record. Page values can be `int`, `long`, `string` or `null` (cursor paging uses strings).
@@ -1078,6 +1075,77 @@ import { InfiniteScroll } from '@inertiajs/react'
 
 <InfiniteScroll data="posts">{posts.data.map((p) => <Post key={p.id} post={p} />)}</InfiniteScroll>
 ```
+
+---
+
+## Pagination
+
+`Pagination` creates page values; `Scroll` adds infinite-scroll metadata and merging. Use a page directly for a classic pager.
+
+| You write | You get |
+|---|---|
+| `Pagination.Paginate(posts, request)` | A numbered `Page<T>` for a pager |
+| `Scroll(Pagination.Paginate(posts, request))` | Numbered infinite scroll |
+| `Scroll(await Pagination.PaginateAsync(request, key, fetch, ct: ct))` | Cursor-based infinite scroll using your data source |
+| `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` | A deferred page; other prop modifiers also work |
+
+Minimal API handlers can take `PageRequest` or `CursorRequest` directly, as in the example above. MVC and FastEndpoints can call `PageRequest.From(Request.Query)` and `CursorRequest.From(HttpContext)`. Page numbers below 1 become 1; invalid page sizes use the default and sizes above the maximum are clamped. Set defaults and parameter names with `o.Pagination` in `AddInertia`. `From` and `BindAsync` retain the query parameter name for the returned page. An explicit paginator name overrides it.
+
+`Pagination.Paginate` slices an already materialized `IReadOnlyList<T>`. For a database, search SDK or HTTP API, `Pagination.PaginateAsync` accepts a `fetch(skip, take, ct)` delegate and an optional count delegate. It requests one extra item to determine `hasMore`; without a count, `total` and `lastPage` are null. Delegate offsets above `int.MaxValue` return an empty page without calling `fetch`; the optional count still runs. Supply a stable, fully unique ordering to your data source. For a classic pager, use `currentPage`, `lastPage`, and `pageName` to build links; pages do not contain URL links.
+
+```json
+{ "data": [ { "id": 21 } ], "currentPage": 2, "perPage": 20, "total": 95, "lastPage": 5, "from": 21, "to": 40, "hasMore": true, "pageName": "page" }
+```
+
+`from` and `to` are one-based and null on an empty page. The examples abbreviate the data array.
+
+For example, a data source can implement numbered pages without exposing `IQueryable`:
+
+```csharp
+var page = await Pagination.PaginateAsync(
+    request,
+    (skip, take, ct) => store.FetchPostsAsync(skip, take, ct),
+    ct => store.CountPostsAsync(ct),
+    ct: cancellationToken);
+```
+
+For a React pager, use Inertia links and preserve any other filters your app needs:
+
+```tsx
+import { Link } from '@inertiajs/react'
+
+{page.lastPage != null && Array.from({ length: page.lastPage }, (_, i) => i + 1).map((n) => (
+  <Link key={n} href={`?${page.pageName}=${n}`} aria-current={n === page.currentPage ? 'page' : undefined}>
+    {n}
+  </Link>
+))}
+```
+
+### Cursors
+
+The cursor overload of `PaginateAsync` takes a key selector and a fetch delegate. The delegate receives a decoded cursor with `Direction` (`After` or `Before`) and `Value`, a take count, and a cancellation token. Return rows in the requested direction, including up to one extra; the helper trims and reverses `Before` results to display order. Choose a stable unique non-null key. `hasMore` indicates more rows in the requested direction.
+
+```json
+{ "data": [ { "id": 21 } ], "perPage": 20, "nextCursor": "eyJ...", "previousCursor": null, "hasMore": true, "cursorName": "cursor" }
+```
+
+Cursors are URL-safe base64 of a compact JSON array: direction (`"a"` or `"b"`) followed by the key values. Supported keys are `int`, `long`, `Guid`, `string`, `DateTime`, `DateTimeOffset`, `decimal`, `double`, and `bool`. Cursors are **not tamper-proof**; apps that need tamper protection should wrap them with `IDataProtector`.
+
+A malformed or foreign nonempty cursor falls back to the first page. When `CursorRequest.Logger` is set, the paginator logs this at Debug without cursor values or exception details. Minimal API binding uses configured pagination options and supplies a logger in the `Inertia.Net.Pagination` category when a logger factory is available. In MVC or FastEndpoints, `CursorRequest.From(HttpContext)` does the same; optional arguments override the configured defaults and parameter names. For a query-only request or a request created outside HTTP, supply an app logger explicitly:
+
+```csharp
+var request = CursorRequest.From(query) with { Logger = logger };
+```
+
+`Logger` is ignored by JSON serialization and does not affect request equality.
+
+### With EF Core
+
+An `Inertia.Net.EntityFrameworkCore` package with queryable helpers is planned for a later phase. Until then, use the delegate overload with your own queries.
+
+### Native AOT
+
+Register each closed page type, such as `[JsonSerializable(typeof(Page<PostDto>))]` and `[JsonSerializable(typeof(CursorPage<PostDto>))]`, in your app's `JsonSerializerContext` along with the item types. See [Native AOT](#native-aot).
 
 ---
 
@@ -1959,6 +2027,7 @@ app.UseStaticFiles(new StaticFileOptions
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 
 [JsonSerializable(typeof(UsersPage))]               // typed page props
+[JsonSerializable(typeof(Page<UserDto>))]           // closed pagination types you return
 [JsonSerializable(typeof(UserDto))]
 [JsonSerializable(typeof(List<UserDto>))]           // closed collection types you return
 [JsonSerializable(typeof(UserDto[]))]
@@ -2152,9 +2221,15 @@ new AssertableInertia(page).HasDeferred("sidebar", "stats").Missing("stats");
 var loaded = await page.LoadDeferredPropsAsync(_client, "sidebar");     // all deferred groups when none are named
 new AssertableInertia(loaded).Has("stats");
 
+new AssertableInertia(page).HasScroll("posts");
+var next = await page.LoadNextPageAsync(_client, "posts");
+var previous = await next.LoadPreviousPageAsync(_client, "posts");
+
 var only = await page.ReloadOnlyAsync(_client, "users");                // also asserts that "users" is in the result
 var except = await page.ReloadExceptAsync(_client, "users");            // also asserts that "users" is missing
 ```
+
+`HasScroll(path)` asserts scroll metadata; `HasScroll(path, currentPage, nextPage)` also checks the page values. The page helpers use the metadata and send the appropriate append or prepend intent.
 
 Other `InertiaPage` members: `Props`, `Raw`, `Prop(path)`, `HasProp(path)`, `PropBigInteger(path)`, `DeferredProps`, `MergeProps`, `PrependProps`, `DeepMergeProps`, `MatchPropsOn`, `RescuedProps`, `SharedProps`, `ScrollProps`, `OnceProps`, `LiveProps`, `Flash`, `EncryptHistory`, `ClearHistory`, `PreserveFragment`, `PreserveBigIntegers`.
 
@@ -2243,6 +2318,16 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `Pages.Directory` / `Pages.Extensions` | `null` / `.tsx .jsx .ts .js .vue .svelte` | Development check that a rendered component has a page file. |
 | `TypeScript.OutputPath`, `.Page<T>(component)`, `.SharedProps<T>()`, `.FlashData<T>()` | `null` | TypeScript declarations, written in Development. |
 | `Share(key, value)` / `Share(key, Func<HttpContext, object?>)` | none | Shared props. |
+
+### `o.Pagination`: `PaginationOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `DefaultPerPage` | `20` | Default page size. |
+| `MaxPerPage` | `100` | Maximum page size, below `int.MaxValue` to allow over-fetching; the default must be between 1 and this value. |
+| `PageName` | `"page"` | Numbered-page query parameter. |
+| `PerPageName` | `"perPage"` | Page-size query parameter. |
+| `CursorName` | `"cursor"` | Cursor query parameter. |
 
 ### `o.Vite`: `ViteOptions`
 

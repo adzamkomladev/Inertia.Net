@@ -146,6 +146,31 @@
       ]
     },
     {
+      "slug": "whats-new",
+      "url": "/docs/whats-new",
+      "title": "What's new in 1.6.1 and 1.6.2",
+      "description": "A practical guide to error pages, safer redirects and pagination.",
+      "section": "Get started",
+      "order": 4,
+      "headings": [
+        {
+          "id": "161-show-an-error-page",
+          "text": "1.6.1: show an error page",
+          "depth": 2
+        },
+        {
+          "id": "161-return-to-the-previous-page",
+          "text": "1.6.1: return to the previous page",
+          "depth": 2
+        },
+        {
+          "id": "162-send-a-list-one-page-at-a-time",
+          "text": "1.6.2: send a list one page at a time",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "ai-agents",
       "url": "/docs/ai-agents",
       "title": "AI agents",
@@ -626,12 +651,42 @@
       ]
     },
     {
+      "slug": "pagination",
+      "url": "/docs/pagination",
+      "title": "Pagination",
+      "description": "Create numbered and cursor pages for pagers and infinite scroll.",
+      "section": "Loading data",
+      "order": 6,
+      "headings": [
+        {
+          "id": "cursors",
+          "text": "Cursors",
+          "depth": 2
+        },
+        {
+          "id": "defer-or-cache-a-page",
+          "text": "Defer or cache a page",
+          "depth": 2
+        },
+        {
+          "id": "with-ef-core",
+          "text": "With EF Core",
+          "depth": 2
+        },
+        {
+          "id": "native-aot",
+          "text": "Native AOT",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "live-props",
       "url": "/docs/live-props",
       "title": "Live props",
       "description": "Props that refresh themselves when the server broadcasts an event.",
       "section": "Loading data",
-      "order": 6,
+      "order": 7,
       "headings": [
         {
           "id": "define-each-event-once",
@@ -971,6 +1026,11 @@
         {
           "id": "addinertiao---inertiaoptions",
           "text": "AddInertia(o => ...): InertiaOptions",
+          "depth": 2
+        },
+        {
+          "id": "opagination-paginationoptions",
+          "text": "o.Pagination: PaginationOptions",
           "depth": 2
         },
         {

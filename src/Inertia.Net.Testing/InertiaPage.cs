@@ -1,4 +1,6 @@
 using System.Numerics;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.WebUtilities;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -132,6 +134,37 @@ public sealed partial class InertiaPage
     {
         var page = await ReloadAsync(client, "X-Inertia-Partial-Data", only);
         new AssertableInertia(page).HasAll(only);
+        return page;
+    }
+
+    /// <summary>Loads the next page of the scroll prop with a partial reload.</summary>
+    public Task<InertiaPage> LoadNextPageAsync(HttpClient client, string path) => LoadScrollPageAsync(client, path, previous: false);
+
+    /// <summary>Loads the previous page of the scroll prop with a partial reload and prepend intent.</summary>
+    public Task<InertiaPage> LoadPreviousPageAsync(HttpClient client, string path) => LoadScrollPageAsync(client, path, previous: true);
+
+    private async Task<InertiaPage> LoadScrollPageAsync(HttpClient client, string path, bool previous)
+    {
+        var direction = previous ? "previous" : "next";
+        if (ScrollProps[path] is not JsonObject metadata || metadata[$"{direction}Page"] is not JsonValue value)
+            throw new InertiaAssertionException($"Scroll prop [{path}] has no {direction} page.");
+        if (metadata["pageName"] is not JsonValue name || !name.TryGetValue<string>(out var pageName) || string.IsNullOrEmpty(pageName))
+            throw new InertiaAssertionException($"Scroll prop [{path}] has no page parameter name.");
+        var pageValue = value.TryGetValue<string>(out var cursor) ? cursor
+            : value.GetValueKind() == JsonValueKind.Number ? value.ToJsonString()
+            : throw new InertiaAssertionException($"Scroll prop [{path}] has an invalid {direction} page value.");
+        var queryIndex = Url.IndexOf('?', StringComparison.Ordinal);
+        var query = QueryHelpers.ParseQuery(queryIndex < 0 ? "" : Url[queryIndex..]);
+        query[pageName] = pageValue;
+        var url = (queryIndex < 0 ? Url : Url[..queryIndex]) + QueryString.Create(query);
+        using var response = await client.InertiaGetAsync(url, Version, request =>
+        {
+            request.Headers.TryAddWithoutValidation("X-Inertia-Partial-Component", Component);
+            request.Headers.TryAddWithoutValidation("X-Inertia-Partial-Data", path);
+            if (previous) request.Headers.TryAddWithoutValidation("X-Inertia-Infinite-Scroll-Merge-Intent", "prepend");
+        });
+        var page = await ParseAsync(response);
+        new AssertableInertia(page).Has(path);
         return page;
     }
 

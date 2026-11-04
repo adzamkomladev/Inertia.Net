@@ -35,17 +35,13 @@ public sealed class CreateContactPageEndpoint : EndpointWithoutRequest<InertiaRe
     public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) => Task.FromResult(Render("Contacts/Create"));
 }
 
-public sealed class FeedEndpoint : Endpoint<FeedRequest>
+public sealed class FeedEndpoint : EndpointWithoutRequest
 {
     public override void Configure() => Get("/feed");
 
-    public override Task HandleAsync(FeedRequest req, CancellationToken ct)
+    public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Feed/Index", new InertiaProps
     {
-        var page = Math.Clamp(req.Page, 1, AppState.FeedPages);
-        var posts = Enumerable.Range((page - 1) * AppState.PageSize + 1, AppState.PageSize).Select(i => new Post(i, $"Post {i}")).ToList();
-        return Send.InertiaAsync("Feed/Index", new InertiaProps
-        {
-            ["posts"] = Scroll(new PostPage(posts), metadata: ScrollMetadata.FromPage(page, page < AppState.FeedPages)),
-        });
-    }
+        ["posts"] = Scroll(Pagination.Paginate(AppState.Posts,
+            PageRequest.From(HttpContext.Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize))),
+    });
 }

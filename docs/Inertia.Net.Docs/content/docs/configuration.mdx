@@ -26,6 +26,16 @@ Core configuration is passed to `AddInertia`; error page options use `AddInertia
 | `TypeScript.OutputPath`, `.Page<T>(component)`, `.SharedProps<T>()`, `.FlashData<T>()` | `null` | TypeScript declarations, written in Development. |
 | `Share(key, value)` / `Share(key, Func<HttpContext, object?>)` | none | Shared props. |
 
+## `o.Pagination`: `PaginationOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `DefaultPerPage` | `20` | Default page size. |
+| `MaxPerPage` | `100` | Maximum page size (below `int.MaxValue` to allow over-fetching); the default must be between 1 and this value. |
+| `PageName` | `"page"` | Numbered-page query parameter. |
+| `PerPageName` | `"perPage"` | Page-size query parameter. |
+| `CursorName` | `"cursor"` | Cursor query parameter. |
+
 ## `o.Vite`: `ViteOptions`
 
 | Option | Default | Description |

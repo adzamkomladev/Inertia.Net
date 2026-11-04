@@ -16,6 +16,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 
 [JsonSerializable(typeof(UsersPage))]               // typed page props
+[JsonSerializable(typeof(Page<UserDto>))]           // closed pagination types you return
 [JsonSerializable(typeof(UserDto))]
 [JsonSerializable(typeof(List<UserDto>))]           // closed collection types you return
 [JsonSerializable(typeof(UserDto[]))]

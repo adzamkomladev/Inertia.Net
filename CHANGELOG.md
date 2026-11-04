@@ -7,6 +7,13 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-04
+
+### Added
+
+- Numbered and cursor pagination values, request binding, in-memory and delegate paginators, `Scroll` metadata integration, and safe Debug logging for malformed cursors.
+- Pagination testing assertions and helpers to load the next or previous scroll page.
+
 ## [1.6.1] - 2026-11-04
 
 ### Added

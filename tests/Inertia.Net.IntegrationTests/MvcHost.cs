@@ -37,6 +37,18 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     [HttpGet("/café")]
     public IResult Cafe() => Render("Page");
 
+    [HttpGet("/paged")]
+    public async Task<IResult> Paged(CancellationToken ct) => Render("Paged",
+        await PagedPage.OffsetAsync(PageRequest.From(Request.Query, defaultPerPage: 10), false, ct));
+
+    [HttpGet("/paged/scroll")]
+    public async Task<IResult> PagedScroll(CancellationToken ct) => Render("Paged",
+        await PagedPage.OffsetAsync(PageRequest.From(Request.Query, defaultPerPage: 10), true, ct));
+
+    [HttpGet("/paged/cursor")]
+    public async Task<IResult> PagedCursor(CancellationToken ct) => Render("Paged",
+        await PagedPage.CursorAsync(CursorRequest.From(Request.Query, defaultPerPage: 10), ct));
+
     [HttpGet("/live")]
     public IResult Live()
     {

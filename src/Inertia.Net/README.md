@@ -1,6 +1,6 @@
 # Inertia.Net
 
-Version 1.6 adds [live props](https://github.com/adzamkomladev/Inertia.Net#live-props): props that refresh themselves when the server broadcasts an event. Version 1.5 lets you remove, replace and tag cached props and SSR renders (`IInertiaCache`), serve them stale while they refresh (`staleFor`), and keep them in a cache store of your choice (`IInertiaCacheStore`). Upgrading from 1.3 or earlier? Read the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md): one default changed (redirects to another origin become a full visit). The [changelog](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md) lists every release. Start a new app with `dotnet new install Inertia.Net.Templates` and `dotnet new inertia`.
+Version 1.6.2 adds pagination helpers for numbered and cursor pages. Version 1.6 adds [live props](https://github.com/adzamkomladev/Inertia.Net#live-props): props that refresh themselves when the server broadcasts an event. Version 1.5 lets you remove, replace and tag cached props and SSR renders (`IInertiaCache`), serve them stale while they refresh (`staleFor`), and keep them in a cache store of your choice (`IInertiaCacheStore`). Upgrading from 1.3 or earlier? Read the [1.4 upgrade notes](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/migrating-to-1.4.md): one default changed (redirects to another origin become a full visit). The [changelog](https://github.com/adzamkomladev/Inertia.Net/blob/main/CHANGELOG.md) lists every release. Start a new app with `dotnet new install Inertia.Net.Templates` and `dotnet new inertia`.
 
 The core of Inertia.Net, a .NET 10 server adapter for the [Inertia.js](https://inertiajs.com) **v3** protocol. It works with Minimal APIs (this package), MVC (`Inertia.Net.Mvc`) and FastEndpoints (`Inertia.Net.FastEndpoints`), with the React, Vue and Svelte clients, and is Native AOT and trim compatible.
 
@@ -52,6 +52,14 @@ Documentation: <https://github.com/adzamkomladev/Inertia.Net#readme>
 - [Live props](https://github.com/adzamkomladev/Inertia.Net#live-props)
 - [Native AOT](https://github.com/adzamkomladev/Inertia.Net#native-aot)
 - [Configuration reference](https://github.com/adzamkomladev/Inertia.Net#configuration-reference)
+
+## Pagination
+
+`PageRequest` and `CursorRequest` bind pagination query parameters in Minimal API handlers. `Pagination.Paginate(posts, request)` pages an in-memory list; `Pagination.PaginateAsync` accepts delegates for other data sources, with an optional count for numbered pages.
+
+Pass the resulting `Page<T>` or `CursorPage<T>` to `Scroll(...)` for infinite scroll, or use `Page<T>` directly for a classic pager. Cursor values are opaque and not tamper-proof. Register closed page types in your JSON context for Native AOT. See [Pagination](https://github.com/adzamkomladev/Inertia.Net#pagination).
+
+Malformed or foreign nonempty cursors fall back to the first page and log at Debug when the request has a logger; cursor values and exception details are omitted. Minimal API binding and `CursorRequest.From(HttpContext)` use configured options and supply a logger when a logger factory is available. For query-only or non-HTTP requests, set `Logger` explicitly, for example `CursorRequest.From(query) with { Logger = logger }`. See [Pagination](https://github.com/adzamkomladev/Inertia.Net#cursors).
 
 ## Live props
 

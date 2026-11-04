@@ -47,13 +47,9 @@ public sealed class PagesController : Controller
     }
 
     [HttpGet("/feed")]
-    public IResult Feed(int page = 1)
+    public IResult Feed() => Render("Feed/Index", new InertiaProps
     {
-        page = Math.Clamp(page, 1, AppState.FeedPages);
-        var posts = Enumerable.Range((page - 1) * AppState.PageSize + 1, AppState.PageSize).Select(i => new Post(i, $"Post {i}")).ToList();
-        return Render("Feed/Index", new InertiaProps
-        {
-            ["posts"] = Scroll(new PostPage(posts), metadata: ScrollMetadata.FromPage(page, page < AppState.FeedPages)),
-        });
-    }
+        ["posts"] = Scroll(Pagination.Paginate(AppState.Posts,
+            PageRequest.From(Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize))),
+    });
 }

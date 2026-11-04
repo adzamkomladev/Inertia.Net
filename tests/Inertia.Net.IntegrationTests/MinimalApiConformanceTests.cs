@@ -9,7 +9,46 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.IntegrationTests;
 
-public sealed class MinimalApiConformanceTests : ProtocolConformanceTests<MinimalApiHost>;
+public sealed class MinimalApiConformanceTests : ProtocolConformanceTests<MinimalApiHost>
+{
+    [Theory]
+    [InlineData("/paged/scroll", "p")]
+    [InlineData("/paged/cursor", "c")]
+    public async Task Bound_custom_parameter_names_follow_the_next_scroll_page(string route, string parameter)
+    {
+        await using var app = await StartAsync(new ConformanceSetup
+        {
+            Inertia = options =>
+            {
+                options.Pagination.PageName = "p";
+                options.Pagination.CursorName = "c";
+                options.Pagination.PerPageName = "size";
+            },
+        });
+        var client = app.CreateClient();
+        var first = await (await client.InertiaGetAsync(route)).PageAsync();
+        var metadata = first["scrollProps"]!["posts"]!;
+        Assert.Equal(parameter, (string?)metadata["pageName"]);
+        var next = metadata["nextPage"]!.ToString();
+        var second = await (await client.InertiaGetAsync(route + "?" + parameter + "=" + Uri.EscapeDataString(next), request =>
+        {
+            request.WithHeader(InertiaHeaders.PartialComponent, "Paged");
+            request.WithHeader(InertiaHeaders.PartialData, "posts");
+        })).PageAsync();
+        Assert.Equal("[11,12,13,14,15,16,17,18,19,20]", second["props"]!["posts"]!["data"]!.ToJsonString());
+        Assert.Equal(parameter, (string?)second["scrollProps"]!["posts"]!["pageName"]);
+    }
+
+    [Fact]
+    public async Task Page_request_binding_clamps_untrusted_query_values()
+    {
+        await using var app = await StartAsync();
+        var page = await (await app.CreateClient().InertiaGetAsync("/paged?page=abc&perPage=9999")).PageAsync();
+        Assert.Equal(1, (int)page["props"]!["posts"]!["currentPage"]!);
+        Assert.Equal(100, (int)page["props"]!["posts"]!["perPage"]!);
+        Assert.Equal(25, page["props"]!["posts"]!["data"]!.AsArray().Count);
+    }
+}
 
 /// <summary>Minimal API validation glue: .NET 10 <c>AddValidation()</c>, returned validation problems, filter ordering.</summary>
 public sealed class MinimalApiValidationTests

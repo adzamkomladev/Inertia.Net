@@ -80,7 +80,11 @@ public sealed class ConformanceApp : IAsyncDisposable
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         builder.Services.AddSingleton<ConformanceCounters>();
         builder.Services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
-        builder.Services.AddInertia(o => setup.Inertia?.Invoke(o));
+        builder.Services.AddInertia(o =>
+        {
+            o.Pagination.DefaultPerPage = 10;
+            setup.Inertia?.Invoke(o);
+        });
         if (setup.UseSession)
         {
             builder.Services.AddDistributedMemoryCache();
@@ -209,4 +213,37 @@ public static class LivePage
         ["flaky"] = Prop<string>(() => throw new InvalidOperationException("down")).Rescue().Live(OrderUpdated),
         ["socket"] = socketId,
     };
+}
+
+/// <summary>Pagination fixtures shared by every conformance host.</summary>
+public static class PagedPage
+{
+    private static readonly int[] Items = Enumerable.Range(1, 25).ToArray();
+
+    public static async Task<InertiaProps> OffsetAsync(PageRequest request, bool scroll, CancellationToken ct)
+    {
+        var page = await Pagination.PaginateAsync(request,
+            (skip, take, _) => Task.FromResult<IReadOnlyList<int>>(Items.Skip(skip).Take(take).ToArray()),
+            _ => Task.FromResult(25L), ct: ct);
+        return new InertiaProps { ["posts"] = scroll ? Scroll(page) : page, ["other"] = "unchanged" };
+    }
+
+    public static async Task<InertiaProps> CursorAsync(CursorRequest request, CancellationToken ct)
+    {
+        var page = await Pagination.PaginateAsync<int, int>(request, i => i, (cursor, take, _) =>
+        {
+            IEnumerable<int> rows = Items;
+            if (cursor is { Direction: CursorDirection.After } after)
+            {
+                rows = rows.Where(i => i > after.Value);
+            }
+            else if (cursor is { Direction: CursorDirection.Before } before)
+            {
+                rows = rows.Where(i => i < before.Value).Reverse();
+            }
+
+            return Task.FromResult<IReadOnlyList<int>>(rows.Take(take).ToArray());
+        }, ct: ct);
+        return new InertiaProps { ["posts"] = Scroll(page), ["other"] = "unchanged" };
+    }
 }
