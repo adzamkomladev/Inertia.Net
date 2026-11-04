@@ -59,6 +59,7 @@ internal sealed class InertiaPageWriter
         ILogger<InertiaPageWriter> logger,
         VersionProvider versionProvider,
         InertiaMetrics metrics,
+        InertiaRefreshQueue refreshes,
         InertiaCaching caching,
         PageComponentCheck pages)
     {
@@ -66,6 +67,7 @@ internal sealed class InertiaPageWriter
         TimeProvider = timeProvider;
         Logger = logger;
         Metrics = metrics;
+        Refreshes = refreshes;
         Caching = caching;
         Pages = pages.Enabled ? pages : null;
         _versionProvider = versionProvider;
@@ -106,6 +108,8 @@ internal sealed class InertiaPageWriter
     public ILogger Logger { get; }
 
     public InertiaMetrics Metrics { get; }
+
+    public InertiaRefreshQueue Refreshes { get; }
 
     /// <summary>The store access for <see cref="InertiaProp.Cache(string, TimeSpan)"/> values.</summary>
     public InertiaCaching Caching { get; }
@@ -657,6 +661,23 @@ internal sealed class InertiaPageWriter
         public InertiaProp Source { get; } = source;
 
         public void Add(string[] segments, int start, object? value) => _assignments.Add((segments, start, value));
+
+        public InertiaProps ApplyCached(JsonElement value) => Apply(CopyCachedObject(value));
+
+        private static InertiaProps CopyCachedObject(JsonElement value)
+        {
+            var result = new InertiaProps();
+            if (value.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in value.EnumerateObject())
+                {
+                    result[property.Name] = property.Value.ValueKind == JsonValueKind.Object
+                        ? CopyCachedObject(property.Value) : property.Value.Clone();
+                }
+            }
+
+            return result;
+        }
 
         public InertiaProps Apply(object? value)
         {

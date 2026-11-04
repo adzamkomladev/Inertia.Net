@@ -176,6 +176,12 @@ public sealed class SsrOptions
     /// </summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// The deadline for establishing a connection to an SSR server. Default 5 seconds, independent of the total render deadline.
+    /// Must be positive, or <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable it.
+    /// </summary>
+    public TimeSpan ConnectTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
     /// <summary>Maximum SSR response body size in bytes, including error responses. Default 16 MiB. Must be positive.</summary>
     public long MaxResponseBytes { get; set; } = 16 * 1024 * 1024;
 

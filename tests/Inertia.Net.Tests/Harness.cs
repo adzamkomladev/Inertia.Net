@@ -79,6 +79,19 @@ internal sealed class Harness
         return ParsePage(body);
     }
 
+    public async Task CompleteRefreshAsync(CompletingResponseFeature completion)
+    {
+        var refreshes = Services.GetRequiredService<InertiaRefreshQueue>();
+        if (refreshes.ExecuteTask is null) await refreshes.StartAsync(TestContext.Current.CancellationToken);
+        await completion.CompleteAsync();
+        await WaitAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        async Task WaitAsync()
+        {
+            while (refreshes.PendingCount > 0) await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
+    }
+
     public static JsonObject ParsePage(string body) => JsonNode.Parse(body.StartsWith('{') ? body : ExtractPageJson(body))!.AsObject();
 
     public static string ExtractPageJson(string html)

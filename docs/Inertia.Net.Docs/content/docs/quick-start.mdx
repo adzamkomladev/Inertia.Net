@@ -182,19 +182,26 @@ Pass your own `resolve` and `setup` functions to `createInertiaApp`. The [client
 
 ## 4. Run it
 
-Start Vite and ASP.NET Core in two terminals, from the project directory:
+Install dependencies and start Vite from the project directory with your package manager:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Keep Vite running in terminal 1. Start ASP.NET Core in terminal 2:
 
 ```sh
-npm run dev      # terminal 1: Vite, writes wwwroot/hot
-dotnet watch     # terminal 2: ASP.NET Core, Development environment
+dotnet watch     # Development environment
 ```
 
 Open the URL printed by `dotnet watch` (not the Vite URL). The first visit to `/` should display “Hello from .NET”.
 
-For production, build the client and publish the app:
+For production, run the build command from your row, then publish the app:
 
 ```sh
-npm run build
 dotnet publish -c Release
 ```
 

@@ -93,6 +93,7 @@ builder.Services.AddInertia(o =>
 {
     o.Ssr.Mode = SsrMode.Preferred;                  // Disabled (default), Preferred or Required
     o.Ssr.Urls.Add("http://127.0.0.1:13714");       // default when empty; add more servers to spread renders
+    o.Ssr.ConnectTimeout = TimeSpan.FromSeconds(5);  // connection establishment
     o.Ssr.Timeout = TimeSpan.FromSeconds(5);         // total deadline per render
     o.Ssr.MaxPageBytes = 2 * 1024 * 1024;            // larger pages render on the client without a call
     o.Ssr.MaxResponseBytes = 16L * 1024 * 1024;      // success and error responses
@@ -248,4 +249,6 @@ The key is the SHA-256 of the page JSON (component, props, url, version and the 
 
 Concurrent misses for the same page share one fill per app instance. Waiting counts against `Ssr.Timeout`; cancelling a waiting request does not cancel the request filling the entry.
 
-With `StaleFor`, a render past its `Duration` is still served and rendered again after the response, like stale props. `IInertiaCache.ClearSsrAsync()` removes every render.
+With `StaleFor`, a render past its `Duration` is still served and refreshed by the bounded background worker after response completion, like stale props. The connection can accept its next request while the renderer runs. Refreshes cancel when the host stops. If the 64-entry queue is full, the refresh is dropped and logged; monitor `inertia.cache.refresh.dropped` with `inertia.cache.kind=ssr`. `IInertiaCache.ClearSsrAsync()` removes every render.
+
+`Ssr.ConnectTimeout` bounds connection establishment independently of `Ssr.Timeout`; both accept a positive duration or `Timeout.InfiniteTimeSpan`. In Required mode, `InertiaSsrException.Message` contains a generic failure category suitable for an error page. Renderer diagnostics remain in application logs and diagnostic exception properties; do not expose those properties to clients.

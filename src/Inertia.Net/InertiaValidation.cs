@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Validation;
 
@@ -65,6 +66,16 @@ internal static class InertiaValidationFilter
     public static EndpointFilterDelegate Create(EndpointFilterFactoryContext context, EndpointFilterDelegate next, bool precognition)
     {
         var validatable = FindValidatableParameters(context);
+        if (validatable is null)
+        {
+            if (context.ApplicationServices.GetService<IOptions<ValidationOptions>>()?.Value is not { Resolvers.Count: > 0 })
+            {
+                throw new InvalidOperationException("WithInertiaValidation() needs services.AddValidation(). Add it at startup, or remove the call.");
+            }
+
+            context.ApplicationServices.GetService<ILoggerFactory>()?.CreateLogger("Inertia.Net.InertiaValidation")
+                .LogDebug("No validatable parameters were found for endpoint {Endpoint}.", context.MethodInfo.Name);
+        }
         var naming = NamingPolicy(context.ApplicationServices);
         return async invocation =>
         {

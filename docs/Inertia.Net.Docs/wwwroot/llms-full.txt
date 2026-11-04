@@ -80,7 +80,7 @@ This site is an Inertia.Net app. The sidebar, search, docs pages and theme switc
 ## Requirements
 
 - .NET 10 SDK
-- Node.js and npm to build the frontend (at runtime only when SSR is enabled)
+- JavaScript frontend build tools with npm, Bun, pnpm or Yarn; managed SSR requires Node.js at runtime
 - An Inertia.js v3 client package for React, Vue or Svelte
 
 <Callout type="tip" title="Starting from scratch?">
@@ -127,7 +127,7 @@ Use the same version for every Inertia.Net package. The package version and the 
 ## Requirements
 
 - .NET 10 SDK and an `Microsoft.NET.Sdk.Web` project.
-- Node.js and npm for the frontend. Node is only needed at runtime when SSR is enabled.
+- JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js at runtime.
 - An Inertia.js v3 client: `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte`.
 
 ## Start from the template
@@ -136,10 +136,21 @@ Use the same version for every Inertia.Net package. The package version and the 
 dotnet new install Inertia.Net.Templates::1.6.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
-npm install
 ```
 
 Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+
+Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Keep Vite running and start ASP.NET Core in another terminal with `dotnet watch`. For production, run your row's build command,
+then `dotnet publish -c Release`. Keep the lockfile for the package manager you choose.
 
 ## Namespace and global usings
 
@@ -354,19 +365,26 @@ Pass your own `resolve` and `setup` functions to `createInertiaApp`. The [client
 
 ## 4. Run it
 
-Start Vite and ASP.NET Core in two terminals, from the project directory:
+Install dependencies and start Vite from the project directory with your package manager:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Keep Vite running in terminal 1. Start ASP.NET Core in terminal 2:
 
 ```sh
-npm run dev      # terminal 1: Vite, writes wwwroot/hot
-dotnet watch     # terminal 2: ASP.NET Core, Development environment
+dotnet watch     # Development environment
 ```
 
 Open the URL printed by `dotnet watch` (not the Vite URL). The first visit to `/` should display “Hello from .NET”.
 
-For production, build the client and publish the app:
+For production, run the build command from your row, then publish the app:
 
 ```sh
-npm run build
 dotnet publish -c Release
 ```
 
@@ -393,7 +411,18 @@ Inertia.Net speaks the Inertia.js v3 protocol. Install a v3 client package; v2 c
 
 ## Install the client
 
-Run the npm commands from the ASP.NET Core project directory (the one containing your `.csproj`).
+Run client setup commands from the ASP.NET Core project directory (the one containing your `.csproj`). npm, Bun, pnpm and
+Yarn are supported. The framework snippets use npm spelling; replace the command with the equivalent for your package manager:
+
+| Package manager | Add packages | Add development packages |
+|---|---|---|
+| npm | `npm install <packages>` | `npm install -D <packages>` |
+| Bun | `bun add <packages>` | `bun add -D <packages>` |
+| pnpm | `pnpm add <packages>` | `pnpm add -D <packages>` |
+| Yarn | `yarn add <packages>` | `yarn add -D <packages>` |
+
+Replace `<packages>` with the names and version ranges from your framework's snippet. If the project has no `package.json`,
+create one first with `npm init -y`, `bun init -y`, `pnpm init` or `yarn init`.
 
 <Tabs>
   <Tab label="React">
@@ -1152,7 +1181,8 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 
 **Stale-while-revalidate.** `staleFor` keeps serving a value after its duration. The first request that reads a stale value gets it at once, and the loader runs after the response has been sent. Past `duration + staleFor` the loader runs during the request again.
 
-- The refresh runs in the response's completion callbacks, before the request's services are disposed, so it can keep using the request's scoped services. It must not touch `HttpContext`.
+- Response completion enqueues refreshes on a bounded background worker; it does not wait for the loader. Loaders using `staleFor` must use singleton dependencies or create an independent scope inside the loader with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`. Do not capture request-scoped services or `HttpContext`.
+- The worker accepts 64 pending refreshes and cancels on host shutdown. A full queue drops the refresh and logs a warning, leaving the stale value at its existing expiration. Monitor `inertia.cache.refresh.dropped`, tagged with `inertia.cache.kind=prop|ssr`.
 - One refresh runs per key and app instance at a time. A refresh that finds the value fresh again skips its loader.
 - A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
 
@@ -1301,7 +1331,7 @@ router.post('/users', data, { errorBag: 'createUser' })
 
 ## Minimal API
 
-`WithInertiaValidation()` for a route or a route group. It requires `services.AddValidation()` for attribute validation.
+`WithInertiaValidation()` applies to a route or route group and requires `services.AddValidation()`. Without validation resolvers, it throws `InvalidOperationException` when the endpoint is constructed. Routing may construct endpoints lazily, so this need not happen during application startup.
 
 ```csharp
 builder.Services.AddValidation();
@@ -1383,7 +1413,7 @@ app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users"))
 // FastEndpoints: c.UseInertia() already answers Precognition requests.
 ```
 
-`WithInertiaPrecognition()` is a superset of `WithInertiaValidation()`: normal Inertia validation redirects keep working. Any endpoint filter you add after it does not run for a precognitive request. In MVC, Precognition is not available.
+`WithInertiaPrecognition()` is a superset of `WithInertiaValidation()` and also requires `services.AddValidation()`: normal Inertia validation redirects keep working. Any endpoint filter you add after it does not run for a precognitive request. In MVC, Precognition is not available.
 
 Client (Inertia v3 has it built in):
 
@@ -2580,6 +2610,7 @@ builder.Services.AddInertia(o =>
 {
     o.Ssr.Mode = SsrMode.Preferred;                  // Disabled (default), Preferred or Required
     o.Ssr.Urls.Add("http://127.0.0.1:13714");       // default when empty; add more servers to spread renders
+    o.Ssr.ConnectTimeout = TimeSpan.FromSeconds(5);  // connection establishment
     o.Ssr.Timeout = TimeSpan.FromSeconds(5);         // total deadline per render
     o.Ssr.MaxPageBytes = 2 * 1024 * 1024;            // larger pages render on the client without a call
     o.Ssr.MaxResponseBytes = 16L * 1024 * 1024;      // success and error responses
@@ -2735,7 +2766,9 @@ The key is the SHA-256 of the page JSON (component, props, url, version and the 
 
 Concurrent misses for the same page share one fill per app instance. Waiting counts against `Ssr.Timeout`; cancelling a waiting request does not cancel the request filling the entry.
 
-With `StaleFor`, a render past its `Duration` is still served and rendered again after the response, like stale props. `IInertiaCache.ClearSsrAsync()` removes every render.
+With `StaleFor`, a render past its `Duration` is still served and refreshed by the bounded background worker after response completion, like stale props. The connection can accept its next request while the renderer runs. Refreshes cancel when the host stops. If the 64-entry queue is full, the refresh is dropped and logged; monitor `inertia.cache.refresh.dropped` with `inertia.cache.kind=ssr`. `IInertiaCache.ClearSsrAsync()` removes every render.
+
+`Ssr.ConnectTimeout` bounds connection establishment independently of `Ssr.Timeout`; both accept a positive duration or `Timeout.InfiniteTimeSpan`. In Required mode, `InertiaSsrException.Message` contains a generic failure category suitable for an error page. Renderer diagnostics remain in application logs and diagnostic exception properties; do not expose those properties to clients.
 
 ---
 
@@ -3034,7 +3067,7 @@ The SSR health check is covered in [Server-side rendering](/docs/server-side-ren
 
 ## Deployment checklist
 
-- [ ] `npm run build` runs before `dotnet publish`, or `wwwroot/build` is copied into the publish output.
+- [ ] The client `build` script runs before `dotnet publish` (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`), or `wwwroot/build` is copied into the publish output.
 - [ ] `app.html` is copied to the publish output.
 - [ ] Forwarded headers are configured, or cookies are forced secure.
 - [ ] Data Protection keys are shared between instances.

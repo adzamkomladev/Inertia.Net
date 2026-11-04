@@ -24,6 +24,8 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddMetrics();
         services.TryAddSingleton<InertiaMetrics>();
+        services.TryAddSingleton<InertiaRefreshQueue>();
+        services.AddHostedService(sp => sp.GetRequiredService<InertiaRefreshQueue>());
         services.TryAddSingleton<ViteAssets>();
         services.TryAddSingleton<IInertiaRootView, RootTemplateView>();
         services.AddMemoryCache(); // the default cache store keeps InertiaProp.Cache() values in it
@@ -32,7 +34,7 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<IInertiaCache, InertiaCache>();
         services.TryAddSingleton<InertiaPageWriter>();
         services.TryAddSingleton<PageComponentCheck>();
-        // Ssr.Timeout is the only deadline. No redirects (a render POST must not be replayed elsewhere), no proxy (renderers are local or
+        // Ssr.Timeout bounds the render; Ssr.ConnectTimeout also bounds connection establishment. No redirects (a render POST must not be replayed elsewhere), no proxy (renderers are local or
         // on a private network), and pooled connections are recycled so a remote renderer's DNS changes are picked up. The default
         // primary handler is set first, so a handler the app configures for this client (before or after AddInertia) replaces it.
         services.AddHttpClient(SsrGateway.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
@@ -42,6 +44,7 @@ public static class InertiaServiceCollectionExtensions
                 AllowAutoRedirect = false,
                 UseProxy = false,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+                ConnectTimeout = builder.Services.GetRequiredService<IOptions<InertiaOptions>>().Value.Ssr.ConnectTimeout,
             }));
         services.TryAddSingleton<SsrGateway>();
         services.TryAddSingleton<IInertiaSsrRenderer>(static sp => sp.GetRequiredService<SsrGateway>());

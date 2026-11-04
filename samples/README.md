@@ -11,7 +11,17 @@ All samples implement **exactly** the contract below, so the one Playwright suit
 `SAMPLE=react|vue|svelte npx playwright test`.
 
 The .NET project of a sample builds without Node (`dotnet build`); the frontend is built separately
-(`npm install && npm run build` inside the sample, which writes `wwwroot/build` with a Vite manifest).
+inside the sample, writing `wwwroot/build` with a Vite manifest. npm, Bun, pnpm and Yarn are supported:
+
+| Package manager | Install dependencies | Start Vite | Build assets |
+|---|---|---|---|
+| npm | `npm install` | `npm run dev` | `npm run build` |
+| Bun | `bun install` | `bun run dev` | `bun run build` |
+| pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
+| Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
+
+Use the package manager and lockfile chosen for your app. Repository CI uses `npm ci` with the committed `package-lock.json`
+for reproducible sample and Playwright installs; that verification command is not an application requirement.
 
 ## Pages
 
@@ -95,7 +105,7 @@ Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
 ## SSR (React sample only)
 
 Enabled with the environment variable `INERTIA_SSR=1`:
-- `npm run build` also builds the SSR bundle (`ssr/ssr.js`);
+- the `build` script (run with any package manager above) also builds the SSR bundle (`ssr/ssr.js`);
 - the backend starts and supervises its Node SSR child on `127.0.0.1:13714`, and falls back to client rendering while it is unavailable;
 - set `INERTIA_SSR_PORT` to the same free port during both the frontend build and backend run to avoid collisions; managed mode rejects an occupied endpoint and does not shut down another server;
 - the Vite configuration explicitly binds SSR to `127.0.0.1`; the backend stops a managed SSR server that also answers on another address. For intentional remote SSR, configure the listener host explicitly and use `o.Ssr.Urls` without `UseNodeProcess()` in .NET;
