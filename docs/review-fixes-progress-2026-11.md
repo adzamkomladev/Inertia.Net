@@ -61,3 +61,19 @@ Vue/Svelte 14 each (11 framework-specific skips each). Two paired processes each
 less per 1,000 entries and GUID keys 408 B less per 500 rows. Ordinary render allocation is unchanged. Parallel path reporting
 adds 160 B per 20 completed loaders; yielding loaders show net 16 B less after the entry-loop optimization. Timings, intervals,
 raw samples, isolated DOM/small-allocation results and limitations are recorded in the benchmark RESULTS document.
+
+## Phase 4
+
+Enabled private PublicApiAnalyzers 5.6.0, recommended analysis and build-time style checks. Six assembly packages track 781
+canonical signatures; the content-only template package has no assembly surface. No compatibility baseline or obsolete
+forwarders were added. Existing hosted-service deduplication and the Testing framework reference remain intact, with a repeated
+registration regression. Culture-invariant testing helpers have a custom-negative-sign regression.
+
+Renamed FastEndpoints Config setup to `ConfigureInertia`, preserving the previous configurator before Inertia setup and the
+optional callback afterward. FastEndpoints 8.3's getter is internal; the narrow static accessor is verified by both the regression
+and an actual Native AOT startup assertion. FastEndpoints tests share their framework's required serialized collection.
+
+Version, template package pin, docs package pin and docs header are 1.6.3. Strict build passed with zero warnings/errors, all
+1,494 tests passed with none skipped, strict pack produced seven packages and six symbol packages without analyzer leakage,
+and actual Native AOT smoke passed without IL warnings. Docs generation/client+SSR build and browser suites passed:
+React 25; Vue/Svelte 14 each with 11 framework-specific skips each. Phase 3 PR #37 merged after all CI checks succeeded.

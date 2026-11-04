@@ -447,6 +447,10 @@ Update every caller: the FastEndpoints sample, the template variant, the FastEnd
 (phase 5). Grep the repository for `UseInertia(` on a `Config` receiver before closing the task; `-warnaserror` catches the rest.
 `CHANGELOG.md` entry under Changed.
 
+**Framework constraint verified.** FastEndpoints 8.3 exposes only the setter publicly; its getter is internal. A narrow static
+`UnsafeAccessor` reads the existing callback without reflection or a new dependency. The exact pinned member contract and
+callback composition are covered by the regression and a startup assertion in the published Native AOT smoke app.
+
 **Tests.** `tests/Inertia.Net.IntegrationTests` FastEndpoints host: a configurator set before `ConfigureInertia()` still runs,
 and the existing FastEndpoints conformance tests pass unchanged against the renamed call.
 
