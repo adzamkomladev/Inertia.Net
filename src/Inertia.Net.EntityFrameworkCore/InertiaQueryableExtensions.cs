@@ -55,6 +55,7 @@ public static class InertiaQueryableExtensions
     {
         ct.ThrowIfCancellationRequested();
         var cursor = CursorCodec.Decode<TKey, TTie>(request.Cursor);
+        if (cursor is null) request.LogInvalidCursor();
         var before = cursor?.Cursor.Direction == CursorDirection.Before;
         KeysetKey[] keys = [
             new(key, cursor is { } value ? value.Cursor.Value : null, descending),

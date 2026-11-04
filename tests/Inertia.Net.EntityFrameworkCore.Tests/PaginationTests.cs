@@ -7,6 +7,8 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Inertia.Net.EntityFrameworkCore.Tests;
 
@@ -269,6 +271,106 @@ public sealed class PaginationTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.Db.Rows.OrderBy(row => row.Id).ToPageAsync(new PageRequest(), ct: source.Token));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.Db.Rows.ToCursorPageAsync(row => row.Id, new CursorRequest(), ct: source.Token));
         Assert.Empty(fixture.Sql.Commands);
+    }
+
+    [Theory]
+    [InlineData("private-cursor-value%%%")]
+    [InlineData("WyJhIiwiZGVjb2RlZC1zZWNyZXQiLDFd")]
+    [InlineData("WyJhIiwxXQ")]
+    public async Task Composite_invalid_cursors_log_once_without_payloads_or_exceptions(string cursor)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var logs = new CaptureLogs();
+        var request = new CursorRequest(cursor, 3) { Logger = logs.CreateLogger("Standalone") };
+        var page = await fixture.Db.Rows.ToCursorPageAsync(row => row.CreatedAt, row => row.Id, request, ct: Ct);
+        Assert.Equal([1, 2, 3], page.Data.Select(row => row.Id));
+        Assert.Null(page.CurrentCursor);
+        var entry = Assert.Single(logs.Entries);
+        AssertInvalidCursorLog(entry, "Standalone");
+        Assert.DoesNotContain(cursor, entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(cursor, string.Join(',', entry.State.Select(item => item.Value)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Composite_missing_empty_and_valid_cursors_do_not_log()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var logs = new CaptureLogs();
+        var first = await fixture.Db.Rows.ToCursorPageAsync(row => row.CreatedAt, row => row.Id, new CursorRequest(PerPage: 3), ct: Ct);
+        Assert.NotNull(first.NextCursor);
+        foreach (var cursor in new[] { null, "", first.NextCursor })
+        {
+            var request = new CursorRequest(cursor, 3) { Logger = logs.CreateLogger("Standalone") };
+            await fixture.Db.Rows.ToCursorPageAsync(row => row.CreatedAt, row => row.Id, request, ct: Ct);
+        }
+
+        Assert.Empty(logs.Entries);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HTTP_cursor_factory_supplies_EF_helpers_with_options_names_and_diagnostics(bool composite)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var logs = new CaptureLogs();
+        using var services = new ServiceCollection()
+            .Configure<InertiaOptions>(options =>
+            {
+                options.Pagination.DefaultPerPage = 7;
+                options.Pagination.MaxPerPage = 12;
+                options.Pagination.CursorName = "c";
+                options.Pagination.PerPageName = "size";
+            })
+            .AddLogging(builder => builder.SetMinimumLevel(LogLevel.Debug).AddProvider(logs))
+            .BuildServiceProvider();
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.QueryString = new QueryString("?c=private-invalid%%%&size=999&alternate=other-invalid&limit=30");
+        Task<CursorPage<Row>> Load(CursorRequest request) => composite
+            ? fixture.Db.Rows.ToCursorPageAsync(row => row.CreatedAt, row => row.Id, request, ct: Ct)
+            : fixture.Db.Rows.ToCursorPageAsync(row => row.Id, request, ct: Ct);
+        var configured = await Load(CursorRequest.From(context));
+        Assert.Equal("c", configured.CursorName);
+        Assert.Equal(12, configured.PerPage);
+        Assert.Equal(Enumerable.Range(1, 12), configured.Data.Select(row => row.Id));
+        var overridden = await Load(CursorRequest.From(context, defaultPerPage: 3, maxPerPage: 4, cursorName: "alternate", perPageName: "limit"));
+        Assert.Equal("alternate", overridden.CursorName);
+        Assert.Equal(4, overridden.PerPage);
+        Assert.Equal([1, 2, 3, 4], overridden.Data.Select(row => row.Id));
+        Assert.Equal(2, logs.Entries.Count);
+        Assert.All(logs.Entries, entry => AssertInvalidCursorLog(entry, "Inertia.Net.Pagination"));
+        context.Request.QueryString = QueryString.Empty;
+        var defaults = await Load(CursorRequest.From(context));
+        Assert.Equal(7, defaults.PerPage);
+        var explicitDefault = await Load(CursorRequest.From(context, defaultPerPage: 3));
+        Assert.Equal(3, explicitDefault.PerPage);
+        Assert.Equal(2, logs.Entries.Count);
+    }
+
+    private static void AssertInvalidCursorLog(CaptureLogs.Entry entry, string category)
+    {
+        Assert.Equal(category, entry.Category);
+        Assert.Equal(LogLevel.Debug, entry.Level);
+        Assert.Equal("Ignoring an invalid pagination cursor; loading the first page.", entry.Message);
+        Assert.Null(entry.Exception);
+        Assert.Equal(new KeyValuePair<string, object?>("{OriginalFormat}", entry.Message), Assert.Single(entry.State));
+    }
+
+    private sealed class CaptureLogs : ILoggerProvider
+    {
+        internal sealed record Entry(string Category, LogLevel Level, string Message, Exception? Exception, KeyValuePair<string, object?>[] State);
+        public List<Entry> Entries { get; } = [];
+        public ILogger CreateLogger(string categoryName) => new Logger(this, categoryName);
+        public void Dispose() { }
+
+        private sealed class Logger(CaptureLogs owner, string category) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel logLevel) => true;
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+                owner.Entries.Add(new Entry(category, logLevel, formatter(state, exception), exception,
+                    state is IEnumerable<KeyValuePair<string, object?>> values ? values.ToArray() : []));
+        }
     }
 
     public sealed class Row
