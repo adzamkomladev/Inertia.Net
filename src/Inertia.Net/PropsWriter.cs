@@ -168,7 +168,7 @@ internal sealed class PropsWriter
                 SawParallel |= prop.IsParallel;
                 if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    PlanLoad(prop);
+                    PlanLoad(prop, key);
                 }
 
                 return;
@@ -180,7 +180,7 @@ internal sealed class PropsWriter
                 SawParallel = true;
                 if (Decide(null, value, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    PlanLoad(lazy.Source);
+                    PlanLoad(lazy.Source, key);
                 }
 
                 return;
@@ -224,14 +224,14 @@ internal sealed class PropsWriter
 
     // A cached prop's loader only starts on a miss. A store that answers at once (the memory store) is asked here, and a hit plans
     // nothing: the walk finds it again and writes it without a loader. Another store's answer is awaited by the started task first.
-    private void PlanLoad(InertiaProp prop)
+    private void PlanLoad(InertiaProp prop, string key)
     {
         if (prop.Caching is { } caching)
         {
             var lookup = _owner.Caching.GetPropAsync(caching, _cancellationToken);
             if (!lookup.IsCompletedSuccessfully)
             {
-                Prefetch(prop, lookup.AsTask());
+                Prefetch(prop, key, lookup.AsTask());
                 return;
             }
 
@@ -241,11 +241,11 @@ internal sealed class PropsWriter
             }
         }
 
-        Prefetch(prop, lookup: null);
+        Prefetch(prop, key, lookup: null);
     }
 
-    private void Prefetch(InertiaProp prop, Task<CachedProp?>? lookup) =>
-        (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, lookup);
+    private void Prefetch(InertiaProp prop, string key, Task<CachedProp?>? lookup) =>
+        (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, _pathLength == key.Length ? key : new string(Path), lookup);
 
     /// <summary>
     /// Writes sharedProps through liveProps, in protocol order, omitting empty ones. The shared keys are the first
@@ -771,9 +771,10 @@ internal sealed class PropsWriter
         _cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            var cancellationToken = _planner?.Token ?? _cancellationToken;
             var value = await (_planner is not null && _planner.TryTake(prop, out var started)
                 ? new ValueTask<object?>(started)
-                : cached ? _owner.LoadCachedPropAsync(prop, _cancellationToken) : prop.ResolveAsync(_cancellationToken));
+                : cached ? _owner.LoadCachedPropAsync(prop, cancellationToken) : prop.ResolveAsync(cancellationToken));
             return value is InertiaPageWriter.RescuedCachedProp rescued ? Rescue(rescued.Exception) : (true, value);
         }
         catch (Exception ex) when (!cached && prop.ShouldRescue
