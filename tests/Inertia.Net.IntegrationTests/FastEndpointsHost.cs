@@ -24,7 +24,7 @@ public sealed class FastEndpointsHost : IConformanceHost
     }
 
     public static void MapRoutes(WebApplication app) =>
-        app.UseFastEndpoints(c => c.UseInertia(ep => ep.AllowAnonymous()));
+        app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));
 }
 
 /// <summary>The route contract as FastEndpoints endpoints.</summary>
