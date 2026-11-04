@@ -16,7 +16,21 @@ return Back("/users");                             // Referer, else "/users"
 return Location("https://billing.example.com");    // leave the SPA
 ```
 
-`Back()` only follows a `Referer` that is an http(s) URL with the request's own host and port. This prevents an open redirect. The scheme is not compared, so it works behind a TLS-terminating proxy; on HTTPS an `http` Referer is upgraded to `https`.
+`Back()` follows a `Referer` only when it is an http(s) URL with the request's own host and port. When it is unavailable, the opt-in [previous URL](#previous-url) is tried before the fallback. This prevents an open redirect. The scheme is not compared, so it works behind a TLS-terminating proxy; on HTTPS an `http` Referer is upgraded to `https`.
+
+## Previous URL
+
+Enable `o.State.RememberPreviousUrl = true` when a `Referrer-Policy: no-referrer` policy or the browser strips `Referer`:
+
+```csharp
+builder.Services.AddInertia(o => o.State.RememberPreviousUrl = true);
+```
+
+`Back()` and the middleware's empty-response redirect consult the same-host `Referer` first, then the remembered URL, then the fallback. `context.Inertia().PreviousUrl` reads the remembered URL, or returns `null` when disabled, absent or invalid; it is user-controlled input validated as a relative path.
+
+Only successful status-200 page GET renders are remembered, including initial HTML visits. Partial reloads, prefetches, Precognition, non-GET requests and error pages are excluded. The value is the relative `PathBase + Path + QueryString`, without scheme or host, in the plain `.Inertia.Previous` session cookie (`HttpOnly`, `SameSite=Lax`, `Path=/`, essential, with `Secure` following `o.State.CookieSecurePolicy`). The cookie is written only when the URL changes. Set `o.State.PreviousUrlCookieName` to change its name; it must differ from `o.State.CookieName`.
+
+This cookie is used with both cookie and session state stores. It is **per browser, not per tab**: the most recent page render wins across tabs. The `Referer` still takes precedence when available.
 
 ## What the middleware changes
 
@@ -26,7 +40,7 @@ return Location("https://billing.example.com");    // leave the SPA
 | Redirect to another origin, non-prefetch | `409` with `X-Inertia-Location`: the client makes a full visit instead of an XHR the browser would block |
 | Redirect whose `Location` contains `#`, non-prefetch | `409` with `X-Inertia-Redirect`: the client performs a full visit that keeps the fragment |
 | `Location(url)` | `409` + `X-Inertia-Location` for Inertia requests, a plain `302` otherwise |
-| Empty `200` response | Redirect back (302, or 303 for PUT/PATCH/DELETE), falling back to the app root |
+| Empty `200` response | Redirect back (302, or 303 for PUT/PATCH/DELETE), using the same previous-URL and app-root fallback as `Back()` |
 | `Vary` | `Vary: X-Inertia` is added to every response through the middleware |
 
 Turn off external redirect conversion with `o.ConvertExternalRedirects = false` if the app intentionally redirects to another origin.

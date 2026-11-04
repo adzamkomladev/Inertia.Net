@@ -419,6 +419,11 @@
           "depth": 2
         },
         {
+          "id": "previous-url",
+          "text": "Previous URL",
+          "depth": 2
+        },
+        {
           "id": "what-the-middleware-changes",
           "text": "What the middleware changes",
           "depth": 2
@@ -446,6 +451,21 @@
         {
           "id": "page-url",
           "text": "Page URL",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "error-pages",
+      "url": "/docs/error-pages",
+      "title": "Error pages",
+      "description": "Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.",
+      "section": "Essentials",
+      "order": 7,
+      "headings": [
+        {
+          "id": "already-using-useexceptionhandler",
+          "text": "Already using UseExceptionHandler()",
           "depth": 2
         }
       ]
@@ -1004,6 +1024,11 @@
           "depth": 2
         },
         {
+          "id": "addinertiaerrorpageso---inertiaerrorpagesoptions",
+          "text": "AddInertiaErrorPages(o => ...): InertiaErrorPagesOptions",
+          "depth": 2
+        },
+        {
           "id": "middleware-and-endpoint-api",
           "text": "Middleware and endpoint API",
           "depth": 2
@@ -1141,6 +1166,11 @@
         {
           "id": "inertiarender-does-not-compile",
           "text": "Inertia.Render(...) does not compile",
+          "depth": 2
+        },
+        {
+          "id": "my-404-shows-the-inertia-modal-in-production",
+          "text": "My 404 shows the Inertia modal in production",
           "depth": 2
         },
         {

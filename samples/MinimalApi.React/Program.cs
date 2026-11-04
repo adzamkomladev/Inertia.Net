@@ -30,6 +30,7 @@ builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddResponseCompression(); // gzip and Brotli for the page JSON and HTML (see the README on HTTPS)
 builder.Services.AddInertia(o =>
 {
+    o.State.RememberPreviousUrl = true;
     o.Share("appName", "Inertia.Net Sample");
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
     o.Vite.Prefetch = VitePrefetch.Waterfall; // fetch the other pages' chunks after load, three at a time
@@ -51,6 +52,8 @@ builder.Services.AddInertia(o =>
 builder.Services.AddInertiaLive().AddSignalR(o =>
     o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)));
 
+// Keep development diagnostics unless the browser tests explicitly enable error pages.
+builder.Services.AddInertiaErrorPages(o => o.EnabledInDevelopment = e2e);
 builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension, in Development only
 
 var app = builder.Build();
@@ -75,6 +78,7 @@ app.UseStaticFiles(new StaticFileOptions
         }
     },
 });
+app.UseInertiaErrorPages(); // before UseInertia(): handle errors from the whole page pipeline
 app.UseInertia();
 app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
 
@@ -133,6 +137,7 @@ app.MapGet("/feed/cursor", async (HttpContext http, FeedDbContext database, Canc
 
 if (e2e)
 {
+    app.MapGet("/__e2e/boom", (Func<IResult>)(() => throw new InvalidOperationException("E2E error page test")));
     // Test hooks called by the E2E runner, not by a browser page: exempt from CSRF validation.
     app.MapPost("/__e2e/bump-version", () => AppState.Version = Guid.NewGuid().ToString("N")).DisableAntiforgery();
     app.MapPost("/__e2e/reset", AppState.Reset).DisableAntiforgery();

@@ -5,7 +5,7 @@ section: Reference
 order: 1
 ---
 
-All configuration is passed to `AddInertia`. Options marked “Development only” do nothing in other environments.
+Core configuration is passed to `AddInertia`; error page options use `AddInertiaErrorPages`. Options marked “Development only” do nothing in other environments.
 
 ## `AddInertia(o => ...)`: `InertiaOptions`
 
@@ -84,15 +84,30 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`. The full SSR o
 | Option | Default | Description |
 |---|---|---|
 | `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
-| `CookieSecurePolicy` | `SameAsRequest` | When the state cookie is `Secure`. |
+| `RememberPreviousUrl` | `false` | Remember successful page GET URLs for `Back()` when Referer is unavailable. |
+| `PreviousUrlCookieName` | `".Inertia.Previous"` | Plain previous-URL cookie, with either state store; non-empty and different from `CookieName`. |
+| `CookieSecurePolicy` | `SameAsRequest` | When state and previous-URL cookies are `Secure`. |
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. |
 | `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData. Inertia.Net.Mvc package. |
+
+## `AddInertiaErrorPages(o => ...)`: `InertiaErrorPagesOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `Component` | `"Error"` | Default error component. |
+| `Components` | empty | Per-status overrides, with keys in `StatusCodes`. |
+| `StatusCodes` | `[403, 404, 500, 503]` | Non-empty set of statuses from 400–599. Protocol `409` and antiforgery `419` responses are preserved. |
+| `EnabledInDevelopment` | `false` | Preview error components in Development. |
+| `Props` | `null` | `Func<HttpContext, int, Exception?, InertiaProps>` for additional props. |
+
+See [Error pages](/docs/error-pages) for setup, shared props and existing exception middleware.
 
 ## Middleware and endpoint API
 
 | API | Description |
 |---|---|
 | `services.AddInertia(configure?)` | Registers services and options. |
+| `services.AddInertiaErrorPages(configure?)` / `app.UseInertiaErrorPages(useExceptionHandler: true)` | Error page services and middleware, before `UseInertia()`. Use `false` with your own `UseExceptionHandler()`. |
 | `app.UseInertia()` | The protocol middleware. Before the endpoints; after `UseSession()` when used. |
 | `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates unsafe requests (`419` on failure). |
 | `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |

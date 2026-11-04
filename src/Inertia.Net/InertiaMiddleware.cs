@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
@@ -74,7 +76,7 @@ internal sealed class InertiaMiddleware
                 && response.ContentLength is null or 0)
             {
                 response.StatusCode = IsPutPatchDelete(request.Method) ? StatusCodes.Status303SeeOther : StatusCodes.Status302Found;
-                response.Headers.Location = InertiaBackResult.GetBackUrl(request, "~/");
+                response.Headers.Location = InertiaBackResult.GetBackUrl(request, "~/", _pageWriter.Options.State);
             }
 
             // Finish while outer middleware such as UseSession is still active.
@@ -202,6 +204,23 @@ internal sealed class InertiaMiddleware
 /// <summary>Adds the Inertia middleware.</summary>
 public static class InertiaApplicationBuilderExtensions
 {
+    /// <summary>
+    /// Adds exception handling and status code pages that render Inertia error pages. Call before <c>UseInertia()</c>.
+    /// If the application already calls <c>UseExceptionHandler()</c>, pass false for <paramref name="useExceptionHandler"/>
+    /// to add only the status code pages. Development keeps the developer exception page unless enabled in the options.
+    /// Register services with <c>AddInertiaErrorPages()</c>.
+    /// </summary>
+    public static IApplicationBuilder UseInertiaErrorPages(this IApplicationBuilder app, bool useExceptionHandler = true)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        if (app.ApplicationServices.GetService<InertiaErrorPagesRegistration>() is null)
+            throw new InvalidOperationException("Inertia.Net error page services are not registered. Call services.AddInertiaErrorPages() at startup.");
+        var options = app.ApplicationServices.GetRequiredService<IOptions<InertiaErrorPagesOptions>>().Value;
+        var environment = app.ApplicationServices.GetRequiredService<IHostEnvironment>();
+        if (useExceptionHandler && (options.EnabledInDevelopment || !environment.IsDevelopment())) app.UseExceptionHandler();
+        return app.UseStatusCodePages(InertiaErrorPages.HandleStatusCodeAsync);
+    }
+
     /// <summary>
     /// Adds the Inertia protocol middleware: asset version check, <c>Vary</c>, 303 and fragment redirects, empty-response
     /// redirects, and carrying flash data/errors/history flags across redirects. Call it before the endpoints

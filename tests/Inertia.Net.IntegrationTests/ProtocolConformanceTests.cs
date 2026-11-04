@@ -41,6 +41,22 @@ namespace Inertia.Net.IntegrationTests;
 public abstract class ProtocolConformanceTests<THost>
     where THost : IConformanceHost
 {
+    [Theory]
+    [InlineData("POST", 302)]
+    [InlineData("PUT", 303)]
+    public async Task Back_without_referer_uses_the_last_page_url(string method, int status)
+    {
+        await using var app = await ConformanceApp.StartAsync<THost>(new ConformanceSetup
+        {
+            Inertia = o => o.State.RememberPreviousUrl = true,
+        });
+        var client = app.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.InertiaGetAsync("/users?x=1")).StatusCode);
+        var response = await client.InertiaAsync(new HttpMethod(method), "/back-test");
+        Assert.Equal(status, (int)response.StatusCode);
+        Assert.Equal("/users?x=1", response.Headers.Location?.OriginalString);
+    }
+
     private const string Base = "http://localhost";
 
     protected static Task<ConformanceApp> StartAsync(ConformanceSetup? setup = null) => ConformanceApp.StartAsync<THost>(setup);

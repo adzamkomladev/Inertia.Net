@@ -57,14 +57,14 @@ All list headers are comma-separated. Parse them as: split on `,`, trim, drop em
 ## 3. Responses and middleware flow
 
 - `Vary: X-Inertia` goes on **every** response that passes through the middleware.
-- A JSON page response has status 200, `Content-Type: application/json`, and `X-Inertia: true`.
+- A JSON page response normally has status 200, `Content-Type: application/json`, and `X-Inertia: true`. Error pages are ordinary pages with a non-200 status; `AddInertiaErrorPages()` can render them for routing failures and unhandled exceptions.
 - An HTML page response is the root template with the page embedded (§5).
 
 The middleware runs in this order:
 1. **Inertia GET with a version mismatch.** If `X-Inertia-Version` (absent = `""`) differs from the current version, respond `409` with `X-Inertia-Location: <absolute request URL>` and `X-Inertia-Version: <current>`, and keep the flash/state. This check runs **before** the handler (deliberate deviation 1). Non-GET requests never get the version 409.
 2. Run the handler.
 3. If the request is not an Inertia request, return the response unchanged.
-4. If the status is 200 and the body is empty, redirect back (same-host Referer, falling back to the app root `PathBase/`).
+4. If the status is 200 and the body is empty, redirect back (same-host Referer, falling back to the validated previous-URL cookie when `State.RememberPreviousUrl` is on, then the app root `PathBase/`).
 5. If the status is 302 and the method is PUT, PATCH or DELETE, change it to 303.
 6. If the response is a redirect to another origin (an absolute or protocol-relative http(s) URL whose scheme, host or port differs from the request's), and the request is not a prefetch, replace it with `409` and `X-Inertia-Location: <Location>` (empty body), unless `ConvertExternalRedirects` is off (deliberate deviation 12).
 7. Otherwise, if the response is a redirect, its `Location` contains `#`, and the request is not a prefetch, replace it with `409` and `X-Inertia-Redirect: <Location>` (empty body).

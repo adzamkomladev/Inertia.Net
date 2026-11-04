@@ -124,6 +124,10 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         }
 
         response.StatusCode = _statusCode;
+        if (_statusCode == StatusCodes.Status200OK && pageWriter.Options.State.RememberPreviousUrl)
+        {
+            PreviousUrlCookie.Store(httpContext, request, pageWriter.Options.State, Component);
+        }
         InertiaHeaders.AppendVary(response.Headers);
 
         if (request.IsInertia)

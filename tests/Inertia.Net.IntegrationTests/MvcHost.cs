@@ -17,12 +17,22 @@ public sealed class MvcHost : IConformanceHost
 
 public sealed class ConformanceController(ConformanceCounters counters) : Controller
 {
+    [HttpGet("/throw")]
+    public IResult Throw() => throw new InvalidOperationException("failed");
+
     [HttpGet("/page")]
     public IResult Page()
     {
         counters.HitPage();
         return Render("Page", new InertiaProps { ["message"] = "hello" });
     }
+
+    [HttpGet("/users")]
+    public IResult Users() => Render("Users");
+
+    [AcceptVerbs("POST", "PUT")]
+    [Route("/back-test")]
+    public IResult BackTest() => Back();
 
     [HttpGet("/café")]
     public IResult Cafe() => Render("Page");
