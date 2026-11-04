@@ -146,6 +146,31 @@
       ]
     },
     {
+      "slug": "whats-new",
+      "url": "/docs/whats-new",
+      "title": "What's new in 1.6.1 and 1.6.2",
+      "description": "A practical guide to error pages, safer redirects and pagination.",
+      "section": "Get started",
+      "order": 4,
+      "headings": [
+        {
+          "id": "161-show-an-error-page",
+          "text": "1.6.1: show an error page",
+          "depth": 2
+        },
+        {
+          "id": "161-return-to-the-previous-page",
+          "text": "1.6.1: return to the previous page",
+          "depth": 2
+        },
+        {
+          "id": "162-send-a-list-one-page-at-a-time",
+          "text": "1.6.2: send a list one page at a time",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "ai-agents",
       "url": "/docs/ai-agents",
       "title": "AI agents",
@@ -636,6 +661,11 @@
         {
           "id": "cursors",
           "text": "Cursors",
+          "depth": 2
+        },
+        {
+          "id": "defer-or-cache-a-page",
+          "text": "Defer or cache a page",
           "depth": 2
         },
         {

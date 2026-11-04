@@ -2,7 +2,13 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.7.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.6.2** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+
+## What's new
+
+Version 1.6.1 added [production error pages](#error-pages), a [remembered previous URL](#previous-url) for `Back()` when the browser omits `Referer`, and HTTP status assertions for tests. Inertia forms keep their input after validation; the [flash recipe](#flash-data) shows how to return selected safe fields for a full-page form.
+
+Version 1.6.2 adds [pagination](#pagination): return numbered pages for a pager, or use cursor pages and [infinite scroll](#infinite-scroll) to load more as the reader scrolls. The [step-by-step release guide](docs/Inertia.Net.Docs/content/docs/whats-new.mdx) explains both releases.
 
 ## Contents
 
@@ -80,7 +86,7 @@ You need the .NET 10 SDK and Node.js with npm. Use an Inertia v3 client; v2 clie
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.0
+dotnet new install Inertia.Net.Templates::1.6.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -181,14 +187,14 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.7.0
-dotnet add package Inertia.Net.Mvc --version 1.7.0 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.7.0 # FastEndpoints only
-dotnet add package Inertia.Net.Testing --version 1.7.0 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.7.0 # live props over SignalR
+dotnet add package Inertia.Net --version 1.6.2
+dotnet add package Inertia.Net.Mvc --version 1.6.2 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.6.2 # FastEndpoints only
+dotnet add package Inertia.Net.Testing --version 1.6.2 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.6.2 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.7.0` for all Inertia.Net packages. Inertia.Net 1.7.0 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus Node.js and npm to build the frontend. Use version `1.6.2` for all Inertia.Net packages. Inertia.Net 1.6.2 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 > **Callout: `Render(...)`, `Defer(...)`, `Back()` without a prefix.**
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
