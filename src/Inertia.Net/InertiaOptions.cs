@@ -358,8 +358,14 @@ public sealed class InertiaStateOptions
     /// <summary>The cookie name (cookie store) or session key (session store). Default <c>.Inertia.State</c>.</summary>
     public string CookieName { get; set; } = ".Inertia.State";
 
+    /// <summary>Remembers successful page GET URLs in a cookie for redirects when Referer is unavailable. Default false.</summary>
+    public bool RememberPreviousUrl { get; set; }
+
+    /// <summary>The previous-URL session cookie name, used with either state store. Default <c>.Inertia.Previous</c>.</summary>
+    public string PreviousUrlCookieName { get; set; } = ".Inertia.Previous";
+
     /// <summary>
-    /// When the state cookie (cookie store) is marked <c>Secure</c>. Default <see cref="CookieSecurePolicy.SameAsRequest"/>; use
+    /// When state and previous-URL cookies are marked <c>Secure</c>. Default <see cref="CookieSecurePolicy.SameAsRequest"/>; use
     /// <see cref="CookieSecurePolicy.Always"/> behind a TLS-terminating proxy that does not forward the scheme.
     /// </summary>
     public CookieSecurePolicy CookieSecurePolicy { get; set; } = CookieSecurePolicy.SameAsRequest;

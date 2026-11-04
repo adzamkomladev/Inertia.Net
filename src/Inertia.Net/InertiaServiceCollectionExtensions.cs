@@ -57,6 +57,24 @@ public static class InertiaServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Registers Inertia error page options and an exception handler. Also call <c>AddInertia()</c>.
+    /// Register application exception handlers first if they should take precedence.
+    /// </summary>
+    public static IServiceCollection AddInertiaErrorPages(this IServiceCollection services, Action<InertiaErrorPagesOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        var options = services.AddOptions<InertiaErrorPagesOptions>();
+        if (configure is not null) options.Configure(configure);
+        options.ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<InertiaErrorPagesOptions>, InertiaErrorPagesOptionsValidator>());
+        services.TryAddSingleton<InertiaErrorPagesRegistration>();
+        // The built-in middleware needs a fallback even when every registered IExceptionHandler declines.
+        services.AddProblemDetails();
+        services.AddExceptionHandler<InertiaExceptionHandler>();
+        return services;
+    }
+
+    /// <summary>
     /// Adds <see cref="IInertiaLive"/>, which publishes live-prop events. Chain a transport (<c>.AddSignalR()</c> from
     /// <c>Inertia.Net.Live.SignalR</c>) or register an <see cref="IInertiaLiveBroadcaster"/>. Safe to call more than once.
     /// </summary>
@@ -67,3 +85,5 @@ public static class InertiaServiceCollectionExtensions
         return new InertiaLiveBuilder(services);
     }
 }
+
+internal sealed class InertiaErrorPagesRegistration;

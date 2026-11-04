@@ -27,7 +27,7 @@ Inertia.Net **1.7.0** is a .NET 10 server adapter for the **Inertia.js v3** prot
 14. [Live props](#live-props)
 15. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
 16. [Flash data](#flash-data)
-17. [Redirects, Location and Back](#redirects-location-and-back)
+17. [Redirects, Location and Back](#redirects-location-and-back), [Error pages](#error-pages)
 18. [History encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
 19. [Asset versioning](#asset-versioning)
 20. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
@@ -133,6 +133,7 @@ The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself 
 | Precognition | `.WithInertiaPrecognition()` | not available | `c.UseInertia()` |
 | Razor root view | no (`app.html` template) | optional (tag helpers) | no (`app.html` template) |
 | Native AOT | yes | no (MVC itself is not AOT) | yes (with the FastEndpoints source generator) |
+| Error pages (routing, authorization, exceptions) | `AddInertiaErrorPages()` | same | same |
 | Live props transport: SignalR | `Inertia.Net.Live.SignalR` | same | same |
 
 | Client | Package | Supported |
@@ -1385,6 +1386,8 @@ return Back().WithFlash("toast", "Saved");
 
 Read it on the client with `usePage().flash` (or the `onFlash` visit callback).
 
+Inertia forms keep their input on the client after `Back().WithErrors(...)`, so there is no `WithInput()` helper. For a full-page POST that needs old input, explicitly flash only sanitized fields: `Back().WithFlash("old", new InertiaProps { ["email"] = email })`, then read `usePage().flash.old`. Never flash passwords, tokens or other secrets.
+
 **Where state is kept.** Flash data, errors, `clearHistory` and `preserveFragment` set during a request that ends in a redirect (or a `Location()`/fragment `409`) are saved in an `IInertiaStateStore` and loaded at the start of the next request. If that request redirects again, the state is carried on (so `Back()` to a URL that itself redirects still shows the flash); otherwise its response consumes it. The state is also kept when the response is the version-mismatch `409`.
 
 - **Default: an encrypted cookie** (`.Inertia.State`). It is protected with ASP.NET Core Data Protection, HttpOnly, SameSite=Lax, and works without sessions and under Native AOT. Tampered or undecryptable cookies are ignored and deleted. It logs a warning above about 4 KB: browsers drop larger cookies.
@@ -1415,10 +1418,24 @@ What `UseInertia()` does for Inertia requests:
 | Redirect to another origin (scheme, host or port), and the request is not a prefetch | `409` with `X-Inertia-Location: <url>`: the client makes a full visit instead of following it with XHR, which the browser would block. Turn it off with `o.ConvertExternalRedirects = false`. |
 | Redirect whose `Location` contains `#`, and the request is not a prefetch | `409` with `X-Inertia-Redirect: <url>` (the client performs a full visit that keeps the fragment) |
 | `Location(url)` | `409` with `X-Inertia-Location: <url>` for Inertia requests, a plain `302` otherwise |
-| An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE), falling back to the app root (`PathBase/`) |
-| `Back()` | `302` to the `Referer` when it is an http(s) URL with the request's own host and port, otherwise to the fallback (default `~/`, the app root including `PathBase`) |
+| An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE), using the same previous-URL and app-root fallback as `Back()` |
+| `Back()` | `302` to the `Referer` when it is an http(s) URL with the request's own host and port, otherwise the opt-in previous URL, then the fallback (default `~/`, the app root including `PathBase`) |
 
 The same-origin rule on `Referer` exists so `Back()` cannot become an open redirect. The scheme is not compared, so it keeps working behind a TLS-terminating proxy. On an HTTPS request an `http` Referer is upgraded to `https`, so going back never downgrades the connection.
+
+### Previous URL
+
+Enable `o.State.RememberPreviousUrl = true` when a `Referrer-Policy: no-referrer` policy or the browser strips `Referer`:
+
+```csharp
+builder.Services.AddInertia(o => o.State.RememberPreviousUrl = true);
+```
+
+`Back()` and the middleware's empty-response redirect consult the same-host `Referer` first, then the remembered URL, then the fallback. `context.Inertia().PreviousUrl` reads the remembered URL, or returns `null` when disabled, absent or invalid; it is user-controlled input validated as a relative path.
+
+Only successful status-200 page GET renders are remembered, including initial HTML visits. Partial reloads, prefetches, Precognition, non-GET requests and error pages are excluded. The value is the relative `PathBase + Path + QueryString`, without scheme or host, in the plain `.Inertia.Previous` session cookie (`HttpOnly`, `SameSite=Lax`, `Path=/`, essential, with `Secure` following `o.State.CookieSecurePolicy`). The cookie is written only when the URL changes. Set `o.State.PreviousUrlCookieName` to change its name; it must differ from `o.State.CookieName`.
+
+This cookie is used with both cookie and session state stores. It is **per browser, not per tab**: the most recent page render wins across tabs. The `Referer` still takes precedence when available.
 
 `Vary: X-Inertia` is added to every response that passes through the middleware.
 
@@ -1428,6 +1445,83 @@ The same-origin rule on `Referer` exists so `Back()` cannot become an open redir
 
 **The page URL.** The page object's `url` is PathBase, Path and QueryString. Behind a proxy that rewrites paths, set
 `o.UrlResolver = ctx => ...` to return the URL the browser sees.
+
+---
+
+## Error pages
+
+Render routing failures, authorization failures and unhandled exceptions as Inertia pages in production:
+
+```csharp
+builder.Services.AddInertia();
+builder.Services.AddInertiaErrorPages(o =>
+{
+    o.Component = "Error";                         // default
+    o.Components[404] = "Errors/NotFound";          // optional per-status component
+    o.StatusCodes = [403, 404, 500, 503];           // default
+    o.Props = (context, status, exception) => new InertiaProps
+    {
+        ["requestId"] = context.TraceIdentifier,
+    };
+});
+
+var app = builder.Build();
+app.UseInertiaErrorPages();                        // before UseInertia and the endpoints
+app.UseInertia();
+```
+
+Create the named components in your client pages directory. Each receives `status`, the optional `Props` callback's values, and
+shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
+responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.
+
+For example, `ClientApp/pages/Error.tsx`:
+
+```tsx
+export default function Error({ status }: { status: number }) {
+  const title = status === 404 ? 'Page not found'
+    : status === 403 ? 'Access denied'
+    : status === 503 ? 'Service unavailable'
+    : 'Something went wrong'
+
+  return <main><h1>{status}: {title}</h1><a href="/">Return home</a></main>
+}
+```
+
+The handler answers requests with `X-Inertia` or an `Accept: text/html` navigation. It preserves the error status: XHR receives a
+JSON page with `X-Inertia: true`; the first visit receives the normal root template. Root views and SSR work as for any other
+render. An error component must also resolve in your SSR bundle when SSR is enabled.
+
+Only configured error statuses with an empty response are replaced. API clients, existing response bodies, redirects, Inertia's
+`409` responses and antiforgery's `419` responses are left to their existing handlers. Exceptions use the status selected by
+ASP.NET Core's exception middleware (500 by default). The default statuses are 403, 404, 500 and 503; extend `StatusCodes` to handle
+other error statuses. A page explicitly returned with `Render(...).WithStatusCode(404)` keeps its component and props.
+
+In Development, error pages are disabled so the developer exception page and Inertia debug modal stay available. Set
+`o.EnabledInDevelopment = true` to preview your error components. The Inertia client renders non-2xx Inertia responses by default;
+application `httpException` event handlers or `onHttpException` callbacks can cancel that rendering.
+
+**Already using `UseExceptionHandler()`?** `AddInertiaErrorPages()` registers an `IExceptionHandler` in the existing chain. Register
+API-specific handlers first if they should take priority. Use one exception middleware, then install just the status-code part:
+
+```csharp
+app.UseExceptionHandler();
+app.UseInertiaErrorPages(useExceptionHandler: false);
+app.UseInertia();
+```
+
+ASP.NET Core 10 suppresses exception diagnostics by default when an `IExceptionHandler` handles the exception. The Inertia
+handler follows that policy and emits only a Debug message naming the rendered component. To keep the built-in exception logs
+and diagnostics, configure the exception middleware explicitly:
+
+```csharp
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ExceptionHandlerOptions>(o =>
+    o.SuppressDiagnosticsCallback = _ => false);
+```
+
+`AddInertiaErrorPages()` also registers the built-in ProblemDetails service as the exception middleware’s fallback. The Inertia
+exception handler declines requests that do not ask for an Inertia page or HTML, so API exceptions use the host’s ProblemDetails
+fallback and content negotiation. Existing ProblemDetails configuration and earlier application handlers still apply; empty
+status-code responses remain unchanged. Loaded flash and validation state is consumed when an error page renders, as on any other page response.
 
 ---
 
@@ -2070,6 +2164,8 @@ by default). Outside Development there is no check and no file access.
 
 ## Testing
 
+The response helpers also parse non-2xx Inertia pages; use `.Status(404)` in an assertion to check an error page’s HTTP status.
+
 `Inertia.Net.Testing` has Laravel-style fluent assertions over Inertia responses and `HttpClient` helpers. It parses both JSON responses (`X-Inertia: true`) and the first-visit HTML `<script data-page>`, and decodes `$bigint` values. Failures throw `InertiaAssertionException` with a readable message, so it works with any test framework.
 
 ```csharp
@@ -2292,15 +2388,28 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | Option | Default | Description |
 |---|---|---|
 | `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
-| `CookieSecurePolicy` | `SameAsRequest` | When the state cookie is `Secure`. `Always` behind a TLS-terminating proxy that does not forward the scheme. |
+| `RememberPreviousUrl` | `false` | Remember successful page GET URLs for `Back()` when Referer is unavailable. |
+| `PreviousUrlCookieName` | `".Inertia.Previous"` | Plain previous-URL cookie, with either state store; non-empty and different from `CookieName`. |
+| `CookieSecurePolicy` | `SameAsRequest` | When state and previous-URL cookies are `Secure`. `Always` behind a TLS-terminating proxy that does not forward the scheme. |
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. The session is only loaded when the request has a session cookie. |
 | `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData (cookie or session provider) instead of the encrypted cookie. Inertia.Net.Mvc package. |
+
+### `AddInertiaErrorPages(o => ...)`: `InertiaErrorPagesOptions`
+
+| Option | Default | Description |
+|---|---|---|
+| `Component` | `"Error"` | Component for error pages without a per-status override. |
+| `Components` | empty | Status-to-component overrides; keys must also be in `StatusCodes`. |
+| `StatusCodes` | `[403, 404, 500, 503]` | Non-empty set of error statuses (400–599). Protocol `409` and antiforgery `419` responses are preserved. |
+| `EnabledInDevelopment` | `false` | Render error pages in Development too. |
+| `Props` | `null` | `Func<HttpContext, int, Exception?, InertiaProps>` for extra error page props. |
 
 ### Middleware, endpoint and result API
 
 | API | Description |
 |---|---|
 | `services.AddInertia(configure?)` | Registers services and options. |
+| `services.AddInertiaErrorPages(configure?)` / `app.UseInertiaErrorPages(useExceptionHandler: true)` | Registers error page handling and wraps the pipeline before `UseInertia()`. Set the flag to `false` when using your own `UseExceptionHandler()`. |
 | `app.UseInertia()` | The protocol middleware. Before the endpoints, after `UseSession()` when the session store is used. |
 | `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates every unsafe request (`419` on failure). Options: `CookieName`, `SecurePolicy`, `ShouldValidate`, `OnRejected`, `CookieRefresh` (`Always`, `Lazy`). |
 | `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |
@@ -2355,6 +2464,9 @@ Behavior differences to check when you migrate:
 ---
 
 ## Troubleshooting and FAQ
+
+**My 404 shows the Inertia modal in production.**
+Register `AddInertiaErrorPages()` and call `UseInertiaErrorPages()` before `UseInertia()`. Create the configured error components; see [Error pages](#error-pages).
 
 **`Inertia.Render(...)` does not compile / "'Inertia' is a namespace".**
 Call `Render(...)` unqualified. The namespace `Inertia.Net` shadows the class name outside the `Inertia.Net` namespace. The global usings come from the package's `buildTransitive` props and need `<ImplicitUsings>enable</ImplicitUsings>`. Without implicit usings (or with `InertiaNetImplicitUsings` set to `false`) add `using static Inertia.Net.Inertia;` to the file. See the [callout](#installation). A class library that references `Inertia.Net` gets the same global usings.

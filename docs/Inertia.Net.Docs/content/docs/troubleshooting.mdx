@@ -23,6 +23,10 @@ The global usings come from the package's `buildTransitive` props and need `<Imp
   </AccordionItem>
 </Accordion>
 
+## My 404 shows the Inertia modal in production
+
+Register `AddInertiaErrorPages()` and call `UseInertiaErrorPages()` before `UseInertia()`. Create your error components; see [Error pages](/docs/error-pages).
+
 ## Form submissions fail with 419
 
 `UseInertiaAntiforgery()` rejected a request without a valid `X-XSRF-TOKEN`. Check that:

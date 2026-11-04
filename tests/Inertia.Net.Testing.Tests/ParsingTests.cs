@@ -6,6 +6,18 @@ namespace Inertia.Net.Testing.Tests;
 
 public class ParsingTests
 {
+    [Theory]
+    [InlineData(404)]
+    [InlineData(500)]
+    public async Task Parses_non_success_Inertia_response_and_asserts_status(int status)
+    {
+        using var response = JsonResponse("{\"component\":\"Error\",\"props\":{\"status\":404},\"url\":\"/missing\"}");
+        response.StatusCode = (HttpStatusCode)status;
+        var page = await response.AssertInertiaAsync(p => p.Status(status).Component("Error"), TestContext.Current.CancellationToken);
+        Assert.Equal(status, page.StatusCode);
+        Assert.Throws<InertiaAssertionException>(() => new AssertableInertia(page).Status(200));
+    }
+
     [Fact]
     public async Task Parses_json_response()
     {

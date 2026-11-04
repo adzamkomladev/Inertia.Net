@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Inertia.Net;
 
@@ -10,6 +12,15 @@ namespace Inertia.Net;
 /// </summary>
 public sealed class InertiaFeature
 {
+    internal HttpContext? Context { get; set; }
+
+    /// <summary>
+    /// The remembered previous page URL, or null when disabled, missing or invalid. User-controlled input, validated only as a relative path.
+    /// </summary>
+    public string? PreviousUrl => Context is { } context
+        ? PreviousUrlCookie.Read(context.Request, context.RequestServices?.GetService<IOptions<InertiaOptions>>()?.Value.State)
+        : null;
+
     // Effective state: pending writes override restored entries.
     private Dictionary<string, object?>? _flash;
     private Dictionary<string, Dictionary<string, string[]>>? _errors;
@@ -143,6 +154,7 @@ public static class InertiaHttpContextExtensions
             httpContext.Features.Set(feature);
         }
 
+        feature.Context ??= httpContext;
         return feature;
     }
 

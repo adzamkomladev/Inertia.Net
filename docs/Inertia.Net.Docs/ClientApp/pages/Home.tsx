@@ -123,12 +123,11 @@ export default function Home() {
         <section className="border-b border-border">
           <div className="mx-auto grid max-w-[1100px] items-center gap-12 px-6 py-16 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
             <div>
-              <p className="text-sm text-muted-foreground">Inertia.js v3 adapter for .NET 10</p>
-              <h1 className="mt-4 max-w-xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+              <h1 className="max-w-xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
                 Modern frontends for ASP.NET Core apps
               </h1>
               <p className="mt-5 max-w-lg text-pretty text-base leading-7 text-muted-foreground">
-                Keep your routes, auth and validation in C#. Build the UI in React, Vue or Svelte. Inertia.Net connects the two, so you skip the API layer and the client-side router.
+                An Inertia.js v3 adapter for .NET 10. Keep your routes, auth and validation in C#. Build the UI in React, Vue or Svelte. Inertia.Net connects the two, so you skip the API layer and the client-side router.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link

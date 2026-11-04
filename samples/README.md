@@ -27,7 +27,10 @@ The layout (used by every page) shows:
 | `GET /users` | `Users/Index` | `users`: array of `{id, name}` (React uses the `Page<User>` shape with items under `data`); each row `data-testid="user-row"` with a button `data-testid="delete-user-{id}"` that calls `router.delete('/users/{id}')`. `stats`: `Defer` (default group), the server sleeps about 300 ms; rendered with `<Deferred data="stats">`: `data-testid="stats-loading"` first, then `data-testid="stats"` containing `stats.total` (the number of users). `plans`: `Once` prop `{items: [...], resolvedCount}`; `data-testid="plans"` with `resolvedCount` in `data-testid="plans-count"`. The server increments a counter each time the loader really runs and sends it as `resolvedCount`, so the E2E can tell the prop was not re-resolved when the page is visited again. A button `data-testid="users-refresh"` calls `router.visit('/users')` (the client only sends `X-Inertia-Except-Once-Props` for once props held by the page it is currently on, so the test needs a Users to Users visit). |
 | `DELETE /users/{id}` | n/a | Removes the user from an in-memory list and returns `Back()` with flash `success` = `User deleted`. Must reach the client as a **303**. |
 | `GET /contacts/create` | `Contacts/Create` | Form 1 (`useForm`): inputs `data-testid="name"`, `data-testid="email"`, button `data-testid="submit"`, error slots `data-testid="error-name"`, `data-testid="error-email"` (empty element when no error). `POST /contacts` validates a record with `[Required] Name` and `[Required][EmailAddress] Email` using the framework's validation plus the adapter's validation glue; on failure it redirects back with errors, on success it redirects to `/` with flash `success` = `Contact created`. Form 2, error bag `newsletter`: input `data-testid="newsletter-email"`, button `data-testid="newsletter-submit"`, error slot `data-testid="error-newsletter-email"` showing `errors.newsletter.email`; `POST /newsletter` (`[Required][EmailAddress] Email`, sent with `X-Inertia-Error-Bag: newsletter`), success redirects to `/contacts/create` with flash `success` = `Subscribed`. |
+| `GET /nope` (unmatched route) | `Error` | HTTP 404 on both first visits and Inertia navigation; `data-testid="error-status"` contains `404`, shared layout remains available, and `Return home` navigates to `/`. |
 | `GET /feed` | `Feed/Index` | `posts`: a `Scroll` prop (wrapper key `data`), 10 items per page, 5 pages, page number in query `page`. Rendered with `<InfiniteScroll data="posts">`; every item `data-testid="post"`. Items must be tall enough (about 160 px) that 10 of them overflow a normal viewport. |
+
+All samples enable `o.State.RememberPreviousUrl = true`. The shared `specs/back.spec.ts` test applies a `no-referrer` policy and verifies that invalid contact submissions return to the form with its input and errors intact.
 
 ## Pagination (React sample only)
 
@@ -68,6 +71,7 @@ after `app.UseInertia()`. Page loads set the `XSRF-TOKEN` cookie, which the Iner
 - `POST /__e2e/bump-version`: changes the asset version (the sample's `VersionResolver` reads a mutable singleton; it is `null`, meaning the hash of the Vite manifest, until bumped).
 - `POST /__e2e/reset`: restores the three seed users (ids 1 to 3), resets the once-prop counter and clears the version override (and, in
   the React sample, the live counter and unread count). The spec calls it before every test.
+- `GET /__e2e/boom`: throws an exception; the `Error` page renders with HTTP 500 and `data-testid="error-status"` containing `500`.
 - React sample: the live publish hooks in [Live props](#live-props-react-sample-only).
 
 Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
@@ -80,6 +84,7 @@ Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
 
 ## Production and development extras (all samples)
 
+- Error pages: `AddInertiaErrorPages()` and `UseInertiaErrorPages()` before `UseInertia()` render navigation errors in Production. Development keeps the diagnostic modal unless `E2E=1`.
 - Response compression (`AddResponseCompression()`) and `Cache-Control: public, max-age=31536000, immutable` for `/build/assets`.
 - Development only: the pages check (`o.Pages.Directory = "ClientApp/pages"`) and the Inertia DevTools recorder
   (`AddInertiaDevTools()`, `MapInertiaDevTools()`); install the browser extension to see the visits.
