@@ -101,13 +101,13 @@ Use the starter template: `dotnet new install Inertia.Net.Templates`, then `dotn
 
 URL: https://inertia-dotnet.temtem.dev/docs/why-inertia
 
-> What Inertia is, how it compares to React, Vue or Svelte with a Web API, and when to choose it.
+> What Inertia is, how it compares to React, Vue or Svelte with a Web API, and the features and prop types Inertia.Net adds.
 
-If you build a React, Vue or Svelte frontend on top of ASP.NET Core today, you probably have two projects: a Web API that returns JSON, and a single-page app (SPA) that calls it. Inertia lets you keep the modern frontend and drop the second half of that setup.
+## The short version
 
-## The idea in one minute
+If you build a React, Vue or Svelte frontend on ASP.NET Core today, you probably have two projects: a Web API that returns JSON, and a single-page app (SPA) that calls it. Inertia lets you keep the modern frontend and drop the second half of that setup.
 
-With Inertia, your ASP.NET Core endpoint does not return JSON. It returns the **name of a frontend page** and the **data that page needs**:
+Your endpoint does not return JSON. It returns the **name of a frontend page** and the **data that page needs**:
 
 ```csharp
 app.MapGet("/users", (UserStore users) =>
@@ -122,9 +122,15 @@ export default function Index({ users }: { users: { id: number; name: string }[]
 }
 ```
 
-The browser loads your app once. After that, clicking a link or submitting a form asks the server for the next page's props in the background, and Inertia swaps the component without a full reload. It feels like an SPA, but the server still decides what URL maps to what page.
+The first visit is a normal HTML response. After that, links and form submissions fetch the next page's props in the background and swap the component without a full reload. It feels like a SPA, but ASP.NET Core still owns routing, authentication and validation.
 
-## Inertia vs a SPA plus a Web API
+**Choose it when** one team ships the frontend and backend together: dashboards, admin tools, SaaS products, internal apps. **Skip it when** you need a public JSON API for mobile apps or third parties, or the frontend is a separate product with its own release cycle.
+
+Want to see it run? Try [First 10 minutes](/docs/first-10-minutes). Want the details? Keep reading.
+
+## In more detail
+
+### Inertia vs a SPA plus a Web API
 
 | | SPA + Web API | Inertia.Net |
 |---|---|---|
@@ -138,33 +144,72 @@ The browser loads your app once. After that, clicking a link or submitting a for
 
 You still write components, hooks and styles. What goes away is the glue: the API layer, the client router, and the code that keeps state in sync with the server.
 
-## Why a .NET developer might like it
+### Why a .NET developer might like it
 
-- **Controllers, Minimal APIs and FastEndpoints stay in charge.** Model binding, authorization, validation attributes and dependency injection work as they always have.
+- **Minimal APIs, MVC controllers and FastEndpoints stay in charge.** Model binding, authorization, validation attributes and dependency injection work as they always have.
 - **One deployment.** `dotnet publish` produces the server and the built frontend assets together.
 - **Security defaults you already know.** CSRF protection, cookies and policies are ASP.NET Core's, with [antiforgery wired up](/docs/csrf-and-antiforgery) for you.
-- **Pages are real URLs.** The first visit is a server-rendered HTML response, so links, refresh, back and bookmarks behave. Optional [server-side rendering](/docs/server-side-rendering) renders the first visit's HTML on the server.
+- **Pages are real URLs.** Links, refresh, back and bookmarks behave, and optional [server-side rendering](/docs/server-side-rendering) renders the first visit's HTML on the server.
 
-## When it is a good fit
+### Features
 
-Inertia suits applications where the frontend and backend ship together: dashboards, admin tools, SaaS products, internal apps, content sites with accounts. If one team owns both halves, it removes a lot of duplicated work.
+| Area | What you get | Learn more |
+|---|---|---|
+| Backends | Minimal APIs, MVC controllers and FastEndpoints on one core package | [Quick start](/docs/quick-start) |
+| Clients | React, Vue and Svelte with the Inertia.js v3 client | [Client setup](/docs/client-setup) |
+| Shared data | Props sent with every page, such as the signed-in user, set statically or per request | [Shared data](/docs/shared-data) |
+| Validation | Redirect back with errors before your handler runs, with named error bags | [Validation](/docs/validation-and-errors) |
+| Precognition | Validate a form before it is submitted, without running the handler | [Precognition](/docs/precognition) |
+| Flash data | One-time messages or typed values that survive a redirect | [Flash data](/docs/flash-data) |
+| Redirects and history | `Back()`, `Location()`, external redirects, history encryption and clearing | [Redirects and history](/docs/redirects-and-history) |
+| Error pages | Routing failures and unhandled exceptions rendered as Inertia pages | [Error pages](/docs/error-pages) |
+| Asset versioning | The client reloads once when your JavaScript or CSS changes | [Asset versioning](/docs/asset-versioning) |
+| Vite | Manifest and dev-server tags, CDN base URLs, prefetching and CSP nonces | [Vite](/docs/vite-integration) |
+| Server-side rendering | Render the first visit on Node or Bun, supervised by the app, with a fallback to client rendering | [SSR](/docs/server-side-rendering) |
+| CSRF | The `XSRF-TOKEN` cookie and `X-XSRF-TOKEN` header, configured for you | [CSRF](/docs/csrf-and-antiforgery) |
+| Multiple apps | Mount a second Inertia UI under its own path with its own shared props and root view | [Mounts](/docs/mounts) |
+| Native AOT | Minimal API apps publish as Native AOT, using source-generated JSON metadata | [Native AOT](/docs/native-aot) |
+| TypeScript | Generate declarations for page props, shared props and flash data from .NET types | [TypeScript types](/docs/typescript) |
+| Testing | Fluent assertions over Inertia responses, with helpers for partial reloads and deferred props | [Testing](/docs/testing) |
+| DevTools | Record visits for the Inertia DevTools extension and catch missing page components | [DevTools](/docs/devtools) |
 
-## When it is not
+### Prop features
 
-- **You need a public API anyway.** Mobile apps, third-party integrations or several different clients need real JSON endpoints. You can still build those next to your Inertia pages, but Inertia will not replace them.
+Props are the data a page receives, and most of the performance and user-experience features of Inertia are choices about how a prop is sent.
+
+| Prop type | In C# | What it does | Learn more |
+|---|---|---|---|
+| Plain | `["title"] = "Hi"` | Sent on every response that includes the key | [Props](/docs/props) |
+| Lazy | `Prop(() => ...)` | The loader runs only when the prop is part of the response | [Props](/docs/props) |
+| Always | `Always(value)` | Sent even when a partial reload does not ask for it | [Partial reloads](/docs/partial-reloads) |
+| Optional | `Optional(() => ...)` | Never sent on the first visit, only when a partial reload asks for it | [Partial reloads](/docs/partial-reloads) |
+| Deferred | `Defer(() => ..., group: "stats")` | Left out of the first response, then loaded right away so the page shows up sooner | [Deferred props](/docs/deferred-props) |
+| Merge | `Merge(value)`, `DeepMerge(value)` | The client appends or deep merges new data instead of replacing it | [Merging props](/docs/merging-props) |
+| Once | `Once(() => ...)` | Resolved once and remembered by the client, with optional expiry | [Once props](/docs/once-props) |
+| Infinite scroll | `Scroll(page, ...)` | Merges pages of items and reports paging metadata | [Infinite scroll](/docs/infinite-scroll) |
+| Rescued | `.Rescue()` | If its loader throws, the prop is left out and reported in `rescuedProps` instead of failing the whole page | [Props](/docs/props) |
+| Parallel | `.Parallel()` | Starts independent async loaders together instead of one after another | [Props](/docs/props) |
+| Cached | `.Cache(key, duration)` | Caches a loader's result between requests | [Props](/docs/props) |
+| Live | live props | Refresh themselves when the server broadcasts an event, over SignalR or your own transport | [Live props](/docs/live-props) |
+
+Partial reloads let the client ask for only some props (`only` and `except`), so a filter change or a poll does not recompute the whole page. See [Pagination](/docs/pagination) for the numbered and cursor pages that feed pagers and infinite scroll.
+
+### When it is not a good fit
+
+- **You need a public API anyway.** Mobile apps, third-party integrations or several different clients need real JSON endpoints. You can build those next to your Inertia pages, but Inertia will not replace them.
 - **The frontend is a separate product.** If another team deploys the frontend on its own schedule, a versioned API is the cleaner boundary.
 - **Heavy offline use.** Inertia expects the server for every page change.
 - **You want no JavaScript at all.** For server-rendered HTML with a little interactivity, Razor Pages or Blazor may be simpler.
 
-## What it is not
+### What it is not
 
-Inertia is not a framework and not a new frontend library. It is a small protocol between your server and the official [Inertia.js](https://inertiajs.com) client. Inertia.Net is the ASP.NET Core side of it. You keep using React, Vue or Svelte exactly as documented.
+Inertia is not a framework and not a new frontend library. It is a small protocol between your server and the official [Inertia.js](https://inertiajs.com) client, and Inertia.Net is the ASP.NET Core side of it. You keep using React, Vue or Svelte exactly as documented.
 
-## Try it
+## Next steps
 
 - [First 10 minutes](/docs/first-10-minutes) creates an app from the starter template and walks through a validated form.
 - [Quick start](/docs/quick-start) adds Inertia.Net to an existing ASP.NET Core app.
-- [Introduction](/docs/introduction) lists what the adapter provides.
+- [Introduction](/docs/introduction) summarizes what the adapter provides.
 
 ---
 

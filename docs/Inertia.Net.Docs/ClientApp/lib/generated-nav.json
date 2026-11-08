@@ -44,43 +44,53 @@
       "slug": "why-inertia",
       "url": "/docs/why-inertia",
       "title": "Why Inertia?",
-      "description": "What Inertia is, how it compares to React, Vue or Svelte with a Web API, and when to choose it.",
+      "description": "What Inertia is, how it compares to React, Vue or Svelte with a Web API, and the features and prop types Inertia.Net adds.",
       "section": "Get started",
       "order": 2,
       "headings": [
         {
-          "id": "the-idea-in-one-minute",
-          "text": "The idea in one minute",
+          "id": "the-short-version",
+          "text": "The short version",
+          "depth": 2
+        },
+        {
+          "id": "in-more-detail",
+          "text": "In more detail",
           "depth": 2
         },
         {
           "id": "inertia-vs-a-spa-plus-a-web-api",
           "text": "Inertia vs a SPA plus a Web API",
-          "depth": 2
+          "depth": 3
         },
         {
           "id": "why-a-net-developer-might-like-it",
           "text": "Why a .NET developer might like it",
-          "depth": 2
+          "depth": 3
         },
         {
-          "id": "when-it-is-a-good-fit",
-          "text": "When it is a good fit",
-          "depth": 2
+          "id": "features",
+          "text": "Features",
+          "depth": 3
         },
         {
-          "id": "when-it-is-not",
-          "text": "When it is not",
-          "depth": 2
+          "id": "prop-features",
+          "text": "Prop features",
+          "depth": 3
+        },
+        {
+          "id": "when-it-is-not-a-good-fit",
+          "text": "When it is not a good fit",
+          "depth": 3
         },
         {
           "id": "what-it-is-not",
           "text": "What it is not",
-          "depth": 2
+          "depth": 3
         },
         {
-          "id": "try-it",
-          "text": "Try it",
+          "id": "next-steps",
+          "text": "Next steps",
           "depth": 2
         }
       ]
