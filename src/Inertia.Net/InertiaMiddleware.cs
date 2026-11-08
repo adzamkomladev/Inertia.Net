@@ -273,7 +273,7 @@ public static class InertiaApplicationBuilderExtensions
         foreach (var mount in mounts.Names)
         {
             var state = monitor.Get(mount).State;
-            foreach (var cookie in (string[])[state.CookieName, state.PreviousUrlCookieName])
+            foreach (var cookie in new[] { state.CookieName, state.PreviousUrlCookieName })
             {
                 if (!seen.TryAdd(cookie, mount) && seen[cookie] != mount)
                     throw new InvalidOperationException($"The Inertia mounts '{seen[cookie]}' and '{mount}' both use the cookie '{cookie}'. Give each mount its own State.CookieName and State.PreviousUrlCookieName.");

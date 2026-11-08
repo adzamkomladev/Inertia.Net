@@ -14,10 +14,10 @@ public sealed class MountIsolationTests
 {
     private static async Task<WebApplication> StartAsync(Action<IServiceCollection>? services = null, Action<WebApplication>? beforeMounts = null)
     {
-        var root = Path.Combine(Path.GetTempPath(), "inertia-mounts-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Join(Path.GetTempPath(), "inertia-mounts-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        File.WriteAllText(Path.Combine(root, "app.html"), "<html><body data-root=\"host\">@inertia</body></html>");
-        File.WriteAllText(Path.Combine(root, "sp.html"), "<html><body data-root=\"sp\">@inertia</body></html>");
+        File.WriteAllText(Path.Join(root, "app.html"), "<html><body data-root=\"host\">@inertia</body></html>");
+        File.WriteAllText(Path.Join(root, "sp.html"), "<html><body data-root=\"sp\">@inertia</body></html>");
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = root, EnvironmentName = Environments.Production });
         builder.WebHost.UseTestServer();
         builder.Services.AddInertia(o =>
