@@ -2,7 +2,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.6.3** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.7.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -33,7 +33,7 @@ Inertia.Net **1.6.3** is a .NET 10 server adapter for the **Inertia.js v3** prot
 20. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
 21. [Vite integration](#vite-integration)
 22. [CSRF and antiforgery](#csrf-and-antiforgery)
-23. [Deploying behind a proxy](#deploying-behind-a-proxy)
+23. [Deploying behind a proxy](#deploying-behind-a-proxy) and [multiple apps and libraries](#multiple-apps-and-libraries)
 24. [Native AOT](#native-aot)
 25. [TypeScript types](#typescript-types), [DevTools](#devtools) and [development checks](#development-checks)
 26. [Testing](#testing)
@@ -80,7 +80,7 @@ You need the .NET 10 SDK and JavaScript frontend build tools. npm, Bun, pnpm and
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.3
+dotnet new install Inertia.Net.Templates::1.7.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -184,15 +184,15 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.6.3
-dotnet add package Inertia.Net.Mvc --version 1.6.3 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.6.3 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.3 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.6.3 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.6.3 # live props over SignalR
+dotnet add package Inertia.Net --version 1.7.0
+dotnet add package Inertia.Net.Mvc --version 1.7.0 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.7.0 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.7.0 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.7.0 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.6.3` for all Inertia.Net packages. Inertia.Net 1.6.3 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.7.0` for all Inertia.Net packages. Inertia.Net 1.7.0 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### Factory name collision
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -2120,6 +2120,40 @@ app.UseStaticFiles(new StaticFileOptions
 
 ---
 
+## Multiple apps and libraries
+
+A second Inertia UI, such as a dashboard library mounted under `/dashboard`, gets its own **mount**: a named `InertiaOptions`
+selected by `app.UseInertia(name)` in a `Map` branch. Each mount has its own shared props, asset version (the 409 check only
+compares against the mount's version), state and previous-URL cookies (`.Inertia.State.{name}`, `.Inertia.Previous.{name}`),
+root view, Vite manifest, SSR servers, TypeScript output and error pages. The default mount is `AddInertia(...)`/`UseInertia()`.
+
+```csharp
+builder.Services.AddInertia(o => o.Share("user", ctx => ctx.User.Identity?.Name));      // the host app
+builder.Services.AddInertia("dashboard", o =>
+{
+    o.Version = "dashboard-2.1.0";
+    o.Share("product", "Dashboard");
+});
+builder.Services.AddKeyedSingleton<IInertiaRootView, DashboardRootView>("dashboard");   // optional: an embedded template
+builder.Services.AddInertiaErrorPages("dashboard", o => o.Component = "Dashboard/Error"); // optional
+
+var app = builder.Build();
+app.Map("/dashboard", dashboard =>
+{
+    dashboard.UseInertia("dashboard");
+    dashboard.UseRouting();
+    dashboard.UseEndpoints(e => e.MapGet("/", () => Render("Dashboard/Index")));
+});
+app.UseInertia();
+```
+
+`Map` sets the path base, so page URLs, `Back()` fallbacks and asset URLs stay under `/dashboard`. Startup fails when
+`UseInertia(name)` names an unregistered mount or two mounts share a cookie name. The cache, live props, metrics (named mounts
+add an `inertia.mount` tag), DevTools and antiforgery are shared. `healthChecks.AddInertiaSsrForMount(name)` checks a
+mount's SSR servers. The page protocol does not change.
+
+---
+
 ## Native AOT
 
 `Inertia.Net`, `Inertia.Net.FastEndpoints` and `Inertia.Net.Live.SignalR` are annotated `IsAotCompatible` and a real app is published with Native AOT in CI (`tests/Inertia.Net.AotSmoke`, with zero trim and AOT warnings allowed). The library never reflects over your props: values are written with `JsonTypeInfo` from your `JsonSerializerContext`.
@@ -2517,9 +2551,9 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 
 | Option | Default | Description |
 |---|---|---|
-| `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
+| `CookieName` | `".Inertia.State"` (`".Inertia.State.{mount}"` for a named mount) | Cookie name (cookie store) or session key (session store). |
 | `RememberPreviousUrl` | `false` | Remember successful page GET URLs for `Back()` when Referer is unavailable. |
-| `PreviousUrlCookieName` | `".Inertia.Previous"` | Plain previous-URL cookie, with either state store; non-empty and different from `CookieName`. |
+| `PreviousUrlCookieName` | `".Inertia.Previous"` (`".Inertia.Previous.{mount}"` for a named mount) | Plain previous-URL cookie, with either state store; non-empty and different from `CookieName`. |
 | `CookieSecurePolicy` | `SameAsRequest` | When state and previous-URL cookies are `Secure`. `Always` behind a TLS-terminating proxy that does not forward the scheme. |
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. The session is only loaded when the request has a session cookie. |
 | `AddInertiaMvc(o => o.UseTempDataStateStore())` | off | Use MVC TempData (cookie or session provider) instead of the encrypted cookie. Inertia.Net.Mvc package. |
@@ -2541,6 +2575,8 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | `services.AddInertia(configure?)` | Registers services and options. |
 | `services.AddInertiaErrorPages(configure?)` / `app.UseInertiaErrorPages(useExceptionHandler: true)` | Registers error page handling and wraps the pipeline before `UseInertia()`. Set the flag to `false` when using your own `UseExceptionHandler()`. |
 | `app.UseInertia()` | The protocol middleware. Before the endpoints, after `UseSession()` when the session store is used. |
+| `services.AddInertia(name, configure)` / `app.UseInertia(name)` | A named [mount](#multiple-apps-and-libraries): its own options, version, state cookie, root view (keyed `IInertiaRootView`) and SSR, selected in a `Map` branch. `httpContext.Inertia().Mount` is the request's mount (null for the default). |
+| `services.AddInertiaErrorPages(name, configure)` | Error pages of a named mount. A mount without them leaves its errors to the pipeline. |
 | `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates every unsafe request (`419` on failure). Options: `CookieName`, `SecurePolicy`, `ShouldValidate`, `OnRejected`, `CookieRefresh` (`Always`, `Lazy`). |
 | `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |
 | `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder (`Enabled`, `Authorize`, `MaxEntriesPerTab`, `MaxEntries`, `MaxAge`, `MaxBodyBytes`, `RedactedKeys`) and its read API. |
@@ -2548,6 +2584,7 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | `endpoint.WithInertiaValidation()` | Minimal API: validation failures redirect back with errors. Endpoint or group. |
 | `endpoint.WithInertiaPrecognition()` | Minimal API: `WithInertiaValidation()` plus Precognition. |
 | `healthChecks.AddInertiaSsr(name = "inertia-ssr", failureStatus?, tags?, timeout?)` | SSR health check, from the gateway's state (no call to the servers). |
+| `healthChecks.AddInertiaSsrForMount(mount, name?, failureStatus?, tags?, timeout?)` | SSR health check of a named mount (default name `inertia-ssr-{mount}`). |
 | `mvc.AddInertiaMvc(o => o.UseRazorRootView("App"))` | MVC filter, optional Razor root view, `ComponentResolver` for `this.InertiaView(props)`. |
 | `config.ConfigureInertia(configure?)` | FastEndpoints: validation redirect and Precognition (`app.UseFastEndpoints(c => ...)`). |
 | `Render(component, props?)` | `InertiaResult`: `.WithStatusCode(int)`, `.WithRootView(string)`, `.WithViewData(key, value)`, `.WithSsr(SsrMode)`, `.WithoutSsr()`, `.WithSsrCache(TimeSpan[, staleFor])`. |

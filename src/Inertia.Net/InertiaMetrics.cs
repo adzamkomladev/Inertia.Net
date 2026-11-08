@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
 
 namespace Inertia.Net;
@@ -32,7 +33,7 @@ internal sealed class InertiaMetrics
     private readonly Counter<long> _processRestarts;
     private readonly Counter<long> _rescued;
     private readonly Counter<long> _droppedRefreshes;
-    private Func<IEnumerable<Measurement<int>>>? _circuitStates;
+    private Func<IEnumerable<Measurement<int>>>[] _circuitStates = [];
 
     public InertiaMetrics(IMeterFactory meterFactory)
     {
@@ -48,46 +49,59 @@ internal sealed class InertiaMetrics
         _processRestarts = meter.CreateCounter<long>("inertia.ssr.process.restarts", "{restart}", "Managed Node SSR process restarts.");
         _rescued = meter.CreateCounter<long>("inertia.props.rescued", "{prop}", "Props whose loader failed and that were rescued (left out and listed in rescuedProps).");
         _droppedRefreshes = meter.CreateCounter<long>("inertia.cache.refresh.dropped", "{refresh}", "Cache refreshes dropped because the background queue is full or stopping.");
-        meter.CreateObservableGauge("inertia.ssr.circuit.state", () => _circuitStates?.Invoke() ?? [], "{state}", "SSR circuit state per server: 0 closed, 1 half-open, 2 open.");
+        meter.CreateObservableGauge("inertia.ssr.circuit.state", () => _circuitStates.SelectMany(static states => states()), "{state}", "SSR circuit state per server: 0 closed, 1 half-open, 2 open.");
     }
 
-    /// <summary>Supplies the per-server circuit states for the observable gauge.</summary>
-    public void ObserveCircuits(Func<IEnumerable<Measurement<int>>> states) => _circuitStates = states;
+    /// <summary>Supplies the per-server circuit states for the observable gauge (one source per mount's SSR gateway).</summary>
+    public void ObserveCircuits(Func<IEnumerable<Measurement<int>>> states) => ImmutableInterlocked.Update(ref _circuitStates, (all, add) => [.. all, add], states);
 
     public bool PageDurationEnabled => _pageDuration.Enabled;
 
     // Boxed once: a bool tag value would otherwise be boxed on every recorded render.
     private static readonly object True = true, False = false;
 
-    public void RecordPage(double seconds, long bytes, bool json, bool partial)
+    public void RecordPage(double seconds, long bytes, bool json, bool partial, string? mount = null)
     {
-        var response = new KeyValuePair<string, object?>("inertia.response", json ? "json" : "html");
-        if (_pageDuration.Enabled)
-        {
-            _pageDuration.Record(seconds, response, new KeyValuePair<string, object?>("inertia.partial", partial ? True : False));
-        }
-
+        var tags = Tags(mount, new("inertia.response", json ? "json" : "html"));
         if (_pageSize.Enabled)
         {
-            _pageSize.Record(bytes, response);
+            _pageSize.Record(bytes, tags);
+        }
+
+        if (_pageDuration.Enabled)
+        {
+            tags.Add("inertia.partial", partial ? True : False);
+            _pageDuration.Record(seconds, tags);
         }
     }
+
+    // The inertia.mount tag is only added for a named mount, so the default mount's series are unchanged.
+    private static TagList Tags(string? mount, KeyValuePair<string, object?> tag)
+    {
+        var tags = new TagList { tag };
+        if (mount is not null) tags.Add(MountTag, mount);
+        return tags;
+    }
+
+    internal const string MountTag = "inertia.mount";
 
     public bool SsrDurationEnabled => _ssrDuration.Enabled;
 
-    public void RecordSsr(double seconds, string outcome)
+    public void RecordSsr(double seconds, string outcome, string? mount = null)
     {
         if (_ssrDuration.Enabled)
         {
-            _ssrDuration.Record(seconds, new KeyValuePair<string, object?>("inertia.ssr.outcome", outcome));
+            _ssrDuration.Record(seconds, Tags(mount, new("inertia.ssr.outcome", outcome)));
         }
     }
 
-    public void RecordOutcome(string outcome, string reason)
+    public void RecordOutcome(string outcome, string reason, string? mount = null)
     {
         if (_ssrOutcomes.Enabled)
         {
-            _ssrOutcomes.Add(1, new KeyValuePair<string, object?>("inertia.ssr.outcome", outcome), new KeyValuePair<string, object?>("inertia.ssr.reason", reason));
+            var tags = Tags(mount, new("inertia.ssr.outcome", outcome));
+            tags.Add("inertia.ssr.reason", reason);
+            _ssrOutcomes.Add(1, tags);
         }
     }
 

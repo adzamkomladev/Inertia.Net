@@ -1070,6 +1070,46 @@
       ]
     },
     {
+      "slug": "mounts",
+      "url": "/docs/mounts",
+      "title": "Multiple apps and libraries",
+      "description": "Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.",
+      "section": "Production",
+      "order": 8,
+      "headings": [
+        {
+          "id": "what-a-mount-keeps-to-itself",
+          "text": "What a mount keeps to itself",
+          "depth": 2
+        },
+        {
+          "id": "register-and-map-a-mount",
+          "text": "Register and map a mount",
+          "depth": 2
+        },
+        {
+          "id": "a-root-view-shipped-by-a-library",
+          "text": "A root view shipped by a library",
+          "depth": 2
+        },
+        {
+          "id": "error-pages-per-mount",
+          "text": "Error pages per mount",
+          "depth": 2
+        },
+        {
+          "id": "ssr-health-checks-and-typescript",
+          "text": "SSR, health checks and TypeScript",
+          "depth": 2
+        },
+        {
+          "id": "for-library-authors",
+          "text": "For library authors",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "configuration",
       "url": "/docs/configuration",
       "title": "Configuration",

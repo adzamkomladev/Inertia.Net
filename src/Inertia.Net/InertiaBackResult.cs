@@ -69,7 +69,7 @@ public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult
         }
 
         httpContext.Response.StatusCode = StatusCodes.Status302Found;
-        httpContext.Response.Headers.Location = GetBackUrl(httpContext.Request, Fallback, httpContext.RequestServices?.GetService<IOptions<InertiaOptions>>()?.Value.State);
+        httpContext.Response.Headers.Location = GetBackUrl(httpContext.Request, Fallback, InertiaMountServices.Options(httpContext)?.State);
         return Task.CompletedTask;
     }
 

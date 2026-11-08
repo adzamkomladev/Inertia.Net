@@ -18,8 +18,13 @@ public sealed class InertiaFeature
     /// The remembered previous page URL, or null when disabled, missing or invalid. User-controlled input, validated only as a relative path.
     /// </summary>
     public string? PreviousUrl => Context is { } context
-        ? PreviousUrlCookie.Read(context.Request, context.RequestServices?.GetService<IOptions<InertiaOptions>>()?.Value.State)
+        ? PreviousUrlCookie.Read(context.Request, InertiaMountServices.Options(context)?.State)
         : null;
+
+    /// <summary>
+    /// The mount selected by <c>app.UseInertia(name)</c> for this request (see <c>services.AddInertia(name, ...)</c>), or null for the default mount.
+    /// </summary>
+    public string? Mount { get; internal set; }
 
     // Effective state: pending writes override restored entries.
     private Dictionary<string, object?>? _flash;
@@ -164,4 +169,26 @@ public static class InertiaHttpContextExtensions
         ArgumentNullException.ThrowIfNull(httpContext);
         return new InertiaRequest(httpContext.Request.Headers);
     }
+}
+
+/// <summary>Resolves the services of the request's mount: keyed by <see cref="InertiaFeature.Mount"/>, or unkeyed for the default mount.</summary>
+internal static class InertiaMountServices
+{
+    public static string? Mount(HttpContext context) => context.Features.Get<InertiaFeature>()?.Mount;
+
+    public static InertiaPageWriter? PageWriter(HttpContext context) => Mount(context) is { } mount
+        ? context.RequestServices?.GetKeyedService<InertiaPageWriter>(mount)
+        : context.RequestServices?.GetService<InertiaPageWriter>();
+
+    public static IInertiaRootView RootView(HttpContext context) => Mount(context) is { } mount
+        ? context.RequestServices.GetRequiredKeyedService<IInertiaRootView>(mount)
+        : context.RequestServices.GetRequiredService<IInertiaRootView>();
+
+    public static IInertiaSsrRenderer? SsrRenderer(HttpContext context) => Mount(context) is { } mount
+        ? context.RequestServices?.GetKeyedService<IInertiaSsrRenderer>(mount)
+        : context.RequestServices?.GetService<IInertiaSsrRenderer>();
+
+    public static InertiaOptions? Options(HttpContext context) => Mount(context) is { } mount
+        ? context.RequestServices?.GetService<IOptionsMonitor<InertiaOptions>>()?.Get(mount)
+        : context.RequestServices?.GetService<IOptions<InertiaOptions>>()?.Value;
 }

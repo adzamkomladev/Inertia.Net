@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
 
@@ -8,11 +9,35 @@ namespace Inertia.Net;
 /// <summary>Registers Inertia.Net services.</summary>
 public static class InertiaServiceCollectionExtensions
 {
-    /// <summary>Adds the Inertia.Net services and options.</summary>
-    public static IServiceCollection AddInertia(this IServiceCollection services, Action<InertiaOptions>? configure = null)
+#pragma warning disable RS0027 // the shipped overload keeps its optional parameter; the named overload is new
+    /// <summary>Adds the Inertia.Net services and the options of the default mount.</summary>
+    public static IServiceCollection AddInertia(this IServiceCollection services, Action<InertiaOptions>? configure = null) =>
+        AddInertia(services, Options.DefaultName, configure);
+#pragma warning restore RS0027
+
+    /// <summary>
+    /// Adds the Inertia.Net services and the options of the mount <paramref name="name"/>: its own shared props, asset version,
+    /// state cookie (default <c>.Inertia.State.{name}</c>), root view, Vite manifest and SSR. Select the mount with
+    /// <c>app.UseInertia(name)</c>, usually in an <c>app.Map("/path", ...)</c> branch. A keyed <see cref="IInertiaRootView"/>
+    /// registered under <paramref name="name"/> replaces the mount's root template. <c>""</c> is the default mount.
+    /// Calling it again for the same name adds to that mount's configuration.
+    /// </summary>
+    public static IServiceCollection AddInertia(this IServiceCollection services, string name, Action<InertiaOptions>? configure)
     {
         ArgumentNullException.ThrowIfNull(services);
-        var options = services.AddOptions<InertiaOptions>();
+        ArgumentNullException.ThrowIfNull(name);
+        var options = services.AddOptions<InertiaOptions>(name);
+        if (GetMounts(services).Names.Add(name) && name.Length > 0)
+        {
+            options.Configure(o =>
+            {
+                o.Mount = name;
+                o.State.CookieName = InertiaStateOptions.DefaultCookieName + "." + name;
+                o.State.PreviousUrlCookieName = InertiaStateOptions.DefaultPreviousUrlCookieName + "." + name;
+            });
+            AddMount(services, name);
+        }
+
         if (configure is not null)
         {
             options.Configure(configure);
@@ -59,18 +84,73 @@ public static class InertiaServiceCollectionExtensions
         return services;
     }
 
+    private static InertiaMounts GetMounts(IServiceCollection services)
+    {
+        if (services.FirstOrDefault(d => d.ServiceType == typeof(InertiaMounts) && !d.IsKeyedService)?.ImplementationInstance is InertiaMounts mounts)
+        {
+            return mounts;
+        }
+
+        mounts = new InertiaMounts();
+        services.AddSingleton(mounts);
+        return mounts;
+    }
+
+    // The per-mount services of a named mount, keyed by its name; the default mount keeps the unkeyed registrations above.
+    private static void AddMount(IServiceCollection services, string name)
+    {
+        services.AddKeyedSingleton(name, (sp, _) => new ViteAssets(MountOptions(sp, name), sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddKeyedSingleton(name, (sp, _) => new VersionProvider(MountOptions(sp, name), sp.GetRequiredKeyedService<ViteAssets>(name)));
+        services.AddKeyedSingleton(name, (sp, _) => new PageComponentCheck(MountOptions(sp, name), sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddKeyedSingleton(name, (sp, _) => ActivatorUtilities.CreateInstance<SsrNodeProcess>(sp, MountOptions(sp, name), sp.GetRequiredKeyedService<ViteAssets>(name)));
+        services.AddKeyedSingleton(name, (sp, _) => ActivatorUtilities.CreateInstance<SsrGateway>(sp,
+            MountOptions(sp, name), sp.GetRequiredKeyedService<ViteAssets>(name), sp.GetRequiredKeyedService<SsrNodeProcess>(name)));
+        services.AddKeyedSingleton<IInertiaSsrRenderer>(name, (sp, _) => sp.GetRequiredKeyedService<SsrGateway>(name));
+        services.AddKeyedSingleton(name, (sp, _) => ActivatorUtilities.CreateInstance<InertiaPageWriter>(sp,
+            MountOptions(sp, name), sp.GetRequiredKeyedService<VersionProvider>(name), sp.GetRequiredKeyedService<PageComponentCheck>(name)));
+        services.TryAddKeyedSingleton<IInertiaRootView>(name, (sp, _) => new RootTemplateView(sp.GetRequiredService<IHostEnvironment>(),
+            sp.GetRequiredKeyedService<ViteAssets>(name), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredKeyedService<IInertiaSsrRenderer>(name)));
+        services.TryAddKeyedSingleton<IInertiaStateStore>(name, (sp, _) => MountOptions(sp, name).Value.State.UsesSession
+            ? ActivatorUtilities.CreateInstance<SessionInertiaStateStore>(sp, MountOptions(sp, name))
+            : ActivatorUtilities.CreateInstance<CookieInertiaStateStore>(sp, MountOptions(sp, name)));
+        // Not AddHostedService: it skips a second hosted service of the same type, and each mount needs its own.
+        services.AddSingleton<IHostedService>(sp => sp.GetRequiredKeyedService<SsrNodeProcess>(name));
+        services.AddSingleton<IHostedService>(sp => ActivatorUtilities.CreateInstance<InertiaTypeScriptWriter>(sp,
+            MountOptions(sp, name), sp.GetRequiredKeyedService<InertiaPageWriter>(name)));
+    }
+
+    private static IOptions<InertiaOptions> MountOptions(IServiceProvider services, string name) =>
+        Options.Create(services.GetRequiredService<IOptionsMonitor<InertiaOptions>>().Get(name));
+
+#pragma warning disable RS0027 // the shipped overload keeps its optional parameter; the named overload is new
     /// <summary>
     /// Registers Inertia error page options and an exception handler. Also call <c>AddInertia()</c>.
     /// Register application exception handlers first if they should take precedence.
     /// </summary>
-    public static IServiceCollection AddInertiaErrorPages(this IServiceCollection services, Action<InertiaErrorPagesOptions>? configure = null)
+    public static IServiceCollection AddInertiaErrorPages(this IServiceCollection services, Action<InertiaErrorPagesOptions>? configure = null) =>
+        AddInertiaErrorPages(services, Options.DefaultName, configure);
+#pragma warning restore RS0027
+
+    /// <summary>
+    /// Registers the error pages of the mount <paramref name="name"/> (see <c>AddInertia(name, ...)</c>): its requests render
+    /// these components. A named mount without its own error pages leaves its errors to the pipeline. Also call
+    /// <c>app.UseInertiaErrorPages()</c> in the mount's branch, before <c>UseInertia(name)</c>, or once before the branch.
+    /// </summary>
+    public static IServiceCollection AddInertiaErrorPages(this IServiceCollection services, string name, Action<InertiaErrorPagesOptions>? configure)
     {
         ArgumentNullException.ThrowIfNull(services);
-        var options = services.AddOptions<InertiaErrorPagesOptions>();
+        ArgumentNullException.ThrowIfNull(name);
+        var options = services.AddOptions<InertiaErrorPagesOptions>(name);
         if (configure is not null) options.Configure(configure);
         options.ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<InertiaErrorPagesOptions>, InertiaErrorPagesOptionsValidator>());
-        services.TryAddSingleton<InertiaErrorPagesRegistration>();
+        if (services.FirstOrDefault(d => d.ServiceType == typeof(InertiaErrorPagesRegistration) && !d.IsKeyedService)?.ImplementationInstance is InertiaErrorPagesRegistration registration)
+        {
+            registration.Mounts.Add(name);
+            return services;
+        }
+
+        services.AddSingleton(new InertiaErrorPagesRegistration { Mounts = { name } });
         // The built-in middleware needs a fallback even when every registered IExceptionHandler declines.
         services.AddProblemDetails();
         services.AddExceptionHandler<InertiaExceptionHandler>();
@@ -89,4 +169,13 @@ public static class InertiaServiceCollectionExtensions
     }
 }
 
-internal sealed class InertiaErrorPagesRegistration;
+internal sealed class InertiaErrorPagesRegistration
+{
+    public HashSet<string> Mounts { get; } = new(StringComparer.Ordinal);
+}
+
+/// <summary>The mount names registered with <c>AddInertia</c>; <c>""</c> is the default mount.</summary>
+internal sealed class InertiaMounts
+{
+    public HashSet<string> Names { get; } = new(StringComparer.Ordinal);
+}

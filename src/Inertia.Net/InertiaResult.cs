@@ -103,7 +103,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     {
         ArgumentNullException.ThrowIfNull(httpContext);
         var services = httpContext.RequestServices;
-        var pageWriter = services.GetService<InertiaPageWriter>()
+        var pageWriter = InertiaMountServices.PageWriter(httpContext)
             ?? throw new InvalidOperationException("Inertia.Net services are not registered. Call services.AddInertia() at startup.");
         var metrics = services.GetService<InertiaMetrics>();
         var started = metrics?.PageDurationEnabled == true ? Stopwatch.GetTimestamp() : 0;
@@ -136,12 +136,12 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
             response.ContentType = "application/json; charset=utf-8";
             response.ContentLength = page.WrittenMemory.Length;
             await response.BodyWriter.WriteAsync(page.WrittenMemory, httpContext.RequestAborted);
-            metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: true, partial);
+            metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: true, partial, pageWriter.Options.Mount);
             return;
         }
 
         response.ContentType = "text/html; charset=utf-8";
-        var rootView = services.GetRequiredService<IInertiaRootView>();
+        var rootView = InertiaMountServices.RootView(httpContext);
         await rootView.RenderAsync(new InertiaRootViewContext(
             httpContext,
             Component,
@@ -158,7 +158,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
             await response.BodyWriter.WriteAsync(DevToolsRecorder.DiscoveryTag(devTools.Id), httpContext.RequestAborted);
         }
 
-        metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: false, partial);
+        metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: false, partial, pageWriter.Options.Mount);
     }
 
     /// <inheritdoc />

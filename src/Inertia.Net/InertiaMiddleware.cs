@@ -27,10 +27,12 @@ internal sealed class InertiaMiddleware
     private readonly InertiaPageWriter _pageWriter;
     private readonly Func<object, Task> _onStarting;
     private readonly DevToolsRecorder? _devTools;
+    private readonly string? _mount;
 
     public InertiaMiddleware(RequestDelegate next, VersionProvider versionProvider, IInertiaStateStore store, InertiaPageWriter pageWriter, DevToolsRecorder? devTools = null)
     {
         _next = next;
+        _mount = pageWriter.Options.Mount;
         _devTools = devTools;
         _versionProvider = versionProvider;
         _store = store;
@@ -43,6 +45,10 @@ internal sealed class InertiaMiddleware
         var request = httpContext.Request;
         var response = httpContext.Response;
         var isInertia = IsInertia(request);
+        if (_mount is not null)
+        {
+            httpContext.Inertia().Mount = _mount; // first, so the result, error pages and option readers use this mount
+        }
 
         if (isInertia && HttpMethods.IsGet(request.Method) && !_versionProvider.Matches(httpContext))
         {
@@ -226,19 +232,52 @@ public static class InertiaApplicationBuilderExtensions
     /// redirects, and carrying flash data/errors/history flags across redirects. Call it before the endpoints
     /// (and after <c>UseSession()</c> when the session state store is used).
     /// </summary>
-    public static IApplicationBuilder UseInertia(this IApplicationBuilder app)
+    public static IApplicationBuilder UseInertia(this IApplicationBuilder app) => UseInertia(app, Options.DefaultName);
+
+    /// <summary>
+    /// Adds the Inertia protocol middleware for the mount <paramref name="name"/> registered with
+    /// <c>services.AddInertia(name, ...)</c>: requests through it use that mount's options, asset version, state cookie and root view.
+    /// Call it in the branch that serves the mount, e.g. inside <c>app.Map("/dashboard", branch =&gt; ...)</c>, before routing.
+    /// <c>""</c> is the default mount.
+    /// </summary>
+    public static IApplicationBuilder UseInertia(this IApplicationBuilder app, string name)
     {
         ArgumentNullException.ThrowIfNull(app);
+        ArgumentNullException.ThrowIfNull(name);
         var services = app.ApplicationServices;
-        var versionProvider = services.GetService<VersionProvider>()
+        var named = name.Length > 0;
+        if (named)
+        {
+            if (services.GetService<InertiaMounts>() is not { } mounts || !mounts.Names.Contains(name))
+                throw new InvalidOperationException($"The Inertia mount '{name}' is not registered. Call services.AddInertia(\"{name}\", ...) at startup.");
+            EnsureDistinctStateCookies(services, mounts);
+        }
+
+        var versionProvider = (named ? services.GetKeyedService<VersionProvider>(name) : services.GetService<VersionProvider>())
             ?? throw new InvalidOperationException("Inertia.Net services are not registered. Call services.AddInertia() at startup.");
-        var store = services.GetRequiredService<IInertiaStateStore>();
-        var pageWriter = services.GetRequiredService<InertiaPageWriter>();
+        var store = named ? services.GetRequiredKeyedService<IInertiaStateStore>(name) : services.GetRequiredService<IInertiaStateStore>();
+        var pageWriter = named ? services.GetRequiredKeyedService<InertiaPageWriter>(name) : services.GetRequiredService<InertiaPageWriter>();
         var devTools = services.GetService<DevToolsRecorder>() is { Enabled: true } recorder ? recorder : null;
         return app.Use(next =>
         {
             var middleware = new InertiaMiddleware(next, versionProvider, store, pageWriter, devTools);
             return devTools is null ? middleware.InvokeAsync : middleware.InvokeRecordedAsync;
         });
+    }
+
+    // Mounts share the request's cookies: one mount reading another's state cookie would render (and consume) its flash.
+    private static void EnsureDistinctStateCookies(IServiceProvider services, InertiaMounts mounts)
+    {
+        var monitor = services.GetRequiredService<IOptionsMonitor<InertiaOptions>>();
+        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var mount in mounts.Names)
+        {
+            var state = monitor.Get(mount).State;
+            foreach (var cookie in (string[])[state.CookieName, state.PreviousUrlCookieName])
+            {
+                if (!seen.TryAdd(cookie, mount) && seen[cookie] != mount)
+                    throw new InvalidOperationException($"The Inertia mounts '{seen[cookie]}' and '{mount}' both use the cookie '{cookie}'. Give each mount its own State.CookieName and State.PreviousUrlCookieName.");
+            }
+        }
     }
 }
