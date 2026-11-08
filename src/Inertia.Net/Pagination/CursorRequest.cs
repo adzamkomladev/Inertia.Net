@@ -35,7 +35,7 @@ public sealed record CursorRequest(string? Cursor = null, int PerPage = 20)
     {
         ArgumentNullException.ThrowIfNull(context);
         var services = context.RequestServices;
-        var options = services?.GetService<IOptions<InertiaOptions>>()?.Value.Pagination;
+        var options = InertiaMountServices.Options(context)?.Pagination;
         return FromQuery(context.Request.Query, defaultPerPage ?? options?.DefaultPerPage ?? 20, maxPerPage ?? options?.MaxPerPage ?? 100,
             cursorName ?? options?.CursorName ?? "cursor", perPageName ?? options?.PerPageName ?? "perPage",
             services?.GetService<ILoggerFactory>()?.CreateLogger("Inertia.Net.Pagination"));

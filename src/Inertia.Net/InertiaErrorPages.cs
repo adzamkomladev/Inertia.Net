@@ -18,7 +18,12 @@ internal static class InertiaErrorPages
     internal static async ValueTask<bool> TryRenderAsync(HttpContext context, Exception? exception)
     {
         var services = context.RequestServices;
-        var options = services.GetRequiredService<IOptions<InertiaErrorPagesOptions>>().Value;
+        // Each mount renders only the error components it registered: another mount's would not exist in its bundle.
+        var mount = InertiaMountServices.Mount(context);
+        if (services.GetService<InertiaErrorPagesRegistration>()?.Mounts.Contains(mount ?? "") != true) return false;
+        var options = mount is null
+            ? services.GetRequiredService<IOptions<InertiaErrorPagesOptions>>().Value
+            : services.GetRequiredService<IOptionsMonitor<InertiaErrorPagesOptions>>().Get(mount);
         var status = context.Response.StatusCode;
         if (context.Response.HasStarted || status is 409 or 419 || !options.StatusCodes.Contains(status)
             || (!options.EnabledInDevelopment && services.GetRequiredService<IHostEnvironment>().IsDevelopment())

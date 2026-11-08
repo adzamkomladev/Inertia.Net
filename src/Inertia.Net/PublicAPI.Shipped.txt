@@ -629,3 +629,8 @@ static Inertia.Net.ScrollMetadata.operator ==(Inertia.Net.ScrollMetadata? left, 
 ~override Inertia.Net.Cursor<TKey>.ToString() -> string
 ~override Inertia.Net.InertiaCacheKey.Equals(object obj) -> bool
 ~override Inertia.Net.LiveChannel.Equals(object obj) -> bool
+Inertia.Net.InertiaFeature.Mount.get -> string?
+static Inertia.Net.InertiaApplicationBuilderExtensions.UseInertia(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, string! name) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static Inertia.Net.InertiaServiceCollectionExtensions.AddInertia(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<Inertia.Net.InertiaOptions!>? configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Inertia.Net.InertiaServiceCollectionExtensions.AddInertiaErrorPages(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<Inertia.Net.InertiaErrorPagesOptions!>? configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Inertia.Net.InertiaSsrHealthChecksBuilderExtensions.AddInertiaSsrForMount(this Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder! builder, string! mount, string? name = null, Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus? failureStatus = null, System.Collections.Generic.IEnumerable<string!>? tags = null, System.TimeSpan? timeout = null) -> Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder!

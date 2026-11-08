@@ -2,10 +2,13 @@ using Microsoft.AspNetCore.Http;
 
 namespace Inertia.Net;
 
-/// <summary>Inertia.Net configuration, set with <see cref="InertiaServiceCollectionExtensions.AddInertia"/>.</summary>
+/// <summary>Inertia.Net configuration, set with <see cref="InertiaServiceCollectionExtensions.AddInertia(Microsoft.Extensions.DependencyInjection.IServiceCollection, string, Action{InertiaOptions})"/>.</summary>
 public sealed class InertiaOptions
 {
     internal Dictionary<string, object?> SharedProps { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>The mount these options belong to; null for the default mount.</summary>
+    internal string? Mount { get; set; }
 
     /// <summary>The root view rendered on the first (non-Inertia) visit, relative to the content root. Default <c>app.html</c>.</summary>
     public string RootView { get; set; } = "app.html";
@@ -361,14 +364,16 @@ public sealed class SsrNodeProcessOptions
 /// <summary>Settings for the store that carries flash data, errors and history flags across redirects.</summary>
 public sealed class InertiaStateOptions
 {
-    /// <summary>The cookie name (cookie store) or session key (session store). Default <c>.Inertia.State</c>.</summary>
-    public string CookieName { get; set; } = ".Inertia.State";
+    /// <summary>The cookie name (cookie store) or session key (session store). Default <c>.Inertia.State</c> (<c>.Inertia.State.{mount}</c> for a named mount).</summary>
+    public string CookieName { get; set; } = DefaultCookieName;
+
+    internal const string DefaultCookieName = ".Inertia.State", DefaultPreviousUrlCookieName = ".Inertia.Previous";
 
     /// <summary>Remembers successful page GET URLs in a cookie for redirects when Referer is unavailable. Default false.</summary>
     public bool RememberPreviousUrl { get; set; }
 
-    /// <summary>The previous-URL session cookie name, used with either state store. Default <c>.Inertia.Previous</c>.</summary>
-    public string PreviousUrlCookieName { get; set; } = ".Inertia.Previous";
+    /// <summary>The previous-URL session cookie name, used with either state store. Default <c>.Inertia.Previous</c> (<c>.Inertia.Previous.{mount}</c> for a named mount).</summary>
+    public string PreviousUrlCookieName { get; set; } = DefaultPreviousUrlCookieName;
 
     /// <summary>
     /// When state and previous-URL cookies are marked <c>Secure</c>. Default <see cref="CookieSecurePolicy.SameAsRequest"/>; use

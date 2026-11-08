@@ -29,7 +29,7 @@ public sealed record PageRequest(int Page = 1, int PerPage = 20)
     /// <summary>Binds a request from the current HTTP query and configured defaults.</summary>
     public static ValueTask<PageRequest?> BindAsync(HttpContext context)
     {
-        var options = context.RequestServices.GetRequiredService<IOptions<InertiaOptions>>().Value.Pagination;
+        var options = (InertiaMountServices.Options(context) ?? context.RequestServices.GetRequiredService<IOptions<InertiaOptions>>().Value).Pagination;
         return ValueTask.FromResult<PageRequest?>(From(context.Request.Query, options.DefaultPerPage, options.MaxPerPage, options.PageName, options.PerPageName));
     }
 }

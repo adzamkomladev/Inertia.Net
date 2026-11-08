@@ -87,6 +87,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
 
     // Rendered HTML by page JSON hash (bounded by Ssr.Cache.MaxBytes in the default store); only filled for responses that use the cache.
     private readonly InertiaCaching _caching;
+    private readonly string? _mount;
 
     public SsrGateway(
         IOptions<InertiaOptions> options,
@@ -101,6 +102,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         ILogger<SsrGateway> logger)
     {
         _ssr = options.Value.Ssr;
+        _mount = options.Value.Mount;
         _vite = vite;
         _httpClients = httpClients;
         _nodeProcess = nodeProcess;
@@ -193,7 +195,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
                 ScheduleRefresh(http, key, context.PageJson, duration, staleFor);
             }
 
-            _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache");
+            _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache", _mount);
             return new SsrRender(hit.Head, hit.Body);
         }
 
@@ -243,7 +245,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         SsrRender Cached(CachedRender hit)
         {
             if (hit.IsStale) ScheduleRefresh(http, key, context.PageJson, duration, staleFor);
-            _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache");
+            _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache", _mount);
             return new SsrRender(hit.Head, hit.Body);
         }
     }
@@ -362,12 +364,12 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         var outcome = render is not null ? "rendered" : "fallback";
         if (_metrics.SsrDurationEnabled)
         {
-            _metrics.RecordSsr(Stopwatch.GetElapsedTime(started).TotalSeconds, outcome);
+            _metrics.RecordSsr(Stopwatch.GetElapsedTime(started).TotalSeconds, outcome, _mount);
         }
 
         if (render is not null)
         {
-            _metrics.RecordOutcome(outcome, "ok");
+            _metrics.RecordOutcome(outcome, "ok", _mount);
         }
 
         if (activity is not null)
@@ -704,14 +706,18 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     {
         foreach (var endpoint in _endpoints)
         {
-            yield return new((int)endpoint.Breaker.State, new KeyValuePair<string, object?>("inertia.ssr.endpoint", endpoint.Name));
+            yield return CircuitState(endpoint.Breaker.State, endpoint.Name);
         }
 
         if (_dev is { } dev)
         {
-            yield return new((int)dev[0].Breaker.State, new KeyValuePair<string, object?>("inertia.ssr.endpoint", "dev"));
+            yield return CircuitState(dev[0].Breaker.State, "dev");
         }
     }
+
+    private System.Diagnostics.Metrics.Measurement<int> CircuitState(SsrCircuitState state, string endpoint) => _mount is null
+        ? new((int)state, new KeyValuePair<string, object?>("inertia.ssr.endpoint", endpoint))
+        : new((int)state, new KeyValuePair<string, object?>("inertia.ssr.endpoint", endpoint), new KeyValuePair<string, object?>(InertiaMetrics.MountTag, _mount));
 
     /// <summary>Matches the request path against exact entries and entries ending in <c>*</c> (prefix match).</summary>
     internal static bool IsExcluded(IList<string> patterns, string? path)
@@ -748,7 +754,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
 
     private SsrRender? Skip(SsrMode mode, SsrFailure failure, string message, bool log = true)
     {
-        _metrics.RecordOutcome(mode == SsrMode.Required ? "error" : "fallback", failure.Name());
+        _metrics.RecordOutcome(mode == SsrMode.Required ? "error" : "fallback", failure.Name(), _mount);
         if (log && ShouldLogSkip(failure, out var suppressed))
         {
             LogSkipped(_logger, failure.Name(), Truncate(message)!, suppressed);
@@ -759,7 +765,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
 
     private SsrRender? Fail(SsrMode mode, SsrFailure failure, string type, string message, string? hint, Exception? inner)
     {
-        _metrics.RecordOutcome(mode == SsrMode.Required ? "error" : "fallback", failure.Name());
+        _metrics.RecordOutcome(mode == SsrMode.Required ? "error" : "fallback", failure.Name(), _mount);
         return mode == SsrMode.Required
             ? throw new InertiaSsrException(PublicFailureMessage(failure), Truncate(type), Truncate(hint), inner)
             : null;

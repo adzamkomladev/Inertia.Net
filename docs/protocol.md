@@ -289,6 +289,11 @@ The React refresh preamble is:
 <script type="module">import RefreshRuntime from '{origin}/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$ = () => {};window.$RefreshSig$ = () => (type) => type;window.__vite_plugin_react_preamble_installed__ = true;</script>
 ```
 
+## Mounts
+
+Named mounts (`AddInertia(name, ...)` with `UseInertia(name)`) are adapter configuration, not a protocol change: each mount
+runs this protocol unchanged with its own options, asset version and state cookie.
+
 ## Deliberate deviations from Laravel
 
 1. **The version 409 check runs before the handler**, so no work is wasted rendering a page that will be discarded.

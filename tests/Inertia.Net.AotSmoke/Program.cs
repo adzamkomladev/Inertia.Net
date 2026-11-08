@@ -37,9 +37,22 @@ builder.Services.AddInertiaDevTools(o =>
 });
 
 builder.Services.AddInertiaErrorPages();
+// A named mount (a library UI under /admin) with its own version, shared props, state cookie and error component.
+builder.Services.AddInertia("admin", o =>
+{
+    o.Version = "admin-1";
+    o.Share("area", "admin");
+});
+builder.Services.AddInertiaErrorPages("admin", o => o.Component = "Admin/Error");
 
 var app = builder.Build();
 app.UseInertiaErrorPages();
+app.Map("/admin", admin =>
+{
+    admin.UseInertia("admin");
+    admin.UseRouting();
+    admin.UseEndpoints(e => e.MapGet("/", () => Render("Admin/Index")));
+});
 app.UseInertia();
 var configuredFastEndpoints = 0;
 app.UseFastEndpoints(c =>

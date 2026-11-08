@@ -60,10 +60,23 @@ public sealed class InertiaSsrHealthCheck : IHealthCheck
 /// <summary>Health check registration for the Inertia SSR server.</summary>
 public static class InertiaSsrHealthChecksBuilderExtensions
 {
-    /// <summary>Adds <see cref="InertiaSsrHealthCheck"/>. Requires <see cref="InertiaServiceCollectionExtensions.AddInertia"/>.</summary>
+    /// <summary>Adds <see cref="InertiaSsrHealthCheck"/> for the default mount. Requires <c>services.AddInertia()</c>.</summary>
     public static IHealthChecksBuilder AddInertiaSsr(this IHealthChecksBuilder builder, string name = "inertia-ssr", HealthStatus? failureStatus = null, IEnumerable<string>? tags = null, TimeSpan? timeout = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder.Add(new HealthCheckRegistration(name, static sp => new InertiaSsrHealthCheck(sp.GetRequiredService<SsrGateway>()), failureStatus, tags, timeout));
+    }
+
+    /// <summary>
+    /// Adds <see cref="InertiaSsrHealthCheck"/> for the SSR servers of the mount <paramref name="mount"/>, registered with
+    /// <c>services.AddInertia(mount, ...)</c>. The check is named <c>inertia-ssr-{mount}</c> unless <paramref name="name"/> is set.
+    /// </summary>
+    public static IHealthChecksBuilder AddInertiaSsrForMount(this IHealthChecksBuilder builder, string mount, string? name = null, HealthStatus? failureStatus = null, IEnumerable<string>? tags = null, TimeSpan? timeout = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(mount);
+        if (mount.Length == 0) return builder.AddInertiaSsr(name ?? "inertia-ssr", failureStatus, tags, timeout);
+        return builder.Add(new HealthCheckRegistration(name ?? "inertia-ssr-" + mount,
+            sp => new InertiaSsrHealthCheck(sp.GetRequiredKeyedService<SsrGateway>(mount)), failureStatus, tags, timeout));
     }
 }

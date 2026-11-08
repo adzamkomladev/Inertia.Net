@@ -43,6 +43,7 @@ Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt
 - [Deploying behind a proxy](https://inertia-dotnet.yebi.africa/docs/deploying): Forwarded headers, secure cookies, compression, asset caching and multi-instance state.
 - [Native AOT](https://inertia-dotnet.yebi.africa/docs/native-aot): Publish a Native AOT Inertia.Net app with source-generated JSON metadata.
 - [Performance](https://inertia-dotnet.yebi.africa/docs/performance): Memory and hosting guidance, payload limits and the design choices behind the adapter.
+- [Multiple apps and libraries](https://inertia-dotnet.yebi.africa/docs/mounts): Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
 
 ## Reference
 

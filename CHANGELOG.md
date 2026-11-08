@@ -7,6 +7,22 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-08
+
+### Added
+
+- Named mounts: `services.AddInertia(name, configure)` and `app.UseInertia(name)` serve a second Inertia UI, such as a library
+  dashboard under `app.Map("/dashboard", ...)`, with its own shared props, asset version check, state and previous-URL cookies
+  (`.Inertia.State.{name}`, `.Inertia.Previous.{name}`), root view (a keyed `IInertiaRootView`), Vite manifest, SSR gateway and
+  managed Node processes, and TypeScript output. `InertiaFeature.Mount` names the request's mount. Startup fails for an
+  unregistered mount or mounts that share a cookie name. Existing registrations keep configuring the default mount.
+- `AddInertiaErrorPages(name, configure)` registers a mount's error components; a mount without them leaves errors to the pipeline.
+- `AddInertiaSsrForMount(mount)` health check, and an `inertia.mount` tag on page, SSR and circuit metrics of named mounts.
+
+### Changed
+
+- Error pages render only for mounts that registered them: `AddInertiaErrorPages()` covers the default mount as before.
+
 ## [1.6.3] - 2026-11-04
 
 ### Fixed

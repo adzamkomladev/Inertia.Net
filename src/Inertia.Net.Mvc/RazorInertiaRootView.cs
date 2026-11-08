@@ -53,7 +53,7 @@ internal sealed class RazorInertiaRootView(IActionResultExecutor<ViewResult> exe
     {
         if (http.Items[SsrKey] is not Task<SsrRender?> ssr)
         {
-            var renderer = http.RequestServices.GetService(typeof(IInertiaSsrRenderer)) as IInertiaSsrRenderer;
+            var renderer = InertiaMountServices.SsrRenderer(http);
             http.Items[SsrKey] = ssr = renderer is null ? Task.FromResult<SsrRender?>(null) : renderer.RenderAsync(GetContext(http)).AsTask();
         }
 

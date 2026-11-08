@@ -25,6 +25,9 @@ app.UseInertiaErrorPages();                        // before UseInertia and the 
 app.UseInertia();
 ```
 
+A second Inertia UI mounted under its own path registers its own components with `AddInertiaErrorPages(name, ...)`; see
+[Multiple apps and libraries](/docs/mounts).
+
 Create the named components in your client pages directory. Each receives `status`, the optional `Props` callback's values, and
 shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
 responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.

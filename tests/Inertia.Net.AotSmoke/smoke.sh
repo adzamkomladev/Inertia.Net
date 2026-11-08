@@ -325,6 +325,20 @@ status_is 302
 hub_poll
 has '"arguments":["public:stats",{"__inertia":{"event":"StatsChanged","props":{"live":{"Name":"live","Value":2}}}}]'
 
+# 17. Named mount under /admin: its own version, shared props and error component.
+req GET /admin/ -H 'X-Inertia: true' -H 'X-Inertia-Version: admin-1'
+status_is 200
+has '"component":"Admin/Index"'
+has '"area":"admin"'
+lacks '"appName"'
+has '"version":"admin-1"'
+inertia GET /admin/
+status_is 409
+header_is X-Inertia-Version admin-1
+req GET /admin/missing -H 'X-Inertia: true' -H 'X-Inertia-Version: admin-1'
+status_is 404
+has '"component":"Admin/Error"'
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES smoke check(s) failed. App log:"
   cat "$T/app.log"

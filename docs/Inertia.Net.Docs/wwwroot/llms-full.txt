@@ -115,15 +115,15 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.6.3
-dotnet add package Inertia.Net.Mvc --version 1.6.3            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.6.3  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.3 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.6.3        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.6.3   # live props over SignalR
+dotnet add package Inertia.Net --version 1.7.0
+dotnet add package Inertia.Net.Mvc --version 1.7.0            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.7.0  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.7.0        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.7.0   # live props over SignalR
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.6.3 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.7.0 implements Inertia.js v3.
 
 ## Requirements
 
@@ -134,7 +134,7 @@ Use the same version for every Inertia.Net package. The package version and the 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.3
+dotnet new install Inertia.Net.Templates::1.7.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -192,7 +192,7 @@ URL: https://inertia-dotnet.yebi.africa/docs/first-10-minutes
 Create the React starter (choose `vue` or `svelte` for another client):
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.3
+dotnet new install Inertia.Net.Templates::1.7.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -1697,6 +1697,9 @@ app.UseInertiaErrorPages();                        // before UseInertia and the 
 app.UseInertia();
 ```
 
+A second Inertia UI mounted under its own path registers its own components with `AddInertiaErrorPages(name, ...)`; see
+[Multiple apps and libraries](/docs/mounts).
+
 Create the named components in your client pages directory. Each receives `status`, the optional `Props` callback's values, and
 shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
 responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.
@@ -2218,7 +2221,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.6.3
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.0
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3541,6 +3544,125 @@ Parallel prop planning and DevTools recording each use a process-wide latch that
 
 ---
 
+# Multiple apps and libraries
+
+URL: https://inertia-dotnet.yebi.africa/docs/mounts
+
+> Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
+
+One ASP.NET Core app can serve more than one Inertia UI. A typical case is a library, such as an admin dashboard, that ships
+its own prebuilt client and is mounted under `/dashboard` in a host app that already uses Inertia.Net.
+
+Each UI is a **mount**: a named `InertiaOptions` that `app.UseInertia(name)` selects inside an `app.Map(...)` branch. The
+default mount is the one `AddInertia(...)` and `UseInertia()` configure, so existing apps do not change.
+
+## What a mount keeps to itself
+
+| Per mount | Shared by all mounts |
+|---|---|
+| Shared props (`o.Share`) and every other `InertiaOptions` setting | `IInertiaCache` and the cache store (choose distinct `InertiaProp.Cache(key)` keys) |
+| Asset version: the 409 check only compares against the mount's own version | `IInertiaLive` and the SignalR hub |
+| State cookie: `.Inertia.State.{name}` and `.Inertia.Previous.{name}` by default | Metrics (named mounts add an `inertia.mount` tag) and DevTools |
+| Root view: the mount's `RootView` file, or a keyed `IInertiaRootView` | Antiforgery and data protection |
+| Vite manifest, SSR servers, managed Node processes, TypeScript output | The SSR `HttpClient` (its `ConnectTimeout` comes from the default mount) |
+| Error pages registered with `AddInertiaErrorPages(name, ...)` | |
+
+## Register and map a mount
+
+```csharp
+builder.Services.AddInertia(o => o.Share("user", ctx => ctx.User.Identity?.Name)); // the host app
+
+builder.Services.AddInertia("dashboard", o =>
+{
+    o.Version = "dashboard-2.1.0";          // the dashboard's own asset version
+    o.RootView = "dashboard.html";           // or register a keyed IInertiaRootView, below
+    o.Share("product", "Dashboard");
+});
+
+var app = builder.Build();
+
+app.Map("/dashboard", dashboard =>
+{
+    dashboard.UseInertia("dashboard");       // before routing in the branch
+    dashboard.UseRouting();
+    dashboard.UseEndpoints(e => e.MapGet("/", () => Render("Dashboard/Index")));
+});
+
+app.UseInertia();                            // the host app's mount
+app.MapGet("/", () => Render("Home"));
+```
+
+`Map` sets the request's path base, so page URLs, `Back()` fallbacks, Vite asset URLs and the previous-URL cookie stay inside
+`/dashboard`. Calling `AddInertia("dashboard", ...)` again adds to that mount's configuration.
+
+Startup fails when `UseInertia(name)` names a mount that was never registered, or when two mounts share a state or
+previous-URL cookie name.
+
+## A root view shipped by a library
+
+A library cannot rely on a file in the host's content root. Register a keyed `IInertiaRootView` that writes an embedded
+template instead:
+
+```csharp
+builder.Services.AddKeyedSingleton<IInertiaRootView, DashboardRootView>("dashboard");
+
+sealed class DashboardRootView : IInertiaRootView
+{
+    public async ValueTask RenderAsync(InertiaRootViewContext context)
+    {
+        var html = context.HttpContext.Response;
+        await html.WriteAsync("<!doctype html><html><head><script type=\"module\" src=\"/dashboard/app.js\"></script></head><body>");
+        await html.WriteAsync(context.GetBodyHtml()); // the page script and root element
+        await html.WriteAsync("</body></html>");
+    }
+}
+```
+
+## Error pages per mount
+
+```csharp
+builder.Services.AddInertiaErrorPages();                                         // the host's Error component
+builder.Services.AddInertiaErrorPages("dashboard", o => o.Component = "Dashboard/Error");
+
+app.UseInertiaErrorPages();                                                      // once, before the Map branches
+```
+
+A mount renders only the error components registered for it, because another mount's components are not in its bundle. A
+mount without `AddInertiaErrorPages(name, ...)` leaves its errors to the rest of the pipeline.
+
+## SSR, health checks and TypeScript
+
+Each mount has its own SSR gateway, and its own managed Node processes when `o.Ssr.UseNodeProcess()` is set; give each mount
+its own `BasePort`. Check a mount's SSR servers with:
+
+```csharp
+builder.Services.AddHealthChecks().AddInertiaSsrForMount("dashboard"); // named "inertia-ssr-dashboard"
+```
+
+`o.TypeScript.OutputPath` is per mount too, so each client gets its own generated declarations.
+
+## For library authors
+
+Expose one registration call and one mapping call, and keep the mount name private to the library:
+
+```csharp
+public static IServiceCollection AddDashboard(this IServiceCollection services) =>
+    services.AddInertia("dashboard", o => o.Version = DashboardAssets.Version)
+            .AddKeyedSingleton<IInertiaRootView, DashboardRootView>("dashboard");
+
+public static IApplicationBuilder MapDashboard(this IApplicationBuilder app, string path) =>
+    app.Map(path, branch =>
+    {
+        branch.UseInertia("dashboard");
+        branch.UseRouting();
+        branch.UseEndpoints(e => { /* the dashboard's endpoints */ });
+    });
+```
+
+Mounts are adapter configuration: the Inertia protocol on the wire does not change.
+
+---
+
 # Configuration
 
 URL: https://inertia-dotnet.yebi.africa/docs/configuration
@@ -4129,7 +4251,7 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.6.3
+dotnet new install Inertia.Net.Templates::1.7.0
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install
