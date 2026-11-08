@@ -22,6 +22,7 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 ### Changed
 
 - Error pages render only for mounts that registered them: `AddInertiaErrorPages()` covers the default mount as before.
+- Releases publish to NuGet with trusted publishing (GitHub OIDC from the `release` environment) instead of a stored API key.
 
 ## [1.6.3] - 2026-11-04
 

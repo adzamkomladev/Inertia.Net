@@ -11,12 +11,13 @@ env:
 
 permissions:
   contents: write # create the GitHub Release
+  id-token: write # NuGet trusted publishing: exchange the GitHub OIDC token for a short-lived API key
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Publishing needs approval: add required reviewers to the "release" environment (Settings > Environments) and store
-    # NUGET_API_KEY as an environment secret there, so a pushed tag alone cannot publish.
+    # Publishing needs approval: add required reviewers to the "release" environment (Settings > Environments), so a pushed
+    # tag alone cannot publish. NuGet trusts this repository, workflow and environment (trusted publishing); no stored API key.
     environment: release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,10 +61,16 @@ jobs:
           done
 
       # A .snupkg next to a .nupkg is pushed to the symbol server automatically.
+      - name: Log in to NuGet
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: adzamkomladev
+
       - name: Push to NuGet
         run: >
           dotnet nuget push "artifacts/*.nupkg"
-          --api-key ${{ secrets.NUGET_API_KEY }}
+          --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 

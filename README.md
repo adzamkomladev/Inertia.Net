@@ -2727,6 +2727,6 @@ bash eng/aot-smoke.sh                    # Native AOT publish + protocol smoke t
 
 - Warnings are errors; the code is nullable-annotated and the public API is documented.
 - Every protocol rule should be backed by a test in `tests/Inertia.Net.Tests` or a conformance case in `tests/Inertia.Net.IntegrationTests` (which runs against Minimal API, MVC and FastEndpoints hosts). The protocol itself is in [docs/protocol.md](docs/protocol.md), including the deliberate deviations from inertia-laravel.
-- Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet with the `NUGET_API_KEY` secret of the `release` environment. Give that environment required reviewers, so that a pushed tag alone cannot publish.
+- Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet through trusted publishing (GitHub OIDC, no stored API key) from the `release` environment. Give that environment required reviewers, so that a pushed tag alone cannot publish.
 
 Licensed under the [MIT license](LICENSE).
