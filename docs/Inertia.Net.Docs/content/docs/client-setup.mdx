@@ -2,7 +2,7 @@
 title: Client setup
 description: Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
 section: Get started
-order: 4
+order: 5
 ---
 
 Inertia.Net speaks the Inertia.js v3 protocol. Install a v3 client package; v2 clients are not supported.
@@ -27,7 +27,7 @@ create one first with `npm init -y`, `bun init -y`, `pnpm init` or `yarn init`.
 
 ```sh
 npm install react react-dom @vitejs/plugin-react @inertiajs/react@^3
-npm install -D vite typescript
+npm install -D vite typescript @types/node @types/react @types/react-dom
 ```
 
   </Tab>
@@ -35,7 +35,7 @@ npm install -D vite typescript
 
 ```sh
 npm install vue @vitejs/plugin-vue @inertiajs/vue3@^3
-npm install -D vite typescript
+npm install -D vite typescript @types/node
 ```
 
   </Tab>
@@ -43,11 +43,31 @@ npm install -D vite typescript
 
 ```sh
 npm install svelte @sveltejs/vite-plugin-svelte @inertiajs/svelte@^3
-npm install -D vite typescript
+npm install -D vite typescript @types/node
 ```
 
   </Tab>
 </Tabs>
+
+`@types/node` types the `node:fs` import and `process` in the Vite config. Add `vite/client` to `tsconfig.json` so `import.meta.glob` is typed:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": ["resources/js", "vite.config.ts"]
+}
+```
+
+Use `"jsx": "preserve"` or omit it for Vue and Svelte.
 
 The starter templates use `ClientApp/pages`. The manual examples below use `resources/js/Pages`. Keep the resolver, file paths and Vite entry consistent with the layout you choose.
 
@@ -126,15 +146,16 @@ Without the plugin, provide the resolver and setup yourself.
 
 ```tsx
 // resources/js/app.tsx
-import { createInertiaApp } from '@inertiajs/react'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
 import { createRoot } from 'react-dom/client'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true })
+    const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', { eager: true })
     return pages[`./Pages/${name}.tsx`]
   },
   setup({ el, App, props }) {
+    if (!el) throw new Error('Inertia root element not found')
     createRoot(el).render(<App {...props} />)
   },
 })
@@ -145,15 +166,16 @@ createInertiaApp({
 
 ```ts
 // resources/js/app.ts
-import { createApp, h } from 'vue'
+import { createApp, h, type DefineComponent } from 'vue'
 import { createInertiaApp } from '@inertiajs/vue3'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.vue', { eager: true })
+    const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue', { eager: true })
     return pages[`./Pages/${name}.vue`]
   },
   setup({ el, App, props, plugin }) {
+    if (!el) throw new Error('Inertia root element not found')
     createApp({ render: () => h(App, props) }).use(plugin).mount(el)
   },
 })
@@ -165,14 +187,15 @@ createInertiaApp({
 ```ts
 // resources/js/app.ts
 import { mount } from 'svelte'
-import { createInertiaApp } from '@inertiajs/svelte'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/svelte'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.svelte', { eager: true })
+    const pages = import.meta.glob<ResolvedComponent>('./Pages/**/*.svelte', { eager: true })
     return pages[`./Pages/${name}.svelte`]
   },
   setup({ el, App, props }) {
+    if (!el) throw new Error('Inertia root element not found')
     mount(App, { target: el, props })
   },
 })
@@ -245,7 +268,14 @@ npm run dev          # or bun/pnpm/yarn run dev; Vite writes wwwroot/hot
 dotnet watch         # terminal 2: the app, ASPNETCORE_ENVIRONMENT=Development
 ```
 
-Open the ASP.NET Core URL, not the Vite URL. In Development the app reads `wwwroot/hot` and renders the Vite tags; in production it reads the manifest.
+Open the ASP.NET Core URL, not the Vite URL. Two servers run side by side:
+
+| URL | What it is | Open it? |
+|---|---|---|
+| `http://localhost:5180` (the template's default) | Your app. ASP.NET Core routes the request, runs your endpoint and renders the Inertia page. | Yes |
+| `http://localhost:5173` | The Vite dev server. It only serves JavaScript, CSS and hot-reload updates to the page above. | No. It has no pages, so it shows a blank page. |
+
+Vite prints `localhost:5173` prominently when it starts, but that address is for the browser's asset requests, not for you. In Development the app reads `wwwroot/hot` and renders the Vite tags; in production it reads the manifest.
 
 For production:
 

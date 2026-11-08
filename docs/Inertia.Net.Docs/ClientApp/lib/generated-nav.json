@@ -41,12 +41,57 @@
       ]
     },
     {
+      "slug": "why-inertia",
+      "url": "/docs/why-inertia",
+      "title": "Why Inertia?",
+      "description": "What Inertia is, how it compares to React, Vue or Svelte with a Web API, and when to choose it.",
+      "section": "Get started",
+      "order": 2,
+      "headings": [
+        {
+          "id": "the-idea-in-one-minute",
+          "text": "The idea in one minute",
+          "depth": 2
+        },
+        {
+          "id": "inertia-vs-a-spa-plus-a-web-api",
+          "text": "Inertia vs a SPA plus a Web API",
+          "depth": 2
+        },
+        {
+          "id": "why-a-net-developer-might-like-it",
+          "text": "Why a .NET developer might like it",
+          "depth": 2
+        },
+        {
+          "id": "when-it-is-a-good-fit",
+          "text": "When it is a good fit",
+          "depth": 2
+        },
+        {
+          "id": "when-it-is-not",
+          "text": "When it is not",
+          "depth": 2
+        },
+        {
+          "id": "what-it-is-not",
+          "text": "What it is not",
+          "depth": 2
+        },
+        {
+          "id": "try-it",
+          "text": "Try it",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "installation",
       "url": "/docs/installation",
       "title": "Installation",
       "description": "Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.",
       "section": "Get started",
-      "order": 2,
+      "order": 3,
       "headings": [
         {
           "id": "requirements",
@@ -76,7 +121,7 @@
       "title": "First 10 minutes",
       "description": "Start a template app, try its validated form, and test the redirect.",
       "section": "Get started",
-      "order": 3,
+      "order": 4,
       "headings": []
     },
     {
@@ -85,7 +130,7 @@
       "title": "Client setup",
       "description": "Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.",
       "section": "Get started",
-      "order": 4,
+      "order": 5,
       "headings": [
         {
           "id": "install-the-client",
@@ -125,7 +170,7 @@
       "title": "Quick start",
       "description": "Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.",
       "section": "Get started",
-      "order": 4,
+      "order": 5,
       "headings": [
         {
           "id": "1-register-the-services",
@@ -160,7 +205,7 @@
       "title": "AI agents",
       "description": "Give coding agents the context and conventions they need to build Inertia.Net pages correctly.",
       "section": "Get started",
-      "order": 5,
+      "order": 6,
       "headings": [
         {
           "id": "point-the-agent-at-the-docs",
@@ -1310,6 +1355,11 @@
         {
           "id": "the-page-keeps-reloading-or-a-request-loops-with-409",
           "text": "The page keeps reloading, or a request loops with 409",
+          "depth": 2
+        },
+        {
+          "id": "a-blank-page-at-localhost5173",
+          "text": "A blank page at localhost:5173",
           "depth": 2
         },
         {

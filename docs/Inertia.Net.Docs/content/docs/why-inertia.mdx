@@ -1,0 +1,69 @@
+---
+title: Why Inertia?
+description: What Inertia is, how it compares to React, Vue or Svelte with a Web API, and when to choose it.
+section: Get started
+order: 2
+---
+
+If you build a React, Vue or Svelte frontend on top of ASP.NET Core today, you probably have two projects: a Web API that returns JSON, and a single-page app (SPA) that calls it. Inertia lets you keep the modern frontend and drop the second half of that setup.
+
+## The idea in one minute
+
+With Inertia, your ASP.NET Core endpoint does not return JSON. It returns the **name of a frontend page** and the **data that page needs**:
+
+```csharp
+app.MapGet("/users", (UserStore users) =>
+    Render("Users/Index", new InertiaProps { ["users"] = users.All() }));
+```
+
+The matching component receives that data as ordinary props:
+
+```tsx
+export default function Index({ users }: { users: { id: number; name: string }[] }) {
+  return <ul>{users.map((u) => <li key={u.id}>{u.name}</li>)}</ul>
+}
+```
+
+The browser loads your app once. After that, clicking a link or submitting a form asks the server for the next page's props in the background, and Inertia swaps the component without a full reload. It feels like an SPA, but the server still decides what URL maps to what page.
+
+## Inertia vs a SPA plus a Web API
+
+| | SPA + Web API | Inertia.Net |
+|---|---|---|
+| Projects to build and deploy | A JSON API and a separate client app, often with different hosts and CORS rules | One ASP.NET Core app that also builds your frontend |
+| Routing | A server router for the API and a client router for pages, kept in sync by hand | ASP.NET Core routes only. Each route renders a page |
+| Data loading | Fetch calls, loading states and caching in each component | Props arrive with the page. Slow data can be [deferred](/docs/deferred-props) |
+| Authentication | Tokens or cookies shared across two apps, plus client-side route guards | Your normal ASP.NET Core cookie auth and `[Authorize]` |
+| Validation | Return an error shape from the API and map it to forms in the client | Redirect back with errors, available as `form.errors` ([validation](/docs/validation-and-errors)) |
+| API contract | You design, version and document JSON endpoints | The props you pass are the contract. [TypeScript types](/docs/typescript) can be generated |
+| Frontend | React, Vue or Svelte | React, Vue or Svelte |
+
+You still write components, hooks and styles. What goes away is the glue: the API layer, the client router, and the code that keeps state in sync with the server.
+
+## Why a .NET developer might like it
+
+- **Controllers, Minimal APIs and FastEndpoints stay in charge.** Model binding, authorization, validation attributes and dependency injection work as they always have.
+- **One deployment.** `dotnet publish` produces the server and the built frontend assets together.
+- **Security defaults you already know.** CSRF protection, cookies and policies are ASP.NET Core's, with [antiforgery wired up](/docs/csrf-and-antiforgery) for you.
+- **Pages are real URLs.** The first visit is a server-rendered HTML response, so links, refresh, back and bookmarks behave. Optional [server-side rendering](/docs/server-side-rendering) renders the first visit's HTML on the server.
+
+## When it is a good fit
+
+Inertia suits applications where the frontend and backend ship together: dashboards, admin tools, SaaS products, internal apps, content sites with accounts. If one team owns both halves, it removes a lot of duplicated work.
+
+## When it is not
+
+- **You need a public API anyway.** Mobile apps, third-party integrations or several different clients need real JSON endpoints. You can still build those next to your Inertia pages, but Inertia will not replace them.
+- **The frontend is a separate product.** If another team deploys the frontend on its own schedule, a versioned API is the cleaner boundary.
+- **Heavy offline use.** Inertia expects the server for every page change.
+- **You want no JavaScript at all.** For server-rendered HTML with a little interactivity, Razor Pages or Blazor may be simpler.
+
+## What it is not
+
+Inertia is not a framework and not a new frontend library. It is a small protocol between your server and the official [Inertia.js](https://inertiajs.com) client. Inertia.Net is the ASP.NET Core side of it. You keep using React, Vue or Svelte exactly as documented.
+
+## Try it
+
+- [First 10 minutes](/docs/first-10-minutes) creates an app from the starter template and walks through a validated form.
+- [Quick start](/docs/quick-start) adds Inertia.Net to an existing ASP.NET Core app.
+- [Introduction](/docs/introduction) lists what the adapter provides.

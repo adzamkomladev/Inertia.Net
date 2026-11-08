@@ -44,7 +44,7 @@ Build both bundles:
 
 ```tsx
 // resources/js/ssr.tsx
-import { createInertiaApp } from '@inertiajs/react'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
 import createServer from '@inertiajs/react/server'
 import ReactDOMServer from 'react-dom/server'
 
@@ -53,7 +53,7 @@ createServer((page) =>
     page,
     render: ReactDOMServer.renderToString,
     resolve: (name) => {
-      const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true })
+      const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', { eager: true })
       return pages[`./Pages/${name}.tsx`]
     },
     setup: ({ App, props }) => <App {...props} />,
@@ -68,6 +68,7 @@ The client entry hydrates when the server rendered:
 import { createRoot, hydrateRoot } from 'react-dom/client'
 
 setup({ el, App, props }) {
+  if (!el) throw new Error('Inertia root element not found')
   if (el.dataset.serverRendered === 'true') hydrateRoot(el, <App {...props} />)
   else createRoot(el).render(<App {...props} />)
 }
