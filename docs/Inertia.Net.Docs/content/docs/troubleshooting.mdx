@@ -58,6 +58,10 @@ A `409` means the asset version differs between the client and the server. A loo
 
 In Development the manifest hash changes after each `vite build`, which is expected once.
 
+## A blank page at localhost:5173
+
+`http://localhost:5173` is the Vite dev server. It serves assets and hot-reload updates to your app and has no pages of its own, so it shows a blank page. Open the ASP.NET Core URL printed by `dotnet watch` or `dotnet run` instead (`http://localhost:5180` in the starter templates).
+
 ## The dev server tags do not appear
 
 The hot file is read only when `ASPNETCORE_ENVIRONMENT=Development`. Check that `wwwroot/hot` exists and contains `http://localhost:5173`, or set `o.Vite.DevServerUrl`. Remember `base: '/'` for the dev server in `vite.config`.

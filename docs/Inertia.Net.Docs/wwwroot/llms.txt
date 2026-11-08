@@ -2,57 +2,58 @@
 
 > Inertia.Net is a .NET 10 server adapter for Inertia.js v3. ASP.NET Core endpoints (Minimal APIs, MVC or FastEndpoints) return a page component name and props; React, Vue or Svelte renders them. There is no separate JSON API or client-side router.
 
-Full documentation as one file: https://inertia-dotnet.yebi.africa/llms-full.txt. Agent conventions: https://inertia-dotnet.yebi.africa/docs/ai-agents.
+Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt. Agent conventions: https://inertia-dotnet.temtem.dev/docs/ai-agents.
 
 ## Get started
 
-- [Introduction](https://inertia-dotnet.yebi.africa/docs/introduction): Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
-- [Installation](https://inertia-dotnet.yebi.africa/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
-- [First 10 minutes](https://inertia-dotnet.yebi.africa/docs/first-10-minutes): Start a template app, try its validated form, and test the redirect.
-- [Client setup](https://inertia-dotnet.yebi.africa/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
-- [Quick start](https://inertia-dotnet.yebi.africa/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
-- [AI agents](https://inertia-dotnet.yebi.africa/docs/ai-agents): Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
+- [Introduction](https://inertia-dotnet.temtem.dev/docs/introduction): Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
+- [Why Inertia?](https://inertia-dotnet.temtem.dev/docs/why-inertia): What Inertia is, how it compares to React, Vue or Svelte with a Web API, and when to choose it.
+- [Installation](https://inertia-dotnet.temtem.dev/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
+- [First 10 minutes](https://inertia-dotnet.temtem.dev/docs/first-10-minutes): Start a template app, try its validated form, and test the redirect.
+- [Client setup](https://inertia-dotnet.temtem.dev/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
+- [Quick start](https://inertia-dotnet.temtem.dev/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
+- [AI agents](https://inertia-dotnet.temtem.dev/docs/ai-agents): Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
 
 ## Essentials
 
-- [Pages and responses](https://inertia-dotnet.yebi.africa/docs/pages-and-responses): Render components, use MapInertia, and understand the root template and response status codes.
-- [Props](https://inertia-dotnet.yebi.africa/docs/props): Lazy, optional, deferred, merged, once, cached and rescued page data.
-- [Shared data](https://inertia-dotnet.yebi.africa/docs/shared-data): Share props with every page, statically or per request, and control the shared prop key list.
-- [Validation](https://inertia-dotnet.yebi.africa/docs/validation-and-errors): Redirect back with validation errors for Minimal APIs, MVC and FastEndpoints, and add Precognition.
-- [Flash data](https://inertia-dotnet.yebi.africa/docs/flash-data): Carry a one-time message, toast or typed value across a redirect.
-- [Redirects and history](https://inertia-dotnet.yebi.africa/docs/redirects-and-history): Redirects, Back, Location, history encryption, clearing and URL fragments.
-- [Error pages](https://inertia-dotnet.yebi.africa/docs/error-pages): Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.
+- [Pages and responses](https://inertia-dotnet.temtem.dev/docs/pages-and-responses): Render components, use MapInertia, and understand the root template and response status codes.
+- [Props](https://inertia-dotnet.temtem.dev/docs/props): Lazy, optional, deferred, merged, once, cached and rescued page data.
+- [Shared data](https://inertia-dotnet.temtem.dev/docs/shared-data): Share props with every page, statically or per request, and control the shared prop key list.
+- [Validation](https://inertia-dotnet.temtem.dev/docs/validation-and-errors): Redirect back with validation errors for Minimal APIs, MVC and FastEndpoints, and add Precognition.
+- [Flash data](https://inertia-dotnet.temtem.dev/docs/flash-data): Carry a one-time message, toast or typed value across a redirect.
+- [Redirects and history](https://inertia-dotnet.temtem.dev/docs/redirects-and-history): Redirects, Back, Location, history encryption, clearing and URL fragments.
+- [Error pages](https://inertia-dotnet.temtem.dev/docs/error-pages): Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.
 
 ## Loading data
 
-- [Partial reloads](https://inertia-dotnet.yebi.africa/docs/partial-reloads): Reload only the props a page needs with only and except filters.
-- [Deferred props](https://inertia-dotnet.yebi.africa/docs/deferred-props): Load slow page sections after the first render, in groups.
-- [Merging props](https://inertia-dotnet.yebi.africa/docs/merging-props): Append, prepend, deep merge and match items instead of replacing the client's value.
-- [Once props](https://inertia-dotnet.yebi.africa/docs/once-props): Remember expensive values on the client and skip them on later visits.
-- [Infinite scroll](https://inertia-dotnet.yebi.africa/docs/infinite-scroll): Merge pages of items and report paging metadata to the InfiniteScroll client component.
-- [Pagination](https://inertia-dotnet.yebi.africa/docs/pagination): Create numbered and cursor pages for pagers and infinite scroll.
-- [Live props](https://inertia-dotnet.yebi.africa/docs/live-props): Props that refresh themselves when the server broadcasts an event.
-- [Precognition](https://inertia-dotnet.yebi.africa/docs/precognition): Validate a form before submission without running its handler.
+- [Partial reloads](https://inertia-dotnet.temtem.dev/docs/partial-reloads): Reload only the props a page needs with only and except filters.
+- [Deferred props](https://inertia-dotnet.temtem.dev/docs/deferred-props): Load slow page sections after the first render, in groups.
+- [Merging props](https://inertia-dotnet.temtem.dev/docs/merging-props): Append, prepend, deep merge and match items instead of replacing the client's value.
+- [Once props](https://inertia-dotnet.temtem.dev/docs/once-props): Remember expensive values on the client and skip them on later visits.
+- [Infinite scroll](https://inertia-dotnet.temtem.dev/docs/infinite-scroll): Merge pages of items and report paging metadata to the InfiniteScroll client component.
+- [Pagination](https://inertia-dotnet.temtem.dev/docs/pagination): Create numbered and cursor pages for pagers and infinite scroll.
+- [Live props](https://inertia-dotnet.temtem.dev/docs/live-props): Props that refresh themselves when the server broadcasts an event.
+- [Precognition](https://inertia-dotnet.temtem.dev/docs/precognition): Validate a form before submission without running its handler.
 
 ## Production
 
-- [Server-side rendering](https://inertia-dotnet.yebi.africa/docs/server-side-rendering): Render the first visit on Bun or Node, supervise the process from .NET, and fall back safely.
-- [Vite](https://inertia-dotnet.yebi.africa/docs/vite-integration): Manifest tags, the dev-server hot file, asset base URLs, prefetching and CSP nonces.
-- [Asset versioning](https://inertia-dotnet.yebi.africa/docs/asset-versioning): Tell the client when its JavaScript and CSS are stale, and reload once when they are.
-- [CSRF protection](https://inertia-dotnet.yebi.africa/docs/csrf-and-antiforgery): Protect forms with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.
-- [Deploying behind a proxy](https://inertia-dotnet.yebi.africa/docs/deploying): Forwarded headers, secure cookies, compression, asset caching and multi-instance state.
-- [Native AOT](https://inertia-dotnet.yebi.africa/docs/native-aot): Publish a Native AOT Inertia.Net app with source-generated JSON metadata.
-- [Performance](https://inertia-dotnet.yebi.africa/docs/performance): Memory and hosting guidance, payload limits and the design choices behind the adapter.
-- [Multiple apps and libraries](https://inertia-dotnet.yebi.africa/docs/mounts): Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
+- [Server-side rendering](https://inertia-dotnet.temtem.dev/docs/server-side-rendering): Render the first visit on Bun or Node, supervise the process from .NET, and fall back safely.
+- [Vite](https://inertia-dotnet.temtem.dev/docs/vite-integration): Manifest tags, the dev-server hot file, asset base URLs, prefetching and CSP nonces.
+- [Asset versioning](https://inertia-dotnet.temtem.dev/docs/asset-versioning): Tell the client when its JavaScript and CSS are stale, and reload once when they are.
+- [CSRF protection](https://inertia-dotnet.temtem.dev/docs/csrf-and-antiforgery): Protect forms with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.
+- [Deploying behind a proxy](https://inertia-dotnet.temtem.dev/docs/deploying): Forwarded headers, secure cookies, compression, asset caching and multi-instance state.
+- [Native AOT](https://inertia-dotnet.temtem.dev/docs/native-aot): Publish a Native AOT Inertia.Net app with source-generated JSON metadata.
+- [Performance](https://inertia-dotnet.temtem.dev/docs/performance): Memory and hosting guidance, payload limits and the design choices behind the adapter.
+- [Multiple apps and libraries](https://inertia-dotnet.temtem.dev/docs/mounts): Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
 
 ## Reference
 
-- [Configuration](https://inertia-dotnet.yebi.africa/docs/configuration): InertiaOptions, Vite, SSR, props, state and the middleware and result API.
-- [TypeScript types](https://inertia-dotnet.yebi.africa/docs/typescript): Generate declarations for page props, shared props and flash data from your .NET contracts.
-- [Testing](https://inertia-dotnet.yebi.africa/docs/testing): Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
-- [DevTools](https://inertia-dotnet.yebi.africa/docs/devtools): Record visits for the Inertia DevTools extension and catch missing page components during development.
-- [Troubleshooting](https://inertia-dotnet.yebi.africa/docs/troubleshooting): Common errors, their causes, and how to fix them.
+- [Configuration](https://inertia-dotnet.temtem.dev/docs/configuration): InertiaOptions, Vite, SSR, props, state and the middleware and result API.
+- [TypeScript types](https://inertia-dotnet.temtem.dev/docs/typescript): Generate declarations for page props, shared props and flash data from your .NET contracts.
+- [Testing](https://inertia-dotnet.temtem.dev/docs/testing): Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
+- [DevTools](https://inertia-dotnet.temtem.dev/docs/devtools): Record visits for the Inertia DevTools extension and catch missing page components during development.
+- [Troubleshooting](https://inertia-dotnet.temtem.dev/docs/troubleshooting): Common errors, their causes, and how to fix them.
 
 ## Tutorial
 
-- [Build a todo app](https://inertia-dotnet.yebi.africa/docs/forget-me-not): Build a complete Inertia.Net todo app with session login, public lists, paginated loading, reminders and SSR.
+- [Build a todo app](https://inertia-dotnet.temtem.dev/docs/forget-me-not): Build a complete Inertia.Net todo app with session login, public lists, paginated loading, reminders and SSR.

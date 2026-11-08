@@ -6,7 +6,7 @@
 
 # Introduction
 
-URL: https://inertia-dotnet.yebi.africa/docs/introduction
+URL: https://inertia-dotnet.temtem.dev/docs/introduction
 
 > Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
 
@@ -89,6 +89,7 @@ Use the starter template: `dotnet new install Inertia.Net.Templates`, then `dotn
 
 ## Next steps
 
+- [Why Inertia?](/docs/why-inertia) compares it with a React, Vue or Svelte app plus a Web API.
 - [First 10 minutes](/docs/first-10-minutes) takes you from the template to a form test.
 - [Install the packages](/docs/installation) in an existing app.
 - [Follow the quick start](/docs/quick-start) for a minimal end-to-end setup.
@@ -96,9 +97,80 @@ Use the starter template: `dotnet new install Inertia.Net.Templates`, then `dotn
 
 ---
 
+# Why Inertia?
+
+URL: https://inertia-dotnet.temtem.dev/docs/why-inertia
+
+> What Inertia is, how it compares to React, Vue or Svelte with a Web API, and when to choose it.
+
+If you build a React, Vue or Svelte frontend on top of ASP.NET Core today, you probably have two projects: a Web API that returns JSON, and a single-page app (SPA) that calls it. Inertia lets you keep the modern frontend and drop the second half of that setup.
+
+## The idea in one minute
+
+With Inertia, your ASP.NET Core endpoint does not return JSON. It returns the **name of a frontend page** and the **data that page needs**:
+
+```csharp
+app.MapGet("/users", (UserStore users) =>
+    Render("Users/Index", new InertiaProps { ["users"] = users.All() }));
+```
+
+The matching component receives that data as ordinary props:
+
+```tsx
+export default function Index({ users }: { users: { id: number; name: string }[] }) {
+  return <ul>{users.map((u) => <li key={u.id}>{u.name}</li>)}</ul>
+}
+```
+
+The browser loads your app once. After that, clicking a link or submitting a form asks the server for the next page's props in the background, and Inertia swaps the component without a full reload. It feels like an SPA, but the server still decides what URL maps to what page.
+
+## Inertia vs a SPA plus a Web API
+
+| | SPA + Web API | Inertia.Net |
+|---|---|---|
+| Projects to build and deploy | A JSON API and a separate client app, often with different hosts and CORS rules | One ASP.NET Core app that also builds your frontend |
+| Routing | A server router for the API and a client router for pages, kept in sync by hand | ASP.NET Core routes only. Each route renders a page |
+| Data loading | Fetch calls, loading states and caching in each component | Props arrive with the page. Slow data can be [deferred](/docs/deferred-props) |
+| Authentication | Tokens or cookies shared across two apps, plus client-side route guards | Your normal ASP.NET Core cookie auth and `[Authorize]` |
+| Validation | Return an error shape from the API and map it to forms in the client | Redirect back with errors, available as `form.errors` ([validation](/docs/validation-and-errors)) |
+| API contract | You design, version and document JSON endpoints | The props you pass are the contract. [TypeScript types](/docs/typescript) can be generated |
+| Frontend | React, Vue or Svelte | React, Vue or Svelte |
+
+You still write components, hooks and styles. What goes away is the glue: the API layer, the client router, and the code that keeps state in sync with the server.
+
+## Why a .NET developer might like it
+
+- **Controllers, Minimal APIs and FastEndpoints stay in charge.** Model binding, authorization, validation attributes and dependency injection work as they always have.
+- **One deployment.** `dotnet publish` produces the server and the built frontend assets together.
+- **Security defaults you already know.** CSRF protection, cookies and policies are ASP.NET Core's, with [antiforgery wired up](/docs/csrf-and-antiforgery) for you.
+- **Pages are real URLs.** The first visit is a server-rendered HTML response, so links, refresh, back and bookmarks behave. Optional [server-side rendering](/docs/server-side-rendering) renders the first visit's HTML on the server.
+
+## When it is a good fit
+
+Inertia suits applications where the frontend and backend ship together: dashboards, admin tools, SaaS products, internal apps, content sites with accounts. If one team owns both halves, it removes a lot of duplicated work.
+
+## When it is not
+
+- **You need a public API anyway.** Mobile apps, third-party integrations or several different clients need real JSON endpoints. You can still build those next to your Inertia pages, but Inertia will not replace them.
+- **The frontend is a separate product.** If another team deploys the frontend on its own schedule, a versioned API is the cleaner boundary.
+- **Heavy offline use.** Inertia expects the server for every page change.
+- **You want no JavaScript at all.** For server-rendered HTML with a little interactivity, Razor Pages or Blazor may be simpler.
+
+## What it is not
+
+Inertia is not a framework and not a new frontend library. It is a small protocol between your server and the official [Inertia.js](https://inertiajs.com) client. Inertia.Net is the ASP.NET Core side of it. You keep using React, Vue or Svelte exactly as documented.
+
+## Try it
+
+- [First 10 minutes](/docs/first-10-minutes) creates an app from the starter template and walks through a validated form.
+- [Quick start](/docs/quick-start) adds Inertia.Net to an existing ASP.NET Core app.
+- [Introduction](/docs/introduction) lists what the adapter provides.
+
+---
+
 # Installation
 
-URL: https://inertia-dotnet.yebi.africa/docs/installation
+URL: https://inertia-dotnet.temtem.dev/docs/installation
 
 > Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
 
@@ -185,7 +257,7 @@ Set `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` and add `using 
 
 # First 10 minutes
 
-URL: https://inertia-dotnet.yebi.africa/docs/first-10-minutes
+URL: https://inertia-dotnet.temtem.dev/docs/first-10-minutes
 
 > Start a template app, try its validated form, and test the redirect.
 
@@ -199,7 +271,11 @@ npm install
 npm run dev
 ```
 
-Use `bun install` and `bun run dev`, `pnpm install` and `pnpm run dev`, or `yarn install` and `yarn run dev` if you prefer. In a second terminal run `dotnet run`. Open the app's address and visit `/todos`; submit an empty title to see the validation message. The template includes Vite, antiforgery and a complete form.
+Use `bun install` and `bun run dev`, `pnpm install` and `pnpm run dev`, or `yarn install` and `yarn run dev` if you prefer. In a second terminal run `dotnet run`. Open the address printed by `dotnet run` (`http://localhost:5180` for the template) and visit `/todos`; submit an empty title to see the validation message. The template includes Vite, antiforgery and a complete form.
+
+<Callout type="warning" title="Open the .NET URL, not the Vite one">
+Vite prints `http://localhost:5173` when it starts, but that server only supplies JavaScript, CSS and hot reload to your app. It has no pages, so opening it shows a blank page. Your app is the ASP.NET Core address from `dotnet run`: `http://localhost:5180`.
+</Callout>
 
 The handler in `Program.cs` is:
 
@@ -262,7 +338,7 @@ See [Testing](/docs/testing) for named error bags and custom XSRF names, and [Qu
 
 # Client setup
 
-URL: https://inertia-dotnet.yebi.africa/docs/client-setup
+URL: https://inertia-dotnet.temtem.dev/docs/client-setup
 
 > Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
 
@@ -288,7 +364,7 @@ create one first with `npm init -y`, `bun init -y`, `pnpm init` or `yarn init`.
 
 ```sh
 npm install react react-dom @vitejs/plugin-react @inertiajs/react@^3
-npm install -D vite typescript
+npm install -D vite typescript @types/node @types/react @types/react-dom
 ```
 
   </Tab>
@@ -296,7 +372,7 @@ npm install -D vite typescript
 
 ```sh
 npm install vue @vitejs/plugin-vue @inertiajs/vue3@^3
-npm install -D vite typescript
+npm install -D vite typescript @types/node
 ```
 
   </Tab>
@@ -304,11 +380,31 @@ npm install -D vite typescript
 
 ```sh
 npm install svelte @sveltejs/vite-plugin-svelte @inertiajs/svelte@^3
-npm install -D vite typescript
+npm install -D vite typescript @types/node
 ```
 
   </Tab>
 </Tabs>
+
+`@types/node` types the `node:fs` import and `process` in the Vite config. Add `vite/client` to `tsconfig.json` so `import.meta.glob` is typed:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": ["resources/js", "vite.config.ts"]
+}
+```
+
+Use `"jsx": "preserve"` or omit it for Vue and Svelte.
 
 The starter templates use `ClientApp/pages`. The manual examples below use `resources/js/Pages`. Keep the resolver, file paths and Vite entry consistent with the layout you choose.
 
@@ -387,15 +483,16 @@ Without the plugin, provide the resolver and setup yourself.
 
 ```tsx
 // resources/js/app.tsx
-import { createInertiaApp } from '@inertiajs/react'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
 import { createRoot } from 'react-dom/client'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true })
+    const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', { eager: true })
     return pages[`./Pages/${name}.tsx`]
   },
   setup({ el, App, props }) {
+    if (!el) throw new Error('Inertia root element not found')
     createRoot(el).render(<App {...props} />)
   },
 })
@@ -406,15 +503,16 @@ createInertiaApp({
 
 ```ts
 // resources/js/app.ts
-import { createApp, h } from 'vue'
+import { createApp, h, type DefineComponent } from 'vue'
 import { createInertiaApp } from '@inertiajs/vue3'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.vue', { eager: true })
+    const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue', { eager: true })
     return pages[`./Pages/${name}.vue`]
   },
   setup({ el, App, props, plugin }) {
+    if (!el) throw new Error('Inertia root element not found')
     createApp({ render: () => h(App, props) }).use(plugin).mount(el)
   },
 })
@@ -426,14 +524,15 @@ createInertiaApp({
 ```ts
 // resources/js/app.ts
 import { mount } from 'svelte'
-import { createInertiaApp } from '@inertiajs/svelte'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/svelte'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.svelte', { eager: true })
+    const pages = import.meta.glob<ResolvedComponent>('./Pages/**/*.svelte', { eager: true })
     return pages[`./Pages/${name}.svelte`]
   },
   setup({ el, App, props }) {
+    if (!el) throw new Error('Inertia root element not found')
     mount(App, { target: el, props })
   },
 })
@@ -506,7 +605,14 @@ npm run dev          # or bun/pnpm/yarn run dev; Vite writes wwwroot/hot
 dotnet watch         # terminal 2: the app, ASPNETCORE_ENVIRONMENT=Development
 ```
 
-Open the ASP.NET Core URL, not the Vite URL. In Development the app reads `wwwroot/hot` and renders the Vite tags; in production it reads the manifest.
+Open the ASP.NET Core URL, not the Vite URL. Two servers run side by side:
+
+| URL | What it is | Open it? |
+|---|---|---|
+| `http://localhost:5180` (the template's default) | Your app. ASP.NET Core routes the request, runs your endpoint and renders the Inertia page. | Yes |
+| `http://localhost:5173` | The Vite dev server. It only serves JavaScript, CSS and hot-reload updates to the page above. | No. It has no pages, so it shows a blank page. |
+
+Vite prints `localhost:5173` prominently when it starts, but that address is for the browser's asset requests, not for you. In Development the app reads `wwwroot/hot` and renders the Vite tags; in production it reads the manifest.
 
 For production:
 
@@ -539,7 +645,7 @@ Keep the SSR listener on loopback: the renderer trusts its output and has no aut
 
 # Quick start
 
-URL: https://inertia-dotnet.yebi.africa/docs/quick-start
+URL: https://inertia-dotnet.temtem.dev/docs/quick-start
 
 > Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 
@@ -761,7 +867,7 @@ Deploy `wwwroot/build` and `app.html` with the published app.
 
 # AI agents
 
-URL: https://inertia-dotnet.yebi.africa/docs/ai-agents
+URL: https://inertia-dotnet.temtem.dev/docs/ai-agents
 
 > Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
 
@@ -785,7 +891,7 @@ Most coding agents read a project instruction file: `AGENTS.md` for Codex and ma
 ````md
 ## Inertia.Net
 
-This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inertia-dotnet.yebi.africa/llms.txt
+This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inertia-dotnet.temtem.dev/llms.txt
 
 - Pages are rendered from the server. An endpoint returns `Render("Users/Index", props)`;
   the component lives in `ClientApp/pages/Users/Index.tsx`. Names must match exactly, including case.
@@ -832,7 +938,7 @@ Agents are most reliable when they can verify a change. Inertia.Net gives them a
 
 # Pages and responses
 
-URL: https://inertia-dotnet.yebi.africa/docs/pages-and-responses
+URL: https://inertia-dotnet.temtem.dev/docs/pages-and-responses
 
 > Render components, use MapInertia, and understand the root template and response status codes.
 
@@ -998,7 +1104,7 @@ builder.Services.AddInertia(o => o.UrlResolver = ctx => ctx.Request.GetEncodedUr
 
 # Props
 
-URL: https://inertia-dotnet.yebi.africa/docs/props
+URL: https://inertia-dotnet.temtem.dev/docs/props
 
 > Lazy, optional, deferred, merged, once, cached and rescued page data.
 
@@ -1238,7 +1344,7 @@ If the loader throws, the exception is logged, the prop is left out of `props`, 
 
 # Shared data
 
-URL: https://inertia-dotnet.yebi.africa/docs/shared-data
+URL: https://inertia-dotnet.temtem.dev/docs/shared-data
 
 > Share props with every page, statically or per request, and control the shared prop key list.
 
@@ -1313,7 +1419,7 @@ The generated declarations infer shared props from the values passed to `o.Share
 
 # Validation
 
-URL: https://inertia-dotnet.yebi.africa/docs/validation-and-errors
+URL: https://inertia-dotnet.temtem.dev/docs/validation-and-errors
 
 > Redirect back with validation errors for Minimal APIs, MVC and FastEndpoints, and add Precognition.
 
@@ -1453,7 +1559,7 @@ Validation errors travel in the state store across the redirect. By default that
 
 # Flash data
 
-URL: https://inertia-dotnet.yebi.africa/docs/flash-data
+URL: https://inertia-dotnet.temtem.dev/docs/flash-data
 
 > Carry a one-time message, toast or typed value across a redirect.
 
@@ -1572,7 +1678,7 @@ See [Redirects and history](/docs/redirects-and-history).
 
 # Redirects and history
 
-URL: https://inertia-dotnet.yebi.africa/docs/redirects-and-history
+URL: https://inertia-dotnet.temtem.dev/docs/redirects-and-history
 
 > Redirects, Back, Location, history encryption, clearing and URL fragments.
 
@@ -1673,7 +1779,7 @@ Flash data, errors, `clearHistory` and `preserveFragment` share the state store.
 
 # Error pages
 
-URL: https://inertia-dotnet.yebi.africa/docs/error-pages
+URL: https://inertia-dotnet.temtem.dev/docs/error-pages
 
 > Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.
 
@@ -1762,7 +1868,7 @@ Validation redirects keep their existing behavior. A required SSR failure can be
 
 # Partial reloads
 
-URL: https://inertia-dotnet.yebi.africa/docs/partial-reloads
+URL: https://inertia-dotnet.temtem.dev/docs/partial-reloads
 
 > Reload only the props a page needs with only and except filters.
 
@@ -1834,7 +1940,7 @@ var deferred = await page.LoadDeferredPropsAsync(client, "sidebar");
 
 # Deferred props
 
-URL: https://inertia-dotnet.yebi.africa/docs/deferred-props
+URL: https://inertia-dotnet.temtem.dev/docs/deferred-props
 
 > Load slow page sections after the first render, in groups.
 
@@ -1915,7 +2021,7 @@ Deferred props are for data the page can render without. If the page cannot be m
 
 # Merging props
 
-URL: https://inertia-dotnet.yebi.africa/docs/merging-props
+URL: https://inertia-dotnet.temtem.dev/docs/merging-props
 
 > Append, prepend, deep merge and match items instead of replacing the client's value.
 
@@ -1994,7 +2100,7 @@ On a partial reload, merge metadata is only emitted for paths the reload asked f
 
 # Once props
 
-URL: https://inertia-dotnet.yebi.africa/docs/once-props
+URL: https://inertia-dotnet.temtem.dev/docs/once-props
 
 > Remember expensive values on the client and skip them on later visits.
 
@@ -2066,7 +2172,7 @@ Revisit the page with the same client and assert that the prop is missing while 
 
 # Infinite scroll
 
-URL: https://inertia-dotnet.yebi.africa/docs/infinite-scroll
+URL: https://inertia-dotnet.temtem.dev/docs/infinite-scroll
 
 > Merge pages of items and report paging metadata to the InfiniteScroll client component.
 
@@ -2133,7 +2239,7 @@ Infinite scroll is also a payload-size tool. Load 10 to 20 items per page instea
 
 # Pagination
 
-URL: https://inertia-dotnet.yebi.africa/docs/pagination
+URL: https://inertia-dotnet.temtem.dev/docs/pagination
 
 > Create numbered and cursor pages for pagers and infinite scroll.
 
@@ -2267,7 +2373,7 @@ A cached page still writes its scroll metadata. Use cache keys that include the 
 
 # Live props
 
-URL: https://inertia-dotnet.yebi.africa/docs/live-props
+URL: https://inertia-dotnet.temtem.dev/docs/live-props
 
 > Props that refresh themselves when the server broadcasts an event.
 
@@ -2536,7 +2642,7 @@ Authorization is checked when a client subscribes, not continuously. If access c
 
 # Precognition
 
-URL: https://inertia-dotnet.yebi.africa/docs/precognition
+URL: https://inertia-dotnet.temtem.dev/docs/precognition
 
 > Validate a form before submission without running its handler.
 
@@ -2794,7 +2900,7 @@ A validation failure returns `422`; a limiter may return `429`. `InertiaPrecogni
 
 # Server-side rendering
 
-URL: https://inertia-dotnet.yebi.africa/docs/server-side-rendering
+URL: https://inertia-dotnet.temtem.dev/docs/server-side-rendering
 
 > Render the first visit on Bun or Node, supervise the process from .NET, and fall back safely.
 
@@ -2837,7 +2943,7 @@ Build both bundles:
 
 ```tsx
 // resources/js/ssr.tsx
-import { createInertiaApp } from '@inertiajs/react'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
 import createServer from '@inertiajs/react/server'
 import ReactDOMServer from 'react-dom/server'
 
@@ -2846,7 +2952,7 @@ createServer((page) =>
     page,
     render: ReactDOMServer.renderToString,
     resolve: (name) => {
-      const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true })
+      const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', { eager: true })
       return pages[`./Pages/${name}.tsx`]
     },
     setup: ({ App, props }) => <App {...props} />,
@@ -2861,6 +2967,7 @@ The client entry hydrates when the server rendered:
 import { createRoot, hydrateRoot } from 'react-dom/client'
 
 setup({ el, App, props }) {
+  if (!el) throw new Error('Inertia root element not found')
   if (el.dataset.serverRendered === 'true') hydrateRoot(el, <App {...props} />)
   else createRoot(el).render(<App {...props} />)
 }
@@ -3056,7 +3163,7 @@ A stale SSR cache hit returns immediately and schedules refresh on a bounded bac
 
 # Vite
 
-URL: https://inertia-dotnet.yebi.africa/docs/vite-integration
+URL: https://inertia-dotnet.temtem.dev/docs/vite-integration
 
 > Manifest tags, the dev-server hot file, asset base URLs, prefetching and CSP nonces.
 
@@ -3145,7 +3252,7 @@ Use `app.UseStaticFiles()` with a long `Cache-Control` for `/build/assets`, or `
 
 # Asset versioning
 
-URL: https://inertia-dotnet.yebi.africa/docs/asset-versioning
+URL: https://inertia-dotnet.temtem.dev/docs/asset-versioning
 
 > Tell the client when its JavaScript and CSS are stale, and reload once when they are.
 
@@ -3195,7 +3302,7 @@ The version check and `X-Inertia-Location` use the request URL. Behind a path ba
 
 # CSRF protection
 
-URL: https://inertia-dotnet.yebi.africa/docs/csrf-and-antiforgery
+URL: https://inertia-dotnet.temtem.dev/docs/csrf-and-antiforgery
 
 > Protect forms with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.
 
@@ -3264,7 +3371,7 @@ See [Deploying](/docs/deploying) for proxy and multi-instance settings.
 
 # Deploying behind a proxy
 
-URL: https://inertia-dotnet.yebi.africa/docs/deploying
+URL: https://inertia-dotnet.temtem.dev/docs/deploying
 
 > Forwarded headers, secure cookies, compression, asset caching and multi-instance state.
 
@@ -3366,7 +3473,7 @@ Keep `AllowedHosts` configured: an asset-version mismatch response includes the 
 
 # Native AOT
 
-URL: https://inertia-dotnet.yebi.africa/docs/native-aot
+URL: https://inertia-dotnet.temtem.dev/docs/native-aot
 
 > Publish a Native AOT Inertia.Net app with source-generated JSON metadata.
 
@@ -3465,7 +3572,7 @@ The reference app is `tests/Inertia.Net.AotSmoke/Program.cs`. Run it end to end 
 
 # Performance
 
-URL: https://inertia-dotnet.yebi.africa/docs/performance
+URL: https://inertia-dotnet.temtem.dev/docs/performance
 
 > Memory and hosting guidance, payload limits and the design choices behind the adapter.
 
@@ -3546,7 +3653,7 @@ Parallel prop planning and DevTools recording each use a process-wide latch that
 
 # Multiple apps and libraries
 
-URL: https://inertia-dotnet.yebi.africa/docs/mounts
+URL: https://inertia-dotnet.temtem.dev/docs/mounts
 
 > Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
 
@@ -3665,7 +3772,7 @@ Mounts are adapter configuration: the Inertia protocol on the wire does not chan
 
 # Configuration
 
-URL: https://inertia-dotnet.yebi.africa/docs/configuration
+URL: https://inertia-dotnet.temtem.dev/docs/configuration
 
 > InertiaOptions, Vite, SSR, props, state and the middleware and result API.
 
@@ -3804,7 +3911,7 @@ The package imports `Inertia.Net` and static members of `Inertia.Net.Inertia` wh
 
 # TypeScript types
 
-URL: https://inertia-dotnet.yebi.africa/docs/typescript
+URL: https://inertia-dotnet.temtem.dev/docs/typescript
 
 > Generate declarations for page props, shared props and flash data from your .NET contracts.
 
@@ -3885,7 +3992,7 @@ Props and MVC validation error keys use the HTTP `JsonOptions`. FastEndpoints er
 
 # Testing
 
-URL: https://inertia-dotnet.yebi.africa/docs/testing
+URL: https://inertia-dotnet.temtem.dev/docs/testing
 
 > Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
 
@@ -4007,7 +4114,7 @@ Import `System.Net` and `System.Net.Http.Json`. For a named bag use `HasErrorBag
 
 # DevTools
 
-URL: https://inertia-dotnet.yebi.africa/docs/devtools
+URL: https://inertia-dotnet.temtem.dev/docs/devtools
 
 > Record visits for the Inertia DevTools extension and catch missing page components during development.
 
@@ -4070,7 +4177,7 @@ If recording is enabled outside Development without an `Authorize` callback, the
 
 # Troubleshooting
 
-URL: https://inertia-dotnet.yebi.africa/docs/troubleshooting
+URL: https://inertia-dotnet.temtem.dev/docs/troubleshooting
 
 > Common errors, their causes, and how to fix them.
 
@@ -4126,6 +4233,10 @@ If it happens for your own host, the app is behind a proxy that does not forward
 A `409` means the asset version differs between the client and the server. A loop means it never converges: usually the version changes on every request (a `VersionResolver` that returns a new value each time, or a manifest regenerated by a file watcher), or different instances behind a load balancer serve different builds. Use a stable version string.
 
 In Development the manifest hash changes after each `vite build`, which is expected once.
+
+## A blank page at localhost:5173
+
+`http://localhost:5173` is the Vite dev server. It serves assets and hot-reload updates to your app and has no pages of its own, so it shows a blank page. Open the ASP.NET Core URL printed by `dotnet watch` or `dotnet run` instead (`http://localhost:5180` in the starter templates).
 
 ## The dev server tags do not appear
 
@@ -4216,7 +4327,7 @@ Check that the key and duration are stable and the cache store works. Dot-key pr
 
 # Build a todo app
 
-URL: https://inertia-dotnet.yebi.africa/docs/forget-me-not
+URL: https://inertia-dotnet.temtem.dev/docs/forget-me-not
 
 > Build a complete Inertia.Net todo app with session login, public lists, paginated loading, reminders and SSR.
 

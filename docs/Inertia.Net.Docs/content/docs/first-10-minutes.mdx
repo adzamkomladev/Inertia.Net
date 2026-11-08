@@ -2,7 +2,7 @@
 title: First 10 minutes
 description: Start a template app, try its validated form, and test the redirect.
 section: Get started
-order: 3
+order: 4
 ---
 
 Create the React starter (choose `vue` or `svelte` for another client):
@@ -15,7 +15,11 @@ npm install
 npm run dev
 ```
 
-Use `bun install` and `bun run dev`, `pnpm install` and `pnpm run dev`, or `yarn install` and `yarn run dev` if you prefer. In a second terminal run `dotnet run`. Open the app's address and visit `/todos`; submit an empty title to see the validation message. The template includes Vite, antiforgery and a complete form.
+Use `bun install` and `bun run dev`, `pnpm install` and `pnpm run dev`, or `yarn install` and `yarn run dev` if you prefer. In a second terminal run `dotnet run`. Open the address printed by `dotnet run` (`http://localhost:5180` for the template) and visit `/todos`; submit an empty title to see the validation message. The template includes Vite, antiforgery and a complete form.
+
+<Callout type="warning" title="Open the .NET URL, not the Vite one">
+Vite prints `http://localhost:5173` when it starts, but that server only supplies JavaScript, CSS and hot reload to your app. It has no pages, so opening it shows a blank page. Your app is the ASP.NET Core address from `dotnet run`: `http://localhost:5180`.
+</Callout>
 
 The handler in `Program.cs` is:
 

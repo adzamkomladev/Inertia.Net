@@ -2,7 +2,7 @@
 title: AI agents
 description: Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
 section: Get started
-order: 5
+order: 6
 ---
 
 An Inertia.Net app is a good fit for coding agents. The backend and the frontend live in one project, a feature follows one request path (endpoint, props, page component), and there is no API contract or client router for the agent to keep in sync. The main thing an agent needs is to know the conventions. This page gives you that context in a form you can paste into your project.
@@ -25,7 +25,7 @@ Most coding agents read a project instruction file: `AGENTS.md` for Codex and ma
 ````md
 ## Inertia.Net
 
-This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inertia-dotnet.yebi.africa/llms.txt
+This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inertia-dotnet.temtem.dev/llms.txt
 
 - Pages are rendered from the server. An endpoint returns `Render("Users/Index", props)`;
   the component lives in `ClientApp/pages/Users/Index.tsx`. Names must match exactly, including case.

@@ -7,6 +7,7 @@ Inertia.Net **1.7.0** is a .NET 10 server adapter for the **Inertia.js v3** prot
 ## Contents
 
 - [How it works](#how-it-works)
+- [Why Inertia instead of a SPA plus a Web API?](#why-inertia-instead-of-a-spa-plus-a-web-api)
 - [Start a new app](#start-a-new-app)
 - [Sample apps](#sample-apps)
 - [Documentation site](#documentation-site)
@@ -73,6 +74,10 @@ export default function Home({ greeting }: { greeting: string }) {
 
 The page name must match your client-side page resolver. The starter templates configure that resolver for you.
 
+### Why Inertia instead of a SPA plus a Web API?
+
+A typical React, Vue or Svelte app on ASP.NET Core means two things to build: a JSON Web API and a client app that calls it, each with its own routing, auth and validation handling. With Inertia there is one app. Your endpoints render pages, and the frontend is just the view layer. You skip the API layer, the client router and most data-fetching code, and keep ASP.NET Core's routing, cookie auth, validation and DI. It fits apps where one team ships the frontend and backend together; if you need a public JSON API for mobile or third parties, you will still build that separately. The [Why Inertia](https://inertia-dotnet.temtem.dev/docs/why-inertia) page has the full comparison.
+
 ## Start a new app
 
 You need the .NET 10 SDK and JavaScript frontend build tools. npm, Bun, pnpm and Yarn are supported; choose the package manager you use for your app. Use an Inertia v3 client; v2 clients are not supported.
@@ -102,7 +107,16 @@ Start ASP.NET Core in another terminal, also from `MyApp`:
 dotnet watch
 ```
 
-Open [http://localhost:5180](http://localhost:5180). Browse through ASP.NET Core; Vite supplies the frontend assets and hot reload.
+Open [http://localhost:5180](http://localhost:5180). This is your app. Browse through ASP.NET Core; Vite supplies the frontend assets and hot reload.
+
+Two servers are running, and only one of them is the app:
+
+| URL | What it is | Open it? |
+|---|---|---|
+| `http://localhost:5180` | **Your app.** ASP.NET Core handles routing, auth and validation, and renders the Inertia pages. | **Yes** |
+| `http://localhost:5173` | The **Vite dev server**. It serves JavaScript, CSS and hot-reload updates to the page above, and has no pages or routes of its own. | No. Opening it shows a blank page or a 404. |
+
+Vite prints `localhost:5173` in large letters when it starts. That is expected; ignore it and use the ASP.NET Core URL printed by `dotnet watch`.
 
 For a production build, run the build command from your row, then `dotnet publish -c Release`. Deploy the built frontend assets with the published app. SSR is optional and requires a Node server at runtime; ordinary client rendering does not.
 
@@ -112,9 +126,9 @@ For a production build, run the build command from your row, then `dotnet publis
 
 | App | What it is | Frontend | Database | Source | Live demo |
 |---|---|---|---|---|---|
-| Inkwell | Multi-user publishing platform with feeds, search, analytics and live notifications | React | SQLite | [samples/Inkwell](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/Inkwell) | [inkwell.yebi.africa](https://inkwell.yebi.africa) |
-| TechLandier | Electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | [samples/TechLandier](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/TechLandier) | [techlandier.yebi.africa](https://techlandier.yebi.africa) |
-| CarParker | Parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | [samples/CarParker](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/CarParker) | [carparker.yebi.africa](https://carparker.yebi.africa) |
+| Inkwell | Multi-user publishing platform with feeds, search, analytics and live notifications | React | SQLite | [samples/Inkwell](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/Inkwell) | [inkwell.temtem.dev](https://inkwell.temtem.dev) |
+| TechLandier | Electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | [samples/TechLandier](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/TechLandier) | [techlandier.temtem.dev](https://techlandier.temtem.dev) |
+| CarParker | Parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | [samples/CarParker](https://github.com/adzamkomladev/Inertia.Net-Samples/tree/main/samples/CarParker) | [carparker.temtem.dev](https://carparker.temtem.dev) |
 
 The other two, CarParkerReplicas and TechLandierDistributed, run CarParker and TechLandier across replicas and run locally only. Each sample's README lists its demo logins and how to run it.
 
@@ -123,7 +137,7 @@ props over SignalR: a public counter and a shared, private unread count.
 
 ## Documentation site
 
-The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself an Inertia.Net app: a Minimal API renders the pages, React renders the layout, and MDX content provides the guides. It includes search, light/dark/system themes and code examples for every feature. The client uses Bun; see its [README](docs/Inertia.Net.Docs/README.md) to run it locally.
+Read the docs at [inertia-dotnet.temtem.dev](https://inertia-dotnet.temtem.dev). The documentation in [`docs/Inertia.Net.Docs`](docs/Inertia.Net.Docs) is itself an Inertia.Net app: a Minimal API renders the pages, React renders the layout, and MDX content provides the guides. It includes search, light/dark/system themes and code examples for every feature. The client uses Bun; see its [README](docs/Inertia.Net.Docs/README.md) to run it locally.
 
 ## Overview and feature matrix
 
@@ -384,7 +398,25 @@ Inertia.Net speaks the v3 protocol: the initial page is the `<script data-page="
 | Vue | `vue @vitejs/plugin-vue @inertiajs/vue3@^3` |
 | Svelte | `svelte @sveltejs/vite-plugin-svelte @inertiajs/svelte@^3` |
 
-Add `vite typescript` as development dependencies using your package manager's command above.
+Add `vite typescript @types/node` as development dependencies using your package manager's command above. `@types/node` provides the types for `node:fs` and `process` used by the Vite config below. The page resolver and `import.meta.glob` types come from `vite/client`, so list it in `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": ["resources/js", "vite.config.ts"]
+}
+```
+
+Use `"jsx": "preserve"` or omit it for Vue and Svelte.
 
 The starter templates use `ClientApp/pages`; the manual setup below uses `resources/js/Pages`. Keep the resolver, file paths and Vite entry consistent with the layout you choose.
 
@@ -453,15 +485,16 @@ The optional `@inertiajs/vite` plugin can resolve pages and mount the app for yo
 
 ```tsx
 // resources/js/app.tsx
-import { createInertiaApp } from '@inertiajs/react'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
 import { createRoot } from 'react-dom/client'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true })
+    const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', { eager: true })
     return pages[`./Pages/${name}.tsx`]
   },
   setup({ el, App, props }) {
+    if (!el) throw new Error('Inertia root element not found')
     createRoot(el).render(<App {...props} />)
   },
 })
@@ -497,15 +530,16 @@ export default function Index({ users }: { users: { id: number; name: string }[]
 
 ```ts
 // resources/js/app.ts
-import { createApp, h } from 'vue'
+import { createApp, h, type DefineComponent } from 'vue'
 import { createInertiaApp } from '@inertiajs/vue3'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.vue', { eager: true })
+    const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue', { eager: true })
     return pages[`./Pages/${name}.vue`]
   },
   setup({ el, App, props, plugin }) {
+    if (!el) throw new Error('Inertia root element not found')
     createApp({ render: () => h(App, props) }).use(plugin).mount(el)
   },
 })
@@ -541,14 +575,15 @@ defineProps<{ users: { id: number; name: string }[] }>()
 ```ts
 // resources/js/app.ts
 import { mount } from 'svelte'
-import { createInertiaApp } from '@inertiajs/svelte'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/svelte'
 
 createInertiaApp({
   resolve: (name) => {
-    const pages = import.meta.glob('./Pages/**/*.svelte', { eager: true })
+    const pages = import.meta.glob<ResolvedComponent>('./Pages/**/*.svelte', { eager: true })
     return pages[`./Pages/${name}.svelte`]
   },
   setup({ el, App, props }) {
+    if (!el) throw new Error('Inertia root element not found')
     mount(App, { target: el, props })
   },
 })
@@ -585,7 +620,7 @@ Start Vite with `npm run dev`, `bun run dev`, `pnpm run dev` or `yarn run dev` i
 dotnet watch         # the app, ASPNETCORE_ENVIRONMENT=Development
 ```
 
-Open the ASP.NET Core URL printed by `dotnet watch`, rather than the Vite URL. The first visit to `/` should display "Hello from .NET". If you started with `dotnet new web`, ensure the launch profile sets `ASPNETCORE_ENVIRONMENT=Development` so the adapter reads the Vite hot file.
+Open the ASP.NET Core URL printed by `dotnet watch` (for example `http://localhost:5180`), **not** the Vite URL (`http://localhost:5173`). Vite only serves assets and hot-reload updates to the page that ASP.NET Core renders, so its own address shows a blank page. The first visit to `/` should display "Hello from .NET". If you started with `dotnet new web`, ensure the launch profile sets `ASPNETCORE_ENVIRONMENT=Development` so the adapter reads the Vite hot file.
 
 For production, run your package manager's `build` script (see [Start a new app](#start-a-new-app)), then `dotnet publish -c Release`. Deploy `wwwroot/build` and `app.html` with the published app. Node.js is needed to build the assets; it is only needed at runtime if you enable SSR. Samples for each framework live in [samples/](samples/).
 
@@ -1680,7 +1715,7 @@ SSR renders the first visit on a Node server using your client bundle, so crawle
 
 ```tsx
 // resources/js/ssr.tsx
-import { createInertiaApp } from '@inertiajs/react'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
 import createServer from '@inertiajs/react/server'
 import ReactDOMServer from 'react-dom/server'
 
@@ -1689,7 +1724,7 @@ createServer((page) =>
     page,
     render: ReactDOMServer.renderToString,
     resolve: (name) => {
-      const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true })
+      const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', { eager: true })
       return pages[`./Pages/${name}.tsx`]
     },
     setup: ({ App, props }) => <App {...props} />,
@@ -1705,6 +1740,7 @@ The client entry then hydrates when the server rendered:
 import { createRoot, hydrateRoot } from 'react-dom/client'
 
 setup({ el, App, props }) {
+  if (!el) throw new Error('Inertia root element not found')
   if (el.dataset.serverRendered === 'true') hydrateRoot(el, <App {...props} />)
   else createRoot(el).render(<App {...props} />)
 },
@@ -1716,7 +1752,7 @@ setup({ el, App, props }) {
 // Vue: resources/js/ssr.ts
 import { createInertiaApp } from '@inertiajs/vue3'
 import createServer from '@inertiajs/vue3/server'
-import { createSSRApp, h } from 'vue'
+import { createSSRApp, h, type DefineComponent } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 
 createServer((page) =>
@@ -1724,7 +1760,7 @@ createServer((page) =>
     page,
     render: renderToString,
     resolve: (name) => {
-      const pages = import.meta.glob('./Pages/**/*.vue', { eager: true })
+      const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue', { eager: true })
       return pages[`./Pages/${name}.vue`]
     },
     setup({ App, props, plugin }) {
@@ -1738,7 +1774,7 @@ createServer((page) =>
 
 ```ts
 // Svelte: resources/js/ssr.ts
-import { createInertiaApp } from '@inertiajs/svelte'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/svelte'
 import createServer from '@inertiajs/svelte/server'
 import { render } from 'svelte/server'
 
@@ -1746,7 +1782,7 @@ createServer((page) =>
   createInertiaApp({
     page,
     resolve: (name) => {
-      const pages = import.meta.glob('./Pages/**/*.svelte', { eager: true })
+      const pages = import.meta.glob<ResolvedComponent>('./Pages/**/*.svelte', { eager: true })
       return pages[`./Pages/${name}.svelte`]
     },
     setup({ App, props }) {
