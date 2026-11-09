@@ -191,6 +191,7 @@ internal sealed partial class InertiaCaching
     private readonly ConcurrentDictionary<InertiaCacheKey, byte> _refreshing = new();
     private readonly ConcurrentDictionary<InertiaCacheKey, TaskCompletionSource<byte[]?>> _filling = new();
     private int _refreshCount;
+    private long _invalidations;
     private long _nextFailureLog;
     private int _suppressedFailures;
 
@@ -274,12 +275,31 @@ internal sealed partial class InertiaCaching
         completion.TrySetResult(null);
     }
 
-    /// <summary>Stores an entry while rendering: a failing store is logged and the page is still written. Ends a refresh of the key.</summary>
-    public async ValueTask SetAsync(InertiaCacheKey key, byte[] value, TimeSpan expiration, string[] tags, CancellationToken cancellationToken)
+    /// <summary>
+    /// Counts the removals made through <see cref="IInertiaCache"/>. A fill or refresh reads it before its loader runs and passes it to
+    /// <see cref="SetAsync"/>, so a value loaded before a removal is not stored after it.
+    /// </summary>
+    public long InvalidationStamp => Volatile.Read(ref _invalidations);
+
+    /// <summary>Marks a removal; called before the store removes, so a fill that stores after the removal sees the new stamp.</summary>
+    public void Invalidating() => Interlocked.Increment(ref _invalidations);
+
+    /// <summary>
+    /// Stores an entry while rendering: a failing store is logged and the page is still written. Ends a refresh of the key. With a
+    /// <paramref name="stamp"/> from <see cref="InvalidationStamp"/>, a removal since then skips the store, or takes back a store that raced it.
+    /// </summary>
+    public async ValueTask SetAsync(InertiaCacheKey key, byte[] value, TimeSpan expiration, string[] tags, CancellationToken cancellationToken, long? stamp = null)
     {
         try
         {
+            if (stamp is { } before && before != InvalidationStamp) return;
             await Store.SetAsync(key, value, new InertiaCacheEntryOptions(expiration, tags), cancellationToken);
+            if (stamp is { } loaded && loaded != InvalidationStamp
+                && await Store.GetAsync(key, cancellationToken) is { } current && current.AsSpan().SequenceEqual(value))
+            {
+                // Only this store's own bytes: a value set after the removal (SetPropAsync, a newer fill) stays.
+                await Store.RemoveAsync(key, cancellationToken);
+            }
         }
         catch (Exception ex) when (!IsCancellation(ex, cancellationToken))
         {
@@ -577,18 +597,28 @@ internal sealed class InertiaCache(InertiaCaching caching, InertiaPageWriter pag
     public ValueTask RemovePropAsync(string key, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
+        caching.Invalidating();
         return caching.Store.RemoveAsync(new InertiaCacheKey(InertiaCacheEntryKind.Prop, key), cancellationToken);
     }
 
     public ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(tag);
+        caching.Invalidating();
         return caching.Store.RemoveByTagAsync(tag, cancellationToken);
     }
 
-    public ValueTask ClearPropsAsync(CancellationToken cancellationToken = default) => caching.Store.RemoveByTagAsync(InertiaCacheTags.Props, cancellationToken);
+    public ValueTask ClearPropsAsync(CancellationToken cancellationToken = default)
+    {
+        caching.Invalidating();
+        return caching.Store.RemoveByTagAsync(InertiaCacheTags.Props, cancellationToken);
+    }
 
-    public ValueTask ClearSsrAsync(CancellationToken cancellationToken = default) => caching.Store.RemoveByTagAsync(InertiaCacheTags.Ssr, cancellationToken);
+    public ValueTask ClearSsrAsync(CancellationToken cancellationToken = default)
+    {
+        caching.Invalidating();
+        return caching.Store.RemoveByTagAsync(InertiaCacheTags.Ssr, cancellationToken);
+    }
 
     public ValueTask SetPropAsync<T>(string key, T value, TimeSpan duration, TimeSpan? staleFor = null, IEnumerable<string>? tags = null, CancellationToken cancellationToken = default)
     {

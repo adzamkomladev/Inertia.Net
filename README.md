@@ -1921,7 +1921,7 @@ app.MapHealthChecks("/health");
 
 The check reports what the renders have already shown, without calling the SSR servers: healthy while SSR is disabled, goes through the Vite dev server, or every server can take renders; degraded while some servers' circuits are open or some managed instances are not ready; the registration's failure status (default unhealthy) when none can. Its data lists each server's state (`closed`, `half-open`, `open` or `not-ready`). A server that went down is reported healthy until renders fail.
 
-Stale refreshes use a bounded background queue of 64 items. Prop loaders must use singleton dependencies or create a scope or context inside the loader; they must not capture request-scoped services. Dropped work is logged and counted by `inertia.cache.refresh.dropped`. Required SSR exposes a generic failure message; detailed failures are logged.
+Stale refreshes use a bounded background queue of 64 items, drained by 4 workers; each refresh is cancelled after 30 seconds. Prop loaders must use singleton dependencies or create a scope or context inside the loader; they must not capture request-scoped services. Dropped work is logged and counted by `inertia.cache.refresh.dropped`. Required SSR exposes a generic failure message; detailed failures are logged.
 
 ### 5. Observability
 
@@ -2329,8 +2329,11 @@ Sensitive query parameters are also redacted in recorded request/page URLs, redi
 unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered;
 unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk.
 
-Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize` accepts
-(`404` otherwise). With `Pages.Directory` set, entries link the component to its file.
+Without an `Authorize` callback the read API answers in Development only, and only requests from this machine: a loopback connection
+to a loopback host name such as `localhost` (`404` otherwise). This keeps an app accidentally run as Development on a server, or a
+DNS-rebinding page in the developer's browser, from reading other users' entries; set `Authorize` to read from a container or another
+machine. Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize`
+accepts (`404` otherwise). With `Pages.Directory` set, entries link the component to its file.
 
 ## Development checks
 

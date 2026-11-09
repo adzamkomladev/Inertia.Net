@@ -1183,9 +1183,10 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
                     continue;
                 }
 
+                var stamp = owner.Caching.InvalidationStamp;
                 var value = await prop.ResolveAsync(cancellationToken);
                 var entry = owner.CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, path, out _);
-                await owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken);
+                await owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken, stamp);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

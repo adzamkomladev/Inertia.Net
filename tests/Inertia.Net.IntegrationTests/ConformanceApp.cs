@@ -185,7 +185,7 @@ public sealed class FakeSsrServer : HttpMessageHandler
         Interlocked.Increment(ref _calls);
         if (Down)
         {
-            throw new HttpRequestException("Connection refused");
+            throw new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused");
         }
 
         var json = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object> { ["head"] = Array.Empty<string>(), ["body"] = Body });

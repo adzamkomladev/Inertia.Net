@@ -235,6 +235,79 @@ public sealed class CachedPropsTests
         Assert.Equal(42, (int?)(await second.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))["props"]!["value"]);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Waiters_of_a_failed_fill_load_at_the_same_time(bool rescue)
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failed = Prop<int>(async ct =>
+        {
+            started.TrySetResult();
+            await release.Task.WaitAsync(ct);
+            throw new InvalidOperationException("failed fill");
+        }).Cache("shared", TimeSpan.FromMinutes(1));
+        if (rescue) failed.Rescue();
+        var first = _harness.PageAsync(new InertiaProps { ["value"] = failed });
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Each waiter's loader finishes only once both run: waiters that took the claim one after another would time out here.
+        var running = 0;
+        var both = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        InertiaProp Waiter() => Prop(async ct =>
+        {
+            if (Interlocked.Increment(ref running) == 2) both.TrySetResult();
+            await both.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);
+            return 42;
+        }).Cache("shared", TimeSpan.FromMinutes(1));
+        var second = _harness.PageAsync(new InertiaProps { ["value"] = Waiter() });
+        var third = _harness.PageAsync(new InertiaProps { ["value"] = Waiter() });
+        await Task.Delay(100, TestContext.Current.CancellationToken); // both wait on the failing fill
+
+        release.SetResult();
+        if (rescue) await first.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        else await Assert.ThrowsAsync<InvalidOperationException>(() => first.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.Equal(42, (int?)(await second.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))["props"]!["value"]);
+        Assert.Equal(42, (int?)(await third.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))["props"]!["value"]);
+    }
+
+    [Theory]
+    [InlineData("tag")]
+    [InlineData("key")]
+    [InlineData("clear")]
+    public async Task A_value_loaded_before_an_invalidation_is_not_stored_after_it(string invalidation)
+    {
+        var cache = _harness.Services.GetRequiredService<IInertiaCache>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        InertiaProp Orders(bool slow) => Prop(async ct =>
+        {
+            var load = ++_loads;
+            if (slow)
+            {
+                started.TrySetResult();
+                await release.Task.WaitAsync(ct);
+            }
+
+            return $"orders {load}";
+        }).Cache("orders", TimeSpan.FromMinutes(5), tags: ["user:ann"]);
+
+        var loading = _harness.PageAsync(new InertiaProps { ["orders"] = Orders(slow: true) });
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await (invalidation switch
+        {
+            "tag" => cache.RemoveByTagAsync("user:ann", TestContext.Current.CancellationToken),
+            "key" => cache.RemovePropAsync("orders", TestContext.Current.CancellationToken),
+            _ => cache.ClearPropsAsync(TestContext.Current.CancellationToken),
+        });
+        release.SetResult();
+        Assert.Equal("orders 1", (string?)(await loading)["props"]!["orders"]); // the request still gets its value
+
+        var next = await _harness.PageAsync(new InertiaProps { ["orders"] = Orders(slow: false) });
+        Assert.Equal("orders 2", (string?)next["props"]!["orders"]);
+    }
+
     [Fact]
     public async Task Parallel_cached_props_publish_before_releasing_the_loader_slot()
     {
@@ -574,6 +647,28 @@ public sealed class CachedPropsTests
     }
 
     [Fact]
+    public async Task Taking_back_a_raced_store_keeps_a_value_set_after_the_removal()
+    {
+        var written = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var store = new RecordingStore { AfterFirstWrite = async () => { written.TrySetResult(); await release.Task; } };
+        var harness = new Harness(configureServices: s => s.AddSingleton<IInertiaCacheStore>(store));
+        var cache = harness.Services.GetRequiredService<IInertiaCache>();
+        InertiaProps Page() => new() { ["orders"] = Prop(() => $"load {++_loads}").Cache("orders", TimeSpan.FromMinutes(5)) };
+
+        // The fill's store has written its bytes but not returned when the key is removed and a new value is set.
+        var filling = harness.PageAsync(Page());
+        await written.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await cache.RemovePropAsync("orders", TestContext.Current.CancellationToken);
+        await cache.SetPropAsync("orders", "seeded", TimeSpan.FromMinutes(5), cancellationToken: TestContext.Current.CancellationToken);
+        release.SetResult();
+        Assert.Equal("load 1", (string?)(await filling)["props"]!["orders"]);
+
+        Assert.Equal("seeded", (string?)(await harness.PageAsync(Page()))["props"]!["orders"]);
+        Assert.Equal(1, _loads);
+    }
+
+    [Fact]
     public async Task A_custom_store_gets_prefixed_keys_and_the_tags()
     {
         var store = new RecordingStore();
@@ -720,6 +815,8 @@ public sealed class CachedPropsTests
 
         public bool Yield { get; init; }
 
+        public Func<Task>? AfterFirstWrite { get; init; }
+
         public async ValueTask<byte[]?> GetAsync(InertiaCacheKey key, CancellationToken cancellationToken)
         {
             await Pause();
@@ -732,6 +829,7 @@ public sealed class CachedPropsTests
             if (FailWrites) throw new InvalidOperationException("store write failed");
             Values[key] = value;
             Sets.Add((key, options));
+            if (AfterFirstWrite is { } after && Sets.Count == 1) await after();
         }
 
         public async ValueTask RemoveAsync(InertiaCacheKey key, CancellationToken cancellationToken)

@@ -99,6 +99,10 @@ public sealed class PrecognitionTests
         Assert.Equal(["address.street"], (await ErrorsAsync(await PostAsync(client, "/precog-nested", new { address = new { street = "" } }))).Select(e => e.Key));
         Assert.Equal(["address.street"], (await ErrorsAsync(await PostAsync(client, "/precog-nested", new { address = new { street = "" } }, only: "address"))).Select(e => e.Key));
         Assert.Equal(HttpStatusCode.NoContent, (await PostAsync(client, "/precog-nested", new { address = new { street = "" } }, only: "other")).StatusCode);
+        // A prefix matches whole path segments only, and a long list of fields still matches.
+        Assert.Equal(HttpStatusCode.NoContent, (await PostAsync(client, "/precog-nested", new { address = new { street = "" } }, only: "addr, address.str")).StatusCode);
+        var many = string.Join(',', Enumerable.Range(0, 2000).Select(i => $"f{i}")) + ",address";
+        Assert.Equal(["address.street"], (await ErrorsAsync(await PostAsync(client, "/precog-nested", new { address = new { street = "" } }, only: many))).Select(e => e.Key));
     }
 
     [Fact]

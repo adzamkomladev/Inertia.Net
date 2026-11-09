@@ -253,7 +253,7 @@ public sealed class SsrGatewayTests
     [Fact]
     public async Task Connection_refused_falls_back_and_logs_the_type()
     {
-        var handler = new FakeHandler((_, _) => throw new HttpRequestException("Connection refused"));
+        var handler = new FakeHandler((_, _) => throw new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused"));
         var harness = Create(handler);
         AssertClientRendered(await GetAsync(harness));
 
