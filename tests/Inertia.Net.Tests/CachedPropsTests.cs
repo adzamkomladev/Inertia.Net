@@ -647,6 +647,28 @@ public sealed class CachedPropsTests
     }
 
     [Fact]
+    public async Task Taking_back_a_raced_store_keeps_a_value_set_after_the_removal()
+    {
+        var written = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var store = new RecordingStore { AfterFirstWrite = async () => { written.TrySetResult(); await release.Task; } };
+        var harness = new Harness(configureServices: s => s.AddSingleton<IInertiaCacheStore>(store));
+        var cache = harness.Services.GetRequiredService<IInertiaCache>();
+        InertiaProps Page() => new() { ["orders"] = Prop(() => $"load {++_loads}").Cache("orders", TimeSpan.FromMinutes(5)) };
+
+        // The fill's store has written its bytes but not returned when the key is removed and a new value is set.
+        var filling = harness.PageAsync(Page());
+        await written.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await cache.RemovePropAsync("orders", TestContext.Current.CancellationToken);
+        await cache.SetPropAsync("orders", "seeded", TimeSpan.FromMinutes(5), cancellationToken: TestContext.Current.CancellationToken);
+        release.SetResult();
+        Assert.Equal("load 1", (string?)(await filling)["props"]!["orders"]);
+
+        Assert.Equal("seeded", (string?)(await harness.PageAsync(Page()))["props"]!["orders"]);
+        Assert.Equal(1, _loads);
+    }
+
+    [Fact]
     public async Task A_custom_store_gets_prefixed_keys_and_the_tags()
     {
         var store = new RecordingStore();
@@ -793,6 +815,8 @@ public sealed class CachedPropsTests
 
         public bool Yield { get; init; }
 
+        public Func<Task>? AfterFirstWrite { get; init; }
+
         public async ValueTask<byte[]?> GetAsync(InertiaCacheKey key, CancellationToken cancellationToken)
         {
             await Pause();
@@ -805,6 +829,7 @@ public sealed class CachedPropsTests
             if (FailWrites) throw new InvalidOperationException("store write failed");
             Values[key] = value;
             Sets.Add((key, options));
+            if (AfterFirstWrite is { } after && Sets.Count == 1) await after();
         }
 
         public async ValueTask RemoveAsync(InertiaCacheKey key, CancellationToken cancellationToken)

@@ -294,8 +294,10 @@ internal sealed partial class InertiaCaching
         {
             if (stamp is { } before && before != InvalidationStamp) return;
             await Store.SetAsync(key, value, new InertiaCacheEntryOptions(expiration, tags), cancellationToken);
-            if (stamp is { } loaded && loaded != InvalidationStamp)
+            if (stamp is { } loaded && loaded != InvalidationStamp
+                && await Store.GetAsync(key, cancellationToken) is { } current && current.AsSpan().SequenceEqual(value))
             {
+                // Only this store's own bytes: a value set after the removal (SetPropAsync, a newer fill) stays.
                 await Store.RemoveAsync(key, cancellationToken);
             }
         }
