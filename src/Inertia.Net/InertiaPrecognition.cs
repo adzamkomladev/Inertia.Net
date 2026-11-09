@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
@@ -45,15 +46,33 @@ public static class InertiaPrecognition
         if (only.Length > 0)
         {
             var fields = only.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                .Select(f => InertiaValidationFilter.ToClientPath(f, null)).ToArray();
-            // A field matches itself and, when it names an object or array, everything below it.
+                .Select(f => InertiaValidationFilter.ToClientPath(f, null)).ToHashSet(StringComparer.Ordinal);
+            var lookup = fields.GetAlternateLookup<ReadOnlySpan<char>>();
             errors = errors
-                .Where(e => fields.Any(f => e.Key == f || e.Key.StartsWith(f + ".", StringComparison.Ordinal) || e.Key.StartsWith(f + "[", StringComparison.Ordinal)))
+                .Where(e => Matches(e.Key, lookup))
                 .ToDictionary(e => e.Key, e => e.Value, StringComparer.Ordinal);
         }
 
         return new PrecognitionResult(errors.Count == 0 ? null : errors);
     }
+
+    // A field matches itself and, when it names an object or array, everything below it: the key, or a prefix of it ending before a
+    // '.' or '['. One lookup per prefix, so a long header costs no more per error than a short one.
+    private static bool Matches(string key, HashSet<string>.AlternateLookup<ReadOnlySpan<char>> fields)
+    {
+        if (fields.Contains(key)) return true;
+        for (var i = 0; i < key.Length; i++)
+        {
+            var next = key.AsSpan(i).IndexOfAny(PathSeparators);
+            if (next < 0) break;
+            i += next;
+            if (i > 0 && fields.Contains(key.AsSpan(0, i))) return true;
+        }
+
+        return false;
+    }
+
+    private static readonly SearchValues<char> PathSeparators = SearchValues.Create(".[");
 
     private sealed class PrecognitionResult(Dictionary<string, string[]>? errors) : IResult
     {

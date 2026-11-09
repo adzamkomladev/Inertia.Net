@@ -28,7 +28,7 @@ public static class InertiaQueryableExtensions
         ValidateCursorQuery(query, request);
         ArgumentNullException.ThrowIfNull(key);
         ValidateKey<TKey>();
-        return Pagination.PaginateAsync(request, key.Compile(), async (cursor, take, token) =>
+        return Pagination.PaginateAsync(request, KeyReader.For(key), async (cursor, take, token) =>
         {
             KeysetKey[] keys = [new(key, cursor is { } value ? value.Value : null, descending)];
             var ordered = KeysetExpression.Apply(query, keys, cursor is not null, cursor?.Direction == CursorDirection.Before);
@@ -64,7 +64,7 @@ public static class InertiaQueryableExtensions
         var ordered = KeysetExpression.Apply(query, keys, cursor is not null, before);
         var rows = await ordered.Take(request.PerPage + 1).ToListAsync(ct).ConfigureAwait(false);
         return Pagination.CreateCursorPage<T, CompositeEncoder<T, TKey, TTie>>(rows, request.PerPage, before,
-            cursor is not null, cursor is null ? null : request.Cursor, cursorName, new(key.Compile(), tieBreaker.Compile()));
+            cursor is not null, cursor is null ? null : request.Cursor, cursorName, new(KeyReader.For(key), KeyReader.For(tieBreaker)));
     }
 
     private static void ValidateKey<TKey>()

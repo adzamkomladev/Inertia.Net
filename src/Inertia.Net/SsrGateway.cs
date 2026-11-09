@@ -208,29 +208,22 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         var started = Stopwatch.GetTimestamp();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
         deadline.CancelAfter(_ssr.Timeout);
-        TaskCompletionSource<byte[]?> completion;
         try
         {
-            while (!_caching.TryBeginFill(key, out completion))
+            if (!_caching.TryBeginFill(key, out var completion))
             {
                 var shared = await completion.Task.WaitAsync(deadline.Token);
                 if (shared is not null && CacheEntry.TryReadRender(shared, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds(), out var filled)) return Cached(filled);
-                if (await _caching.GetRenderAsync(key, deadline.Token) is { } hit) return Cached(hit);
+                if (await _caching.GetRenderAsync(key, deadline.Token) is { } stored) return Cached(stored);
+
+                // The fill stored nothing (it failed or was cancelled): render at once rather than queue behind the other waiters.
+                return await RenderAndStoreAsync(null);
             }
 
             try
             {
                 if (await _caching.GetRenderAsync(key, deadline.Token) is { } hit) return Cached(hit);
-                deadline.Token.ThrowIfCancellationRequested();
-                var remaining = _ssr.Timeout;
-                if (remaining != Timeout.InfiniteTimeSpan)
-                {
-                    remaining -= Stopwatch.GetElapsedTime(started);
-                    if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
-                }
-                var render = await RenderOnServersAsync(mode, context.PageJson, _endpoints, _managed, http.RequestAborted,
-                    remaining);
-                return render is null ? null : await StoreAsync(key, duration, staleFor, render, http.RequestAborted, completion);
+                return await RenderAndStoreAsync(completion);
             }
             finally
             {
@@ -247,6 +240,21 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             if (hit.IsStale) ScheduleRefresh(http, key, context.PageJson, duration, staleFor);
             _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache", _mount);
             return new SsrRender(hit.Head, hit.Body);
+        }
+
+        async ValueTask<SsrRender?> RenderAndStoreAsync(TaskCompletionSource<byte[]?>? fill)
+        {
+            deadline.Token.ThrowIfCancellationRequested();
+            var remaining = _ssr.Timeout;
+            if (remaining != Timeout.InfiniteTimeSpan)
+            {
+                remaining -= Stopwatch.GetElapsedTime(started);
+                if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
+            }
+
+            var stamp = _caching.InvalidationStamp;
+            var render = await RenderOnServersAsync(mode, context.PageJson, _endpoints, _managed, http.RequestAborted, remaining);
+            return render is null ? null : await StoreAsync(key, duration, staleFor, render, http.RequestAborted, fill, stamp);
         }
     }
 
@@ -332,9 +340,10 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             }
 
             // Preferred: a failed refresh is logged like any fallback, and the stale render stays until it expires.
+            var stamp = _caching.InvalidationStamp;
             if (await RenderOnServersAsync(SsrMode.Preferred, pageJson, _endpoints, _managed, cancellationToken) is { } render)
             {
-                (await StoreAsync(key, duration, staleFor, render, cancellationToken)).Dispose();
+                (await StoreAsync(key, duration, staleFor, render, cancellationToken, stamp: stamp)).Dispose();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -521,8 +530,10 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             }
             catch (HttpRequestException ex)
             {
-                // Nothing was received, so another server can take the render.
-                return new Attempt(SsrFailure.Connection, "connection", $"Could not reach the SSR server at {endpoint.DisplayUrl}: {ex.Message}", Inner: ex, Retryable: true);
+                // Only a failed connect means the server never saw the render. A response that ended early may be a render that crashed
+                // the server: sending it to another one would crash that one too.
+                return new Attempt(SsrFailure.Connection, "connection", $"Could not reach the SSR server at {endpoint.DisplayUrl}: {ex.Message}", Inner: ex,
+                    Retryable: ex.HttpRequestError is HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError);
             }
 
             using (response)
@@ -806,13 +817,14 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     }
 
     // Keeps a copy of the render in a cache entry of its own and hands out the copy, so the pooled array goes back at once.
-    private async ValueTask<SsrRender> StoreAsync(InertiaCacheKey key, TimeSpan duration, TimeSpan staleFor, SsrRender render, CancellationToken cancellationToken, TaskCompletionSource<byte[]?>? fill = null)
+    private async ValueTask<SsrRender> StoreAsync(InertiaCacheKey key, TimeSpan duration, TimeSpan staleFor, SsrRender render, CancellationToken cancellationToken,
+        TaskCompletionSource<byte[]?>? fill = null, long? stamp = null)
     {
         var expiration = InertiaCaching.Expiration(duration, staleFor);
         var (freshUntil, expiresAt) = _caching.Times(duration, expiration);
         var entry = CacheEntry.CreateRender(render.Head.Span, render.Body.Span, freshUntil, expiresAt, out var stored);
         render.Dispose();
-        await _caching.SetAsync(key, entry, expiration, InertiaCaching.SsrTags, cancellationToken);
+        await _caching.SetAsync(key, entry, expiration, InertiaCaching.SsrTags, cancellationToken, stamp);
         fill?.SetResult(entry);
         return new SsrRender(stored.Head, stored.Body);
     }

@@ -7,6 +7,25 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+### Fixed
+
+- Stale refreshes no longer stall behind one slow loader: the background queue runs 4 refreshes at a time, cancels each after
+  30 seconds (a loader that ignores the token is abandoned), and logs dropped refreshes at most every 30 seconds with a count.
+- Requests waiting on a cache fill that failed, was rescued or was cancelled now load or render at once, instead of taking the fill
+  one after another.
+- A cache fill or stale refresh that started before an `IInertiaCache` removal on the same app instance no longer stores its old
+  value after the removal.
+- SSR fails over to another server only when the connection could not be made. A response that ended early (for example a render
+  that crashed its server) is no longer sent to a second server.
+- `Precognition-Validate-Only` matching uses one lookup per path prefix of each error, so a long header no longer costs work per
+  field and error pair.
+- Keyset pages read the cursor key from the loaded rows without compiling the key selectors on every request.
+
+### Changed
+
+- Without `InertiaDevToolsOptions.Authorize`, the DevTools read API in Development answers only requests from this machine (a
+  loopback connection to a loopback host name); set `Authorize` to read from a container or another machine.
+
 ## [1.7.0] - 2026-11-08
 
 ### Added

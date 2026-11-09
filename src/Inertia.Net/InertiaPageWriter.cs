@@ -729,38 +729,47 @@ internal sealed class InertiaPageWriter
     internal async ValueTask<object?> LoadCachedPropAsync(InertiaProp prop, CancellationToken cancellationToken)
     {
         var caching = prop.Caching!;
-        TaskCompletionSource<byte[]?> completion;
-        while (!Caching.TryBeginFill(caching.StoreKey, out completion))
+        if (!Caching.TryBeginFill(caching.StoreKey, out var completion))
         {
             var shared = await completion.Task.WaitAsync(cancellationToken);
             if (shared is not null && CacheEntry.TryReadProp(shared, TimeProvider.GetUtcNow().ToUnixTimeMilliseconds(), out var filled)) return filled;
-            if (await Caching.GetPropAsync(caching, cancellationToken) is { } hit) return hit;
+            if (await Caching.GetPropAsync(caching, cancellationToken) is { } stored) return stored;
+
+            // The fill stored nothing (it failed, was rescued or cancelled): load at once rather than queue behind the other waiters.
+            return await LoadAndStoreAsync(prop, null, cancellationToken);
         }
 
         try
         {
             // Another fill may have finished between the caller's lookup and this claim.
             if (await Caching.GetPropAsync(caching, cancellationToken) is { } hit) return hit;
-            cancellationToken.ThrowIfCancellationRequested();
-            object? value;
-            try
-            {
-                value = await prop.ResolveAsync(cancellationToken);
-            }
-            catch (Exception ex) when (prop.ShouldRescue && !(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
-            {
-                return new RescuedCachedProp(ex);
-            }
-
-            var entry = CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, caching.Key, out var stored);
-            await Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken);
-            completion.SetResult(entry);
-            return stored;
+            return await LoadAndStoreAsync(prop, completion, cancellationToken);
         }
         finally
         {
             Caching.EndFill(caching.StoreKey, completion);
         }
+    }
+
+    private async ValueTask<object?> LoadAndStoreAsync(InertiaProp prop, TaskCompletionSource<byte[]?>? completion, CancellationToken cancellationToken)
+    {
+        var caching = prop.Caching!;
+        cancellationToken.ThrowIfCancellationRequested();
+        var stamp = Caching.InvalidationStamp;
+        object? value;
+        try
+        {
+            value = await prop.ResolveAsync(cancellationToken);
+        }
+        catch (Exception ex) when (prop.ShouldRescue && !(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
+        {
+            return new RescuedCachedProp(ex);
+        }
+
+        var entry = CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, caching.Key, out var stored);
+        await Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken, stamp);
+        completion?.SetResult(entry);
+        return stored;
     }
 
     internal void WritePlainValue(Utf8JsonWriter writer, object? value)

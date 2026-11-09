@@ -34,7 +34,7 @@ public sealed class SsrResilienceTests
     private static HttpResponseMessage Json(HttpStatusCode status, string json) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-    private static Servers Refused() => new((_, _) => throw new HttpRequestException("Connection refused"));
+    private static Servers Refused() => new((_, _) => throw new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused"));
 
     private static Harness Create(Servers servers, Action<SsrOptions>? configure = null, TimeProvider? clock = null, Action<IServiceCollection>? services = null) =>
         new(
@@ -116,7 +116,7 @@ public sealed class SsrResilienceTests
     {
         var clock = new FakeTimeProvider();
         var down = true;
-        var servers = new Servers((_, _) => down ? throw new HttpRequestException("Connection refused") : Ok());
+        var servers = new Servers((_, _) => down ? throw new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused") : Ok());
         var harness = Create(servers, s => s.CircuitBreaker.FailureThreshold = 2, clock);
 
         for (var i = 0; i < 4; i++)
@@ -161,7 +161,7 @@ public sealed class SsrResilienceTests
     public async Task Renders_spread_across_servers_and_fail_over_when_one_refuses_connections()
     {
         var aDown = false;
-        var servers = new Servers((request, _) => aDown && request.RequestUri!.Host == "a.test" ? throw new HttpRequestException("Connection refused") : Ok());
+        var servers = new Servers((request, _) => aDown && request.RequestUri!.Host == "a.test" ? throw new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused") : Ok());
         var harness = Create(servers, s =>
         {
             s.Urls.Add("http://a.test");
@@ -185,6 +185,21 @@ public sealed class SsrResilienceTests
         Assert.Equal(2 + 5, servers.To("a.test")); // the default threshold of 5 opens a's circuit
         Assert.Equal(2 + 20, servers.To("b.test"));
         Assert.Equal(5, Warnings(harness).Count(m => m.Contains("(connection)", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task A_response_that_ends_early_is_not_retried_on_another_server()
+    {
+        // A render that crashes its server ends the response: sending it to the next server would crash that one too.
+        var servers = new Servers((_, _) => throw new HttpRequestException(HttpRequestError.ResponseEnded, "The response ended prematurely."));
+        var harness = Create(servers, s =>
+        {
+            s.Urls.Add("http://a.test");
+            s.Urls.Add("http://b.test");
+        });
+
+        Assert.False(IsServerRendered(await GetAsync(harness)));
+        Assert.Single(servers.Requests);
     }
 
     [Fact]
@@ -379,7 +394,7 @@ public sealed class SsrResilienceTests
     {
         var servers = new Servers((request, _) => request.RequestUri!.Host == "a.test"
             ? Task.FromResult(Json(HttpStatusCode.InternalServerError, $$"""{"error":"{{new string('x', 5000)}}"}"""))
-            : throw new HttpRequestException("Connection refused"));
+            : throw new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused"));
         var render = Create(servers, s => s.Urls.Add("http://a.test"));
         await GetAsync(render);
         var warning = Assert.Single(Warnings(render));
@@ -395,7 +410,7 @@ public sealed class SsrResilienceTests
     public async Task Metrics_record_outcomes_page_sizes_and_circuit_states()
     {
         var fail = false;
-        var harness = Create(new Servers((_, _) => fail ? throw new HttpRequestException("Connection refused") : Ok()));
+        var harness = Create(new Servers((_, _) => fail ? throw new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused") : Ok()));
         var factory = harness.Services.GetRequiredService<IMeterFactory>();
         var measurements = new ConcurrentQueue<(string Name, double Value, Dictionary<string, object?> Tags)>();
         using var listener = new MeterListener();
@@ -443,7 +458,7 @@ public sealed class SsrResilienceTests
             (await harness.Services.GetRequiredService<HealthCheckService>().CheckHealthAsync(TestContext.Current.CancellationToken)).Entries["inertia-ssr"];
 
         var aDown = false;
-        var servers = new Servers((request, _) => aDown && request.RequestUri!.Host == "a.test" ? throw new HttpRequestException("Connection refused") : Ok());
+        var servers = new Servers((request, _) => aDown && request.RequestUri!.Host == "a.test" ? throw new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused") : Ok());
         var harness = Create(
             servers,
             s =>

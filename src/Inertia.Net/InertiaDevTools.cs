@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -24,8 +25,9 @@ public sealed class InertiaDevToolsOptions
     public bool? Enabled { get; set; }
 
     /// <summary>
-    /// Who may read the recorded entries. Null (the default) allows everyone in Development and nobody elsewhere. Outside Development
-    /// the read API answers only requests this returns true for (for example a signed-in developer), and <c>404</c> otherwise.
+    /// Who may read the recorded entries. Null (the default) allows requests from this machine (a loopback connection to a loopback host
+    /// name) in Development and nobody elsewhere. When set, the read API answers only requests this returns true for (for example a
+    /// signed-in developer, or a container's host network), and <c>404</c> otherwise.
     /// </summary>
     public Func<HttpContext, bool>? Authorize { get; set; }
 
@@ -273,7 +275,19 @@ internal sealed partial class DevToolsRecorder
     }
 
     private bool CanRead(HttpContext httpContext) =>
-        _enabled && (_options.Authorize is { } authorize ? authorize(httpContext) : _development);
+        _enabled && (_options.Authorize is { } authorize ? authorize(httpContext) : _development && IsLocal(httpContext));
+
+    // The default reader: this machine only. The entries hold every user's props and bodies, so an app mistakenly run as Development on a
+    // server must not serve them, and the Host check keeps a DNS-rebinding page from reading them through the developer's browser.
+    private static bool IsLocal(HttpContext httpContext)
+    {
+        var remote = httpContext.Connection.RemoteIpAddress;
+        if (remote is not null && !IPAddress.IsLoopback(remote)) return false;
+        var host = httpContext.Request.Host.Host;
+        return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
+            || (IPAddress.TryParse(host, out var address) && IPAddress.IsLoopback(address));
+    }
 
     private static Task NotFound(HttpContext httpContext)
     {
