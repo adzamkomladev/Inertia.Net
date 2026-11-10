@@ -7,6 +7,16 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-10
+
+### Added
+
+- `dotnet run -- --inertia-types` writes the TypeScript declarations in any environment and stops the app, exiting with code 1 when
+  they cannot be written, so CI can regenerate them and fail on a stale file. The templates add it as the `types` package script.
+- `InertiaOptions.Share<T>(key, Func<HttpContext, T>)`: a factory share is typed by what it returns in the generated declarations
+  (`user: UserDto` instead of `unknown`). Existing lambdas such as `o.Share("now", _ => DateTime.UtcNow)` now bind to it.
+- Numeric enums in the generated declarations carry their member names in a doc comment (`/** Low = 0, High = 1 */`).
+
 ### Fixed
 
 - Stale refreshes no longer stall behind one slow loader: the background queue runs 4 refreshes at a time, cancels each after
@@ -23,6 +33,8 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ### Changed
 
+- The README now opens with a link to the documentation site; it stays the complete single-file reference for coding agents.
+- The TypeScript docs show that `FlashData<T>()` types the whole `page.flash` object, with a `Toast` example.
 - Without `InertiaDevToolsOptions.Authorize`, the DevTools read API in Development answers only requests from this machine (a
   loopback connection to a loopback host name); set `Authorize` to read from a container or another machine.
 

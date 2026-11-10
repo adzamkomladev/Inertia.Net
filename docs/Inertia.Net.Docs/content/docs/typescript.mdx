@@ -14,7 +14,7 @@ builder.Services.AddInertia(o =>
 {
     o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";   // written in Development, only when it changed
     o.TypeScript.Page<UsersPage>("Users/Index").Page<HomePage>("Home");
-    o.TypeScript.FlashData<Flash>();                             // optional; SharedProps<T>() too
+    o.TypeScript.FlashData<Flash>();                             // optional: the whole page.flash object; SharedProps<T>() too
 });
 
 public sealed record UsersPage(
@@ -23,6 +23,18 @@ public sealed record UsersPage(
 ```
 
 The file is written when the app starts in Development, and only when its content changed. Commit it so `tsc` passes in CI without running the app.
+
+## Generate in CI
+
+To write the file without starting the app for real (in CI, or outside Development), run it with `--inertia-types`: it writes the
+declarations in any environment, then stops, and exits with code 1 if they could not be written. The templates add it as a script:
+
+```sh
+dotnet run -- --inertia-types   # or: npm run types
+git diff --exit-code ClientApp/types/inertia.d.ts   # fail CI when the committed file is stale
+```
+
+Program.cs still runs up to `app.Run()`, so startup code such as migrations runs too; the server stops as soon as it has started.
 
 ```ts
 // ClientApp/types/inertia.d.ts (excerpt)
@@ -53,7 +65,18 @@ export default function Index({ users, stats }: InertiaPages['Users/Index']) {
 
 ## Shared props
 
-Shared props are inferred from the values passed to `o.Share(...)`; dot keys nest. Factories and per-request shares are typed as `unknown`. `o.TypeScript.SharedProps<T>()` replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+Shared props are inferred from the values passed to `o.Share(...)`; dot keys nest. A factory is typed by what it returns: `o.Share("user", ctx => new UserDto(...))` gives `user: UserDto`, while a factory cast to `Func<HttpContext, object?>` is `unknown`. Shares added per request (middleware, `HttpContext.Inertia().Share(...)`) are not known at startup; type them with `o.TypeScript.SharedProps<T>()`, which replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+
+## Flash data
+
+`FlashData<T>()` types the whole flash object, not one entry: each property of `T` is a flash key. To type
+`Flash("toast", new Toast("success", "Saved"))`, wrap the entry:
+
+```csharp
+public sealed record Toast(string Type, string Message);
+public sealed record Flash(Toast? Toast);   // page.flash.toast is Toast | null
+o.TypeScript.FlashData<Flash>();
+```
 
 ## Prop members
 
@@ -65,7 +88,7 @@ An `InertiaProp` member is optional (it can be deferred, optional or rescued) an
 |---|---|
 | `int`, `long`, `double`, `decimal`, `float` | `number` (`number \| bigint` for 64-bit and larger with `PreserveBigIntegers`) |
 | `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid`, `byte[]` | `string` |
-| enum | union of JSON values (string names with a string enum converter) |
+| enum | union of JSON values: numbers by default, with the member names in a doc comment; string names with `JsonStringEnumConverter` |
 | dictionary | `Record<string, T>` |
 | polymorphic type | union tagged with its discriminator |
 | nullable member | `T \| null` |

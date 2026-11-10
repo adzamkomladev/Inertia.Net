@@ -26,7 +26,8 @@ public sealed class InertiaTypeScriptOptions
 
     /// <summary>
     /// The file to write, relative to the content root, e.g. <c>ClientApp/types/inertia.d.ts</c>. It is written when the app starts in
-    /// Development, and only when its content changed. Null (the default) writes nothing.
+    /// Development, and only when its content changed. Null (the default) writes nothing. Run the app with <c>--inertia-types</c>
+    /// (<c>dotnet run -- --inertia-types</c>) to write it in any environment and exit, e.g. in CI.
     /// </summary>
     public string? OutputPath { get; set; }
 
@@ -40,8 +41,9 @@ public sealed class InertiaTypeScriptOptions
     }
 
     /// <summary>
-    /// Types the shared props with <typeparamref name="TShared"/>. Without it, <c>SharedProps</c> is inferred from the values given to
-    /// <see cref="InertiaOptions.Share(string, object?)"/>; factories and per-request shares are <c>unknown</c> there.
+    /// Types the shared props with <typeparamref name="TShared"/>. Without it, <c>SharedProps</c> is inferred from the values and typed
+    /// factories given to <see cref="InertiaOptions.Share(string, object?)"/>; shares added per request (middleware,
+    /// <c>HttpContext.Inertia().Share</c>) are not known at startup, so type them with this.
     /// </summary>
     public InertiaTypeScriptOptions SharedProps<TShared>()
     {
@@ -49,7 +51,10 @@ public sealed class InertiaTypeScriptOptions
         return this;
     }
 
-    /// <summary>Types the flash data (<c>page.flash</c>) with <typeparamref name="TFlash"/>.</summary>
+    /// <summary>
+    /// Types the whole flash object (<c>page.flash</c>) with <typeparamref name="TFlash"/>: its properties are the flash keys. For
+    /// <c>Flash("toast", ...)</c>, use <c>record Flash(Toast? Toast)</c>, then <c>page.flash.toast</c> is typed.
+    /// </summary>
     public InertiaTypeScriptOptions FlashData<TFlash>()
     {
         FlashDataType = typeof(TFlash);
@@ -70,18 +75,54 @@ public sealed class InertiaPropTypeAttribute(Type valueType) : Attribute
     public Type ValueType { get; } = valueType;
 }
 
-/// <summary>Writes the declarations at startup in Development (no-op otherwise).</summary>
+/// <summary>
+/// Writes the declarations at startup in Development (no-op otherwise). With <c>--inertia-types</c> on the command line it writes them in
+/// any environment and stops the app, failing the exit code when they cannot be written.
+/// </summary>
 internal sealed partial class InertiaTypeScriptWriter(
     IOptions<InertiaOptions> options,
     IHostEnvironment environment,
     InertiaPageWriter pageWriter,
-    ILogger<InertiaTypeScriptWriter> logger) : IHostedService
+    ILogger<InertiaTypeScriptWriter> logger,
+    IHostApplicationLifetime? lifetime = null) : IHostedService
 {
+    internal const string GenerateFlag = "--inertia-types";
+
+    internal bool GenerateOnly { get; init; } = Environment.GetCommandLineArgs().Contains(GenerateFlag, StringComparer.Ordinal);
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!environment.IsDevelopment() || options.Value.TypeScript.OutputPath is not { Length: > 0 } output)
+        if (GenerateOnly)
         {
+            if (!Write())
+            {
+                Environment.ExitCode = 1;
+            }
+
+            // Stopping inside StartAsync cancels the other hosted services and the host throws; stop once started instead.
+            lifetime?.ApplicationStarted.Register(lifetime.StopApplication);
             return Task.CompletedTask;
+        }
+
+        if (environment.IsDevelopment())
+        {
+            Write();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private bool Write()
+    {
+        if (options.Value.TypeScript.OutputPath is not { Length: > 0 } output)
+        {
+            if (GenerateOnly)
+            {
+                LogNoOutputPath(logger);
+                return false;
+            }
+
+            return true;
         }
 
         var path = Path.GetFullPath(output, environment.ContentRootPath); // an absolute OutputPath is used as is
@@ -106,9 +147,10 @@ internal sealed partial class InertiaTypeScriptWriter(
         {
             // A development convenience must not stop the app from starting.
             LogFailed(logger, ex, path);
+            return false;
         }
 
-        return Task.CompletedTask;
+        return true;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -118,6 +160,9 @@ internal sealed partial class InertiaTypeScriptWriter(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inertia TypeScript declarations: {Warning}")]
     private static partial void LogWarning(ILogger logger, string warning);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "--inertia-types was given but InertiaOptions.TypeScript.OutputPath is not set; no declarations were written.")]
+    private static partial void LogNoOutputPath(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inertia TypeScript declarations could not be written to {Path}.")]
     private static partial void LogFailed(ILogger logger, Exception exception, string path);
@@ -137,7 +182,7 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
     {
         var typescript = options.TypeScript;
         var head = new StringBuilder();
-        head.Append("// Generated by Inertia.Net from the app's JSON contracts. Do not edit: it is rewritten when the app starts in Development.\n\n");
+        head.Append("// Generated by Inertia.Net from the app's JSON contracts. Do not edit: it is rewritten when the app starts in Development\n// or runs with --inertia-types.\n\n");
 
         head.Append("export interface InertiaPages {\n");
         foreach (var (component, props) in typescript.Pages)
@@ -203,7 +248,7 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
                 {
                     null => "null",
                     InertiaProp prop2 => ValueReference(prop2),
-                    Func<HttpContext, object?> => "unknown",
+                    Func<HttpContext, object?> => options.SharedPropTypes.TryGetValue(key, out var type) ? Reference(type) : "unknown",
                     _ => Reference(value.GetType()),
                 });
         }
@@ -339,7 +384,13 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
         var name = _names[type];
         if (type.IsEnum)
         {
-            _declarations.Append("export type ").Append(name).Append(" = ").Append(EnumValues(type)).Append("\n\n");
+            var (values, names) = EnumValues(type);
+            if (names is not null)
+            {
+                _declarations.Append("/** ").Append(names).Append(" */\n"); // numeric values: name them in the IDE tooltip
+            }
+
+            _declarations.Append("export type ").Append(name).Append(" = ").Append(values).Append("\n\n");
             return;
         }
 
@@ -425,27 +476,36 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
             ? attribute.ValueType
             : null;
 
-    // The values the serializer writes for each member: strings with a string enum converter, numbers otherwise.
-    private string EnumValues(Type type)
+    // The values the serializer writes for each member: strings with a string enum converter, numbers otherwise. Numeric values also
+    // return their member names (Low = 0, High = 1) for a doc comment.
+    private (string Values, string? Names) EnumValues(Type type)
     {
         var info = serializerOptions.GetTypeInfo(type);
         if (type.IsDefined(typeof(FlagsAttribute), inherit: false))
         {
-            return JsonSerializer.Serialize(Enum.ToObject(type, 0), info).StartsWith('"') ? "string" : "number";
+            return (JsonSerializer.Serialize(Enum.ToObject(type, 0), info).StartsWith('"') ? "string" : "number", null);
         }
 
         var values = new List<string>();
+        var names = new List<string>();
         foreach (var value in Enum.GetValuesAsUnderlyingType(type))
         {
-            var json = JsonSerializer.Serialize(Enum.ToObject(type, value!), info);
-            var literal = json.StartsWith('"') ? Quote(JsonSerializer.Deserialize(json, InertiaJsonContext.Default.String)!) : json;
+            var member = Enum.ToObject(type, value!);
+            var json = JsonSerializer.Serialize(member, info);
+            var numeric = !json.StartsWith('"');
+            var literal = numeric ? json : Quote(JsonSerializer.Deserialize(json, InertiaJsonContext.Default.String)!);
+            if (numeric)
+            {
+                names.Add($"{Enum.GetName(type, member)} = {json}");
+            }
+
             if (!values.Contains(literal))
             {
                 values.Add(literal);
             }
         }
 
-        return values.Count == 0 ? "never" : string.Join(" | ", values);
+        return (values.Count == 0 ? "never" : string.Join(" | ", values), names.Count == 0 ? null : string.Join(", ", names));
     }
 
     private string UniqueName(Type type, string suffix = "")

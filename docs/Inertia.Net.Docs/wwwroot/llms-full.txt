@@ -232,15 +232,15 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.7.0
-dotnet add package Inertia.Net.Mvc --version 1.7.0            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.7.0  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.7.0        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.7.0   # live props over SignalR
+dotnet add package Inertia.Net --version 1.7.1
+dotnet add package Inertia.Net.Mvc --version 1.7.1            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.7.1  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.1 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.7.1        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.7.1   # live props over SignalR
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.7.0 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.7.1 implements Inertia.js v3.
 
 ## Requirements
 
@@ -251,7 +251,7 @@ Use the same version for every Inertia.Net package. The package version and the 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.0
+dotnet new install Inertia.Net.Templates::1.7.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -309,7 +309,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/first-10-minutes
 Create the React starter (choose `vue` or `svelte` for another client):
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.0
+dotnet new install Inertia.Net.Templates::1.7.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -1331,8 +1331,9 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 **Stale-while-revalidate.** `staleFor` keeps serving a value after its duration. The first request that reads a stale value gets it at once, and the loader runs after the response has been sent. Past `duration + staleFor` the loader runs during the request again.
 
 - Response completion enqueues refreshes on a bounded background worker; it does not wait for the loader. Loaders using `staleFor` must use singleton dependencies or create an independent scope inside the loader with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`. Do not capture request-scoped services or `HttpContext`.
-- The worker accepts 64 pending refreshes and cancels on host shutdown. A full queue drops the refresh and logs a warning, leaving the stale value at its existing expiration. Monitor `inertia.cache.refresh.dropped`, tagged with `inertia.cache.kind=prop|ssr`.
+- The worker accepts 64 pending refreshes, runs up to 4 at a time, cancels each one after 30 seconds and cancels them all on host shutdown. A full queue drops the refresh and logs a warning, leaving the stale value at its existing expiration. Monitor `inertia.cache.refresh.dropped`, tagged with `inertia.cache.kind=prop|ssr`.
 - One refresh runs per key and app instance at a time. A refresh that finds the value fresh again skips its loader.
+- A fill or refresh whose loader started before an `IInertiaCache` removal (`RemovePropAsync`, `RemoveByTagAsync`, `ClearPropsAsync`) on the same app instance does not store its value; the request still gets it.
 - A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
 
 **Another store.** Props and SSR renders live in an `IInertiaCacheStore`. Register your own singleton before or after `AddInertia()`:
@@ -1638,7 +1639,7 @@ const { flash } = usePage()
 ```
 
 <Callout type="info" title="Typed flash data">
-The TypeScript generator can write a `Flash` type for you. Call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript).
+The TypeScript generator can type `page.flash`. `FlashData<T>()` takes the whole flash object, so for the `toast` above use `record Flash(Toast? Toast)` and call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript#flash-data).
 </Callout>
 
 Inertia forms keep their input on the client after `Back().WithErrors(...)`; they do not need a `WithInput()` helper. For a full-page form submission, choose only safe fields to flash before redirecting:
@@ -2372,7 +2373,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.0
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.1
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3969,7 +3970,7 @@ builder.Services.AddInertia(o =>
 {
     o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";   // written in Development, only when it changed
     o.TypeScript.Page<UsersPage>("Users/Index").Page<HomePage>("Home");
-    o.TypeScript.FlashData<Flash>();                             // optional; SharedProps<T>() too
+    o.TypeScript.FlashData<Flash>();                             // optional: the whole page.flash object; SharedProps<T>() too
 });
 
 public sealed record UsersPage(
@@ -3978,6 +3979,18 @@ public sealed record UsersPage(
 ```
 
 The file is written when the app starts in Development, and only when its content changed. Commit it so `tsc` passes in CI without running the app.
+
+## Generate in CI
+
+To write the file without starting the app for real (in CI, or outside Development), run it with `--inertia-types`: it writes the
+declarations in any environment, then stops, and exits with code 1 if they could not be written. The templates add it as a script:
+
+```sh
+dotnet run -- --inertia-types   # or: npm run types
+git diff --exit-code ClientApp/types/inertia.d.ts   # fail CI when the committed file is stale
+```
+
+Program.cs still runs up to `app.Run()`, so startup code such as migrations runs too; the server stops as soon as it has started.
 
 ```ts
 // ClientApp/types/inertia.d.ts (excerpt)
@@ -4008,7 +4021,18 @@ export default function Index({ users, stats }: InertiaPages['Users/Index']) {
 
 ## Shared props
 
-Shared props are inferred from the values passed to `o.Share(...)`; dot keys nest. Factories and per-request shares are typed as `unknown`. `o.TypeScript.SharedProps<T>()` replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+Shared props are inferred from the values passed to `o.Share(...)`; dot keys nest. A factory is typed by what it returns: `o.Share("user", ctx => new UserDto(...))` gives `user: UserDto`, while a factory cast to `Func<HttpContext, object?>` is `unknown`. Shares added per request (middleware, `HttpContext.Inertia().Share(...)`) are not known at startup; type them with `o.TypeScript.SharedProps<T>()`, which replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+
+## Flash data
+
+`FlashData<T>()` types the whole flash object, not one entry: each property of `T` is a flash key. To type
+`Flash("toast", new Toast("success", "Saved"))`, wrap the entry:
+
+```csharp
+public sealed record Toast(string Type, string Message);
+public sealed record Flash(Toast? Toast);   // page.flash.toast is Toast | null
+o.TypeScript.FlashData<Flash>();
+```
 
 ## Prop members
 
@@ -4020,7 +4044,7 @@ An `InertiaProp` member is optional (it can be deferred, optional or rescued) an
 |---|---|
 | `int`, `long`, `double`, `decimal`, `float` | `number` (`number \| bigint` for 64-bit and larger with `PreserveBigIntegers`) |
 | `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid`, `byte[]` | `string` |
-| enum | union of JSON values (string names with a string enum converter) |
+| enum | union of JSON values: numbers by default, with the member names in a doc comment; string names with `JsonStringEnumConverter` |
 | dictionary | `Record<string, T>` |
 | polymorphic type | union tagged with its discriminator |
 | nullable member | `T \| null` |
@@ -4216,7 +4240,7 @@ The development startup also writes TypeScript declarations when `o.TypeScript.O
 Install the Inertia DevTools extension, open your app in Development, and use the extension's panel. The server entries are correlated by the `X-Inertia-Devtools-Id` header.
 </Callout>
 
-If recording is enabled outside Development without an `Authorize` callback, the app logs a warning and the read API returns 404. Map the reader with `MapInertiaDevTools()` and authorize its users. The recorder's process-wide latch remains active once used; parallel-prop planning also uses a process-wide latch after its first use.
+Without an `Authorize` callback the read API answers in Development only, and only requests from this machine (a loopback connection to a loopback host name such as `localhost`); set `Authorize` to read from a container or another machine. If recording is enabled outside Development without an `Authorize` callback, the app logs a warning and the read API returns 404. Map the reader with `MapInertiaDevTools()` and authorize its users. The recorder's process-wide latch remains active once used; parallel-prop planning also uses a process-wide latch after its first use.
 
 ---
 
@@ -4407,7 +4431,7 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.0
+dotnet new install Inertia.Net.Templates::1.7.1
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install

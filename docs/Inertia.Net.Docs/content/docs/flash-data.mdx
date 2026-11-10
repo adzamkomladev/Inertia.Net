@@ -35,7 +35,7 @@ const { flash } = usePage()
 ```
 
 <Callout type="info" title="Typed flash data">
-The TypeScript generator can write a `Flash` type for you. Call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript).
+The TypeScript generator can type `page.flash`. `FlashData<T>()` takes the whole flash object, so for the `toast` above use `record Flash(Toast? Toast)` and call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript#flash-data).
 </Callout>
 
 Inertia forms keep their input on the client after `Back().WithErrors(...)`; they do not need a `WithInput()` helper. For a full-page form submission, choose only safe fields to flash before redirecting:

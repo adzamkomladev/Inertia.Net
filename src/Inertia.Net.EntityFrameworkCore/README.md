@@ -3,7 +3,7 @@
 Page EF Core queries with [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net#pagination). Install this package alongside an EF Core provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.0
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.1
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token.

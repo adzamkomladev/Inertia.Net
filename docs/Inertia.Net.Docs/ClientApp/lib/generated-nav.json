@@ -1238,8 +1238,18 @@
           "depth": 2
         },
         {
+          "id": "generate-in-ci",
+          "text": "Generate in CI",
+          "depth": 2
+        },
+        {
           "id": "shared-props",
           "text": "Shared props",
+          "depth": 2
+        },
+        {
+          "id": "flash-data",
+          "text": "Flash data",
           "depth": 2
         },
         {
