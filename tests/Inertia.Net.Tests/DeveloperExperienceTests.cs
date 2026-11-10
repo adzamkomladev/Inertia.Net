@@ -1,7 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using static Inertia.Net.Inertia;
 
 namespace Inertia.Net.Tests;
@@ -136,7 +139,8 @@ public sealed class DeveloperExperienceTests : IDisposable
             ts,
             StringComparison.Ordinal);
         Assert.Contains("export type Status = 'active' | 'disabled'", ts, StringComparison.Ordinal);
-        Assert.Contains("export type Priority = 0 | 1 | 2", ts, StringComparison.Ordinal);
+        Assert.Contains("/** Low = 0, Normal = 1, High = 2 */\nexport type Priority = 0 | 1 | 2", ts, StringComparison.Ordinal);
+        Assert.DoesNotContain("/** active", ts, StringComparison.Ordinal);
         Assert.Contains("export type Shape = Circle | Square", ts, StringComparison.Ordinal);
         Assert.Contains(
             """
@@ -160,6 +164,7 @@ public sealed class DeveloperExperienceTests : IDisposable
             o.Share("auth.user", new TsUser(1, "Ann", Status.Active, DateTime.UnixEpoch, null));
             o.Share("plans", Optional(() => new List<string>()));
             o.Share("now", _ => DateTime.UtcNow);
+            o.Share("requestId", (Func<HttpContext, object?>)(c => c.TraceIdentifier));
             o.WithAllErrors = true;
             o.TypeScript.FlashData<Flash>();
         });
@@ -171,8 +176,9 @@ public sealed class DeveloperExperienceTests : IDisposable
               auth: {
                 user: TsUser
               }
-              now: unknown
+              now: string
               plans?: string[]
+              requestId: unknown
             }
             """.ReplaceLineEndings("\n"),
             ts,
@@ -241,6 +247,33 @@ public sealed class DeveloperExperienceTests : IDisposable
         var production = new Harness(o => o.TypeScript.OutputPath = "ClientApp/types/other.d.ts", contentRoot: _root.Path);
         await production.Services.GetServices<IHostedService>().OfType<InertiaTypeScriptWriter>().Single().StartAsync(CancellationToken.None);
         Assert.False(File.Exists(Path.Combine(_root.Path, "ClientApp/types/other.d.ts")));
+    }
+
+    [Fact]
+    public async Task The_generate_flag_writes_in_any_environment_and_fails_without_an_output_path()
+    {
+        var path = Path.Combine(_root.Path, "ClientApp/types/ci.d.ts");
+        var harness = new Harness(o => o.TypeScript.OutputPath = "ClientApp/types/ci.d.ts", contentRoot: _root.Path);
+        var exitCode = Environment.ExitCode;
+        try
+        {
+            await Writer(harness).StartAsync(CancellationToken.None);
+            Assert.True(File.Exists(path));
+            Assert.Equal(exitCode, Environment.ExitCode);
+
+            await Writer(new Harness(contentRoot: _root.Path)).StartAsync(CancellationToken.None);
+            Assert.Equal(1, Environment.ExitCode);
+        }
+        finally
+        {
+            Environment.ExitCode = exitCode;
+        }
+
+        static InertiaTypeScriptWriter Writer(Harness harness) => new(
+            harness.Services.GetRequiredService<IOptions<InertiaOptions>>(),
+            harness.Services.GetRequiredService<IHostEnvironment>(),
+            harness.Services.GetRequiredService<InertiaPageWriter>(),
+            harness.Services.GetRequiredService<ILogger<InertiaTypeScriptWriter>>()) { GenerateOnly = true };
     }
 
     [Fact]

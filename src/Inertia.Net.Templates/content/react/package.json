@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "types": "dotnet run -- --inertia-types",
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {

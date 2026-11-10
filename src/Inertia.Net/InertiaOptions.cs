@@ -7,6 +7,9 @@ public sealed class InertiaOptions
 {
     internal Dictionary<string, object?> SharedProps { get; } = new(StringComparer.Ordinal);
 
+    // The value types of typed factory shares, for the TypeScript declarations.
+    internal Dictionary<string, Type> SharedPropTypes { get; } = new(StringComparer.Ordinal);
+
     /// <summary>The mount these options belong to; null for the default mount.</summary>
     internal string? Mount { get; set; }
 
@@ -80,6 +83,7 @@ public sealed class InertiaOptions
     {
         ArgumentNullException.ThrowIfNull(key);
         SharedProps[key] = value;
+        SharedPropTypes.Remove(key);
         return this;
     }
 
@@ -89,6 +93,19 @@ public sealed class InertiaOptions
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(factory);
         SharedProps[key] = factory;
+        SharedPropTypes.Remove(key);
+        return this;
+    }
+
+    /// <summary>
+    /// Shares a prop computed per request, typed as <typeparamref name="T"/> in the generated TypeScript declarations
+    /// (<see cref="TypeScript"/>). Page props with the same key win.
+    /// </summary>
+    public InertiaOptions Share<T>(string key, Func<HttpContext, T> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        Share(key, context => (object?)factory(context));
+        SharedPropTypes[key] = typeof(T);
         return this;
     }
 }

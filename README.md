@@ -1,8 +1,11 @@
 # Inertia.Net
 
+> **Reading as a person? Start at the docs site: [inertia-dotnet.temtem.dev](https://inertia-dotnet.temtem.dev).** This README is the
+> complete reference in one file, kept long on purpose for coding agents and offline search.
+
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.7.0** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.7.1** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -85,7 +88,7 @@ You need the .NET 10 SDK and JavaScript frontend build tools. npm, Bun, pnpm and
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.0
+dotnet new install Inertia.Net.Templates::1.7.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -198,15 +201,15 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.7.0
-dotnet add package Inertia.Net.Mvc --version 1.7.0 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.7.0 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.7.0 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.7.0 # live props over SignalR
+dotnet add package Inertia.Net --version 1.7.1
+dotnet add package Inertia.Net.Mvc --version 1.7.1 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.7.1 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.1 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.7.1 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.7.1 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.7.0` for all Inertia.Net packages. Inertia.Net 1.7.0 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.7.1` for all Inertia.Net packages. Inertia.Net 1.7.1 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### Factory name collision
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -2268,11 +2271,30 @@ builder.Services.AddInertia(o =>
 {
     o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";   // written when the app starts in Development, only when it changed
     o.TypeScript.Page<UsersPage>("Users/Index").Page<HomePage>("Home");
-    o.TypeScript.FlashData<Flash>();                             // optional; SharedProps<T>() too
+    o.TypeScript.FlashData<Flash>();                             // optional: the whole page.flash object; SharedProps<T>() too
 });
 
 public sealed record UsersPage(List<User> Users, [property: InertiaPropType(typeof(UserStats))] InertiaProp Stats);
 ```
+
+`FlashData<T>()` types the whole flash object, not one entry: each property of `T` is a flash key. To type
+`Flash("toast", new Toast("success", "Saved"))`, wrap the entry:
+
+```csharp
+public sealed record Toast(string Type, string Message);
+public sealed record Flash(Toast? Toast);   // page.flash.toast is Toast | null
+o.TypeScript.FlashData<Flash>();
+```
+
+To write the file without starting the app for real (in CI, or outside Development), run it with `--inertia-types`: it writes the
+declarations in any environment, then stops, and exits with code 1 if they could not be written. The templates add it as a script:
+
+```sh
+dotnet run -- --inertia-types   # or: npm run types
+git diff --exit-code ClientApp/types/inertia.d.ts   # fail CI when the committed file is stale
+```
+
+Program.cs still runs up to `app.Run()`, so startup code such as migrations runs too; the server stops as soon as it has started.
 
 ```ts
 // ClientApp/types/inertia.d.ts (excerpt)
@@ -2298,12 +2320,15 @@ import type { InertiaPages } from '../../types/inertia'
 export default function Index({ users, stats }: InertiaPages['Users/Index']) { /* ... */ }
 ```
 
-- **Shared props** are inferred from the values passed to `o.Share(...)` (dot keys nest); factories and per-request shares are `unknown`.
-  `o.TypeScript.SharedProps<T>()` replaces the inference with a type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+- **Shared props** are inferred from the values passed to `o.Share(...)` (dot keys nest). A factory is typed by what it returns,
+  `o.Share("user", ctx => new UserDto(...))` gives `user: UserDto`; a factory cast to `Func<HttpContext, object?>` is `unknown`.
+  Shares added per request (middleware, `HttpContext.Inertia().Share(...)`) are not known at startup: type them with
+  `o.TypeScript.SharedProps<T>()`, which replaces the inference. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
 - **Prop members.** An `InertiaProp` member is optional (it can be deferred, optional or rescued) and `unknown`, unless
   `[InertiaPropType(typeof(T))]` names its value type.
 - **Mapping.** Numbers are `number` (`number | bigint` for 64-bit and larger with `PreserveBigIntegers`), dates, GUIDs and `byte[]`
-  are `string`, enums are unions of their JSON values (string names with a string enum converter), dictionaries are `Record<string, T>`,
+  are `string`, enums are unions of their JSON values (numbers by default, with the member names in a doc comment; string names with
+  `JsonStringEnumConverter`), dictionaries are `Record<string, T>`,
   polymorphic types are unions tagged with their discriminator, and nullable members get `| null`.
 - Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.
   Commit the file, so `tsc` passes in CI without running the app.
@@ -2512,7 +2537,7 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `ConvertExternalRedirects` | `true` | Turn an Inertia request's redirect to another origin into `409` + `X-Inertia-Location`. |
 | `UrlResolver` | `null` | `Func<HttpContext, string>`: the page `url`. |
 | `Pages.Directory` / `Pages.Extensions` | `null` / `.tsx .jsx .ts .js .vue .svelte` | Development check that a rendered component has a page file. |
-| `TypeScript.OutputPath`, `.Page<T>(component)`, `.SharedProps<T>()`, `.FlashData<T>()` | `null` | TypeScript declarations, written in Development. |
+| `TypeScript.OutputPath`, `.Page<T>(component)`, `.SharedProps<T>()`, `.FlashData<T>()` | `null` | TypeScript declarations, written in Development or with `--inertia-types`. |
 | `Share(key, value)` / `Share(key, Func<HttpContext, object?>)` | none | Shared props. |
 
 ### `o.Pagination`: `PaginationOptions`
