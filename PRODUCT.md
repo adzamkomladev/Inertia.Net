@@ -12,7 +12,7 @@ web
 
 ## Product Purpose
 
-Inertia.Net is a .NET 10 server adapter for the Inertia.js v3 protocol. Endpoints pick a frontend page and supply its props; the client renders it with no hand-written API. The docs site (`docs/Inertia.Net.Docs`) teaches installation, props, partial/deferred/merged/once props, validation, SSR, Vite, AOT, testing and migration. Success is a developer getting a working app and finding answers quickly, whether they or their agent is reading.
+Inertia.Net is a .NET 10 and .NET 11 server adapter for the Inertia.js v3 protocol. Endpoints pick a frontend page and supply its props; the client renders it with no hand-written API. The docs site (`docs/Inertia.Net.Docs`) teaches installation, props, partial/deferred/merged/once props, validation, SSR, Vite, AOT, testing and migration. Success is a developer getting a working app and finding answers quickly, whether they or their agent is reading.
 
 ## Positioning
 

@@ -22,6 +22,10 @@ app.UseInertiaAntiforgery();
 - **Reject.** A missing or wrong token gets **`419`** (page expired, as in Laravel); the handler does not run.
 - **Opt out** per endpoint with `.DisableAntiforgery()` (webhooks, test hooks), or for whole areas with `ShouldValidate`.
 
+## .NET 11 automatic CSRF check
+
+Apps built with `WebApplication.CreateBuilder` on .NET 11 also get the framework's automatic CSRF middleware. It checks `Sec-Fetch-Site` and `Origin` on unsafe requests, issues no tokens, and only records a verdict. `UseInertiaAntiforgery()` remains the token check Inertia needs: like `app.UseAntiforgery()`, it replaces that verdict with its own, so a request with a valid token passes and one without still gets `419`. `.DisableAntiforgery()` opts an endpoint out of both; configuration `DisableCsrfProtection=true` turns the automatic check off.
+
 ## Options
 
 ```csharp

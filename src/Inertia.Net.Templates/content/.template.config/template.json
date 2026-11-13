@@ -20,6 +20,17 @@
         { "choice": "vue", "description": "Vue 3 with @inertiajs/vue3" },
         { "choice": "svelte", "description": "Svelte 5 with @inertiajs/svelte" }
       ]
+    },
+    "tfm": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "net10.0",
+      "replaces": "net10.0",
+      "description": "The target framework.",
+      "choices": [
+        { "choice": "net10.0", "description": ".NET 10 (LTS)" },
+        { "choice": "net11.0", "description": ".NET 11 (STS)" }
+      ]
     }
   },
   "sources": [

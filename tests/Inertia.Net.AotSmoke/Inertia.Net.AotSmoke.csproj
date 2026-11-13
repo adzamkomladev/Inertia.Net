@@ -3,6 +3,8 @@
   <Import Project="..\..\src\Inertia.Net\buildTransitive\Inertia.Net.props" />
   <PropertyGroup>
     <RootNamespace>Inertia.Net.AotSmoke</RootNamespace>
+    <!-- eng/aot-smoke.sh sets this (TFM=net11.0); restore ignores a -p:TargetFramework override, but not a property the project reads. -->
+    <TargetFramework Condition="'$(AotSmokeTargetFramework)' != ''">$(AotSmokeTargetFramework)</TargetFramework>
     <PublishAot>true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>

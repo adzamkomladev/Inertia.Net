@@ -1,6 +1,12 @@
 <Project>
+  <!-- Libraries (src/) and test projects build for every supported runtime; samples, docs, AotSmoke and Benchmarks stay on net10.0. -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <_InertiaMultiTarget Condition="$(MSBuildProjectDirectory.StartsWith('$(MSBuildThisFileDirectory)src')) or $(MSBuildProjectName.EndsWith('Tests'))">true</_InertiaMultiTarget>
+    <_InertiaMultiTarget Condition="'$(MSBuildProjectName)' == 'Inertia.Net.Templates'">false</_InertiaMultiTarget>
+    <TargetFrameworks Condition="'$(_InertiaMultiTarget)' == 'true'">net10.0;net11.0</TargetFrameworks>
+    <TargetFramework Condition="'$(_InertiaMultiTarget)' != 'true'">net10.0</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -187,7 +187,9 @@ internal static class InertiaStateSerializer
                             writer.WriteNullValue();
                             break;
                         case JsonElement element:
+#pragma warning disable CA2263 // GetTypeInfo<T>() exists only on .NET 11; net10.0 compiles this line too.
                             JsonSerializer.Serialize(writer, element, serializerOptions.GetTypeInfo(typeof(JsonElement)));
+#pragma warning restore CA2263
                             break;
                         default:
                             JsonSerializer.Serialize(writer, value, serializerOptions.GetTypeInfo(value.GetType()));

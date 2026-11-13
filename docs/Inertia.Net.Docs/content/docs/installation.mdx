@@ -18,31 +18,43 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.7.1
-dotnet add package Inertia.Net.Mvc --version 1.7.1            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.7.1  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.1 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.7.1        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.7.1   # live props over SignalR
+dotnet add package Inertia.Net --version 1.8.0
+dotnet add package Inertia.Net.Mvc --version 1.8.0            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.8.0  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.8.0        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.8.0   # live props over SignalR
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.7.1 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.8.0 implements Inertia.js v3.
 
 ## Requirements
 
-- .NET 10 SDK and an `Microsoft.NET.Sdk.Web` project.
+- .NET 10 or .NET 11 SDK and an `Microsoft.NET.Sdk.Web` project.
 - JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js or Bun at runtime.
 - An Inertia.js v3 client: `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte`.
+
+## .NET 10 and .NET 11
+
+Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one that matches your app. Things to know on .NET 11:
+
+- **Use 1.8.0 or later on .NET 11.** Inertia.Net 1.7.1 and earlier were built against .NET 10 only. .NET 11 reshaped the experimental resolver API of `Microsoft.Extensions.Validation`, so `WithInertiaValidation()` and `WithInertiaPrecognition()` from 1.7.1 fail on .NET 11 with `TypeLoadException: Could not load type 'Microsoft.Extensions.Validation.IValidatableInfo'`.
+- **Retarget, don't roll forward.** A `net10.0` app that calls `AddValidation()` and runs on the .NET 11 runtime (`DOTNET_ROLL_FORWARD=LatestMajor`) fails whatever adapter it uses: the validation source generator wrote .NET 10 types that .NET 11 removed. Set `<TargetFramework>net11.0</TargetFramework>` and rebuild.
+- **Dependencies follow the target framework.** On `net11.0`, `Inertia.Net.EntityFrameworkCore` depends on EF Core 11 and `Inertia.Net.FastEndpoints` on FastEndpoints 9; on `net10.0` they use EF Core 10.0.15 and FastEndpoints 8.3.0. Reference the `FastEndpoints.Generator` version that matches your FastEndpoints version.
+- **Async validators.** `AsyncValidationAttribute` and `IAsyncValidatableObject` errors go through `WithInertiaValidation()` and `WithInertiaPrecognition()` like synchronous ones. See [Validation and errors](/docs/validation-and-errors).
+- **Automatic CSRF check.** Apps built with `WebApplication.CreateBuilder` also get the framework's `Sec-Fetch-Site`/`Origin` check. `UseInertiaAntiforgery()` is still the token check Inertia needs. See [CSRF and antiforgery](/docs/csrf-and-antiforgery).
+- **C# 15 unions** work as props and in the generated TypeScript. See [Props](/docs/props) and [TypeScript](/docs/typescript).
+- **Compression.** `AddResponseCompression()` also offers Zstandard and always adds `Vary: Accept-Encoding`; Inertia's `Vary: X-Inertia` stays next to it.
 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.1
+dotnet new install Inertia.Net.Templates::1.8.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
 
-Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
 
 Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
 

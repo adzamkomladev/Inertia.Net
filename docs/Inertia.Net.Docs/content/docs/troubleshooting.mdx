@@ -23,6 +23,10 @@ The global usings come from the package's `buildTransitive` props and need `<Imp
   </AccordionItem>
 </Accordion>
 
+## TypeLoadException for `IValidatableInfo` on .NET 11
+
+`Could not load type 'Microsoft.Extensions.Validation.IValidatableInfo'` (or `ValidatableTypeInfo`) means a .NET 10 build is running on .NET 11. Upgrade every Inertia.Net package to 1.8.0 or later and target `net11.0`; don't roll a `net10.0` app forward to the .NET 11 runtime. See [Installation](/docs/installation).
+
 ## My 404 shows the Inertia modal in production
 
 Register `AddInertiaErrorPages()` and call `UseInertiaErrorPages()` before `UseInertia()`. Create your error components; see [Error pages](/docs/error-pages).

@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" Condition="'$(InertiaDocsPackage)' != 'true'" />
-    <PackageReference Include="Inertia.Net" Version="1.7.1" Condition="'$(InertiaDocsPackage)' == 'true'" />
+    <PackageReference Include="Inertia.Net" Version="1.8.0" Condition="'$(InertiaDocsPackage)' == 'true'" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="node_modules\**;ClientApp\**;ssr\**;package*.json;tsconfig*.json;vite.config.ts;scripts\**" />

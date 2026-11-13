@@ -874,8 +874,10 @@ internal sealed class InertiaPageWriter
 
         // The default object converter dispatches property names through the runtime key converter, preserving enum naming
         // and custom converters without constructing a probe dictionary. This also supports read-only dictionaries.
+#pragma warning disable CA2263 // GetTypeInfo<T>() exists only on .NET 11; net10.0 compiles this line too.
         var converter = (JsonConverter<object>)(keyType == typeof(object)
             ? SerializerOptions.GetTypeInfo(typeof(object)) : InertiaJsonContext.Default.GetTypeInfo(typeof(object))!).Converter;
+#pragma warning restore CA2263
         IDictionary? probe = null;
         using var buffer = new PooledBufferWriter(256);
         using var writer = new Utf8JsonWriter(buffer);
