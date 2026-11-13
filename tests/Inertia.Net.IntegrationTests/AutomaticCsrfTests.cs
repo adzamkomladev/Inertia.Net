@@ -19,9 +19,9 @@ public sealed class AutomaticCsrfTests
 {
     private static async Task<(WebApplication App, HttpClient Client)> StartAsync(bool disableCsrfProtection = false)
     {
-        var root = Path.Combine(Path.GetTempPath(), "inertia-csrf-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Join(Path.GetTempPath(), "inertia-csrf-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        File.WriteAllText(Path.Combine(root, "app.html"), "<html><body>@inertia</body></html>");
+        File.WriteAllText(Path.Join(root, "app.html"), "<html><body>@inertia</body></html>");
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = root, EnvironmentName = Environments.Production });
         builder.WebHost.UseTestServer();
         if (disableCsrfProtection)
@@ -58,11 +58,14 @@ public sealed class AutomaticCsrfTests
     {
         var (app, client) = await StartAsync(disableCsrfProtection);
         await using var _ = app;
-        var token = (await client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/page") { Headers = { { InertiaHeaders.Inertia, "true" } } }, TestContext.Current.CancellationToken)).GetXsrfToken();
+        using var __ = client; // also disposes its CookieContainerHandler
+        using var page = new HttpRequestMessage(HttpMethod.Get, "/page") { Headers = { { InertiaHeaders.Inertia, "true" } } };
+        var token = (await client.SendAsync(page, TestContext.Current.CancellationToken)).GetXsrfToken();
 
-        var form = await client.SendAsync(CrossSite("/form", token, new FormUrlEncodedContent([new("name", "Ann")])), TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, form.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(CrossSite("/json", token), TestContext.Current.CancellationToken)).StatusCode);
+        using var formRequest = CrossSite("/form", token, new FormUrlEncodedContent([new("name", "Ann")]));
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(formRequest, TestContext.Current.CancellationToken)).StatusCode);
+        using var jsonRequest = CrossSite("/json", token);
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(jsonRequest, TestContext.Current.CancellationToken)).StatusCode);
     }
 
     [Fact]
@@ -70,7 +73,8 @@ public sealed class AutomaticCsrfTests
     {
         var (app, client) = await StartAsync();
         await using var _ = app;
-        var request = new HttpRequestMessage(HttpMethod.Post, "/form") { Content = new FormUrlEncodedContent([new("name", "Ann")]) };
+        using var __ = client; // also disposes its CookieContainerHandler
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/form") { Content = new FormUrlEncodedContent([new("name", "Ann")]) };
         request.Headers.Add("Sec-Fetch-Site", "cross-site");
         Assert.Equal(419, (int)(await client.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode);
     }

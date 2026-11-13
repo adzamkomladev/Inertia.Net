@@ -145,7 +145,7 @@ public sealed class PrecognitionTests
 
         foreach (var (precognitive, inertia) in new[] { (true, false), (false, true) })
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, "/precog") { Content = new StringContent("{", System.Text.Encoding.UTF8, "application/json") };
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/precog") { Content = new StringContent("{", System.Text.Encoding.UTF8, "application/json") };
             if (precognitive) request.WithHeader("Precognition", "true");
             if (inertia) request.WithHeader(InertiaHeaders.Inertia, "true");
             var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
