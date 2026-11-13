@@ -355,9 +355,21 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
             JsonTypeInfoKind.Enumerable => Array(Reference(info.ElementType ?? typeof(object), handling)),
             JsonTypeInfoKind.Dictionary => $"Record<string, {Reference(info.ElementType ?? typeof(object), handling)}>",
             JsonTypeInfoKind.Object => Named(type),
+#if NET11_0_OR_GREATER
+            JsonTypeInfoKind.Union => UnionCases(info, handling),
+#endif
             _ => "unknown", // a custom converter: its output shape is unknown
         };
     }
+
+#if NET11_0_OR_GREATER
+    // A C# union is written as its active case, with no wrapper or discriminator (a default struct union writes null; not modeled).
+    private string UnionCases(JsonTypeInfo info, JsonNumberHandling? handling)
+    {
+        var type = info.UnionCases.Select(c => Reference(c.CaseType, handling)).Aggregate(Union);
+        return info.UnionCases.Any(c => c.IsNullable) ? Union(type, "null") : type;
+    }
+#endif
 
     private static string Number(string type, JsonNumberHandling handling) => (handling & JsonNumberHandling.WriteAsString) != 0 ? Union(type, "string") : type;
 

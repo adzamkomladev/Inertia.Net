@@ -1,6 +1,6 @@
 # Inertia.Net documentation
 
-> Inertia.Net is a .NET 10 server adapter for Inertia.js v3. ASP.NET Core endpoints (Minimal APIs, MVC or FastEndpoints) return a page component name and props; React, Vue or Svelte renders them. There is no separate JSON API or client-side router.
+> Inertia.Net is a .NET 10 and .NET 11 server adapter for Inertia.js v3. ASP.NET Core endpoints (Minimal APIs, MVC or FastEndpoints) return a page component name and props; React, Vue or Svelte renders them. There is no separate JSON API or client-side router.
 
 ---
 
@@ -8,7 +8,7 @@
 
 URL: https://inertia-dotnet.temtem.dev/docs/introduction
 
-> Inertia.Net is a .NET 10 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
+> Inertia.Net is a .NET 10 and .NET 11 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
 
 Inertia.Net connects ASP.NET Core to the Inertia.js v3 client. Your endpoints return pages and props; the client renders them as React, Vue or Svelte components. The first visit is a normal HTML response, and later visits are Inertia requests that update the page without a full reload.
 
@@ -79,7 +79,7 @@ This site is an Inertia.Net app. The sidebar, search, docs pages and theme switc
 
 ## Requirements
 
-- .NET 10 SDK
+- .NET 10 or .NET 11 SDK
 - JavaScript frontend build tools with npm, Bun, pnpm or Yarn; managed SSR requires Node.js or Bun at runtime
 - An Inertia.js v3 client package for React, Vue or Svelte
 
@@ -232,31 +232,43 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.7.1
-dotnet add package Inertia.Net.Mvc --version 1.7.1            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.7.1  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.1 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.7.1        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.7.1   # live props over SignalR
+dotnet add package Inertia.Net --version 1.8.0
+dotnet add package Inertia.Net.Mvc --version 1.8.0            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.8.0  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.8.0        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.8.0   # live props over SignalR
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.7.1 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.8.0 implements Inertia.js v3.
 
 ## Requirements
 
-- .NET 10 SDK and an `Microsoft.NET.Sdk.Web` project.
+- .NET 10 or .NET 11 SDK and an `Microsoft.NET.Sdk.Web` project.
 - JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js or Bun at runtime.
 - An Inertia.js v3 client: `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte`.
+
+## .NET 10 and .NET 11
+
+Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one that matches your app. Things to know on .NET 11:
+
+- **Use 1.8.0 or later on .NET 11.** Inertia.Net 1.7.1 and earlier were built against .NET 10 only. .NET 11 reshaped the experimental resolver API of `Microsoft.Extensions.Validation`, so `WithInertiaValidation()` and `WithInertiaPrecognition()` from 1.7.1 fail on .NET 11 with `TypeLoadException: Could not load type 'Microsoft.Extensions.Validation.IValidatableInfo'`.
+- **Retarget, don't roll forward.** A `net10.0` app that calls `AddValidation()` and runs on the .NET 11 runtime (`DOTNET_ROLL_FORWARD=LatestMajor`) fails whatever adapter it uses: the validation source generator wrote .NET 10 types that .NET 11 removed. Set `<TargetFramework>net11.0</TargetFramework>` and rebuild.
+- **Dependencies follow the target framework.** On `net11.0`, `Inertia.Net.EntityFrameworkCore` depends on EF Core 11 and `Inertia.Net.FastEndpoints` on FastEndpoints 9; on `net10.0` they use EF Core 10.0.15 and FastEndpoints 8.3.0. Reference the `FastEndpoints.Generator` version that matches your FastEndpoints version.
+- **Async validators.** `AsyncValidationAttribute` and `IAsyncValidatableObject` errors go through `WithInertiaValidation()` and `WithInertiaPrecognition()` like synchronous ones. See [Validation and errors](/docs/validation-and-errors).
+- **Automatic CSRF check.** Apps built with `WebApplication.CreateBuilder` also get the framework's `Sec-Fetch-Site`/`Origin` check. `UseInertiaAntiforgery()` is still the token check Inertia needs. See [CSRF and antiforgery](/docs/csrf-and-antiforgery).
+- **C# 15 unions** work as props and in the generated TypeScript. See [Props](/docs/props) and [TypeScript](/docs/typescript).
+- **Compression.** `AddResponseCompression()` also offers Zstandard and always adds `Vary: Accept-Encoding`; Inertia's `Vary: X-Inertia` stays next to it.
 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.1
+dotnet new install Inertia.Net.Templates::1.8.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
 
-Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
 
 Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
 
@@ -306,10 +318,10 @@ URL: https://inertia-dotnet.temtem.dev/docs/first-10-minutes
 
 > Start a template app, try its validated form, and test the redirect.
 
-Create the React starter (choose `vue` or `svelte` for another client):
+Create the React starter (choose `vue` or `svelte` for another client; add `--tfm net11.0` to target .NET 11 instead of .NET 10):
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.1
+dotnet new install Inertia.Net.Templates::1.8.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -1157,6 +1169,8 @@ Props are the data a page receives. `Render(component, props)` takes an `Inertia
 
 Every page has an `errors` prop. Its key order is `errors`, shared props, then page props.
 
+**C# 15 unions (.NET 11).** A prop whose type is a `union` (for example `public union Subject(User, Team);`) is written as the JSON of its active case, with no wrapper or discriminator, through your source-generated `JsonSerializerContext`; partial reloads select it like any other prop. An `InertiaProp` (`Defer`, `Optional`, ...) stored inside a union case is not resolved: keep lazy props at the page level.
+
 ## The prop factories
 
 | C\# | Behavior |
@@ -1505,6 +1519,8 @@ app.MapGroup("/admin").WithInertiaValidation()
 ```
 
 For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
+
+On .NET 11, async validators (`AsyncValidationAttribute`, `IAsyncValidatableObject`) report through `WithInertiaValidation()` and `WithInertiaPrecognition()` like synchronous attributes. A body that cannot be bound (malformed JSON) is still a `400` on both .NET 10 and .NET 11, never a redirect back without errors or a Precognition success.
 
 <Callout type="warning" title="Why not rely on AddValidation alone?">
 The built-in .NET 10 validation filter is added automatically and always runs outermost: it writes the 400 itself before any filter you add can see it. `WithInertiaValidation()` disables it on the endpoint and runs the same source-generated validation itself. Do not combine it with your own `.DisableValidation()`.
@@ -2373,7 +2389,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.1
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3369,6 +3385,10 @@ app.UseInertiaAntiforgery();
 - **Reject.** A missing or wrong token gets **`419`** (page expired, as in Laravel); the handler does not run.
 - **Opt out** per endpoint with `.DisableAntiforgery()` (webhooks, test hooks), or for whole areas with `ShouldValidate`.
 
+## .NET 11 automatic CSRF check
+
+Apps built with `WebApplication.CreateBuilder` on .NET 11 also get the framework's automatic CSRF middleware. It checks `Sec-Fetch-Site` and `Origin` on unsafe requests, issues no tokens, and only records a verdict. `UseInertiaAntiforgery()` remains the token check Inertia needs: like `app.UseAntiforgery()`, it replaces that verdict with its own, so a request with a valid token passes and one without still gets `419`. `.DisableAntiforgery()` opts an endpoint out of both; configuration `DisableCsrfProtection=true` turns the automatic check off.
+
 ## Options
 
 ```csharp
@@ -3462,7 +3482,7 @@ Keep the SSR server on loopback on each instance. See [Server-side rendering](/d
 Page JSON and HTML compress five to ten times. Compress at the proxy, or in the app:
 
 ```csharp
-builder.Services.AddResponseCompression();
+builder.Services.AddResponseCompression();   // Brotli and gzip; Zstandard too on .NET 11 (which always adds Vary: Accept-Encoding)
 app.UseResponseCompression();                // before UseStaticFiles and UseInertia
 ```
 
@@ -4047,6 +4067,7 @@ An `InertiaProp` member is optional (it can be deferred, optional or rescued) an
 | enum | union of JSON values: numbers by default, with the member names in a doc comment; string names with `JsonStringEnumConverter` |
 | dictionary | `Record<string, T>` |
 | polymorphic type | union tagged with its discriminator |
+| C# 15 `union` (.NET 11) | union of its case types, `User \| Team` (plus `\| null` when a case is nullable) |
 | nullable member | `T \| null` |
 
 Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.
@@ -4268,6 +4289,10 @@ The global usings come from the package's `buildTransitive` props and need `<Imp
   </AccordionItem>
 </Accordion>
 
+## TypeLoadException for `IValidatableInfo` on .NET 11
+
+`Could not load type 'Microsoft.Extensions.Validation.IValidatableInfo'` (or `ValidatableTypeInfo`) means a .NET 10 build is running on .NET 11. Upgrade every Inertia.Net package to 1.8.0 or later and target `net11.0`; don't roll a `net10.0` app forward to the .NET 11 runtime. See [Installation](/docs/installation).
+
 ## My 404 shows the Inertia modal in production
 
 Register `AddInertiaErrorPages()` and call `UseInertiaErrorPages()` before `UseInertia()`. Create your error components; see [Error pages](/docs/error-pages).
@@ -4403,7 +4428,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/forget-me-not
 ForgetMeNot is a small todo app, but it uses the same pieces as a real product: sign-in, private data, a public share page, a list that loads as you scroll, and reminders that run in the background. You will start from the official `Inertia.Net.Templates` template, then add each feature one small step at a time.
 
 <Callout type="info" title="What you need">
-- .NET 10 SDK
+- .NET 10 or .NET 11 SDK
 - JavaScript tooling with npm, Bun, pnpm or Yarn
 - A code editor
 - A terminal
@@ -4431,7 +4456,7 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.1
+dotnet new install Inertia.Net.Templates::1.8.0
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install

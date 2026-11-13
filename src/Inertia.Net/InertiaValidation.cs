@@ -1,5 +1,5 @@
-// The resolver half of Microsoft.Extensions.Validation is marked experimental (ASP0029) in .NET 10; ASP.NET Core's own validation
-// filter suppresses it the same way. If the API changes, only this file is affected.
+// The resolver half of Microsoft.Extensions.Validation is marked experimental (ASP0029); ASP.NET Core's own validation filter
+// suppresses it the same way. Its shape changed in .NET 11 (IValidatableParameterInfo, ValidationError lists): only this file knows.
 #pragma warning disable ASP0029
 
 using System.ComponentModel.DataAnnotations;
@@ -15,6 +15,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Validation;
+#if NET11_0_OR_GREATER
+using ValidatableParameterInfo = Microsoft.Extensions.Validation.IValidatableParameterInfo;
+#else
+using ValidatableParameterInfo = Microsoft.Extensions.Validation.IValidatableInfo;
+#endif
 
 namespace Inertia.Net;
 
@@ -217,7 +222,7 @@ internal static partial class InertiaValidationFilter
     };
 
     // Mirrors the built-in ValidationEndpointFilterFactory (Microsoft.AspNetCore.Routing, .NET 10).
-    private static (ValidationOptions Options, (int Index, IValidatableInfo Info, string DisplayName)[] Parameters)? FindValidatableParameters(EndpointFilterFactoryContext context)
+    private static (ValidationOptions Options, (int Index, ValidatableParameterInfo Info, string DisplayName)[] Parameters)? FindValidatableParameters(EndpointFilterFactoryContext context)
     {
         if (context.ApplicationServices.GetService<IOptions<ValidationOptions>>()?.Value is not { Resolvers.Count: > 0 } options)
         {
@@ -226,7 +231,7 @@ internal static partial class InertiaValidationFilter
 
         var isService = context.ApplicationServices.GetService<IServiceProviderIsService>();
         var parameters = context.MethodInfo.GetParameters();
-        var result = new List<(int, IValidatableInfo, string)>();
+        var result = new List<(int, ValidatableParameterInfo, string)>();
         for (var i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
@@ -247,7 +252,7 @@ internal static partial class InertiaValidationFilter
 
     private static async ValueTask<Dictionary<string, string[]>?> ValidateAsync(
         EndpointFilterInvocationContext invocation,
-        (ValidationOptions Options, (int Index, IValidatableInfo Info, string DisplayName)[] Parameters) validatable)
+        (ValidationOptions Options, (int Index, ValidatableParameterInfo Info, string DisplayName)[] Parameters) validatable)
     {
         ValidateContext? validateContext = null;
         foreach (var (index, info, displayName) in validatable.Parameters)
@@ -257,13 +262,24 @@ internal static partial class InertiaValidationFilter
                 continue;
             }
 
+#if NET11_0_OR_GREATER
+            _ = displayName; // .NET 11's ValidateContext no longer takes a ValidationContext to carry it.
+            validateContext ??= new ValidateContext { ValidationOptions = validatable.Options, ServiceProvider = invocation.HttpContext.RequestServices };
+#else
             var validationContext = new ValidationContext(argument, displayName, invocation.HttpContext.RequestServices, items: null);
             validateContext ??= new ValidateContext { ValidationOptions = validatable.Options, ValidationContext = validationContext };
             validateContext.ValidationContext = validationContext;
+#endif
             await info.ValidateAsync(argument, validateContext, invocation.HttpContext.RequestAborted);
         }
 
+#if NET11_0_OR_GREATER
+        return validateContext?.ValidationErrors is { Count: > 0 } errors
+            ? errors.ToDictionary(e => e.Key, e => e.Value.Select(error => error.ErrorMessage).ToArray())
+            : null;
+#else
         return validateContext?.ValidationErrors is { Count: > 0 } errors ? errors : null;
+#endif
     }
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "No validatable parameters were found for endpoint {Endpoint}.")]

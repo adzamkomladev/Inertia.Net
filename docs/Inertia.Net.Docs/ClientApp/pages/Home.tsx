@@ -127,7 +127,7 @@ export default function Home() {
                 Modern frontends for ASP.NET Core apps
               </h1>
               <p className="mt-5 max-w-lg text-pretty text-base leading-7 text-muted-foreground">
-                An Inertia.js v3 adapter for .NET 10. Keep your routes, auth and validation in C#. Build the UI in React, Vue or Svelte. Inertia.Net connects the two, so you skip the API layer and the client-side router.
+                An Inertia.js v3 adapter for .NET 10 and .NET 11. Keep your routes, auth and validation in C#. Build the UI in React, Vue or Svelte. Inertia.Net connects the two, so you skip the API layer and the client-side router.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link

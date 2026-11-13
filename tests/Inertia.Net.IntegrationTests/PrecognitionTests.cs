@@ -135,6 +135,47 @@ public sealed class PrecognitionTests
         Assert.Equal(["inner", "handler"], calls.Names);
     }
 
+    // .NET 11 runs endpoint filters after a binding failure (status already 400, argument missing): a malformed body must not
+    // pass Precognition as valid or redirect back without errors. .NET 10 never runs the filters here; both answer 400.
+    [Fact]
+    public async Task A_malformed_body_is_a_400_for_precognitive_and_inertia_requests()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+
+        foreach (var (precognitive, inertia) in new[] { (true, false), (false, true) })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/precog") { Content = new StringContent("{", System.Text.Encoding.UTF8, "application/json") };
+            if (precognitive) request.WithHeader("Precognition", "true");
+            if (inertia) request.WithHeader(InertiaHeaders.Inertia, "true");
+            var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Null(response.Header("Precognition-Success"));
+        }
+
+        Assert.Empty(app.App.Services.GetRequiredService<Calls>().Names);
+    }
+
+#if NET11_0_OR_GREATER
+    [Fact]
+    public async Task Async_validation_attributes_report_through_precognition_and_inertia_validation()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+
+        var precognitive = await PostAsync(client, "/precog-async", new { name = "taken" });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, precognitive.StatusCode);
+        Assert.Equal(["name"], (await ErrorsAsync(precognitive)).Select(e => e.Key));
+        Assert.Equal(HttpStatusCode.NoContent, (await PostAsync(client, "/precog-async", new { name = "free" })).StatusCode);
+
+        var inertia = await PostAsync(client, "/validate-async", new { name = "taken" }, precognitive: false, inertia: true);
+        Assert.Equal(HttpStatusCode.Found, inertia.StatusCode);
+        var page = await (await client.InertiaGetAsync("/page")).PageAsync();
+        Assert.Equal("The name is taken.", (string?)page["props"]!["errors"]!["name"]);
+    }
+#endif
+
     public sealed class Calls
     {
         public List<string> Names { get; } = [];
@@ -174,6 +215,10 @@ public sealed class PrecognitionTests
             app.MapPost("/precog-nested", ([FromBody] NestedInput input) => Results.Ok()).WithInertiaPrecognition();
             app.MapPost("/precog-none", () => Results.Ok()).WithInertiaPrecognition();
             app.MapPost("/precog-collection", ([FromBody] CollectionInput input) => Results.Ok()).WithInertiaPrecognition();
+#if NET11_0_OR_GREATER
+            app.MapPost("/precog-async", ([FromBody] AsyncInput input) => Results.Ok()).WithInertiaPrecognition();
+            app.MapPost("/validate-async", ([FromBody] AsyncInput input) => Results.Ok()).WithInertiaValidation();
+#endif
         }
     }
 
@@ -185,6 +230,27 @@ public sealed class PrecognitionTests
         [Required]
         public string? Email { get; set; }
     }
+
+#if NET11_0_OR_GREATER
+    public sealed class AsyncInput
+    {
+        [NotTakenAsync]
+        public string? Name { get; set; }
+    }
+
+    // Async only: the synchronous path accepts everything, so an error proves the async validator ran.
+    [AttributeUsage(AttributeTargets.Property)]
+    public sealed class NotTakenAsyncAttribute : AsyncValidationAttribute
+    {
+        protected override ValidationResult? IsValid(object? value, ValidationContext validationContext) => ValidationResult.Success;
+
+        protected override async Task<ValidationResult?> IsValidAsync(object? value, ValidationContext validationContext, CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            return value as string == "taken" ? new ValidationResult("The name is taken.") : ValidationResult.Success;
+        }
+    }
+#endif
 
     public sealed class NestedInput
     {

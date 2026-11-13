@@ -47,6 +47,10 @@ public sealed class MiddlewareCompositionTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("true", response.Header(InertiaHeaders.Inertia));
+        // Compression adds Accept-Encoding (always on .NET 11); the Inertia value must survive next to it.
+        var vary = response.Headers.Vary.ToArray();
+        Assert.Contains(InertiaHeaders.Inertia, vary);
+        Assert.Contains("Accept-Encoding", vary);
     }
 
     [Theory]

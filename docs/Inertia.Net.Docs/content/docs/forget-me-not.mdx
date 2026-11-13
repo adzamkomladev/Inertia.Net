@@ -8,7 +8,7 @@ order: 1
 ForgetMeNot is a small todo app, but it uses the same pieces as a real product: sign-in, private data, a public share page, a list that loads as you scroll, and reminders that run in the background. You will start from the official `Inertia.Net.Templates` template, then add each feature one small step at a time.
 
 <Callout type="info" title="What you need">
-- .NET 10 SDK
+- .NET 10 or .NET 11 SDK
 - JavaScript tooling with npm, Bun, pnpm or Yarn
 - A code editor
 - A terminal
@@ -36,7 +36,7 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.1
+dotnet new install Inertia.Net.Templates::1.8.0
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install

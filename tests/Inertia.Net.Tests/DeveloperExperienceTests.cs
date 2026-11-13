@@ -155,6 +155,17 @@ public sealed class DeveloperExperienceTests : IDisposable
         Assert.Contains("export interface PagedTsUser {", ts, StringComparison.Ordinal);
     }
 
+#if NET11_0_OR_GREATER
+    [Fact]
+    public void Union_props_are_typed_as_a_union_of_their_cases()
+    {
+        var ts = Generate(o => o.TypeScript.Page<UnionPage>("Union"));
+
+        Assert.Contains("subject: TsUser | string", ts, StringComparison.Ordinal);
+        Assert.Contains("export interface TsUser {", ts, StringComparison.Ordinal);
+    }
+
+#endif
     [Fact]
     public void Shared_props_are_inferred_from_the_shares_and_feed_the_inertia_config()
     {
@@ -373,6 +384,13 @@ public sealed class TsNullableNumberConverter : JsonConverter<int?>
     public override void Write(Utf8JsonWriter writer, int? value, JsonSerializerOptions options) => writer.WriteStringValue("custom nullable number");
 }
 
+#if NET11_0_OR_GREATER
+public union TsSubject(TsUser, string);
+
+public sealed record UnionPage(TsSubject Subject);
+
+[JsonSerializable(typeof(UnionPage))]
+#endif
 [JsonSerializable(typeof(UsersPage))]
 [JsonSerializable(typeof(OrdersPage))]
 [JsonSerializable(typeof(Flash))]

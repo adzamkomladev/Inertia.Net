@@ -1,6 +1,6 @@
 # Inertia.Net.FastEndpoints
 
-FastEndpoints integration for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net), a .NET 10 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
+FastEndpoints integration for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net), a .NET 10 and .NET 11 server adapter for the Inertia.js v3 protocol. Install it next to `Inertia.Net`:
 
 ```sh
 dotnet add package Inertia.Net

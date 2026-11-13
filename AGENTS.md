@@ -12,7 +12,7 @@ These rules apply to Codex, Claude, and any other coding assistant working in th
 
 ## Project
 
-- .NET 10 Inertia v3 adapter. SDK selection is in `global.json`; package versions are centralized in `Directory.Packages.props`.
+- .NET 10 and .NET 11 Inertia v3 adapter (libraries and tests target `net10.0;net11.0`; samples, docs, AotSmoke and Benchmarks stay `net10.0`). SDK selection is in `global.json`; package versions are centralized in `Directory.Packages.props`.
 - `src/Inertia.Net` contains the protocol, props, state, Vite, and SSR implementation. MVC, FastEndpoints, and testing helpers are separate packages under `src/`.
 - Read `docs/protocol.md` before protocol changes, including its deliberate deviations. Public usage is documented in `README.md` and package READMEs.
 - Keep changes small, reuse existing helpers, and trace callers before changing shared behavior. Preserve Native AOT support and source-generated System.Text.Json metadata.

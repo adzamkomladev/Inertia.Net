@@ -77,7 +77,7 @@ fast paths, Kestrel memory-pool eviction, HTTP/2 HPACK memory, zlib-ng compressi
 | `IMemoryCache` (in the shared framework) | Unused | Backing store for cached props and the SSR cache. No new dependency. |
 | 103 Early Hints | Kestrel has no API (dotnet/aspnetcore#27851, now in the .NET 12 planning milestone) | Blocked. Would let the browser fetch Vite assets while loaders run. Revisit when Kestrel ships it. |
 | `IOutputCachePolicyProvider` (.NET 11) | n/a | A documented output-cache policy for anonymous pages that varies on the Inertia headers. |
-| Runtime-async (.NET 11) | Preview | Evaluate when adding a `net11.0` target after GA in November 2026. |
+| Runtime-async (.NET 11) | Preview | The `net11.0` target shipped in 1.8.0; runtime-async is still preview and opt-in, so evaluate it separately. |
 | Native OpenTelemetry attributes on the request activity (.NET 11) | n/a | Our `inertia.render` activity already nests under it; nothing to change. |
 | `FrozenDictionary`, `AlternateLookup<ReadOnlySpan<char>>` | Unused | Manifest chunks and the shared-prop index are candidates; measure before changing (the tags are already pre-rendered per entry set). |
 | `JsonElement.Parse` instead of `JsonDocument.Parse` | One use in `InertiaStateStore` (disposed) | Fine as is. |

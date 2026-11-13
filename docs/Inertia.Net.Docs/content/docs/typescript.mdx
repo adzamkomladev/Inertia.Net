@@ -91,6 +91,7 @@ An `InertiaProp` member is optional (it can be deferred, optional or rescued) an
 | enum | union of JSON values: numbers by default, with the member names in a doc comment; string names with `JsonStringEnumConverter` |
 | dictionary | `Record<string, T>` |
 | polymorphic type | union tagged with its discriminator |
+| C# 15 `union` (.NET 11) | union of its case types, `User \| Team` (plus `\| null` when a case is nullable) |
 | nullable member | `T \| null` |
 
 Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.

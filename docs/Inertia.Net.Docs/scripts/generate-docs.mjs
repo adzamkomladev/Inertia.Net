@@ -124,7 +124,7 @@ await fs.writeFile(path.join(output, 'generated-search.json'), `${JSON.stringify
 
 // llms.txt (https://llmstxt.org) and the full plain-text docs for coding agents.
 const siteUrl = 'https://inertia-dotnet.temtem.dev'
-const summary = 'Inertia.Net is a .NET 10 server adapter for Inertia.js v3. ASP.NET Core endpoints (Minimal APIs, MVC or FastEndpoints) return a page component name and props; React, Vue or Svelte renders them. There is no separate JSON API or client-side router.'
+const summary = 'Inertia.Net is a .NET 10 and .NET 11 server adapter for Inertia.js v3. ASP.NET Core endpoints (Minimal APIs, MVC or FastEndpoints) return a page component name and props; React, Vue or Svelte renders them. There is no separate JSON API or client-side router.'
 const llmsIndex = [
   '# Inertia.Net',
   '',

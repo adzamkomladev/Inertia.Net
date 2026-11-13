@@ -7,6 +7,34 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-13
+
+### Added
+
+- .NET 11 support: every library package now ships `net10.0` and `net11.0` assemblies. The repository builds with the .NET 11 SDK
+  and C# 15; the public API is unchanged.
+- On `net11.0`, `Inertia.Net.EntityFrameworkCore` depends on EF Core 11 and `Inertia.Net.FastEndpoints` on FastEndpoints 9.
+- `dotnet new inertia --tfm net11.0` creates a .NET 11 app; the default stays `net10.0` (LTS).
+- C# 15 `union` props are written as the JSON of their active case, and the generated TypeScript types a union as the union of its
+  case types (`User | Team`).
+- On .NET 11, async validators (`AsyncValidationAttribute`, `IAsyncValidatableObject`) report through `WithInertiaValidation()` and
+  `WithInertiaPrecognition()`.
+
+### Fixed
+
+- Inertia.Net 1.7.1 does not work on .NET 11: `WithInertiaValidation()` and `WithInertiaPrecognition()` failed with
+  `TypeLoadException` (`Microsoft.Extensions.Validation.IValidatableInfo`) because .NET 11 reshaped that experimental API. The
+  `net11.0` build uses the new API.
+- On .NET 11, `UseInertiaAntiforgery()` answered a form post without a valid token with a 500 (`This form is being accessed with a
+  failed antiforgery validation`) instead of `419` when the framework's automatic CSRF check had judged the request cross-site. It
+  now replaces that verdict with its own token check, as `app.UseAntiforgery()` does.
+
+### Changed
+
+- Dependency floors: EF Core `10.0.15` on `net10.0` (was `10.0.14`).
+- A `net10.0` app that calls `AddValidation()` cannot be rolled forward to the .NET 11 runtime (its generated validation code uses
+  types .NET 11 removed); retarget it to `net11.0`. See ".NET 10 and .NET 11" in the README.
+
 ## [1.7.1] - 2026-11-10
 
 ### Added

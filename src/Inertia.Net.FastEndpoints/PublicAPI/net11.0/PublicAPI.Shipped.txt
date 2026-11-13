@@ -1,0 +1,3 @@
+static Inertia.Net.FastEndpoints.InertiaSendExtensions.InertiaAsync<TRequest, TResponse>(this FastEndpoints.ResponseSender<TRequest, TResponse> send, string! component, object? props = null) -> System.Threading.Tasks.Task<FastEndpoints.Void>!
+static Inertia.Net.FastEndpoints.InertiaSendExtensions.InertiaBackAsync<TRequest, TResponse>(this FastEndpoints.ResponseSender<TRequest, TResponse> send, string! fallback = "~/") -> System.Threading.Tasks.Task<FastEndpoints.Void>!
+static Inertia.Net.FastEndpoints.InertiaSendExtensions.InertiaLocationAsync<TRequest, TResponse>(this FastEndpoints.ResponseSender<TRequest, TResponse> send, string! url) -> System.Threading.Tasks.Task<FastEndpoints.Void>!

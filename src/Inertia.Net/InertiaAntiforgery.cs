@@ -114,6 +114,11 @@ public static class InertiaAntiforgeryApplicationBuilderExtensions
             }
             else if (options.ShouldValidate?.Invoke(httpContext) ?? RequiresValidation(httpContext))
             {
+#if NET11_0_OR_GREATER
+                // Like UseAntiforgery(): the token check replaces the automatic CSRF middleware's Sec-Fetch-Site/Origin verdict,
+                // which would otherwise make reading the form token throw before this check can answer.
+                httpContext.Features.Set<IAntiforgeryValidationFeature>(null);
+#endif
                 try
                 {
                     await antiforgery.ValidateRequestAsync(httpContext);

@@ -46,7 +46,7 @@ Keep the SSR server on loopback on each instance. See [Server-side rendering](/d
 Page JSON and HTML compress five to ten times. Compress at the proxy, or in the app:
 
 ```csharp
-builder.Services.AddResponseCompression();
+builder.Services.AddResponseCompression();   // Brotli and gzip; Zstandard too on .NET 11 (which always adds Vary: Accept-Encoding)
 app.UseResponseCompression();                // before UseStaticFiles and UseInertia
 ```
 

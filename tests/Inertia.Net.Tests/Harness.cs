@@ -223,6 +223,13 @@ public sealed record IgnoredMembers(
 
 public sealed record BigNumbers(long Long, ulong ULong, Int128 Int128, UInt128 UInt128, BigInteger Big, long? Nullable, List<long> List);
 
+#if NET11_0_OR_GREATER
+public union UnionSubject(User, int, string);
+
+public sealed record UnionSubjectPage(UnionSubject Subject, UnionSubject Score, string Title);
+
+[JsonSerializable(typeof(UnionSubjectPage))]
+#endif
 [JsonSerializable(typeof(User))]
 [JsonSerializable(typeof(List<User>))]
 [JsonSerializable(typeof(DashboardPage))]

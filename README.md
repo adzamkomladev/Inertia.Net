@@ -5,7 +5,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.7.1** is a .NET 10 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.8.0** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -16,7 +16,7 @@ Inertia.Net **1.7.1** is a .NET 10 server adapter for the **Inertia.js v3** prot
 - [Documentation site](#documentation-site)
 
 1. [Overview and feature matrix](#overview-and-feature-matrix)
-2. [Installation](#installation)
+2. [Installation](#installation) and [.NET 10 and .NET 11](#net-10-and-net-11)
 3. [Quick start](#quick-start): [Minimal API](#minimal-api), [MVC](#mvc), [FastEndpoints](#fastendpoints)
 4. [Client setup](#client-setup): [Vite config](#vite-config), [React](#react), [Vue](#vue), [Svelte](#svelte)
 5. [The root template](#the-root-template)
@@ -83,17 +83,18 @@ A typical React, Vue or Svelte app on ASP.NET Core means two things to build: a 
 
 ## Start a new app
 
-You need the .NET 10 SDK and JavaScript frontend build tools. npm, Bun, pnpm and Yarn are supported; choose the package manager you use for your app. Use an Inertia v3 client; v2 clients are not supported.
+You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bun, pnpm and Yarn are supported; choose the package manager you use for your app. Use an Inertia v3 client; v2 clients are not supported.
 
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.7.1
+dotnet new install Inertia.Net.Templates::1.8.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
 
 Choose `--framework vue` or `--framework svelte` for another frontend. Each template uses Minimal APIs and includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
 
 Install dependencies and start Vite in one terminal, from `MyApp`, using one row:
 
@@ -201,15 +202,36 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.7.1
-dotnet add package Inertia.Net.Mvc --version 1.7.1 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.7.1 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.7.1 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.7.1 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.7.1 # live props over SignalR
+dotnet add package Inertia.Net --version 1.8.0
+dotnet add package Inertia.Net.Mvc --version 1.8.0 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.8.0 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.8.0 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.8.0 # live props over SignalR
 ```
 
-Requires .NET 10 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.7.1` for all Inertia.Net packages. Inertia.Net 1.7.1 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.8.0` for all Inertia.Net packages. Inertia.Net 1.8.0 uses the Inertia.js v3 protocol; these are separate version numbers.
+
+### .NET 10 and .NET 11
+
+Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one that matches your app. Things to know on .NET 11:
+
+- **Use 1.8.0 or later on .NET 11.** Inertia.Net 1.7.1 and earlier were built against .NET 10 only. .NET 11 reshaped the experimental
+  resolver API of `Microsoft.Extensions.Validation`, so `WithInertiaValidation()` and `WithInertiaPrecognition()` from 1.7.1 fail on
+  .NET 11 with `TypeLoadException: Could not load type 'Microsoft.Extensions.Validation.IValidatableInfo'`.
+- **Retarget, don't roll forward.** A `net10.0` app that calls `AddValidation()` and runs on the .NET 11 runtime
+  (`DOTNET_ROLL_FORWARD=LatestMajor`) fails whatever adapter it uses: the validation source generator wrote .NET 10 types that .NET 11
+  removed. Set `<TargetFramework>net11.0</TargetFramework>` and rebuild.
+- **Dependencies follow the target framework.** On `net11.0`, `Inertia.Net.EntityFrameworkCore` depends on EF Core 11 and
+  `Inertia.Net.FastEndpoints` on FastEndpoints 9; on `net10.0` they use EF Core 10.0.15 and FastEndpoints 8.3.0. Reference the
+  `FastEndpoints.Generator` version that matches your FastEndpoints version.
+- **Async validators.** `AsyncValidationAttribute` and `IAsyncValidatableObject` errors go through `WithInertiaValidation()` (redirect
+  back with the errors) and `WithInertiaPrecognition()` (`422`) like synchronous ones.
+- **Automatic CSRF check.** Apps built with `WebApplication.CreateBuilder` also get the framework's `Sec-Fetch-Site`/`Origin` check.
+  `UseInertiaAntiforgery()` is still the token check Inertia needs; see [CSRF and antiforgery](#csrf-and-antiforgery).
+- **C# 15 unions** work as props and in the generated TypeScript; see [Props reference](#props-reference) and [TypeScript types](#typescript-types).
+- **Compression.** `AddResponseCompression()` also offers Zstandard and always adds `Vary: Accept-Encoding`; Inertia's `Vary: X-Inertia`
+  stays next to it.
 
 ### Factory name collision
 > The namespace is `Inertia.Net` and the static factory class is `Inertia.Net.Inertia`. C# resolves a leading `Inertia` to the *namespace*, so `Inertia.Render(...)` does **not** compile in your app (outside the `Inertia.Net` namespace).
@@ -716,6 +738,10 @@ public sealed class MyRootView : IInertiaRootView
 `Render(component, props)` takes either an `InertiaProps` (an ordered `Dictionary<string, object?>`), any `IDictionary<string, object?>`, or a typed object whose properties are the props. Nested `InertiaProps` and dictionaries are walked, so props can be nested at any depth.
 
 Every page has an `errors` prop (an empty object when there are no errors). Key order in `props` is `errors`, shared props, then the page props.
+
+**C# 15 unions (.NET 11).** A prop whose type is a `union` (for example `public union Subject(User, Team);`) is written as the JSON of its
+active case, with no wrapper or discriminator, through your source-generated `JsonSerializerContext`; partial reloads select it like any other
+prop. An `InertiaProp` (`Defer`, `Optional`, ...) stored inside a union case is not resolved: keep lazy props at the page level.
 
 ### The prop factories
 
@@ -2072,6 +2098,11 @@ app.UseInertiaAntiforgery();
 - **Reject.** A missing or wrong token gets **`419`** (page expired, as in Laravel); the handler does not run.
 - **Opt out** per endpoint with `.DisableAntiforgery()` (webhooks, test hooks), or for whole areas with `ShouldValidate`.
 
+**.NET 11.** Apps built with `WebApplication.CreateBuilder` also get the framework's automatic CSRF middleware. It checks `Sec-Fetch-Site`
+and `Origin` on unsafe requests, issues no tokens, and only records a verdict. `UseInertiaAntiforgery()` remains the token check Inertia
+needs: like `app.UseAntiforgery()`, it replaces that verdict with its own, so a request with a valid token passes and one without still
+gets `419`. `.DisableAntiforgery()` opts an endpoint out of both; configuration `DisableCsrfProtection=true` turns the automatic check off.
+
 ```csharp
 app.UseInertiaAntiforgery(o =>
 {
@@ -2132,7 +2163,7 @@ tokens are protected with it. Keep the SSR server on loopback on each instance (
 Page JSON and HTML compress five to ten times. Compress at the proxy, or in the app (the samples and the template do):
 
 ```csharp
-builder.Services.AddResponseCompression();   // Brotli and gzip; Zstandard too from .NET 11
+builder.Services.AddResponseCompression();   // Brotli and gzip; Zstandard too on .NET 11 (which always adds Vary: Accept-Encoding)
 app.UseResponseCompression();                // before UseStaticFiles and UseInertia
 ```
 
@@ -2329,7 +2360,8 @@ export default function Index({ users, stats }: InertiaPages['Users/Index']) { /
 - **Mapping.** Numbers are `number` (`number | bigint` for 64-bit and larger with `PreserveBigIntegers`), dates, GUIDs and `byte[]`
   are `string`, enums are unions of their JSON values (numbers by default, with the member names in a doc comment; string names with
   `JsonStringEnumConverter`), dictionaries are `Record<string, T>`,
-  polymorphic types are unions tagged with their discriminator, and nullable members get `| null`.
+  polymorphic types are unions tagged with their discriminator, C# 15 `union` types (.NET 11) are unions of their case types
+  (`User | Team`, plus `| null` when a case is nullable), and nullable members get `| null`.
 - Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.
   Commit the file, so `tsc` passes in CI without running the app.
 - Number handling follows member settings, then type settings, then the global JSON options. Custom converter output is typed as
@@ -2705,6 +2737,10 @@ Call `Render(...)` unqualified. The namespace `Inertia.Net` shadows the class na
 **Generated code fails with "'Inertia' is a type" (e.g. FastEndpoints' source generator).**
 Inside a namespace that starts with `Inertia.Net.`, the name `Inertia` binds to the `Inertia.Net.Inertia` class. Source generators that emit non-`global::` names starting with `Inertia` then break. Don't put your app's code under an `Inertia.Net.*` namespace.
 
+**`TypeLoadException: Could not load type 'Microsoft.Extensions.Validation.IValidatableInfo'` (or `ValidatableTypeInfo`) on .NET 11.**
+Upgrade every Inertia.Net package to 1.8.0 or later and target `net11.0`; don't run a `net10.0` build on the .NET 11 runtime. See
+[.NET 10 and .NET 11](#net-10-and-net-11).
+
 **`Vite manifest not found. Looked in: ...`**
 Run your package manager's build script, or start the dev server so the hot file exists (in Development), or set `o.Vite.ManifestPath` / `o.Vite.BuildDirectory`. Check that Vite writes `.vite/manifest.json` (`build.manifest: true`, Vite 5 and later) to `wwwroot/build`, and that the build output is part of what you deploy.
 
@@ -2789,6 +2825,9 @@ dotnet test --solution Inertia.Net.slnx -c Release --no-build
 bash eng/aot-smoke.sh                    # Native AOT publish + protocol smoke test (Linux, clang + zlib)
 ```
 
+- The repository builds with the .NET 11 SDK (`global.json`) and needs the .NET 10 runtime too: the libraries and test projects target
+  `net10.0;net11.0`, and `dotnet test` runs both. Samples, the docs app, AotSmoke and Benchmarks stay on `net10.0`.
+  `TFM=net11.0 bash eng/aot-smoke.sh` runs the Native AOT smoke test on .NET 11.
 - Warnings are errors; the code is nullable-annotated and the public API is documented.
 - Every protocol rule should be backed by a test in `tests/Inertia.Net.Tests` or a conformance case in `tests/Inertia.Net.IntegrationTests` (which runs against Minimal API, MVC and FastEndpoints hosts). The protocol itself is in [docs/protocol.md](docs/protocol.md), including the deliberate deviations from inertia-laravel.
 - Changes are listed in [CHANGELOG.md](CHANGELOG.md). Releases are cut by pushing a `v*` tag: the release workflow builds, tests, packs and publishes to NuGet through trusted publishing (GitHub OIDC, no stored API key) from the `release` environment. Give that environment required reviewers, so that a pushed tag alone cannot publish.

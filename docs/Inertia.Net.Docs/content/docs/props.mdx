@@ -9,6 +9,8 @@ Props are the data a page receives. `Render(component, props)` takes an `Inertia
 
 Every page has an `errors` prop. Its key order is `errors`, shared props, then page props.
 
+**C# 15 unions (.NET 11).** A prop whose type is a `union` (for example `public union Subject(User, Team);`) is written as the JSON of its active case, with no wrapper or discriminator, through your source-generated `JsonSerializerContext`; partial reloads select it like any other prop. An `InertiaProp` (`Defer`, `Optional`, ...) stored inside a union case is not resolved: keep lazy props at the page level.
+
 ## The prop factories
 
 | C\# | Behavior |
