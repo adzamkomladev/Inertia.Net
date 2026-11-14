@@ -27,22 +27,6 @@ public sealed class PagesController : Controller
         return Back("/users").WithFlash("success", "User deleted");
     }
 
-    // An InertiaUI modal over the users list (MVC controllers return it like any other result). A direct visit renders /users
-    // with the modal open; Back() from the modal's form returns to the page under it, which keeps the modal open with the errors.
-    [HttpGet("/users/{id:int}/edit", Name = "users.edit")]
-    public IResult EditUser(int id) => AppState.Users.Find(u => u.Id == id) is { } user
-        ? Modal("Users/Edit", new InertiaProps { ["user"] = user }).WithBaseUrl("/users")
-        : Results.NotFound();
-
-    [HttpPut("/users/{id:int}", Name = "users.update")]
-    public IResult UpdateUser(int id, [FromBody] UserForm form)
-    {
-        var index = AppState.Users.FindIndex(u => u.Id == id);
-        if (index < 0) return Results.NotFound();
-        AppState.Users[index] = new User(id, form.Name!);
-        return Back("/users").WithFlash("success", "User updated");
-    }
-
     [HttpGet("/contacts/create", Name = "contacts.create")]
     public IResult CreateContact() => Render("Contacts/Create");
 

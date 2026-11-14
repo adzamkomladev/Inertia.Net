@@ -114,20 +114,6 @@ app.MapDelete("/users/{id:int}", (int id) =>
     return Back("/users").WithFlash("success", "User deleted");
 }).WithName("users.destroy");
 
-// An InertiaUI modal over the users list. The modal client gets the modal page; a direct visit (or a reload) renders /users with
-// the modal open. Back() from the modal's form returns to the page under it, which keeps the modal open with the errors.
-app.MapGet("/users/{id:int}/edit", (int id) => AppState.Users.Find(u => u.Id == id) is { } user
-    ? Modal("Users/Edit", new InertiaProps { ["user"] = user }).WithBaseUrl("/users")
-    : Results.NotFound()).WithName("users.edit");
-
-app.MapPut("/users/{id:int}", (int id, [FromBody] UserForm form) =>
-{
-    var index = AppState.Users.FindIndex(u => u.Id == id);
-    if (index < 0) return Results.NotFound();
-    AppState.Users[index] = new User(id, form.Name!);
-    return Back("/users").WithFlash("success", "User updated");
-}).WithInertiaValidation().WithName("users.update");
-
 app.MapGet("/live", (HttpContext http) => Render("Live/Index", new InertiaProps
 {
     ["counter"] = Live(() => new Counter(AppState.Counter), SampleEvents.CounterChanged),
@@ -252,12 +238,6 @@ namespace MinimalApi.React
     /// <summary>The flash data the pages read (<c>page.flash</c>), for the generated TypeScript declarations.</summary>
     public sealed record Flash(string? Success);
 
-    public sealed class UserForm
-    {
-        [Required, StringLength(40)]
-        public string? Name { get; set; }
-    }
-
     public sealed class ContactForm
     {
         [Required]
@@ -283,7 +263,6 @@ namespace MinimalApi.React
     [JsonSerializable(typeof(LoginForm))]
     [JsonSerializable(typeof(LoginPage))]
     [JsonSerializable(typeof(ContactForm))]
-    [JsonSerializable(typeof(UserForm))]
     [JsonSerializable(typeof(NewsletterForm))]
     [JsonSerializable(typeof(List<DeferredRow>))]
     [JsonSerializable(typeof(Flash))]

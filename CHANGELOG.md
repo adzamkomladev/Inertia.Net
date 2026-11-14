@@ -40,9 +40,6 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 - `dotnet new inertia --auth`: cookie sign-in with a login page (Precognition), a protected dashboard, logout, `auth.user` and a
   sign-in rate limit, for React, Vue and Svelte.
   Signing in returns to the page that asked for it (`ReturnUrl`, local paths only).
-- Modal routes for InertiaUI Modal 3.x (React and Vue): `Modal(component, props).WithBaseUrl(...)` answers the modal client's request
-  with the modal page, and renders a direct visit as the page under the modal with the modal open. `Back()` prefers the modal's
-  `X-InertiaUI-Modal-Base-Url` header, so a form in a modal returns to it with its errors.
 - `Inertia.Net.Testing`: `HasHead(key, contains)`, `WhereRoute(key, url, method)` for `{ url, method }` props, and a test-host recipe
   in the package README.
 

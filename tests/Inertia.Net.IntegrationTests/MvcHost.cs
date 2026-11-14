@@ -30,9 +30,6 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     [HttpGet("/typed/{id:int}", Name = "typed.show")]
     public IResult Typed(int id) => Render(new TypedHostPage(id));
 
-    [HttpGet("/modal/{id:int}")]
-    public IResult ModalEdit(int id, [FromQuery(Name = "base")] string? baseUrl) => ModalRoute.Open(id, baseUrl);
-
     [HttpPost("/typed", Name = "typed.store")]
     public IActionResult TypedStore([FromBody] TypedStoreInput input) => Redirect($"/typed/{input.Id}");
 

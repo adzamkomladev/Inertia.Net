@@ -40,20 +40,6 @@ public sealed record TypedHostPage(int Id) : IInertiaPage
     public static string Component => "Typed/Show";
 }
 
-/// <summary>
-/// <c>GET /modal/{id:int}?base=...</c> on every host: the <c>Modal/Edit</c> modal with a deferred and a merge prop, its base URL
-/// <c>base</c> (default <c>/page</c>).
-/// </summary>
-public static class ModalRoute
-{
-    public static InertiaModalResult Open(int id, string? baseUrl) => Modal("Modal/Edit", new InertiaProps
-    {
-        ["id"] = id,
-        ["later"] = Defer(() => "later"),
-        ["items"] = Merge(new[] { id }),
-    }).WithBaseUrl(baseUrl ?? "/page");
-}
-
 /// <summary>The body of <c>POST /typed</c> (named <c>typed.store</c>) on every host.</summary>
 public sealed class TypedStoreInput
 {

@@ -165,33 +165,13 @@ const r10 = Object.assign(
   },
 )
 
-const r11_url = (args: { id: number } | [id: number] | number, options?: RouteOptions): string => build([['users'], [['id', false, null, false]], ['edit']], ['id'], args, options)
+const r11_url = (options?: RouteOptions): string => build([['users']], [], undefined, options)
 const r11 = Object.assign(
-  (args: { id: number } | [id: number] | number, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r11_url(args, options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r11_url(options), method: 'get' }),
   {
     url: r11_url,
-    definition: { methods: ['get'] as const, url: '/users/{id}/edit' },
-    get: (args: { id: number } | [id: number] | number, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r11_url(args, options), method: 'get' }),
-  },
-)
-
-const r12_url = (options?: RouteOptions): string => build([['users']], [], undefined, options)
-const r12 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r12_url(options), method: 'get' }),
-  {
-    url: r12_url,
     definition: { methods: ['get'] as const, url: '/users' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r12_url(options), method: 'get' }),
-  },
-)
-
-const r13_url = (args: { id: number } | [id: number] | number, options?: RouteOptions): string => build([['users'], [['id', false, null, false]]], ['id'], args, options)
-const r13 = Object.assign(
-  (args: { id: number } | [id: number] | number, options?: RouteOptions): RouteDefinition<'put'> => ({ url: r13_url(args, options), method: 'put' }),
-  {
-    url: r13_url,
-    definition: { methods: ['put'] as const, url: '/users/{id}' },
-    put: (args: { id: number } | [id: number] | number, options?: RouteOptions): RouteDefinition<'put'> => ({ url: r13_url(args, options), method: 'put' }),
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r11_url(options), method: 'get' }),
   },
 )
 
@@ -219,9 +199,7 @@ export const routes = {
   },
   users: {
     destroy: r10,
-    edit: r11,
-    index: r12,
-    update: r13,
+    index: r11,
   },
 }
 
@@ -235,7 +213,6 @@ export interface RouteBodies {
   'contacts.store': ContactForm
   'login.store': LoginForm
   'newsletter.store': NewsletterForm
-  'users.update': UserForm
 }
 
 export interface ContactForm {
@@ -250,9 +227,5 @@ export interface LoginForm {
 
 export interface NewsletterForm {
   email: string | null
-}
-
-export interface UserForm {
-  name: string | null
 }
 

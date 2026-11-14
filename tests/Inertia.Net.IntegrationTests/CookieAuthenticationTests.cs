@@ -127,18 +127,4 @@ public abstract class CookieAuthenticationTests<THost>
         }
     }
 
-    [Fact]
-    public async Task A_modals_base_page_is_authorized_like_a_visit_to_it()
-    {
-        await using var app = await StartAsync();
-        var client = app.CreateClient();
-        var denied = await client.GetAsync("/modal/1?base=/secret", TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.Found, denied.StatusCode);
-        Assert.StartsWith("http://localhost/login", denied.Headers.Location?.OriginalString, StringComparison.Ordinal);
-
-        await client.PostAsync(new Uri("/sign-in", UriKind.Relative), null, TestContext.Current.CancellationToken);
-        var page = await (await client.GetAsync("/modal/1?base=/secret", TestContext.Current.CancellationToken)).PageAsync();
-        Assert.Equal("Secret", (string?)page["component"]);
-        Assert.Equal("Modal/Edit", (string?)page["props"]!["_inertiaui_modal"]!["component"]);
-    }
 }

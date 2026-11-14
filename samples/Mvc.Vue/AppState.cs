@@ -12,12 +12,6 @@ public sealed record Plans(List<Plan> Items, int ResolvedCount);
 
 public sealed record Post(int Id, string Title);
 
-public sealed class UserForm
-{
-    [Required, StringLength(40)]
-    public string? Name { get; set; }
-}
-
 public sealed class ContactForm
 {
     [Required]

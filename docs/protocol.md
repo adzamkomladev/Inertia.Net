@@ -296,20 +296,6 @@ The React refresh preamble is:
 Named mounts (`AddInertia(name, ...)` with `UseInertia(name)`) are adapter configuration, not a protocol change: each mount
 runs this protocol unchanged with its own options, asset version and state cookie.
 
-## Modal routes (InertiaUI Modal 3.x)
-
-There is no written protocol; this follows `inertiaui/modal` 3.1 (`Modal.php`, `DispatchBaseUrlRequest.php`, `Redirector.php`).
-
-- A request with `X-InertiaUI-Modal: <id>` gets the modal's page JSON with `mergeProps`, `deferredProps` and `cache` moved under `meta`
-  (`{}` when none). Other page fields are unchanged.
-- Any other request resolves the base URL: the first of `X-InertiaUI-Modal-Base-Url`, `Referer` and the configured base whose path is
-  not the request's. Unlike Laravel, a candidate must be on the request's host (scheme not compared, like `Back()`) and under `PathBase`.
-  The base endpoint is matched with the pipeline's routing and run as a GET through the middleware after `UseInertia()`, with the
-  shared prop `_inertiaui_modal` = the modal's page JSON (as above) plus `id: null` and `baseUrl` (absolute). The base page's `url` is
-  the modal request's URL. A base endpoint that returns a modal renders it as a page. With no base URL, or no endpoint at it, the modal
-  renders as a page (not moved under `meta`).
-- `Back()` and the middleware's empty-response redirect prefer a same-host `X-InertiaUI-Modal-Base-Url` over the `Referer`.
-
 ## Deliberate deviations from Laravel
 
 1. **The version 409 check runs before the handler**, so no work is wasted rendering a page that will be discarded.

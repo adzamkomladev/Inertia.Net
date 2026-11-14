@@ -23,15 +23,17 @@ public sealed class FastEndpointsHost : IConformanceHost
             t.Namespace == typeof(FastEndpointsRoutes.PageEndpoint).Namespace || t.DeclaringType == typeof(FastEndpointsTests));
     }
 
-    public static void MapRoutes(WebApplication app) =>
-        app.UseFastEndpoints(c => c.ConfigureInertia(ep =>
+    public static void MapRoutes(WebApplication app) => app.UseFastEndpoints(c => c.ConfigureInertia(AllowAnonymous));
+
+    // FastEndpoints keeps endpoint definitions for the process: the cookie authentication tests' endpoints keep their own
+    // requirements in every app that maps them, or a later app finds them anonymous.
+    public static void AllowAnonymous(EndpointDefinition ep)
+    {
+        if (!ep.EndpointType.Name.StartsWith("Secret", StringComparison.Ordinal))
         {
-            // The cookie authentication tests' endpoints keep their own requirements.
-            if (!ep.EndpointType.Name.StartsWith("Secret", StringComparison.Ordinal))
-            {
-                ep.AllowAnonymous();
-            }
-        }));
+            ep.AllowAnonymous();
+        }
+    }
 }
 
 /// <summary>The route contract as FastEndpoints endpoints.</summary>
@@ -76,13 +78,6 @@ public static class FastEndpointsRoutes
         }
 
         public override Task HandleAsync(TypedRequest req, CancellationToken ct) => Send.InertiaAsync(new TypedHostPage(req.Id));
-    }
-
-    public sealed class ModalEndpoint : Endpoint<TypedRequest>
-    {
-        public override void Configure() => Get("/modal/{id:int}");
-
-        public override Task HandleAsync(TypedRequest req, CancellationToken ct) => Send.ResultAsync(ModalRoute.Open(req.Id, Query<string?>("base", isRequired: false)));
     }
 
     public sealed class TypedStoreEndpoint : Endpoint<TypedStoreInput>

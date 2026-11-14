@@ -32,7 +32,7 @@ Inertia.Net **1.9.0** is a .NET 10 and .NET 11 server adapter for the **Inertia.
 15. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
 16. [Flash data](#flash-data)
 17. [Redirects, Location and Back](#redirects-location-and-back), [Error pages](#error-pages), [Authentication and rate limiting](#authentication-and-rate-limiting)
-18. [Head tags](#head-tags), [modal routes](#modal-routes) and [history encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
+18. [Head tags](#head-tags) and [history encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
 19. [Asset versioning](#asset-versioning)
 20. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
 21. [Vite integration](#vite-integration)
@@ -1818,34 +1818,6 @@ Put `@inertiaHead` (or `<inertia-head />` in Razor) before the template's own `<
 (`data-inertia`) by `title`, the meta name or property, or the link rel; a later call with the same key replaces the tag, and
 `Remove(key)` drops one set earlier (e.g. by middleware). With SSR the server-rendered head is used, which the client builds from
 the same prop. `o.Head.PropName` renames the prop.
-
-## Modal routes
-
-`Modal(...)` serves a page that opens in an [InertiaUI Modal](https://inertiaui.com/inertia-modal/docs) (`@inertiaui/modal-react` or
-`@inertiaui/modal-vue` 3.x; there is no Svelte client):
-
-```csharp
-app.MapGet("/users/{id:int}/edit", (int id) => Modal("Users/Edit", new { user = users.Find(id) }).WithBaseUrl("/users"))
-    .WithName("users.edit");
-```
-
-- A `<ModalLink href="/users/1/edit">` request gets the modal's page, which the client shows over the current page.
-- A direct visit (a shared link, a reload) renders the page under the modal with the modal open, and the modal's URL as the page
-  URL. The page under it is the first of the client's `X-InertiaUI-Modal-Base-Url` header, the `Referer` and `WithBaseUrl(...)` that is
-  on this host and is not the modal's own path; its endpoint runs in-process as a GET. With none, or no endpoint at that URL, the modal
-  renders as a normal page.
-- `Back()` from a form in the modal returns to the page under the modal, so validation errors show in the modal's form.
-
-`Modal(...)` is a result like `Render(...)`: return it from an MVC action, or send it from FastEndpoints with `Send.ResultAsync(...)`.
-It also takes a page record: `Modal(new EditUserPage(user))`.
-
-The page under the modal runs through the middleware after `UseInertia()`, so put `UseAuthorization()` after `UseInertia()`: an
-endpoint that needs authorization then redirects to the login page as it would on a visit (with `UseAuthorization()` before
-`UseInertia()`, a base page that needs authorization fails instead). Middleware before `UseInertia()` does not run twice.
-
-Set up the client as the InertiaUI docs describe: React wraps the app with `renderApp(App, props)` in `createInertiaApp`'s `setup`
-(and the SSR entry), Vue passes `withApp: (app) => withInertiaModal(app)`. The styled `<Modal>` expects Tailwind CSS;
-`<HeadlessModal>` leaves the styling to you. See `samples/MinimalApi.React` and `samples/Mvc.Vue` (`Users/Edit`).
 
 ## History encryption, clearing and fragments
 

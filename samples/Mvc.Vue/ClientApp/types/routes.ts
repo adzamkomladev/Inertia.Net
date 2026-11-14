@@ -115,33 +115,13 @@ const r5 = Object.assign(
   },
 )
 
-const r6_url = (args: { id: number } | [id: number] | number, options?: RouteOptions): string => build([['users'], [['id', false, null, false]], ['edit']], ['id'], args, options)
+const r6_url = (options?: RouteOptions): string => build([['users']], [], undefined, options)
 const r6 = Object.assign(
-  (args: { id: number } | [id: number] | number, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r6_url(args, options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r6_url(options), method: 'get' }),
   {
     url: r6_url,
-    definition: { methods: ['get'] as const, url: '/users/{id}/edit' },
-    get: (args: { id: number } | [id: number] | number, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r6_url(args, options), method: 'get' }),
-  },
-)
-
-const r7_url = (options?: RouteOptions): string => build([['users']], [], undefined, options)
-const r7 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r7_url(options), method: 'get' }),
-  {
-    url: r7_url,
     definition: { methods: ['get'] as const, url: '/users' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r7_url(options), method: 'get' }),
-  },
-)
-
-const r8_url = (args: { id: number } | [id: number] | number, options?: RouteOptions): string => build([['users'], [['id', false, null, false]]], ['id'], args, options)
-const r8 = Object.assign(
-  (args: { id: number } | [id: number] | number, options?: RouteOptions): RouteDefinition<'put'> => ({ url: r8_url(args, options), method: 'put' }),
-  {
-    url: r8_url,
-    definition: { methods: ['put'] as const, url: '/users/{id}' },
-    put: (args: { id: number } | [id: number] | number, options?: RouteOptions): RouteDefinition<'put'> => ({ url: r8_url(args, options), method: 'put' }),
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r6_url(options), method: 'get' }),
   },
 )
 
@@ -159,16 +139,13 @@ export const routes = {
   },
   users: {
     destroy: r5,
-    edit: r6,
-    index: r7,
-    update: r8,
+    index: r6,
   },
 }
 
 export interface RouteBodies {
   'contacts.store': ContactForm
   'newsletter.store': NewsletterForm
-  'users.update': UserForm
 }
 
 export interface ContactForm {
@@ -178,9 +155,5 @@ export interface ContactForm {
 
 export interface NewsletterForm {
   email: string | null
-}
-
-export interface UserForm {
-  name: string | null
 }
 

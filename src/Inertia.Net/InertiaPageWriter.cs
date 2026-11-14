@@ -117,9 +117,6 @@ internal sealed class InertiaPageWriter
     /// <summary>The Development pages check, or null while it is off (no per-render lookup).</summary>
     public PageComponentCheck? Pages { get; }
 
-    /// <summary>Renders the base page of modal routes; set by <c>UseInertia()</c>.</summary>
-    public ModalDispatcher? Modals { get; set; }
-
     /// <summary>Writer options whose output is valid JSON and safe inside a <c>&lt;script&gt;</c> element.</summary>
     public JsonWriterOptions HtmlWriterOptions => _htmlWriterOptions;
 
@@ -159,11 +156,7 @@ internal sealed class InertiaPageWriter
             propsWriter.ScheduleRefreshes(httpContext);
             rootInfo?.OnSerialized?.Invoke(props!);
             feature = httpContext.Features.Get<InertiaFeature>();
-            if (feature?.PageUrl is { } pageUrl)
-            {
-                writer.WriteString("url", pageUrl);
-            }
-            else if (Options.UrlResolver is { } resolveUrl)
+            if (Options.UrlResolver is { } resolveUrl)
             {
                 writer.WriteString("url", resolveUrl(httpContext));
             }

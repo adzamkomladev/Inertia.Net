@@ -17,9 +17,6 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     private SsrCaching? _ssrCache; // one reference, set only by WithSsrCache()
     private InertiaHead? _head;
 
-    /// <summary>Set by a modal route answering InertiaUI Modal's request: the page JSON moves its prop metadata under <c>meta</c>.</summary>
-    internal bool ModalMeta { get; set; }
-
     internal InertiaResult(string component, object? props)
     {
         ArgumentNullException.ThrowIfNull(component);
@@ -148,12 +145,11 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
 
         if (request.IsInertia)
         {
-            var json = ModalMeta ? InertiaModalResult.ModalPage(page.WrittenMemory.Span, pageWriter.JsonWriterOptions) : page.WrittenMemory;
             response.Headers[InertiaHeaders.Inertia] = "true";
             response.ContentType = "application/json; charset=utf-8";
-            response.ContentLength = json.Length;
-            await response.BodyWriter.WriteAsync(json, httpContext.RequestAborted);
-            metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, json.Length, json: true, partial, pageWriter.Options.Mount);
+            response.ContentLength = page.WrittenMemory.Length;
+            await response.BodyWriter.WriteAsync(page.WrittenMemory, httpContext.RequestAborted);
+            metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: true, partial, pageWriter.Options.Mount);
             return;
         }
 

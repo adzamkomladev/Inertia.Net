@@ -36,7 +36,6 @@ public sealed class MinimalApiHost : IConformanceHost
         });
         app.MapGet("/typed/{id:int}", (int id) => Render(new TypedHostPage(id))).WithName("typed.show");
         app.MapPost("/typed", ([FromBody] TypedStoreInput input) => Results.Redirect($"/typed/{input.Id}")).WithName("typed.store");
-        app.MapGet("/modal/{id:int}", (int id, string? @base) => ModalRoute.Open(id, @base));
         app.MapMethods("/back-test", [HttpMethods.Post, HttpMethods.Put], () => Back());
 
         app.MapGet("/café", () => Render("Page"));

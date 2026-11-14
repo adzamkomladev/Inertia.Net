@@ -260,8 +260,6 @@ public static class InertiaApplicationBuilderExtensions
         var devTools = services.GetService<DevToolsRecorder>() is { Enabled: true } recorder ? recorder : null;
         return app.Use(next =>
         {
-            // shortcut: one dispatcher per mount, so a mount used by two UseInertia() branches renders modal base pages through the last one.
-            pageWriter.Modals = new ModalDispatcher(app, next);
             var middleware = new InertiaMiddleware(next, versionProvider, store, pageWriter, devTools);
             return devTools is null ? middleware.InvokeAsync : middleware.InvokeRecordedAsync;
         });

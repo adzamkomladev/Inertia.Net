@@ -605,31 +605,6 @@
       ]
     },
     {
-      "slug": "modal-routes",
-      "url": "/docs/modal-routes",
-      "title": "Modal routes",
-      "description": "Serve a page that opens in an InertiaUI Modal, and render a direct visit as the page under the modal with the modal open.",
-      "section": "Essentials",
-      "order": 10,
-      "headings": [
-        {
-          "id": "mvc-fastendpoints-and-page-records",
-          "text": "MVC, FastEndpoints and page records",
-          "depth": 2
-        },
-        {
-          "id": "middleware-order",
-          "text": "Middleware order",
-          "depth": 2
-        },
-        {
-          "id": "client-setup",
-          "text": "Client setup",
-          "depth": 2
-        }
-      ]
-    },
-    {
       "slug": "partial-reloads",
       "url": "/docs/partial-reloads",
       "title": "Partial reloads",

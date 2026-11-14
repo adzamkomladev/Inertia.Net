@@ -1,6 +1,4 @@
 import { Deferred, router } from '@inertiajs/react'
-import { ModalLink } from '@inertiaui/modal-react'
-import { routes } from '../../types/routes'
 import Layout from '../../Layout'
 
 interface Props {
@@ -22,7 +20,6 @@ export default function Index({ users, stats, plans }: Props) {
         {users.data.map((user) => (
           <li key={user.id} data-testid="user-row">
             {user.name}{' '}
-            <ModalLink href={routes.users.edit.url(user.id)} data-testid={`edit-user-${user.id}`}>Edit</ModalLink>{' '}
             <button data-testid={`delete-user-${user.id}`} onClick={() => router.delete(`/users/${user.id}`)}>Delete</button>
           </li>
         ))}

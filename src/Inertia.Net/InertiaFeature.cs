@@ -59,9 +59,6 @@ public sealed class InertiaFeature
 
     internal bool FragmentPreserved => _preserveFragment;
 
-    /// <summary>Set while a modal route renders its base page: the page's <c>url</c>, which is the modal's URL.</summary>
-    internal string? PageUrl { get; set; }
-
     /// <summary>The state store had data for this request; the middleware clears it unless it persists new state.</summary>
     internal bool StateLoaded { get; set; }
 

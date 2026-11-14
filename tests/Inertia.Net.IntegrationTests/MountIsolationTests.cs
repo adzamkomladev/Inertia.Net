@@ -44,7 +44,6 @@ public sealed class MountIsolationTests
             {
                 e.MapGet("/", () => Render("Dashboard/Index"));
                 e.MapGet("/back", () => Back());
-                e.MapGet("/modal", () => Modal("Dashboard/Modal").WithBaseUrl("/"));
                 e.MapGet("/flash", (HttpContext http) =>
                 {
                     http.Inertia().Flash("message", "from sp");
@@ -55,7 +54,6 @@ public sealed class MountIsolationTests
         app.UseInertia();
         app.UseRouting();
         app.MapGet("/", () => Render("Home"));
-        app.MapGet("/modal", () => Modal("Host/Modal").WithBaseUrl("/"));
         await app.StartAsync(TestContext.Current.CancellationToken);
         return app;
     }
@@ -77,24 +75,6 @@ public sealed class MountIsolationTests
         Assert.Equal("alice", host["props"]!["user"]?.GetValue<string>());
         Assert.False(host["props"]!.AsObject().ContainsKey("product"));
         Assert.Equal("host-1", host["version"]?.GetValue<string>());
-    }
-
-    [Fact]
-    public async Task A_modal_renders_its_base_page_from_its_own_mount()
-    {
-        await using var app = await StartAsync();
-        var client = app.GetTestClient();
-
-        var sp = await (await Get(client, "/dashboard/modal", "sp-1")).PageAsync();
-        Assert.Equal("Dashboard/Index", (string?)sp["component"]);
-        Assert.Equal("/dashboard/modal", (string?)sp["url"]);
-        Assert.Equal("SP", (string?)sp["props"]!["product"]);
-        Assert.Equal("Dashboard/Modal", (string?)sp["props"]!["_inertiaui_modal"]!["component"]);
-        Assert.Equal("http://localhost/dashboard/", (string?)sp["props"]!["_inertiaui_modal"]!["baseUrl"]);
-
-        var host = await (await Get(client, "/modal", "host-1")).PageAsync();
-        Assert.Equal("Home", (string?)host["component"]);
-        Assert.Equal("alice", (string?)host["props"]!["_inertiaui_modal"]!["props"]!["user"]);
     }
 
     [Fact]
@@ -312,7 +292,7 @@ public sealed class MountHostParityTests
                 }
                 else
                 {
-                    e.MapFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));
+                    e.MapFastEndpoints(c => c.ConfigureInertia(FastEndpointsHost.AllowAnonymous));
                 }
             });
         });
@@ -325,7 +305,7 @@ public sealed class MountHostParityTests
     [Theory]
     [InlineData("mvc")]
     [InlineData("fastendpoints")]
-    public async Task Pages_modals_and_redirects_use_the_mount(string host)
+    public async Task Pages_and_redirects_use_the_mount(string host)
     {
         await using var app = await StartAsync(host);
         var client = app.GetTestClient();
@@ -341,11 +321,6 @@ public sealed class MountHostParityTests
 
         var html = await client.GetStringAsync(new Uri("/dashboard/page", UriKind.Relative), TestContext.Current.CancellationToken);
         Assert.Contains("data-root=\"sp\"", html, StringComparison.Ordinal);
-
-        var modal = await (await client.GetAsync(new Uri("/dashboard/modal/1", UriKind.Relative), TestContext.Current.CancellationToken)).PageAsync();
-        Assert.Equal("Page", (string?)modal["component"]);
-        Assert.Equal("/dashboard/modal/1", (string?)modal["url"]);
-        Assert.Equal("http://localhost/dashboard/page", (string?)modal["props"]!["_inertiaui_modal"]!["baseUrl"]);
 
         var redirect = await client.InertiaAsync(HttpMethod.Put, "/dashboard/redirect", configure: r => r.WithHeader(InertiaHeaders.Version, "sp-1"));
         Assert.Equal(HttpStatusCode.SeeOther, redirect.StatusCode);

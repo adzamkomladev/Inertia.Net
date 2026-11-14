@@ -665,11 +665,3 @@ Inertia.Net.InertiaHeadOptions.TitleTemplate.set -> void
 Inertia.Net.InertiaOptions.Head.get -> Inertia.Net.InertiaHeadOptions!
 Inertia.Net.InertiaResult.WithHead(System.Action<Inertia.Net.InertiaHead!>! configure) -> Inertia.Net.InertiaResult!
 Inertia.Net.InertiaTypeScriptOptions.LiveEvents(params Inertia.Net.LiveEvent![]! events) -> Inertia.Net.InertiaTypeScriptOptions!
-Inertia.Net.InertiaModalResult
-Inertia.Net.InertiaModalResult.BaseUrl.get -> string?
-Inertia.Net.InertiaModalResult.Component.get -> string!
-Inertia.Net.InertiaModalResult.ExecuteAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext) -> System.Threading.Tasks.Task!
-Inertia.Net.InertiaModalResult.Props.get -> object?
-Inertia.Net.InertiaModalResult.WithBaseUrl(string! baseUrl) -> Inertia.Net.InertiaModalResult!
-static Inertia.Net.Inertia.Modal(string! component, object? props = null) -> Inertia.Net.InertiaModalResult!
-static Inertia.Net.Inertia.Modal<TPage>(TPage page) -> Inertia.Net.InertiaModalResult!

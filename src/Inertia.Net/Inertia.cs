@@ -241,15 +241,6 @@ public static class Inertia
     /// <param name="page">The typed page props.</param>
     public static InertiaResult Render<TPage>(TPage page) where TPage : IInertiaPage => new(TPage.Component, page);
 
-    /// <summary>
-    /// A page opened in an InertiaUI Modal: the modal client gets the modal's page, a direct visit gets the base page with the modal
-    /// open. See <see cref="InertiaModalResult"/>.
-    /// </summary>
-    public static InertiaModalResult Modal(string component, object? props = null) => new(component, props);
-
-    /// <summary>Opens <paramref name="page"/> in an InertiaUI Modal with the component it names. See <see cref="InertiaModalResult"/>.</summary>
-    public static InertiaModalResult Modal<TPage>(TPage page) where TPage : IInertiaPage => new(TPage.Component, page);
-
     /// <summary>A full page visit to <paramref name="url"/>: 409 with <c>X-Inertia-Location</c> for Inertia requests, otherwise a 302.</summary>
     public static InertiaLocationResult Location(string url) => new(url);
 

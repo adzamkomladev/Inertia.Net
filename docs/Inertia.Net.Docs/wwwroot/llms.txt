@@ -25,7 +25,6 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [Error pages](https://inertia-dotnet.temtem.dev/docs/error-pages): Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.
 - [Authentication and rate limiting](https://inertia-dotnet.temtem.dev/docs/authentication): Redirect Inertia visits to the login page, send rate-limited forms back with a flash message, and start from the --auth template.
 - [Head tags](https://inertia-dotnet.temtem.dev/docs/head-tags): Set the page title, meta and link tags on the server, in the first HTML response and on every visit.
-- [Modal routes](https://inertia-dotnet.temtem.dev/docs/modal-routes): Serve a page that opens in an InertiaUI Modal, and render a direct visit as the page under the modal with the modal open.
 
 ## Loading data
 
