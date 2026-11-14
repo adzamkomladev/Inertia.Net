@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net</RootNamespace>
+    <Description>MongoDB pagination for Inertia.Net (not Native AOT compatible).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Inertia.Net/Inertia.Net.csproj" />
+    <PackageReference Include="MongoDB.Driver" />
+    <InternalsVisibleTo Include="Inertia.Net.MongoDB.Tests" />
+  </ItemGroup>
+</Project>
