@@ -1,5 +1,36 @@
 # Inertia.Net benchmark results
 
+## Todo app and SSR process memory — 2026-11-15
+
+Replaces the estimated todo and SSR rows of the performance page with measurements. Busy 8-vCPU AMD EPYC VM (load average 10–17 from
+unrelated work), .NET 10, Bun 1.4.4, Node 26.13.1. RSS figures held within 1–3 MB of the GitHub-runner run of the same probe; CPU and
+request rates from this machine are not used.
+
+**Todo app** (`eng/hosting-probe.sh --only todo`, 3 rounds, 64 connections): the signed-in user's 25 todos from SQLite as an Inertia
+visit, cookie auth. JIT uses EF Core (`AddDbContext`, `AsNoTracking`); Native AOT uses `Microsoft.Data.Sqlite`.
+
+| Build | RSS at rest | Peak RSS under load | RSS after load |
+|---|---:|---:|---:|
+| JIT, server GC | 115 MB | 154 MB | 155 MB |
+| JIT, workstation GC | 114 MB | 141 MB | 147 MB |
+| Native AOT, server GC | 35 MB | 53 MB | 50 MB |
+| Native AOT, workstation GC | 34 MB | 43 MB | 44 MB |
+
+**SSR process** (`eng/ssr-memory-probe.sh`, 3 rounds): the process started on the bundle, one render of each page, 2 s idle ("at rest"),
+3,000 renders from 8 parallel clients sampled every 100 ms ("peak"), 3 s idle ("after"). Small app: `samples/MinimalApi.React`, 4 pages
+(`Users/Index` is left out: it uses browser APIs and fails SSR by design). Large app: the docs site's MDX bundle, 8 pages.
+
+| Runtime, bundle | Started | At rest | Peak | After |
+|---|---:|---:|---:|---:|
+| Bun, small app | 55–61 MB | 58–59 MB | 99–106 MB | 82–83 MB |
+| Node, small app | 88–89 MB | 89–90 MB | 138–147 MB | 138–147 MB |
+| Bun, docs site | 38–41 MB | 82–85 MB | 324–344 MB | 144–222 MB |
+| Node, docs site | 76 MB | 138–139 MB | 242–247 MB | 229–239 MB |
+| Bun `--smol`, docs site (2 rounds) | 38–39 MB | 80–82 MB | 319–322 MB | 190–212 MB |
+| Node `--max-old-space-size=128`, docs site (2 rounds) | 76 MB | 132–133 MB | 228–230 MB | 219–228 MB |
+
+The two flags cost 2–4× in render time for 1–7% less peak memory.
+
 ## Hosting with and without Inertia — 2026-11-14
 
 `eng/hosting-probe.sh` (`tests/Inertia.Net.HostingProbe`) publishes one Minimal API app twice, framework-dependent (JIT) and Native AOT,

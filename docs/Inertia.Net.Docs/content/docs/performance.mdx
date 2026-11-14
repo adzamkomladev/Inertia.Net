@@ -51,15 +51,27 @@ The [`hosting-probe` workflow](https://github.com/adzamkomladev/Inertia.Net/acti
 
 For capacity planning, the useful number is how much memory the whole process needs at rest and under load, not a microbenchmark. These are reference points for complete apps, measured on Linux x64 after the first request. They are not guarantees:
 
-| App shape | RSS at rest | Plan for |
-|---|---:|---:|
-| Inertia.Net JIT app, no database (`samples/MinimalApi.React`) | about 90 MB | 256–512 MB |
-| Inertia.Net Native AOT app (`tests/Inertia.Net.AotSmoke`) | about 42 MB | 128–256 MB |
-| Small JIT todo: Minimal API + EF Core + SQLite + cookie auth | roughly 120–180 MB | 256–512 MB |
-| Small Native AOT todo: source-generated JSON + SQLite | roughly 45–70 MB | 128–256 MB |
-| Add managed Bun SSR | +30–60 MB for the Bun process | add 128 MB headroom |
+| App shape | RSS at rest | Peak RSS under load | Plan for |
+|---|---:|---:|---:|
+| Inertia.Net JIT app, no database (`samples/MinimalApi.React`) | about 90 MB | not measured | 256–512 MB |
+| Inertia.Net Native AOT app (`tests/Inertia.Net.AotSmoke`) | about 42 MB | not measured | 128–256 MB |
+| Small JIT todo app: EF Core + SQLite + cookie auth | 115 MB | 141–154 MB | 256–512 MB |
+| Small Native AOT todo app: `Microsoft.Data.Sqlite` + source-generated JSON + cookie auth | 35 MB | 43–53 MB | 128–256 MB |
+| Managed SSR process, small React app (Bun) | +58 MB | +99–106 MB | add 128 MB |
+| Managed SSR process, small React app (Node) | +89 MB | +138–147 MB | add 192 MB |
+| Managed SSR process, large app: this docs site, 3 MB bundle (Bun) | +83 MB | +324–344 MB | add 384 MB |
+| Managed SSR process, large app: this docs site (Node) | +138 MB | +242–247 MB | add 320 MB |
 
-The two Inertia.Net baseline rows were measured from this repository on Linux x64; the todo rows are planning ranges, not benchmark claims. The JIT todo range includes the runtime, EF Core, SQLite, authentication and a small working set. PostgreSQL or MongoDB, image processing and a large cache move it upward; measure your own app under realistic concurrency. Native AOT removes most JIT and reflection overhead, but it does not make EF Core or a database free.
+All rows were measured on Linux x64 after the first request. The rows below the first two come from the [hosting probes](#with-and-without-inertia):
+
+- **Todo apps.** These are the probe's todo mode: a signed-in user's 25 todos, read from SQLite on every request, as an Inertia visit. The JIT row is 64 concurrent connections under server and workstation GC; the Native AOT build uses `Microsoft.Data.Sqlite` directly, because EF Core's runtime query compilation is not Native AOT compatible.
+- **SSR rows.** These are the Bun or Node process that managed SSR starts, measured with `eng/ssr-memory-probe.sh`. It renders each page once ("at rest"), then sends 3,000 renders from 8 parallel clients ("peak"). The small app is `samples/MinimalApi.React`; the large one is this site's MDX bundle.
+
+A few things to plan for:
+
+- **SSR peaks.** Bun starts smaller, but the large bundle peaked higher under Bun than under Node. Bun handed most of it back within seconds (144–222 MB 3 s later); Node kept its peak (229–239 MB). Size the SSR container for the peak. Runtime flags passed through `n.Arguments` barely change it: Bun's `--smol` peaked at 319–322 MB and Node's `--max-old-space-size=128` at 228–230 MB, and both rendered about 2–4× slower. Measure your own bundle with `eng/ssr-memory-probe.sh`.
+- **Bigger apps.** PostgreSQL or MongoDB, image processing and a large cache move every number upward, so measure your own app under realistic concurrency.
+- **Native AOT.** It removes most JIT and reflection overhead, but it does not make EF Core or a database free.
 
 For containers:
 
