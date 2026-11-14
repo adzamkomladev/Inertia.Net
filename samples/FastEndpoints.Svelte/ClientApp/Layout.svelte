@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Link, page } from '@inertiajs/svelte'
   import type { Snippet } from 'svelte'
+  import { routes } from './types/routes'
 
   let { children }: { children: Snippet } = $props()
 </script>
@@ -9,10 +10,10 @@
   <header>
     <strong data-testid="app-name">{page.props.appName}</strong>
     <nav style="display: flex; gap: 12px; margin: 8px 0">
-      <Link href="/" data-testid="nav-home">Home</Link>
-      <Link href="/users" data-testid="nav-users">Users</Link>
-      <Link href="/contacts/create" data-testid="nav-contacts">Contacts</Link>
-      <Link href="/feed" data-testid="nav-feed">Feed</Link>
+      <Link href={routes.home()} data-testid="nav-home">Home</Link>
+      <Link href={routes.users.index()} data-testid="nav-users">Users</Link>
+      <Link href={routes.contacts.create()} data-testid="nav-contacts">Contacts</Link>
+      <Link href={routes.feed.index()} data-testid="nav-feed">Feed</Link>
     </nav>
     <div data-testid="flash">{page.flash.success ?? ''}</div>
   </header>

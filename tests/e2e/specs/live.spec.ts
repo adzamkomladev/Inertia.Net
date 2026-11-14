@@ -34,13 +34,13 @@ const watchReloads = (page: Page) => {
   return reloads
 }
 
-/** Opens /live and waits until both of its channels (counter and the shared inbox) are joined. */
+/** Opens /live and waits until its channels (counter, the shared inbox, and the posts feed's liveReload) are joined. */
 const openLive = async (page: Page) => {
   const hub = watchHub(page)
   const reloads = watchReloads(page)
   await page.goto('/live')
   await expect(page.getByTestId('counter')).toHaveText('0')
-  await expect.poll(() => hub.joined).toBe(2)
+  await expect.poll(() => hub.joined).toBe(3)
   return { hub, reloads }
 }
 
@@ -78,7 +78,7 @@ test('leaving the page leaves its channel, and coming back fetches a fresh value
 
   await page.getByTestId('nav-users').click()
   await expect(page.getByTestId('user-row')).toHaveCount(3)
-  await expect.poll(() => hub.left).toBe(1) // counter only: the shared inbox stays subscribed
+  await expect.poll(() => hub.left).toBe(2) // counter and posts: the shared inbox stays subscribed
 
   await request.post('/__e2e/live/increment')
   await page.waitForTimeout(300)
@@ -109,5 +109,55 @@ test('a live listener that returns false holds the update back', async ({ page, 
   await expect(page.getByTestId('held')).toHaveText('1 held')
   await page.waitForTimeout(300)
   await expect(page.getByTestId('counter')).toHaveText('0')
+  expect(reloads).toHaveLength(0)
+})
+
+/** Partial reloads of the posts feed, which liveReload() makes on PostCreated. */
+const watchPostReloads = (page: Page) => {
+  const reloads: Request[] = []
+  page.on('request', (request) => {
+    if (/\bposts\b/.test(request.headers()['x-inertia-partial-data'] ?? '')) reloads.push(request)
+  })
+  return reloads
+}
+
+const postTitles = (page: Page) => page.getByTestId('live-post').allTextContents()
+
+test('liveReload brings a new post into a scroll prop without duplicates, keeping the scroll position', async ({ page, request }) => {
+  const reloads = watchPostReloads(page)
+  await openLive(page)
+  await page.evaluate(() => window.scrollTo(0, 300))
+  const scrollY = await page.evaluate(() => window.scrollY)
+
+  await request.post('/__e2e/live/posts')
+
+  await expect(page.getByTestId('live-post').first()).toHaveText('Live post 16')
+  const titles = await postTitles(page)
+  expect(new Set(titles).size).toBe(titles.length)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollY)
+  expect(reloads).toHaveLength(1)
+  expect(reloads[0].headers()['x-inertia-reset']).toBe('posts')
+})
+
+test('a burst of events becomes one reload', async ({ page, request }) => {
+  const reloads = watchPostReloads(page)
+  await openLive(page)
+
+  await request.post('/__e2e/live/posts?count=20')
+
+  await expect(page.getByTestId('live-post').first()).toHaveText('Live post 35')
+  await page.waitForTimeout(500) // nothing follows the reload
+  expect(reloads).toHaveLength(1)
+})
+
+test('the sender of an event is not reloaded by it', async ({ page }) => {
+  const reloads = watchPostReloads(page)
+  await openLive(page)
+
+  await page.getByTestId('add-post').click()
+
+  // The post's own visit brings it back; the broadcast leaves this connection out.
+  await expect(page.getByTestId('live-post').first()).toHaveText('Live post 16')
+  await page.waitForTimeout(500)
   expect(reloads).toHaveLength(0)
 })

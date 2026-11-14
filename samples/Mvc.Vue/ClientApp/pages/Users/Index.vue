@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Deferred, router } from '@inertiajs/vue3'
+import { ModalLink } from '@inertiaui/modal-vue'
+import { routes } from '../../types/routes'
 import Layout from '../../Layout.vue'
 
 defineProps<{
@@ -15,6 +17,7 @@ defineProps<{
     <ul>
       <li v-for="user in users" :key="user.id" data-testid="user-row">
         {{ user.name }}
+        <ModalLink :href="routes.users.edit.url(user.id)" :data-testid="`edit-user-${user.id}`">Edit</ModalLink>
         <button :data-testid="`delete-user-${user.id}`" @click="router.delete(`/users/${user.id}`)">Delete</button>
       </li>
     </ul>

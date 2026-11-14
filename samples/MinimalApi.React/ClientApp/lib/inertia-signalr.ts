@@ -15,7 +15,8 @@ export type SignalROptions = Omit<LiveOptions, 'transport'> & {
   onConnection?: (connection: HubConnection) => void
 }
 
-type Subscription = { channel: LiveChannel; handler: (payload: unknown) => void }
+// Inertia and liveReload() may both listen on a channel: it is joined once, and every handler gets its events.
+type Subscription = { channel: LiveChannel; handlers: Set<(payload: unknown) => void> }
 
 const channelKey = (channel: LiveChannel) => `${channel.type}:${channel.name}`
 
@@ -63,7 +64,9 @@ export function signalr({ url = '/inertia-live', idleTimeout, configure, onConne
           .withAutomaticReconnect()
           .configureLogging(signalR.LogLevel.Warning)
         connection = (configure ? configure(builder) : builder).build()
-        connection.on('inertia', (key: string, payload: unknown) => subscriptions.get(key)?.handler(payload))
+        connection.on('inertia', (key: string, payload: unknown) =>
+          subscriptions.get(key)?.handlers.forEach((handler) => handler(payload)),
+        )
         connection.onreconnecting(() => status?.(false))
         connection.onreconnected(async () => {
           await joinAll()
@@ -92,8 +95,11 @@ export function signalr({ url = '/inertia-live', idleTimeout, configure, onConne
   const transport: LiveChannelTransport = {
     subscribeToChannel(channel, handler) {
       const key = channelKey(channel)
-      const subscription = { channel, handler }
       const isNew = !subscriptions.has(key)
+      const subscription = subscriptions.get(key) ?? { channel, handlers: new Set() }
+      // A wrapper per call, so the same function subscribed twice is also removed twice.
+      const listener = (payload: unknown) => handler(payload)
+      subscription.handlers.add(listener)
       subscriptions.set(key, subscription)
       clearTimeout(idleTimer)
 
@@ -104,8 +110,8 @@ export function signalr({ url = '/inertia-live', idleTimeout, configure, onConne
       }
 
       return () => {
-        // A newer subscription to the same channel replaced this one (Inertia subscribes before it unsubscribes).
-        if (subscriptions.get(key) !== subscription) return
+        // The channel is left once its last handler goes (Inertia subscribes before it unsubscribes).
+        if (!subscription.handlers.delete(listener) || subscription.handlers.size > 0) return
         subscriptions.delete(key)
         if (isConnected()) void connection!.invoke('Unsubscribe', channel.type, channel.name).catch(() => {})
         if (subscriptions.size === 0 && idleTimeout !== undefined) {

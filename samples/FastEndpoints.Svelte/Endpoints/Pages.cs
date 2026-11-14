@@ -6,7 +6,11 @@ namespace FastEndpointsSvelte.Endpoints;
 // Style 1: return the Inertia result from ExecuteAsync (FastEndpoints sends any IResult).
 public sealed class HomeEndpoint : EndpointWithoutRequest<InertiaResult>
 {
-    public override void Configure() => Get("/");
+    public override void Configure()
+    {
+        Get("/");
+        Description(b => b.WithName("home"));
+    }
 
     public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) => Task.FromResult(Render("Home"));
 }
@@ -14,7 +18,11 @@ public sealed class HomeEndpoint : EndpointWithoutRequest<InertiaResult>
 // Style 2: Send.InertiaAsync from HandleAsync.
 public sealed class UsersEndpoint : EndpointWithoutRequest
 {
-    public override void Configure() => Get("/users");
+    public override void Configure()
+    {
+        Get("/users");
+        Description(b => b.WithName("users.index"));
+    }
 
     public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Users/Index", new InertiaProps
     {
@@ -30,14 +38,22 @@ public sealed class UsersEndpoint : EndpointWithoutRequest
 
 public sealed class CreateContactPageEndpoint : EndpointWithoutRequest<InertiaResult>
 {
-    public override void Configure() => Get("/contacts/create");
+    public override void Configure()
+    {
+        Get("/contacts/create");
+        Description(b => b.WithName("contacts.create"));
+    }
 
     public override Task<InertiaResult> ExecuteAsync(CancellationToken ct) => Task.FromResult(Render("Contacts/Create"));
 }
 
 public sealed class FeedEndpoint : EndpointWithoutRequest
 {
-    public override void Configure() => Get("/feed");
+    public override void Configure()
+    {
+        Get("/feed");
+        Description(b => b.WithName("feed.index"));
+    }
 
     public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Feed/Index", new InertiaProps
     {

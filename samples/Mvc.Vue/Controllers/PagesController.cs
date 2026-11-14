@@ -5,10 +5,10 @@ namespace Mvc.Vue.Controllers;
 // Plain MVC controllers (no [ApiController]): they return the core IResult factories (Render, Back), which MVC executes.
 public sealed class PagesController : Controller
 {
-    [HttpGet("/")]
+    [HttpGet("/", Name = "home")]
     public IResult Home() => Render("Home");
 
-    [HttpGet("/users")]
+    [HttpGet("/users", Name = "users.index")]
     public IResult Users() => Render("Users/Index", new InertiaProps
     {
         ["users"] = AppState.Users.ToList(),
@@ -20,33 +20,49 @@ public sealed class PagesController : Controller
         ["plans"] = Once(() => new Plans([new("Free", 0), new("Pro", 9)], AppState.NextPlansCount())),
     });
 
-    [HttpDelete("/users/{id:int}")]
+    [HttpDelete("/users/{id:int}", Name = "users.destroy")]
     public IResult DeleteUser(int id)
     {
         AppState.Users.RemoveAll(u => u.Id == id);
         return Back("/users").WithFlash("success", "User deleted");
     }
 
-    [HttpGet("/contacts/create")]
+    // An InertiaUI modal over the users list (MVC controllers return it like any other result). A direct visit renders /users
+    // with the modal open; Back() from the modal's form returns to the page under it, which keeps the modal open with the errors.
+    [HttpGet("/users/{id:int}/edit", Name = "users.edit")]
+    public IResult EditUser(int id) => AppState.Users.Find(u => u.Id == id) is { } user
+        ? Modal("Users/Edit", new InertiaProps { ["user"] = user }).WithBaseUrl("/users")
+        : Results.NotFound();
+
+    [HttpPut("/users/{id:int}", Name = "users.update")]
+    public IResult UpdateUser(int id, [FromBody] UserForm form)
+    {
+        var index = AppState.Users.FindIndex(u => u.Id == id);
+        if (index < 0) return Results.NotFound();
+        AppState.Users[index] = new User(id, form.Name!);
+        return Back("/users").WithFlash("success", "User updated");
+    }
+
+    [HttpGet("/contacts/create", Name = "contacts.create")]
     public IResult CreateContact() => Render("Contacts/Create");
 
     // An Inertia request with an invalid ModelState never gets here: the filter redirects back with the errors.
     // The Inertia client posts JSON, so the models need [FromBody] outside [ApiController].
-    [HttpPost("/contacts")]
+    [HttpPost("/contacts", Name = "contacts.store")]
     public IActionResult StoreContact([FromBody] ContactForm form)
     {
         HttpContext.Inertia().Flash("success", "Contact created");
         return Redirect("/");
     }
 
-    [HttpPost("/newsletter")]
+    [HttpPost("/newsletter", Name = "newsletter.store")]
     public IActionResult Subscribe([FromBody] NewsletterForm form)
     {
         HttpContext.Inertia().Flash("success", "Subscribed");
         return Redirect("/contacts/create");
     }
 
-    [HttpGet("/feed")]
+    [HttpGet("/feed", Name = "feed.index")]
     public IResult Feed() => Render("Feed/Index", new InertiaProps
     {
         ["posts"] = Scroll(Pagination.Paginate(AppState.Posts,

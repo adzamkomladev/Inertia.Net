@@ -2,14 +2,20 @@
 // or runs with --inertia-types.
 
 export interface InertiaPages {
+  Login: LoginPage
 }
 
 export interface SharedProps {
   appName: string
+  head?: string[]
   inbox: Inbox
 }
 
 export interface FlashData extends Flash {}
+
+export interface LoginPage {
+  submissions: number
+}
 
 export interface Inbox {
   unread: number
