@@ -58,6 +58,9 @@ public sealed class AnalyzerTests
                 private sealed record Hidden : IInertiaPage { public static string Component => "Hidden"; }
             }
             public sealed record Generic<T> : IInertiaPage { public static string Component => "G"; }
+            public sealed record Lookalike : Fake.IInertiaPage, Inertia.Net.IInertiaPage;
+            public static class Fake { public interface IInertiaPage { } }
+            public static class Inertia { public static class Net { public interface IInertiaPage { } } }
             public static class Use
             {
                 public static InertiaTypeScriptOptions Run(InertiaTypeScriptOptions o) => o.AddGeneratedPages();
@@ -74,6 +77,7 @@ public sealed class AnalyzerTests
         Assert.DoesNotContain("Hidden", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("Generic", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("Base>", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("Lookalike", generated, StringComparison.Ordinal); // same name, another namespace
     }
 
     [Fact]

@@ -52,6 +52,8 @@ public sealed class ComponentNameAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
+            // The member that implements IInertiaPage.Component is checked against this, found once per compilation.
+            var componentMember = pageInterface.GetMembers("Component").FirstOrDefault();
             var pages = Pages(start.Options);
             var claimed = new ConcurrentBag<(string Component, INamedTypeSymbol Type, Location Location)>();
 
@@ -68,8 +70,7 @@ public sealed class ComponentNameAnalyzer : DiagnosticAnalyzer
                 }
 
                 // Only the member that implements IInertiaPage.Component (also when implemented explicitly).
-                var member = pageInterface.GetMembers("Component").FirstOrDefault();
-                if (member is null || !SymbolEqualityComparer.Default.Equals(symbol.ContainingType.FindImplementationForInterfaceMember(member), symbol))
+                if (componentMember is null || !SymbolEqualityComparer.Default.Equals(symbol.ContainingType.FindImplementationForInterfaceMember(componentMember), symbol))
                 {
                     return;
                 }

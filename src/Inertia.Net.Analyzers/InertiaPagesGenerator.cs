@@ -42,7 +42,11 @@ public sealed class InertiaPagesGenerator : IIncrementalGenerator
         !type.IsAbstract
         && !type.IsGenericType
         && IsReachable(type)
-        && type.AllInterfaces.Any(i => i.ToDisplayString() == PageInterface);
+        && type.AllInterfaces.Any(IsPageInterface);
+
+    // Inertia.Net.IInertiaPage, compared by name and namespace: ToDisplayString built a string per interface on every edit.
+    private static bool IsPageInterface(INamedTypeSymbol type) =>
+        type is { Name: "IInertiaPage", ContainingNamespace: { Name: "Net", ContainingNamespace: { Name: "Inertia", ContainingNamespace.IsGlobalNamespace: true } } };
 
     // The generated class is internal to the project: private or protected nested types cannot be named from it.
     private static bool IsReachable(INamedTypeSymbol type) =>
