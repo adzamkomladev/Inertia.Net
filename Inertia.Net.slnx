@@ -25,6 +25,7 @@
     <Project Path="tests/Inertia.Net.Redis.Tests/Inertia.Net.Redis.Tests.csproj" />
     <Project Path="tests/Inertia.Net.AotSmoke/Inertia.Net.AotSmoke.csproj" />
     <Project Path="tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj" />
+    <Project Path="tests/Inertia.Net.HostingProbe/Inertia.Net.HostingProbe.csproj" />
     <Project Path="tests/Inertia.Net.IntegrationTests/Inertia.Net.IntegrationTests.csproj" />
     <Project Path="tests/Inertia.Net.Testing.Tests/Inertia.Net.Testing.Tests.csproj" />
     <Project Path="tests/Inertia.Net.Tests/Inertia.Net.Tests.csproj" />
