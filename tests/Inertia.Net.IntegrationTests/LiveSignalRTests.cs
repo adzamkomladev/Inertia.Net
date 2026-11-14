@@ -165,6 +165,34 @@ public sealed class LiveSignalRTests
     }
 
     [Fact]
+    public void A_typed_authorizer_is_created_per_scope_with_constructor_injection()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddScoped<ScopedDependency>();
+        services.AddInertiaLive().AddSignalR(o => o.Authorize<InjectedAuthorizer>());
+        using var provider = services.BuildServiceProvider();
+        using var first = provider.CreateScope();
+        using var second = provider.CreateScope();
+
+        var a = Assert.IsType<InjectedAuthorizer>(first.ServiceProvider.GetRequiredService<ILiveChannelAuthorizer>());
+        var b = Assert.IsType<InjectedAuthorizer>(second.ServiceProvider.GetRequiredService<ILiveChannelAuthorizer>());
+        Assert.NotSame(a, b);
+        Assert.Same(first.ServiceProvider.GetRequiredService<ScopedDependency>(), a.Dependency);
+        Assert.Same(second.ServiceProvider.GetRequiredService<ScopedDependency>(), b.Dependency);
+    }
+
+    private sealed class ScopedDependency;
+
+    private sealed class InjectedAuthorizer(ScopedDependency dependency) : ILiveChannelAuthorizer
+    {
+        public ScopedDependency Dependency { get; } = dependency;
+
+        public ValueTask<bool> AuthorizeAsync(HubCallerContext context, LiveChannel channel, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(false);
+    }
+
+    [Fact]
     public async Task A_custom_authorizer_allows_private_channels_and_can_cover_public_ones()
     {
         await using var app = await LiveApp.StartAsync(o =>

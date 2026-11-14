@@ -28,7 +28,8 @@ public sealed class InertiaLiveSignalROptions
     public InertiaLiveSignalROptions Authorize<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAuthorizer>()
         where TAuthorizer : class, ILiveChannelAuthorizer
     {
-        AuthorizerFactory = static sp => ActivatorUtilities.CreateInstance<TAuthorizer>(sp);
+        var create = ActivatorUtilities.CreateFactory<TAuthorizer>([]); // the constructor is found once, not per invocation
+        AuthorizerFactory = sp => create(sp, null);
         return this;
     }
 

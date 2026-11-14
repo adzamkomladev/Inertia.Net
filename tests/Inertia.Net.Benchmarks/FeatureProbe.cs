@@ -11,7 +11,8 @@ namespace Inertia.Net.Benchmarks;
 
 /// <summary>
 /// <c>--feature-probe</c>: the per-request cost of the 1.6-1.9 features. The 20-prop page with five head tags (HTML and JSON), five
-/// lazy props with and without <c>.Live(evt)</c>, resolving a typed live-channel authorizer as the hub does per invocation, and a GET
+/// lazy props with and without <c>.Live(evt)</c>, resolving a typed live-channel authorizer as the hub does per invocation (in a new
+/// scope, and the options' factory alone), and a GET
 /// through <c>UseInertiaAntiforgery()</c> that is not a page load. <c>--feature-probe check</c> prints the bodies instead, to compare
 /// output before and after a change.
 /// </summary>
@@ -52,6 +53,7 @@ internal static class FeatureProbe
         hub.AddInertiaLive().AddSignalR(o => o.Authorize<BenchAuthorizer>());
         var hubServices = hub.BuildServiceProvider();
         var scopes = hubServices.GetRequiredService<IServiceScopeFactory>();
+        var authorizerFactory = hubServices.GetRequiredService<Microsoft.Extensions.Options.IOptions<InertiaLiveSignalROptions>>().Value.AuthorizerFactory!;
 
         var antiforgeryServices = BenchApp.CreateServices(configureServices: s => s.AddAntiforgery(o => o.HeaderName = "X-XSRF-TOKEN"));
         var app = new ApplicationBuilder(antiforgeryServices);
@@ -73,6 +75,11 @@ internal static class FeatureProbe
             {
                 using var scope = scopes.CreateScope();
                 scope.ServiceProvider.GetRequiredService<ILiveChannelAuthorizer>();
+                return Task.CompletedTask;
+            });
+            await MeasureAsync(repetition, "hub authorizer factory", 1000000, null, _ =>
+            {
+                authorizerFactory(hubServices);
                 return Task.CompletedTask;
             });
             await MeasureAsync(repetition, "antiforgery GET", 200000, api, c => pipeline(c));
