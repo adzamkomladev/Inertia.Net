@@ -50,7 +50,13 @@ builder.Services.AddScoped<Greeter>();
 // The Redis store is compiled in (trim and AOT analysis) and used only when REDIS_URL is set.
 if (Environment.GetEnvironmentVariable("REDIS_URL") is { Length: > 0 } redis)
 {
-    builder.Services.AddInertiaRedisCache(o => o.Configuration = redis);
+    // A prefix per run: the checks count loads, so entries left by an earlier run would fail them.
+    var prefix = $"aot-smoke:{Guid.NewGuid():N}:";
+    builder.Services.AddInertiaRedisCache(o =>
+    {
+        o.Configuration = redis;
+        o.KeyPrefix = prefix;
+    });
 }
 // A named mount (a library UI under /admin) with its own version, shared props, state cookie and error component.
 builder.Services.AddInertia("admin", o =>
