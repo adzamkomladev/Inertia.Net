@@ -112,16 +112,21 @@ internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
         }
 
         var member = key.ToString();
-        var tags = options.Tags.Distinct(StringComparer.Ordinal).ToArray();
-        var keys = new RedisKey[tags.Length + 2];
-        var args = new RedisValue[tags.Length + 4];
+        var tags = options.Tags;
+        if (tags.Count > 1)
+        {
+            tags = tags.Distinct(StringComparer.Ordinal).ToArray();
+        }
+
+        var keys = new RedisKey[tags.Count + 2];
+        var args = new RedisValue[tags.Count + 4];
         keys[0] = Prefix + member;
         keys[1] = Prefix + "tags:" + member;
         args[0] = value;
         args[1] = ttl;
         args[2] = Prefix;
         args[3] = ttl;
-        for (var i = 0; i < tags.Length; i++)
+        for (var i = 0; i < tags.Count; i++)
         {
             keys[i + 2] = Prefix + "tag:" + tags[i];
             args[i + 4] = tags[i];

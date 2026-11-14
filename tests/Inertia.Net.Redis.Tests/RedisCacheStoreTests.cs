@@ -107,6 +107,24 @@ public sealed class RedisCacheStoreTests
     }
 
     [Fact]
+    public async Task Repeated_tags_are_indexed_once_and_a_single_tag_needs_no_deduplication()
+    {
+        await using var app = App();
+        var store = Store(app);
+        await store.SetAsync(Key("one"), [1], Entry(null, InertiaCacheTags.Props), Ct);
+        await store.SetAsync(Key("many"), [2], Entry(null, "user:1", "user:1", InertiaCacheTags.Props), Ct);
+
+        using var redis = await ConnectionMultiplexer.ConnectAsync(Url!);
+        var db = redis.GetDatabase();
+        Assert.Equal(1, await db.SetLengthAsync(_prefix + "tags:" + Key("one")));
+        Assert.Equal(2, await db.SetLengthAsync(_prefix + "tags:" + Key("many")));
+
+        await store.RemoveByTagAsync("user:1", Ct);
+        Assert.Null(await store.GetAsync(Key("many"), Ct));
+        Assert.Equal([1], await store.GetAsync(Key("one"), Ct));
+    }
+
+    [Fact]
     public async Task Tag_sets_shed_the_members_of_expired_entries_as_new_entries_are_written()
     {
         const int Expired = 1000;
