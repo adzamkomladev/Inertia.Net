@@ -2,13 +2,14 @@ import { Deferred, router, useForm } from '@inertiajs/react'
 import type { FormEvent } from 'react'
 import Layout from '../../Layout'
 import type { InertiaPages } from '../../types/inertia'
+import { routes } from '../../types/routes'
 
 export default function Index({ todos, stats }: InertiaPages['Todos/Index']) {
   const form = useForm({ title: '' })
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    form.post('/todos', { onSuccess: () => form.reset() })
+    form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
   }
 
   return (
@@ -18,9 +19,9 @@ export default function Index({ todos, stats }: InertiaPages['Todos/Index']) {
         {todos.map((todo) => (
           <li key={todo.id}>
             <label style={{ textDecoration: todo.done ? 'line-through' : undefined }}>
-              <input type="checkbox" checked={todo.done} onChange={() => router.patch(`/todos/${todo.id}/toggle`)} /> {todo.title}
+              <input type="checkbox" checked={todo.done} onChange={() => router.visit(routes.todos.toggle(todo.id))} /> {todo.title}
             </label>{' '}
-            <button onClick={() => router.delete(`/todos/${todo.id}`)}>Delete</button>
+            <button onClick={() => router.visit(routes.todos.destroy(todo.id))}>Delete</button>
           </li>
         ))}
       </ul>
