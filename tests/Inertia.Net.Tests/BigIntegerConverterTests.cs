@@ -79,6 +79,16 @@ public sealed class BigIntegerConverterTests
         Assert.Equal(expected, JsonSerializer.Serialize(JsonNode.Parse(input), options));
     }
 
+    [Fact]
+    public void Dom_objects_keep_property_names_and_values_whether_written_whole_or_converted()
+    {
+        const string input = """{"plain":"x\"y","caf\u00e9":true,"<b>":null,"n":12,"d":1.50,"e":-2E-3,"big":-9007199254740993,"nested":{"q\"":[1,9007199254740992]}}""";
+        const string expected = """{"plain":"x\u0022y","caf\u00E9":true,"\u003Cb\u003E":null,"n":12,"d":1.50,"e":-2E-3,"big":{"$bigint":"-9007199254740993"},"nested":{"q\u0022":[1,{"$bigint":"9007199254740992"}]}}""";
+        using var document = JsonDocument.Parse(input);
+        Assert.Equal(expected, JsonSerializer.Serialize(document.RootElement, Options()));
+        Assert.Equal(expected, JsonSerializer.Serialize(JsonNode.Parse(input), Options()));
+    }
+
     private static T Read<T>(string json, int split)
     {
         var bytes = Encoding.UTF8.GetBytes(json);
