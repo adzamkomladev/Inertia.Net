@@ -7,6 +7,23 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+### Fixed
+
+- `Inertia.Net.Redis`: a tag set kept the keys of entries that had expired on their own, so the `inertia:props` set grew for as long
+  as the app wrote per-user or per-query entries. Writing an entry now removes up to two expired members from each of its tag sets.
+- `UseTempDataStateStore()` with `AddSessionStateTempDataProvider()` read the session synchronously, blocking a thread on a
+  distributed session store (Redis, SQL Server) and losing the state with a store that only reads asynchronously. The session is now
+  loaded asynchronously before TempData reads or writes it.
+
+### Changed
+
+- `ToPageAsync` (EF Core and MongoDB) and `Pagination.PaginateAsync` skip the count query when the page already gives the total: a
+  first page with no more rows, or a last page with rows. Middle pages and pages past the end still count.
+- Fewer allocations, with unchanged output: head tags (+1,432 B per HTML render with five tags, was +3,608 B), live props (136 B
+  each, was 333 B), keyset cursor pages in EF Core (5.3 KB, was 16.2 KB, with a composite key), the MVC Razor root view, the SignalR
+  hub's typed authorizer and `AllowedOrigins` check, Redis writes with one tag, `UseInertiaAntiforgery()` requests, SSR requests,
+  `PreserveBigIntegers` with `JsonElement` and `JsonNode` values, and the page analyzer and generator in the IDE.
+
 ## [1.9.0] - 2026-11-14
 
 ### Added
