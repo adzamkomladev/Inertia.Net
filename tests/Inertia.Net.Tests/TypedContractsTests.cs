@@ -206,7 +206,7 @@ public sealed class TypedContractsTests
     public async Task Routes_are_written_from_the_app_endpoints_only_when_the_path_is_set_and_content_changed()
     {
         using var root = new TempRoot();
-        var path = Path.Combine(root.Path, "ClientApp/types/routes.ts");
+        var path = Path.Join(root.Path, "ClientApp/types/routes.ts");
         var harness = new Harness(
             o => o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts",
             configureServices: s => s.AddSingleton<EndpointDataSource>(new DefaultEndpointDataSource(Endpoint("/todos/{id:int}", "todos.show", "GET"), Endpoint("/unnamed", null, "GET"))),
@@ -223,7 +223,7 @@ public sealed class TypedContractsTests
 
         var unset = new Harness(contentRoot: root.Path, environment: "Development");
         await unset.Services.GetServices<IHostedService>().OfType<InertiaTypeScriptWriter>().Single().StartAsync(TestContext.Current.CancellationToken);
-        Assert.Single(Directory.GetFiles(Path.Combine(root.Path, "ClientApp/types")));
+        Assert.Single(Directory.GetFiles(Path.Join(root.Path, "ClientApp/types")));
     }
 
     [Fact]

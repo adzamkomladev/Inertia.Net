@@ -93,7 +93,7 @@ internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
     public async ValueTask<byte[]?> GetAsync(InertiaCacheKey key, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return (byte[]?)await Database.StringGetAsync(Prefix + key.ToString());
+        return (byte[]?)await Database.StringGetAsync(Prefix + key);
     }
 
     public async ValueTask SetAsync(InertiaCacheKey key, byte[] value, InertiaCacheEntryOptions options, CancellationToken cancellationToken)

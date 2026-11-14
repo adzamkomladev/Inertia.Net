@@ -45,18 +45,9 @@ public sealed class InertiaPagesGenerator : IIncrementalGenerator
         && type.AllInterfaces.Any(i => i.ToDisplayString() == PageInterface);
 
     // The generated class is internal to the project: private or protected nested types cannot be named from it.
-    private static bool IsReachable(INamedTypeSymbol type)
-    {
-        for (var current = type; current is not null; current = current.ContainingType)
-        {
-            if (current.DeclaredAccessibility is Accessibility.Private or Accessibility.Protected or Accessibility.ProtectedAndInternal)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    private static bool IsReachable(INamedTypeSymbol type) =>
+        type.DeclaredAccessibility is not (Accessibility.Private or Accessibility.Protected or Accessibility.ProtectedAndInternal)
+        && (type.ContainingType is not { } outer || IsReachable(outer));
 
     private static string Source(ImmutableArray<string?> pages)
     {

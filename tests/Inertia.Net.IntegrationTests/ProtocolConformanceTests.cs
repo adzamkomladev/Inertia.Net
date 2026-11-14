@@ -72,7 +72,7 @@ public abstract class ProtocolConformanceTests<THost>
     [Fact]
     public async Task Routes_are_generated_from_the_named_endpoints_when_the_app_starts()
     {
-        var path = Path.Combine(Path.GetTempPath(), "inertia-routes-" + Guid.NewGuid().ToString("N"), "routes.ts");
+        var path = Path.Join(Path.GetTempPath(), "inertia-routes-" + Guid.NewGuid().ToString("N"), "routes.ts");
         try
         {
             // Written by the hosted service during StartAsync: the endpoints must already be known then, for every host.

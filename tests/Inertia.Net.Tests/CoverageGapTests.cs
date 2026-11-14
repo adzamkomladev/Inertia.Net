@@ -14,7 +14,7 @@ public sealed class CoverageGapTests
     [Fact]
     public async Task Every_way_of_writing_a_body_counts_and_empty_writes_do_not()
     {
-        var body = new MemoryStream();
+        using var body = new MemoryStream();
         var tracker = Tracker(body);
         tracker.Stream.Write([]);
         tracker.Stream.Write(new byte[0], 0, 0);
@@ -41,11 +41,13 @@ public sealed class CoverageGapTests
         try
         {
             await File.WriteAllBytesAsync(path, [1, 2, 3], Ct);
-            var empty = Tracker(new MemoryStream());
+            using var emptyBody = new MemoryStream();
+            var empty = Tracker(emptyBody);
             await empty.SendFileAsync(path, 3, null, Ct);
             await empty.SendFileAsync(path, 0, 0, Ct);
             Assert.False(empty.HasWritten);
-            var sent = Tracker(new MemoryStream());
+            using var sentBody = new MemoryStream();
+            var sent = Tracker(sentBody);
             await sent.SendFileAsync(path, 1, null, Ct);
             Assert.True(sent.HasWritten);
         }
@@ -58,7 +60,7 @@ public sealed class CoverageGapTests
     [Fact]
     public async Task The_tracked_body_passes_everything_else_through()
     {
-        var body = new MemoryStream([1, 2, 3]);
+        using var body = new MemoryStream([1, 2, 3]);
         var tracker = Tracker(body);
         tracker.DisableBuffering();
         var stream = tracker.Stream;
@@ -78,14 +80,15 @@ public sealed class CoverageGapTests
 
         tracker.Writer.CancelPendingFlush();
         tracker.Writer.Complete();
-        await Tracker(new MemoryStream()).Writer.CompleteAsync();
+        using var completed = new MemoryStream();
+        await Tracker(completed).Writer.CompleteAsync();
         await tracker.CompleteAsync();
     }
 
     [Fact]
     public async Task The_ssr_response_stream_reads_up_to_its_limit_and_nothing_else()
     {
-        var stream = new SsrResponseStream(new MemoryStream([1, 2, 3, 4, 5, 6]), 4);
+        using var stream = new SsrResponseStream(new MemoryStream([1, 2, 3, 4, 5, 6]), 4);
         Assert.True(stream.CanRead);
         Assert.False(stream.CanSeek || stream.CanWrite);
         Assert.Throws<NotSupportedException>(() => stream.Length);
@@ -101,7 +104,7 @@ public sealed class CoverageGapTests
         Assert.Equal(4, stream.Position);
         await Assert.ThrowsAsync<SsrResponseTooLargeException>(() => stream.ReadAsync(buffer, 0, 3, Ct));
 
-        var unlimited = new SsrResponseStream(new MemoryStream([1, 2]), null);
+        using var unlimited = new SsrResponseStream(new MemoryStream([1, 2]), null);
         Assert.Equal(2, await unlimited.ReadAsync(new byte[8], 0, 8, Ct));
     }
 

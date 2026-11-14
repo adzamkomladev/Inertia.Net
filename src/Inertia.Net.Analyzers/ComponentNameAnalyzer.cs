@@ -144,9 +144,8 @@ public sealed class ComponentNameAnalyzer : DiagnosticAnalyzer
 
         var marker = "/" + directory.Replace('\\', '/').Trim('/') + "/";
         var components = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var file in options.AdditionalFiles)
+        foreach (var path in options.AdditionalFiles.Select(file => file.Path.Replace('\\', '/')))
         {
-            var path = file.Path.Replace('\\', '/');
             var at = path.LastIndexOf(marker, StringComparison.Ordinal);
             var extension = Path.GetExtension(path);
             if (at >= 0 && Extensions.Contains(extension, StringComparer.Ordinal))

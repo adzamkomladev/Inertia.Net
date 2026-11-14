@@ -59,6 +59,7 @@ public sealed class PaginationTests : IAsyncLifetime
 {
     private static readonly string? Uri = Environment.GetEnvironmentVariable("MONGODB_URI");
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
+    private MongoClient? _client;
     private IMongoDatabase? _database;
     private IMongoCollection<Row> _rows = null!;
     private List<Row> _seeded = [];
@@ -66,7 +67,8 @@ public sealed class PaginationTests : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         if (Uri is null) return;
-        _database = new MongoClient(Uri).GetDatabase("inertia_tests_" + Guid.NewGuid().ToString("N"));
+        _client = new MongoClient(Uri);
+        _database = _client.GetDatabase("inertia_tests_" + Guid.NewGuid().ToString("N"));
         _rows = _database.GetCollection<Row>("rows");
         var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         // 25 rows; CreatedAt repeats in fives, so a composite cursor crosses duplicate keys.
@@ -74,7 +76,7 @@ public sealed class PaginationTests : IAsyncLifetime
         {
             Id = ObjectId.Parse($"6500000000000000000000{i:x2}"),
             Number = i,
-            CreatedAt = start.AddHours((i - 1) / 5),
+            CreatedAt = start + TimeSpan.FromHours((i - 1) / 5),
             Name = $"n{i:00}",
             Active = i % 2 == 1,
         })];
@@ -84,6 +86,7 @@ public sealed class PaginationTests : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         if (_database is not null) await _database.Client.DropDatabaseAsync(_database.DatabaseNamespace.DatabaseName);
+        _client?.Dispose();
     }
 
     private IFindFluent<Row, Row> All() => Find(_ => true);

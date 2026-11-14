@@ -177,5 +177,5 @@ internal static class Codec<TValue>
 {
     public static readonly bool IsObjectId = typeof(TValue) == typeof(ObjectId);
 
-    public static TValue Parse(string value) => (TValue)(object)ObjectId.Parse(value);
+    public static TValue Parse(string value) => ObjectId.Parse(value) is TValue id ? id : throw new InvalidOperationException($"{typeof(TValue)} is not ObjectId.");
 }

@@ -180,13 +180,19 @@ internal sealed partial class InertiaTypeScriptWriter(
 
         // Endpoints are complete only once the server has built its pipeline, which happens after the app's hosted services start
         // (WebApplication registers the web host last). Stopping inside StartAsync would also make the host throw.
+        // The routes file is written even when the declarations file was not.
         if (lifetime is null)
         {
-            Finish(written & WriteRoutes(routes));
+            var routesWritten = WriteRoutes(routes);
+            Finish(written && routesWritten);
         }
         else
         {
-            lifetime.ApplicationStarted.Register(() => Finish(written & WriteRoutes(routes)));
+            lifetime.ApplicationStarted.Register(() =>
+            {
+                var routesWritten = WriteRoutes(routes);
+                Finish(written && routesWritten);
+            });
         }
 
         return Task.CompletedTask;
