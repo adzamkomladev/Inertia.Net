@@ -149,7 +149,7 @@ The root template is an HTML file in the content root. The default name is `app.
 </html>
 ```
 
-Remove `@viteReactRefresh` for Vue and Svelte. `@inertia` is required. The other tokens are described in [Pages and responses](/docs/pages-and-responses#the-root-template).
+For Vue and Svelte, remove `@viteReactRefresh` and point `@vite` at `ClientApp/app.ts`. `@inertia` is required. The other tokens are described in [Pages and responses](/docs/pages-and-responses#the-root-template).
 
 Make sure `app.html` is copied to the output and publish directory:
 
@@ -163,6 +163,9 @@ Make sure `app.html` is copied to the output and publish directory:
 
 The page name passed to `Render` must match the client resolver. With `@inertiajs/vite` the resolver maps `ClientApp/pages/**` automatically.
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 // ClientApp/pages/Home.tsx
 export default function Home({ greeting }: { greeting: string }) {
@@ -170,7 +173,39 @@ export default function Home({ greeting }: { greeting: string }) {
 }
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Home.vue -->
+<script setup lang="ts">
+defineProps<{ greeting: string }>()
+</script>
+
+<template>
+  <h1>{{ greeting }}</h1>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Home.svelte -->
+<script lang="ts">
+  let { greeting }: { greeting: string } = $props()
+</script>
+
+<h1>{greeting}</h1>
+```
+
+  </Tab>
+</Tabs>
+
 The client entry only needs to start Inertia:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 // ClientApp/app.tsx
@@ -178,6 +213,29 @@ import { createInertiaApp } from '@inertiajs/react'
 
 createInertiaApp()
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+// ClientApp/app.ts
+import { createInertiaApp } from '@inertiajs/vue3'
+
+createInertiaApp()
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+// ClientApp/app.ts
+import { createInertiaApp } from '@inertiajs/svelte'
+
+createInertiaApp()
+```
+
+  </Tab>
+</Tabs>
 
 <Callout type="info" title="Not using @inertiajs/vite?">
 Pass your own `resolve` and `setup` functions to `createInertiaApp`. The [client setup](/docs/client-setup) page shows both forms for React, Vue and Svelte.

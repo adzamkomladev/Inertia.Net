@@ -24,11 +24,41 @@ app.MapGet("/", () => Render("Home", new InertiaProps
   </Step>
   <Step title="Inertia connects it to a client component">
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 export default function Home({ greeting }: { greeting: string }) {
   return <h1>{greeting}</h1>
 }
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+defineProps<{ greeting: string }>()
+</script>
+
+<template>
+  <h1>{{ greeting }}</h1>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  let { greeting }: { greeting: string } = $props()
+</script>
+
+<h1>{greeting}</h1>
+```
+
+  </Tab>
+</Tabs>
 
   </Step>
   <Step title="The client updates the page">

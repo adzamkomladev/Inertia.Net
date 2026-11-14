@@ -167,18 +167,101 @@ What a broadcaster delivers:
 
 Read a live prop like any other prop. `useProp` exposes its loading state, and the cancelable `live` router event can hold an update back, for example to show a "new posts" button instead:
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 import { router, useProp } from '@inertiajs/react'
+import { useEffect, useState } from 'react'
 
-const order = useProp<Order>('order')   // { value, loading, loaded }
+type Order = { id: number; status: string }
 
-router.on('live', (event) => {
-  if (event.detail.props.includes('posts')) {
-    showNewPostsButton()
-    return false
-  }
-})
+export default function Show() {
+  const order = useProp<Order>('order')   // { value, loading, loaded }
+  const [newPosts, setNewPosts] = useState(false)
+
+  // Returning false holds the update back.
+  useEffect(
+    () =>
+      router.on('live', (event) => {
+        if (event.detail.props.includes('posts')) {
+          setNewPosts(true)
+          return false
+        }
+      }),
+    [],
+  )
+
+  return (
+    <>
+      <p>Status: {order.value?.status}{order.loading && ' (updating...)'}</p>
+      {newPosts && <button onClick={() => router.reload({ only: ['posts'] })}>New posts</button>}
+    </>
+  )
+}
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { router, useProp } from '@inertiajs/vue3'
+import { onUnmounted, ref } from 'vue'
+
+type Order = { id: number; status: string }
+
+const order = useProp<Order>('order')   // { value, loading, loaded }, each a ref
+const newPosts = ref(false)
+
+// Returning false holds the update back.
+onUnmounted(
+  router.on('live', (event) => {
+    if (event.detail.props.includes('posts')) {
+      newPosts.value = true
+      return false
+    }
+  }),
+)
+</script>
+
+<template>
+  <p>Status: {{ order.value.value?.status }}<template v-if="order.loading.value"> (updating...)</template></p>
+  <button v-if="newPosts" @click="router.reload({ only: ['posts'] })">New posts</button>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { router, useProp } from '@inertiajs/svelte'
+
+  type Order = { id: number; status: string }
+
+  const order = useProp<Order>('order')   // { value, loading, loaded }
+  let newPosts = $state(false)
+
+  // Returning false holds the update back.
+  $effect(() =>
+    router.on('live', (event) => {
+      if (event.detail.props.includes('posts')) {
+        newPosts = true
+        return false
+      }
+    }),
+  )
+</script>
+
+<p>Status: {order.value?.status}{order.loading ? ' (updating...)' : ''}</p>
+{#if newPosts}
+  <button onclick={() => router.reload({ only: ['posts'] })}>New posts</button>
+{/if}
+```
+
+  </Tab>
+</Tabs>
 
 ## SignalR
 
@@ -237,13 +320,49 @@ o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
 o.TypeScript.LiveEvents(Events.PostCreated);   // exported from routes.ts as liveEvents.PostCreated
 ```
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
+import { useEffect } from 'react'
 import { liveReload } from '../lib/inertia-live-reload'
 import { live } from '../lib/live'                 // the value given to createInertiaApp({ live })
 import { liveEvents } from '../types/routes'
 
 useEffect(() => liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] }), [])
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
+import { liveReload } from '../lib/inertia-live-reload'
+import { live } from '../lib/live'                 // the value given to createInertiaApp({ live })
+import { liveEvents } from '../types/routes'
+
+let stop: (() => void) | undefined
+onMounted(() => (stop = liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] })))
+onUnmounted(() => stop?.())
+</script>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { liveReload } from '../lib/inertia-live-reload'
+  import { live } from '../lib/live'                 // the value given to createInertiaApp({ live })
+  import { liveEvents } from '../types/routes'
+
+  $effect(() => liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] }))
+</script>
+```
+
+  </Tab>
+</Tabs>
 
 Events within `debounce` milliseconds (default 250) become one reload, a reload waits for a visit in flight, the scroll position is kept, and the client that caused the event (`exceptSocketId`) is not reloaded. `reset` replaces the prop instead of merging it, so the reload brings no duplicates. The SignalR client transport delivers a channel's events to every subscriber. See [Typed routes](/docs/typed-routes) for `routes.ts`.
 

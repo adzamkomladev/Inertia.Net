@@ -75,12 +75,15 @@ The templates also ship `ClientApp/lib/inertia-signalr.ts`, the client transport
 
 ## Vite configuration
 
-The same Vite config works for every client; only the framework plugin changes.
+The Vite config is the same for every client except the framework plugin and the entry file (`app.tsx` for React, `app.ts` for Vue and Svelte).
+
+<Tabs>
+  <Tab label="React">
 
 ```ts
 // vite.config.ts
 import { defineConfig, type Plugin } from 'vite'
-import react from '@vitejs/plugin-react'            // Vue: @vitejs/plugin-vue, Svelte: @sveltejs/vite-plugin-svelte
+import react from '@vitejs/plugin-react'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 
 // Writes the dev server URL to wwwroot/hot. Inertia.Net reads it in Development
@@ -121,23 +124,144 @@ export default defineConfig(({ command }) => ({
 }))
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+// vite.config.ts
+import { defineConfig, type Plugin } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+
+// Writes the dev server URL to wwwroot/hot. Inertia.Net reads it in Development
+// and renders the dev-server tags instead of the manifest tags.
+function hotFile(): Plugin {
+  const file = 'wwwroot/hot'
+  return {
+    name: 'inertia-net-hot-file',
+    apply: 'serve',
+    configureServer(server) {
+      server.httpServer?.once('listening', () => {
+        const address = server.httpServer!.address()
+        if (address && typeof address === 'object') {
+          mkdirSync('wwwroot', { recursive: true })
+          writeFileSync(file, `http://localhost:${address.port}`)
+        }
+      })
+      const clean = () => rmSync(file, { force: true })
+      process.on('exit', clean)
+      process.on('SIGINT', () => process.exit())
+      process.on('SIGTERM', () => process.exit())
+    },
+  }
+}
+
+export default defineConfig(({ command }) => ({
+  plugins: [vue(), hotFile()],
+  // Built assets live at /build/. The dev server serves from the root because
+  // Inertia.Net emits {origin}/@vite/client and {origin}/{entry}.
+  base: command === 'build' ? '/build/' : '/',
+  server: { port: 5173, strictPort: true, origin: 'http://localhost:5173' },
+  build: {
+    outDir: 'wwwroot/build',
+    emptyOutDir: true,
+    manifest: true,
+    rollupOptions: { input: 'resources/js/app.ts' },
+  },
+}))
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+// vite.config.ts
+import { defineConfig, type Plugin } from 'vite'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+
+// Writes the dev server URL to wwwroot/hot. Inertia.Net reads it in Development
+// and renders the dev-server tags instead of the manifest tags.
+function hotFile(): Plugin {
+  const file = 'wwwroot/hot'
+  return {
+    name: 'inertia-net-hot-file',
+    apply: 'serve',
+    configureServer(server) {
+      server.httpServer?.once('listening', () => {
+        const address = server.httpServer!.address()
+        if (address && typeof address === 'object') {
+          mkdirSync('wwwroot', { recursive: true })
+          writeFileSync(file, `http://localhost:${address.port}`)
+        }
+      })
+      const clean = () => rmSync(file, { force: true })
+      process.on('exit', clean)
+      process.on('SIGINT', () => process.exit())
+      process.on('SIGTERM', () => process.exit())
+    },
+  }
+}
+
+export default defineConfig(({ command }) => ({
+  plugins: [svelte(), hotFile()],
+  // Built assets live at /build/. The dev server serves from the root because
+  // Inertia.Net emits {origin}/@vite/client and {origin}/{entry}.
+  base: command === 'build' ? '/build/' : '/',
+  server: { port: 5173, strictPort: true, origin: 'http://localhost:5173' },
+  build: {
+    outDir: 'wwwroot/build',
+    emptyOutDir: true,
+    manifest: true,
+    rollupOptions: { input: 'resources/js/app.ts' },
+  },
+}))
+```
+
+  </Tab>
+</Tabs>
+
 Add these fields to `package.json`:
 
 ```json
 { "type": "module", "scripts": { "dev": "vite", "build": "vite build" } }
 ```
 
-The manifest key of the entry (`resources/js/app.tsx`) is what you pass to `@vite("...")`.
+The manifest key of the entry (`resources/js/app.tsx` for React, `resources/js/app.ts` for Vue and Svelte) is what you pass to `@vite("...")`.
 
 ## Client entry
 
 The optional `@inertiajs/vite` plugin resolves pages and mounts the app for you. With it, the entry is just:
 
+<Tabs>
+  <Tab label="React">
+
 ```ts
-import { createInertiaApp } from '@inertiajs/react'   // or @inertiajs/vue3, @inertiajs/svelte
+import { createInertiaApp } from '@inertiajs/react'
 
 createInertiaApp()
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+import { createInertiaApp } from '@inertiajs/vue3'
+
+createInertiaApp()
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+import { createInertiaApp } from '@inertiajs/svelte'
+
+createInertiaApp()
+```
+
+  </Tab>
+</Tabs>
 
 Without the plugin, provide the resolver and setup yourself.
 
@@ -290,7 +414,11 @@ Node is needed to build the assets and only needed at runtime when SSR is enable
 
 The plugin also contributes the SSR dev endpoint and page resolution. Add it before the hot-file plugin:
 
+<Tabs>
+  <Tab label="React">
+
 ```ts
+import react from '@vitejs/plugin-react'
 import inertia from '@inertiajs/vite'
 
 export default defineConfig({
@@ -301,5 +429,40 @@ export default defineConfig({
   ],
 })
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+import vue from '@vitejs/plugin-vue'
+import inertia from '@inertiajs/vite'
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    inertia({ ssr: { entry: 'resources/js/ssr.ts', host: '127.0.0.1', port: 13714 } }),
+    hotFile(),
+  ],
+})
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+import inertia from '@inertiajs/vite'
+
+export default defineConfig({
+  plugins: [
+    svelte(),
+    inertia({ ssr: { entry: 'resources/js/ssr.ts', host: '127.0.0.1', port: 13714 } }),
+    hotFile(),
+  ],
+})
+```
+
+  </Tab>
+</Tabs>
 
 Keep the SSR listener on loopback: the renderer trusts its output and has no authentication. The [SSR guide](/docs/server-side-rendering) covers the full setup.

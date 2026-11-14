@@ -9,12 +9,38 @@ The Inertia client can reload the current page and ask for a subset of its props
 
 ## From the client
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 import { router } from '@inertiajs/react'
 
 router.reload({ only: ['users'] })
 router.reload({ except: ['permissions'] })
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+import { router } from '@inertiajs/vue3'
+
+router.reload({ only: ['users'] })
+router.reload({ except: ['permissions'] })
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+import { router } from '@inertiajs/svelte'
+
+router.reload({ only: ['users'] })
+router.reload({ except: ['permissions'] })
+```
+
+  </Tab>
+</Tabs>
 
 `router.visit('/users', { only: ['users'] })` works for a new page too. The client sends:
 

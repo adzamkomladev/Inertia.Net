@@ -9,8 +9,12 @@ SSR renders the first visit on a JavaScript server using your client bundle, so 
 
 ## 1. Build the SSR bundle
 
+### With @inertiajs/vite
+
+The plugin wraps the entry with the SSR server bootstrap and resolves your pages. The entry is `ClientApp/ssr.tsx` for React and `ClientApp/ssr.ts` for Vue and Svelte.
+
 <Tabs>
-  <Tab label="@inertiajs/vite">
+  <Tab label="React">
 
 ```tsx
 // ClientApp/ssr.tsx
@@ -21,6 +25,8 @@ createInertiaApp()
 
 ```ts
 // vite.config.ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 import inertia from '@inertiajs/vite'
 
 export default defineConfig({
@@ -33,14 +39,73 @@ export default defineConfig({
 })
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+// ClientApp/ssr.ts
+import { createInertiaApp } from '@inertiajs/vue3'
+
+createInertiaApp()
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import inertia from '@inertiajs/vite'
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    inertia({
+      ssr: { entry: 'ClientApp/ssr.ts', host: '127.0.0.1', port: 13714 },
+    }),
+  ],
+})
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+// ClientApp/ssr.ts
+import { createInertiaApp } from '@inertiajs/svelte'
+
+createInertiaApp()
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+import inertia from '@inertiajs/vite'
+
+export default defineConfig({
+  plugins: [
+    svelte(),
+    inertia({
+      ssr: { entry: 'ClientApp/ssr.ts', host: '127.0.0.1', port: 13714 },
+    }),
+  ],
+})
+```
+
+  </Tab>
+</Tabs>
+
 Build both bundles:
 
 ```json
 { "scripts": { "build": "vite build && vite build --ssr" } }
 ```
 
-  </Tab>
-  <Tab label="Manual entry">
+### Without the plugin
+
+Write the server entry yourself (`ssr.tsx` for React, `ssr.ts` for Vue and Svelte):
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 // resources/js/ssr.tsx
@@ -62,7 +127,59 @@ createServer((page) =>
 )
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+// resources/js/ssr.ts
+import { createSSRApp, h, type DefineComponent } from 'vue'
+import { renderToString } from 'vue/server-renderer'
+import { createInertiaApp } from '@inertiajs/vue3'
+import createServer from '@inertiajs/vue3/server'
+
+createServer((page) =>
+  createInertiaApp({
+    page,
+    render: renderToString,
+    resolve: (name) => {
+      const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue', { eager: true })
+      return pages[`./Pages/${name}.vue`]
+    },
+    setup: ({ App, props, plugin }) => createSSRApp({ render: () => h(App, props) }).use(plugin),
+  }),
+  { host: '127.0.0.1', port: Number(process.env.INERTIA_SSR_PORT ?? 13714) },
+)
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+// resources/js/ssr.ts
+import { render } from 'svelte/server'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/svelte'
+import createServer from '@inertiajs/svelte/server'
+
+createServer((page) =>
+  createInertiaApp({
+    page,
+    resolve: (name) => {
+      const pages = import.meta.glob<ResolvedComponent>('./Pages/**/*.svelte', { eager: true })
+      return pages[`./Pages/${name}.svelte`]
+    },
+    setup: ({ App, props }) => render(App, { props }),
+  }),
+  { host: '127.0.0.1', port: Number(process.env.INERTIA_SSR_PORT ?? 13714) },
+)
+```
+
+  </Tab>
+</Tabs>
+
 The client entry hydrates when the server rendered:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 import { createRoot, hydrateRoot } from 'react-dom/client'
@@ -71,6 +188,32 @@ setup({ el, App, props }) {
   if (!el) throw new Error('Inertia root element not found')
   if (el.dataset.serverRendered === 'true') hydrateRoot(el, <App {...props} />)
   else createRoot(el).render(<App {...props} />)
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+import { createApp, createSSRApp, h } from 'vue'
+
+setup({ el, App, props, plugin }) {
+  if (!el) throw new Error('Inertia root element not found')
+  const create = el.dataset.serverRendered === 'true' ? createSSRApp : createApp
+  create({ render: () => h(App, props) }).use(plugin).mount(el)
+}
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+import { hydrate, mount } from 'svelte'
+
+setup({ el, App, props }) {
+  if (!el) throw new Error('Inertia root element not found')
+  if (el.dataset.serverRendered === 'true') hydrate(App, { target: el, props })
+  else mount(App, { target: el, props })
 }
 ```
 
@@ -164,6 +307,8 @@ import inertia from '@inertiajs/vite'
 
 inertia({ ssr: { entry: 'resources/js/ssr.tsx', host: '127.0.0.1', port: 13714 } })
 ```
+
+Use `ssr.ts` as the entry for Vue and Svelte.
 
 `BundlePath` is ignored while the dev server runs.
 

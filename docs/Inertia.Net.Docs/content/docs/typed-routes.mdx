@@ -35,13 +35,82 @@ app.MapGet("/users/{id:int}", ...).WithName("users.show");
 app.MapPost("/users", (CreateUser input) => ...).WithName("users.store");
 ```
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
-import { routes, type RouteBodies } from '../types/routes'
-<Link href={routes.users.show(user.id)}>...</Link>               // { url: '/users/1', method: 'get' }
-const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
-form.submit(routes.users.store())
-routes.users.show.url(1, { query: { tab: 'posts' } })            // '/users/1?tab=posts'
+import { Link, useForm } from '@inertiajs/react'
+import { routes, type RouteBodies } from '../../types/routes'
+
+export default function Create({ user }: { user: { id: number; name: string } }) {
+  const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+  const posts = routes.users.show.url(user.id, { query: { tab: 'posts' } })   // '/users/1?tab=posts'
+
+  return (
+    <>
+      {/* routes.users.show(1) is { url: '/users/1', method: 'get' } */}
+      <Link href={routes.users.show(user.id)}>{user.name}</Link> <a href={posts}>Posts</a>
+      <form onSubmit={(e) => { e.preventDefault(); form.submit(routes.users.store()) }}>
+        <input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
+        <button disabled={form.processing}>Create</button>
+      </form>
+    </>
+  )
+}
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { Link, useForm } from '@inertiajs/vue3'
+import { computed } from 'vue'
+import { routes, type RouteBodies } from '../../types/routes'
+
+const props = defineProps<{ user: { id: number; name: string } }>()
+const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+const posts = computed(() => routes.users.show.url(props.user.id, { query: { tab: 'posts' } }))   // '/users/1?tab=posts'
+</script>
+
+<template>
+  <!-- routes.users.show(1) is { url: '/users/1', method: 'get' } -->
+  <Link :href="routes.users.show(user.id)">{{ user.name }}</Link> <a :href="posts">Posts</a>
+  <form @submit.prevent="form.submit(routes.users.store())">
+    <input v-model="form.name" />
+    <button :disabled="form.processing">Create</button>
+  </form>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { Link, useForm } from '@inertiajs/svelte'
+  import { routes, type RouteBodies } from '../../types/routes'
+
+  let { user }: { user: { id: number; name: string } } = $props()
+  const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+  const posts = $derived(routes.users.show.url(user.id, { query: { tab: 'posts' } }))   // '/users/1?tab=posts'
+
+  function submit(e: SubmitEvent) {
+    e.preventDefault()
+    form.submit(routes.users.store())
+  }
+</script>
+
+<!-- routes.users.show(1) is { url: '/users/1', method: 'get' } -->
+<Link href={routes.users.show(user.id)}>{user.name}</Link> <a href={posts}>Posts</a>
+<form onsubmit={submit}>
+  <input bind:value={form.name} />
+  <button disabled={form.processing}>Create</button>
+</form>
+```
+
+  </Tab>
+</Tabs>
 
 - Route parameters are typed from their constraints; optional and catch-all parameters are optional.
 - Every HTTP method of an endpoint has a variant (`routes.users.update.put(1)`).

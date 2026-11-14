@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- What a package consumer gets from buildTransitive/: global usings for Inertia.Net and its static Inertia class. -->
+  <Import Project="..\..\src\Inertia.Net\buildTransitive\Inertia.Net.props" />
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net.HostingProbe</RootNamespace>
+    <!-- eng/hosting-probe.sh publishes it twice: framework-dependent (JIT) and, with -p:HostingProbeAot=true, Native AOT. -->
+    <PublishAot Condition="'$(HostingProbeAot)' == 'true'">true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- Source-generated Minimal API delegates in both builds, so JIT and AOT run the same endpoint code. -->
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

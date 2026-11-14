@@ -18,11 +18,47 @@ app.MapGet("/users", (UserStore users) =>
 
 The matching component receives that data as ordinary props:
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 export default function Index({ users }: { users: { id: number; name: string }[] }) {
   return <ul>{users.map((u) => <li key={u.id}>{u.name}</li>)}</ul>
 }
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+defineProps<{ users: { id: number; name: string }[] }>()
+</script>
+
+<template>
+  <ul>
+    <li v-for="u in users" :key="u.id">{{ u.name }}</li>
+  </ul>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  let { users }: { users: { id: number; name: string }[] } = $props()
+</script>
+
+<ul>
+  {#each users as u (u.id)}
+    <li>{u.name}</li>
+  {/each}
+</ul>
+```
+
+  </Tab>
+</Tabs>
 
 The first visit is a normal HTML response. After that, links and form submissions fetch the next page's props in the background and swap the component without a full reload. It feels like a SPA, but ASP.NET Core still owns routing, authentication and validation.
 

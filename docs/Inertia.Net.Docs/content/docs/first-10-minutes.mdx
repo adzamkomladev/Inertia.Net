@@ -32,7 +32,10 @@ app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
 }).WithInertiaValidation();
 ```
 
-`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The React template's `ClientApp/pages/Todos/Index.tsx` uses `useForm` to submit and display the error:
+`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The template's `ClientApp/pages/Todos/Index.tsx` (`Index.vue` or `Index.svelte` for the other clients) uses `useForm` to submit and display the error:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 import { useForm } from '@inertiajs/react'
@@ -52,6 +55,52 @@ const submit = (e: FormEvent) => {
   {form.errors.title && <div style={{ color: 'crimson' }}>{form.errors.title}</div>}
 </form>
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { useForm } from '@inertiajs/vue3'
+
+const form = useForm({ title: '' })
+const submit = () => form.post('/todos', { onSuccess: () => form.reset() })
+</script>
+
+<template>
+  <form @submit.prevent="submit">
+    <input v-model="form.title" placeholder="What needs doing?" />
+    <button type="submit" :disabled="form.processing">Add</button>
+    <div v-if="form.errors.title" style="color: crimson">{{ form.errors.title }}</div>
+  </form>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { useForm } from '@inertiajs/svelte'
+
+  const form = useForm({ title: '' })
+  const submit = (e: SubmitEvent) => {
+    e.preventDefault()
+    form.post('/todos', { onSuccess: () => form.reset() })
+  }
+</script>
+
+<form onsubmit={submit}>
+  <input placeholder="What needs doing?" bind:value={form.title} />
+  <button type="submit" disabled={form.processing}>Add</button>
+  {#if form.errors.title}
+    <div style="color: crimson">{form.errors.title}</div>
+  {/if}
+</form>
+```
+
+  </Tab>
+</Tabs>
 
 To test the round trip, add `Inertia.Net.Testing` and `Microsoft.AspNetCore.Mvc.Testing` to a test project, expose `public partial class Program;` in the app, and create a cookie-preserving `WebApplicationFactory<Program>` client with `AllowAutoRedirect = false`:
 

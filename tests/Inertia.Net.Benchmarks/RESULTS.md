@@ -1,5 +1,46 @@
 # Inertia.Net benchmark results
 
+## Hosting with and without Inertia — 2026-11-14
+
+`eng/hosting-probe.sh` (`tests/Inertia.Net.HostingProbe`) publishes one Minimal API app twice, framework-dependent (JIT) and Native AOT,
+and runs each scenario in a fresh server process: a plain JSON API (`Results.Json`) and a plain HTML shell with the same data embedded,
+next to an Inertia visit (`X-Inertia` JSON) and an Inertia first load (HTML). The data is 25 users plus `appName` and `auth`, built per
+request; handlers do no I/O. A raw-socket keep-alive client in a separate process measures requests per second and latency; the server's
+RSS (`/proc/<pid>/status` VmRSS) is read 2 s after the first request (at rest), every 100 ms under load (peak) and 3 s after the load
+stops. Server CPU per request is the server's utime + stime over the measured window divided by the requests served.
+
+GitHub-hosted `ubuntu-24.04` runner (image 20261103.629), AMD EPYC 9V74, 4 vCPUs, .NET 10; server pinned to vCPUs 0-1 and the client to
+2-3 (`taskset`). The 2 server vCPUs were saturated in every row (CPU per request × req/s ≈ 2 cores). Rounds agreed within about 2%. Run
+[43646350512](https://github.com/adzamkomladev/Inertia.Net/actions/runs/43646350512), commit `f580d0d`.
+
+64 keep-alive connections, 8 s warmup, 12 s measured, 5 rounds; each round starts a fresh server process for every row, in table order. Server on CPUs 0-1. Medians across rounds.
+
+| Build | Scenario | Response | Req/s | p50 ms | p99 ms | Server CPU per request | RSS at rest | Peak RSS under load | RSS after load | Startup |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| JIT, server GC | Plain JSON API | 2,657 B | 73,148 | 0.83 | 2.00 | 27 µs | 61 MB | 77 MB | 77 MB | 173 ms |
+| JIT, server GC | Plain HTML shell | 2,856 B | 64,129 | 0.93 | 2.34 | 30 µs | 61 MB | 78 MB | 78 MB | 165 ms |
+| JIT, server GC | Inertia visit (JSON) | 2,776 B | 57,241 | 1.05 | 2.32 | 35 µs | 74 MB | 96 MB | 94 MB | 217 ms |
+| JIT, server GC | Inertia first load (HTML) | 2,988 B | 56,117 | 1.07 | 2.31 | 35 µs | 75 MB | 92 MB | 92 MB | 223 ms |
+| JIT, workstation GC | Plain JSON API | 2,657 B | 75,565 | 0.82 | 2.02 | 26 µs | 61 MB | 88 MB | 88 MB | 163 ms |
+| JIT, workstation GC | Plain HTML shell | 2,856 B | 66,631 | 0.93 | 2.11 | 29 µs | 61 MB | 92 MB | 92 MB | 168 ms |
+| JIT, workstation GC | Inertia visit (JSON) | 2,776 B | 58,583 | 1.04 | 2.26 | 34 µs | 74 MB | 106 MB | 103 MB | 216 ms |
+| JIT, workstation GC | Inertia first load (HTML) | 2,988 B | 57,889 | 1.05 | 2.29 | 34 µs | 75 MB | 105 MB | 105 MB | 213 ms |
+| Native AOT, server GC | Plain JSON API | 2,657 B | 65,364 | 0.93 | 2.28 | 30 µs | 29 MB | 35 MB | 33 MB | 28 ms |
+| Native AOT, server GC | Plain HTML shell | 2,856 B | 55,776 | 1.06 | 2.19 | 35 µs | 29 MB | 42 MB | 33 MB | 28 ms |
+| Native AOT, server GC | Inertia visit (JSON) | 2,776 B | 44,979 | 1.33 | 2.92 | 44 µs | 33 MB | 48 MB | 38 MB | 37 ms |
+| Native AOT, server GC | Inertia first load (HTML) | 2,988 B | 44,666 | 1.34 | 2.97 | 44 µs | 33 MB | 48 MB | 38 MB | 35 ms |
+| Native AOT, workstation GC | Plain JSON API | 2,657 B | 67,511 | 0.91 | 2.11 | 29 µs | 29 MB | 45 MB | 45 MB | 28 ms |
+| Native AOT, workstation GC | Plain HTML shell | 2,856 B | 58,612 | 1.03 | 2.21 | 34 µs | 29 MB | 49 MB | 49 MB | 25 ms |
+| Native AOT, workstation GC | Inertia visit (JSON) | 2,776 B | 45,871 | 1.31 | 2.85 | 43 µs | 35 MB | 50 MB | 50 MB | 38 ms |
+| Native AOT, workstation GC | Inertia first load (HTML) | 2,988 B | 45,623 | 1.32 | 3.01 | 44 µs | 35 MB | 50 MB | 50 MB | 35 ms |
+
+Inertia.Net adds 5–8 µs of server CPU per request on JIT (9–14 µs on Native AOT) and about 13 MB of RSS at rest (4–6 MB on Native AOT).
+Native AOT halves memory and starts about six times faster; JIT serves more requests per second (dynamic PGO).
+
+The same probe on a busy 8-vCPU development VM (load average 10–17 from unrelated work) gave the same RSS figures within 1–3 MB, but
+requests per second varied by 2× between rounds and neither server nor client reached its CPU allotment; throughput from a shared
+machine is not comparable. Run it on a quiet machine or through the `hosting-probe` workflow.
+
 ## 1.9.1 patch performance work — 2026-11-14
 
 The items of [plan-performance-1.9.1-2026-11.md](../../docs/plan-performance-1.9.1-2026-11.md). The workloads are warm and

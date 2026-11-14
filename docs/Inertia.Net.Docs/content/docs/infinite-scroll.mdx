@@ -28,6 +28,9 @@ See [Pagination](/docs/pagination) for numbered and cursor pages, query binding 
 
 ## The client
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 import { InfiniteScroll } from '@inertiajs/react'
 
@@ -35,6 +38,45 @@ import { InfiniteScroll } from '@inertiajs/react'
   {posts.data.map((post) => <Post key={post.id} post={post} />)}
 </InfiniteScroll>
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { InfiniteScroll } from '@inertiajs/vue3'
+import Post from './Post.vue'
+
+defineProps<{ posts: { data: { id: number }[] } }>()
+</script>
+
+<template>
+  <InfiniteScroll data="posts">
+    <Post v-for="post in posts.data" :key="post.id" :post="post" />
+  </InfiniteScroll>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { InfiniteScroll } from '@inertiajs/svelte'
+  import Post from './Post.svelte'
+
+  let { posts }: { posts: { data: { id: number }[] } } = $props()
+</script>
+
+<InfiniteScroll data="posts">
+  {#each posts.data as post (post.id)}
+    <Post {post} />
+  {/each}
+</InfiniteScroll>
+```
+
+  </Tab>
+</Tabs>
 
 ## Metadata
 

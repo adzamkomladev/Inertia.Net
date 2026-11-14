@@ -50,7 +50,7 @@ The path before the wrapper stays on the client; only the value below the path i
 
 The client can ask for a fresh value instead of a merge by listing the path in `X-Inertia-Reset`:
 
-```tsx
+```ts
 router.reload({ only: ['posts'], reset: ['posts'] })
 ```
 
