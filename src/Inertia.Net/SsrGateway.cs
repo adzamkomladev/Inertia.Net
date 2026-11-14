@@ -517,12 +517,15 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         return null;
     }
 
+    // Shared: the client only reads it to write the request header.
+    private static readonly MediaTypeHeaderValue JsonContentType = new("application/json") { CharSet = "utf-8" };
+
     private async ValueTask<Attempt> SendAsync(SsrEndpoint endpoint, ReadOnlyMemory<byte> pageJson, CancellationTokenSource deadline, CancellationToken aborted)
     {
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint.RenderUrl) { Content = new ReadOnlyMemoryContent(pageJson) };
-            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
+            request.Content.Headers.ContentType = JsonContentType;
             HttpResponseMessage response;
             try
             {
