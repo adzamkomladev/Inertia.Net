@@ -132,7 +132,7 @@ public sealed record LiveEvent
 /// <summary>A live prop's listeners and throttle, set by <see cref="InertiaProp.Live(LiveEvent)"/> and <see cref="InertiaProp.Throttle"/>.</summary>
 internal sealed class LiveSpec
 {
-    public List<(LiveChannel Channel, string Event)> Listeners { get; } = [];
+    public List<(LiveChannel Channel, string Event)> Listeners { get; } = new(1); // one listener is the common case
 
     public int? ThrottleMs { get; set; }
 }
