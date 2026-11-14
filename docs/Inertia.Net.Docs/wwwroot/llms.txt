@@ -45,7 +45,7 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [CSRF protection](https://inertia-dotnet.temtem.dev/docs/csrf-and-antiforgery): Protect forms with the XSRF-TOKEN cookie and the X-XSRF-TOKEN header.
 - [Deploying behind a proxy](https://inertia-dotnet.temtem.dev/docs/deploying): Forwarded headers, secure cookies, compression, asset caching and multi-instance state.
 - [Native AOT](https://inertia-dotnet.temtem.dev/docs/native-aot): Publish a Native AOT Inertia.Net app with source-generated JSON metadata.
-- [Performance](https://inertia-dotnet.temtem.dev/docs/performance): Memory and hosting guidance, payload limits and the design choices behind the adapter.
+- [Performance](https://inertia-dotnet.temtem.dev/docs/performance): Memory, requests per second and CPU with and without Inertia, hosting guidance, payload limits and the design choices behind the adapter.
 - [Multiple apps and libraries](https://inertia-dotnet.temtem.dev/docs/mounts): Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
 - [Redis cache](https://inertia-dotnet.temtem.dev/docs/redis): Share cached props and SSR renders between app instances with the Inertia.Net.Redis cache store.
 

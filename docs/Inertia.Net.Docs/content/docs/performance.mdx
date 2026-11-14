@@ -1,15 +1,55 @@
 ---
 title: Performance
-description: Memory and hosting guidance, payload limits and the design choices behind the adapter.
+description: Memory, requests per second and CPU with and without Inertia, hosting guidance, payload limits and the design choices behind the adapter.
 section: Production
 order: 7
 ---
 
 Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
 
+## With and without Inertia
+
+What does Inertia.Net cost next to a Minimal API without it? `tests/Inertia.Net.HostingProbe` serves the same screen both ways: a list of 25 users plus `appName` and `auth`, about 2.7 KB of JSON.
+
+- **Plain JSON API** returns the data from `Results.Json`.
+- **Plain HTML shell** writes it into a hand-made HTML page.
+- **Inertia visit** is the `X-Inertia` JSON response.
+- **Inertia first load** is the HTML page the browser gets on the first request.
+
+Each row runs in its own process, under load from 64 keep-alive connections. The handlers do no I/O, so the gap is the whole cost of the adapter.
+
+All runs were on a GitHub-hosted `ubuntu-24.04` runner (AMD EPYC 9V74, 4 vCPUs) on .NET 10. The server was pinned to 2 vCPUs and the load client to the other 2. Values are medians of 5 rounds, which agreed within about 2%.
+
+| Build (server GC) | Scenario | Req/s | p99 | Server CPU per request | RSS at rest | Peak RSS under load | Startup |
+|---|---|---:|---:|---:|---:|---:|---:|
+| JIT | Plain JSON API | 73,148 | 2.00 ms | 27 µs | 61 MB | 77 MB | 173 ms |
+| JIT | Plain HTML shell | 64,129 | 2.34 ms | 30 µs | 61 MB | 78 MB | 165 ms |
+| JIT | Inertia visit (JSON) | 57,241 | 2.32 ms | 35 µs | 74 MB | 96 MB | 217 ms |
+| JIT | Inertia first load (HTML) | 56,117 | 2.31 ms | 35 µs | 75 MB | 92 MB | 223 ms |
+| Native AOT | Plain JSON API | 65,364 | 2.28 ms | 30 µs | 29 MB | 35 MB | 28 ms |
+| Native AOT | Plain HTML shell | 55,776 | 2.19 ms | 35 µs | 29 MB | 42 MB | 28 ms |
+| Native AOT | Inertia visit (JSON) | 44,979 | 2.92 ms | 44 µs | 33 MB | 48 MB | 37 ms |
+| Native AOT | Inertia first load (HTML) | 44,666 | 2.97 ms | 44 µs | 33 MB | 48 MB | 35 ms |
+
+What this means for an app:
+
+- **Memory.** On JIT, Inertia.Net adds about 13 MB at rest and 14–19 MB at peak under load. On Native AOT it adds about 4 MB at rest and 6–13 MB at peak.
+- **CPU.** An Inertia response costs 5–8 µs more server CPU than a hand-written JSON or HTML endpoint on JIT, and 9–14 µs more on Native AOT. On these do-nothing handlers that is 12–31% fewer requests per second. A handler that spends 1 ms on a database query loses under 1.5%.
+- **Latency.** Under 64 concurrent connections, p99 stays below 3 ms in every build.
+- **JIT or Native AOT.** Native AOT uses about half the memory and starts six times faster. JIT serves more requests per second, because dynamic PGO keeps optimizing the hot path after startup.
+- **GC mode.** Workstation GC gave about the same throughput. Its RSS at rest was the same on JIT and up to 2 MB higher on Native AOT, and its peak under load was 2–14 MB higher. That is why the table uses server GC, the ASP.NET Core default.
+
+Run it yourself on Linux. It needs `taskset`, plus `clang` and `zlib` for the Native AOT build:
+
+```sh
+eng/hosting-probe.sh artifacts/hosting-probe.md --seconds 12 --warmup 8 --repeat 5
+```
+
+The [`hosting-probe` workflow](https://github.com/adzamkomladev/Inertia.Net/actions/workflows/hosting-probe.yml) runs the same probe on a GitHub runner whenever the probe changes, or on demand. The full table, including workstation GC and RSS after load, is in its job summary and in the [benchmark results](https://github.com/adzamkomladev/Inertia.Net/blob/main/tests/Inertia.Net.Benchmarks/RESULTS.md). Measure on a quiet machine: on a shared one, other processes take CPU from both the server and the client, so requests per second varies from run to run.
+
 ## Memory and hosting
 
-The useful planning number is not a microbenchmark; it is how much memory the whole process needs at rest and under load. These are reference points measured on Linux x64 after the first request, not guarantees:
+For capacity planning, the useful number is how much memory the whole process needs at rest and under load, not a microbenchmark. These are reference points for complete apps, measured on Linux x64 after the first request. They are not guarantees:
 
 | App shape | RSS at rest | Plan for |
 |---|---:|---:|
@@ -28,7 +68,7 @@ For containers:
 - Expect SSR to add a second process. If the Bun renderer is optional, `SsrMode.Preferred` lets the app fall back to client rendering when it is unavailable.
 - Profile with real page sizes. A dashboard with deferred props and a paginated feed behaves very differently from a page that serializes every row.
 
-The benchmark project still has the throughput and allocation probes:
+For in-process render throughput and allocations, use the benchmark project:
 
 ```sh
 dotnet run -c Release --project tests/Inertia.Net.Benchmarks -- --filter '*'

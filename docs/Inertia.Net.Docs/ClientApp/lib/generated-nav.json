@@ -918,6 +918,16 @@
           "depth": 2
         },
         {
+          "id": "with-inertiajsvite",
+          "text": "With @inertiajs/vite",
+          "depth": 3
+        },
+        {
+          "id": "without-the-plugin",
+          "text": "Without the plugin",
+          "depth": 3
+        },
+        {
           "id": "2-enable-it",
           "text": "2. Enable it",
           "depth": 2
@@ -1173,10 +1183,15 @@
       "slug": "performance",
       "url": "/docs/performance",
       "title": "Performance",
-      "description": "Memory and hosting guidance, payload limits and the design choices behind the adapter.",
+      "description": "Memory, requests per second and CPU with and without Inertia, hosting guidance, payload limits and the design choices behind the adapter.",
       "section": "Production",
       "order": 7,
       "headings": [
+        {
+          "id": "with-and-without-inertia",
+          "text": "With and without Inertia",
+          "depth": 2
+        },
         {
           "id": "memory-and-hosting",
           "text": "Memory and hosting",
