@@ -7,6 +7,8 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-11-14
+
 ### Fixed
 
 - `Inertia.Net.Redis`: a tag set kept the keys of entries that had expired on their own, so the `inertia:props` set grew for as long

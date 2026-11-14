@@ -5,7 +5,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.9.0** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.1** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -88,7 +88,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.0
+dotnet new install Inertia.Net.Templates::1.9.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -202,17 +202,17 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.0
-dotnet add package Inertia.Net.Mvc --version 1.9.0 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.0 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.0 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.0 # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.0 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.0 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.1
+dotnet add package Inertia.Net.Mvc --version 1.9.1 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.1 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.1 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.1 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.1 # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.1 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.1 # MongoDB pagination
 ```
 
-Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.0` for all Inertia.Net packages. Inertia.Net 1.9.0 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.1` for all Inertia.Net packages. Inertia.Net 1.9.1 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### .NET 10 and .NET 11
 
