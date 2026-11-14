@@ -12,17 +12,18 @@ namespace Inertia.Net.Benchmarks;
 /// <summary>
 /// <c>--feature-probe</c>: the per-request cost of the 1.6-1.9 features. The 20-prop page with five head tags (HTML and JSON), five
 /// lazy props with and without <c>.Live(evt)</c>, resolving a typed live-channel authorizer as the hub does per invocation (in a new
-/// scope, and the options' factory alone), and a GET
+/// scope, and the options' factory alone), the hub's origin check for an origin third in <c>AllowedOrigins</c>, and a GET
 /// through <c>UseInertiaAntiforgery()</c> that is not a page load. <c>--feature-probe check</c> prints the bodies instead, to compare
-/// output before and after a change.
+/// output before and after a change; <c>--feature-probe {text}</c> runs only the rows whose name contains the text.
 /// </summary>
 internal static class FeatureProbe
 {
     private static readonly int[] Ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     private static readonly LiveEvent Changed = new("Changed", LiveChannel.Private("orders.1"));
 
-    internal static async Task RunAsync(bool check)
+    internal static async Task RunAsync(bool check, string? only = null)
     {
+        _only = only;
         var services = BenchApp.CreateServices();
         var version = BenchApp.Version(services);
         var json = BenchApp.CreateContext(services, "/users", (InertiaHeaders.Inertia, "true"), (InertiaHeaders.Version, version));
@@ -55,6 +56,11 @@ internal static class FeatureProbe
         var scopes = hubServices.GetRequiredService<IServiceScopeFactory>();
         var authorizerFactory = hubServices.GetRequiredService<Microsoft.Extensions.Options.IOptions<InertiaLiveSignalROptions>>().Value.AuthorizerFactory!;
 
+        var origin = new LiveOrigin(Microsoft.Extensions.Logging.Abstractions.NullLogger<LiveOrigin>.Instance);
+        string[] allowedOrigins = ["https://admin.example.com", "https://docs.example.com", "https://app.example.com"];
+        var crossOrigin = BenchApp.CreateContext(hubServices, "/live/negotiate");
+        crossOrigin.Request.Headers.Origin = "https://app.example.com";
+
         var antiforgeryServices = BenchApp.CreateServices(configureServices: s => s.AddAntiforgery(o => o.HeaderName = "X-XSRF-TOKEN"));
         var app = new ApplicationBuilder(antiforgeryServices);
         app.UseInertiaAntiforgery();
@@ -82,6 +88,11 @@ internal static class FeatureProbe
                 authorizerFactory(hubServices);
                 return Task.CompletedTask;
             });
+            await MeasureAsync(repetition, "live origin, third allowed", 1000000, null, _ =>
+            {
+                if (!origin.IsAllowed(crossOrigin.Request, allowedOrigins)) throw new InvalidOperationException("The origin is allowed.");
+                return Task.CompletedTask;
+            });
             await MeasureAsync(repetition, "antiforgery GET", 200000, api, c => pipeline(c));
         }
     }
@@ -102,8 +113,11 @@ internal static class FeatureProbe
         ["e"] = live ? Prop(() => Ids).Live(Changed) : Prop(() => Ids),
     };
 
+    private static string? _only;
+
     private static async Task MeasureAsync(int repetition, string name, int iterations, DefaultHttpContext? context, Func<HttpContext, Task> run)
     {
+        if (_only is not null && !name.Contains(_only, StringComparison.Ordinal)) return;
         for (var i = 0; i < iterations / 10; i++) await Run(context, run);
         var before = GC.GetTotalAllocatedBytes(true);
         var started = Stopwatch.GetTimestamp();
