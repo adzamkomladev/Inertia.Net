@@ -33,12 +33,15 @@ builder.Services.AddInertia(o =>
 {
     o.State.RememberPreviousUrl = true;
     o.Share("appName", "Inertia.Net Sample");
+    o.Head.TitleTemplate = "{0} - Inertia.Net Sample"; // Render(...).WithHead(h => h.Title("Users"))
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
     o.Vite.Prefetch = VitePrefetch.Waterfall; // fetch the other pages' chunks after load, three at a time
     // Development only: Render("Users/Indx") fails fast, and the TypeScript declarations are rewritten at startup.
     o.Pages.Directory = "ClientApp/pages";
     o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";
-    o.TypeScript.FlashData<Flash>();
+    o.TypeScript.FlashData<Flash>().Page<LoginPage>();
+    o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts"; // from the named endpoints (WithName)
+    o.TypeScript.LiveEvents(SampleEvents.CounterChanged, SampleEvents.InboxChanged, SampleEvents.PostCreated); // exported from routes.ts
     o.Ssr.BundlePath = "ssr/ssr.js";
     // A live prop on every page: the demo user's private channel (the sample has no sign-in, so the demo user is always id 1).
     o.Share("inbox", Prop(() => new Inbox(AppState.Unread)).Live(SampleEvents.InboxChanged));
@@ -85,13 +88,13 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseInertiaErrorPages(); // wraps rate-limit and page responses
 app.UseRouting();
-app.UseRateLimiter();
 app.UseInertia();
+app.UseRateLimiter(); // after UseInertia(), which saves the flash data of a rejection
 app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
 
 app.MapInertiaDevTools();
 app.MapInertiaLiveHub(); // /inertia-live
-app.MapInertia("/", "Home");
+app.MapInertia("/", "Home").WithName("home");
 LoginDemo.MapRoutes(app);
 
 app.MapGet("/users", (HttpContext http) => Render("Users/Index", new InertiaProps
@@ -103,45 +106,56 @@ app.MapGet("/users", (HttpContext http) => Render("Users/Index", new InertiaProp
         return new Stats(AppState.Users.Count);
     }),
     ["plans"] = Once(() => new Plans([new("Free", 0), new("Pro", 9)], AppState.NextPlansCount())),
-}));
+}).WithHead(h => h.Title("Users").Meta("description", "Paginated users with deferred stats"))).WithName("users.index");
 
 app.MapDelete("/users/{id:int}", (int id) =>
 {
     AppState.Users.RemoveAll(u => u.Id == id);
     return Back("/users").WithFlash("success", "User deleted");
-});
+}).WithName("users.destroy");
 
-app.MapGet("/live", () => Render("Live/Index", new InertiaProps
+app.MapGet("/live", (HttpContext http) => Render("Live/Index", new InertiaProps
 {
     ["counter"] = Live(() => new Counter(AppState.Counter), SampleEvents.CounterChanged),
-}));
+    // A scroll prop cannot be Live(): the page reloads it with liveReload() when PostCreated arrives.
+    ["posts"] = Scroll(Pagination.Paginate(AppState.LivePosts(),
+        PageRequest.From(http.Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize))),
+})).WithName("live.index");
 
-app.MapGet("/contacts/create", () => Render("Contacts/Create"));
+app.MapPost("/live/posts", async (HttpContext http, IInertiaLive live) =>
+{
+    AppState.AddLivePost();
+    // The sender has the new post from this visit's response: leave its connection out.
+    await live.PublishAsync(SampleEvents.PostCreated, exceptSocketId: http.InertiaRequest().SocketId);
+    return Back("/live");
+}).WithName("live.posts.store");
+
+app.MapGet("/contacts/create", () => Render("Contacts/Create")).WithName("contacts.create");
 
 app.MapPost("/contacts", (HttpContext http, [FromBody] ContactForm form) =>
 {
     http.Inertia().Flash("success", "Contact created");
     return Results.Redirect("/");
-}).WithInertiaValidation();
+}).WithInertiaValidation().WithName("contacts.store");
 
 app.MapPost("/newsletter", (HttpContext http, [FromBody] NewsletterForm form) =>
 {
     http.Inertia().Flash("success", "Subscribed");
     return Results.Redirect("/contacts/create");
-}).WithInertiaValidation();
+}).WithInertiaValidation().WithName("newsletter.store");
 
 app.MapGet("/feed", (HttpContext http) => Render("Feed/Index", new InertiaProps
 {
     ["posts"] = Scroll(Pagination.Paginate(AppState.Posts,
         PageRequest.From(http.Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize))),
-}));
+})).WithName("feed.index");
 
 app.MapGet("/feed/cursor", async (HttpContext http, FeedDbContext database, CancellationToken ct) =>
 {
     var request = CursorRequest.From(http, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize);
     var posts = await database.Posts.AsNoTracking().ToCursorPageAsync(post => post.Id, request, descending: true, ct: ct);
     return Render("Feed/Cursor", new InertiaProps { ["posts"] = Scroll(posts) });
-});
+}).WithName("feed.cursor");
 
 if (e2e)
 {
@@ -164,6 +178,14 @@ if (e2e)
     {
         var value = AppState.IncrementCounter();
         await live.PublishAsync(SampleEvents.CounterChanged, new CounterUpdate(new Counter(value)));
+    }).DisableAntiforgery();
+    app.MapPost("/__e2e/live/posts", async (IInertiaLive live, int? count) =>
+    {
+        for (var i = 0; i < (count ?? 1); i++)
+        {
+            AppState.AddLivePost();
+            await live.PublishAsync(SampleEvents.PostCreated);
+        }
     }).DisableAntiforgery();
     app.MapPost("/__e2e/live/inbox", async (IInertiaLive live) =>
     {
@@ -209,6 +231,8 @@ namespace MinimalApi.React
         public static LiveEvent CounterChanged { get; } = new("CounterChanged", LiveChannel.Public("counter"));
 
         public static LiveEvent InboxChanged { get; } = new("InboxChanged", LiveChannel.Private("users.1"));
+
+        public static LiveEvent PostCreated { get; } = new("PostCreated", LiveChannel.Public("posts"));
     }
 
     /// <summary>The flash data the pages read (<c>page.flash</c>), for the generated TypeScript declarations.</summary>
@@ -252,7 +276,7 @@ namespace MinimalApi.React
     {
         public const int PageSize = 10, FeedPages = 5;
 
-        private static int _plansCount, _counter, _unread;
+        private static int _plansCount, _counter, _unread, _livePosts = 15;
 
         public static List<User> Users { get; } = Seed();
 
@@ -275,6 +299,15 @@ namespace MinimalApi.React
 
         public static int IncrementUnread() => Interlocked.Increment(ref _unread);
 
+        /// <summary>The live feed on the Live page, newest first.</summary>
+        public static Post[] LivePosts()
+        {
+            var count = Volatile.Read(ref _livePosts);
+            return [.. Enumerable.Range(1, count).Reverse().Select(id => new Post(id, $"Live post {id}"))];
+        }
+
+        public static void AddLivePost() => Interlocked.Increment(ref _livePosts);
+
         public static IResult Reset()
         {
             LoginDemo.Reset();
@@ -284,6 +317,7 @@ namespace MinimalApi.React
             Interlocked.Exchange(ref _plansCount, 0);
             Interlocked.Exchange(ref _counter, 0);
             Interlocked.Exchange(ref _unread, 0);
+            Interlocked.Exchange(ref _livePosts, 15);
             return Results.NoContent();
         }
 

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net</RootNamespace>
+    <Description>A Redis cache store for Inertia.Net: cached props and SSR renders shared by every app instance.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Inertia.Net/Inertia.Net.csproj" />
+    <PackageReference Include="StackExchange.Redis" />
+  </ItemGroup>
+</Project>

@@ -8,6 +8,7 @@ export interface InertiaPages {
 
 export interface SharedProps {
   appName: string
+  head?: string[]
 }
 
 export interface FlashData extends Flash {}

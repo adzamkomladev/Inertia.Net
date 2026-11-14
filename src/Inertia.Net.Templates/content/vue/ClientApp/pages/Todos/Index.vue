@@ -2,11 +2,12 @@
 import { Deferred, router, useForm } from '@inertiajs/vue3'
 import Layout from '../../Layout.vue'
 import type { InertiaPages } from '../../types/inertia'
+import { routes } from '../../types/routes'
 
 defineProps<InertiaPages['Todos/Index']>()
 
 const form = useForm({ title: '' })
-const submit = () => form.post('/todos', { onSuccess: () => form.reset() })
+const submit = () => form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
 </script>
 
 <template>
@@ -15,9 +16,9 @@ const submit = () => form.post('/todos', { onSuccess: () => form.reset() })
     <ul>
       <li v-for="todo in todos" :key="todo.id">
         <label :style="{ textDecoration: todo.done ? 'line-through' : undefined }">
-          <input type="checkbox" :checked="todo.done" @change="router.patch(`/todos/${todo.id}/toggle`)" /> {{ todo.title }}
+          <input type="checkbox" :checked="todo.done" @change="router.visit(routes.todos.toggle(todo.id))" /> {{ todo.title }}
         </label>
-        <button @click="router.delete(`/todos/${todo.id}`)">Delete</button>
+        <button @click="router.visit(routes.todos.destroy(todo.id))">Delete</button>
       </li>
     </ul>
     <form @submit.prevent="submit">

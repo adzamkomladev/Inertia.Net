@@ -26,6 +26,7 @@ builder.Services.AddInertia(o =>
     o.Share("auth", ctx => new AuthInfo(ctx.Request.Headers["X-User"].ToString() is { Length: > 0 } user ? user : null));
     o.CspNonce = ctx => ctx.Request.Headers["X-Nonce"].ToString();
     o.Vite.Prefetch = VitePrefetch.Waterfall;
+    o.TypeScript.AddGeneratedPages(); // source-generated Page<TPage>() calls: no assembly scan under Native AOT
 });
 // Live props over SignalR (Inertia.Net.Live.SignalR): smoke.sh subscribes with a long-polling client made of curl calls.
 builder.Services.AddInertiaLive().AddSignalR();
@@ -37,6 +38,26 @@ builder.Services.AddInertiaDevTools(o =>
 });
 
 builder.Services.AddInertiaErrorPages();
+// Cookie sign-in: an Inertia visit to a protected page is redirected to the login path instead of getting 401.
+builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/login";
+        o.UseInertiaRedirects();
+    });
+builder.Services.AddAuthorization();
+builder.Services.AddScoped<Greeter>();
+// The Redis store is compiled in (trim and AOT analysis) and used only when REDIS_URL is set.
+if (Environment.GetEnvironmentVariable("REDIS_URL") is { Length: > 0 } redis)
+{
+    // A prefix per run: the checks count loads, so entries left by an earlier run would fail them.
+    var prefix = $"aot-smoke:{Guid.NewGuid():N}:";
+    builder.Services.AddInertiaRedisCache(o =>
+    {
+        o.Configuration = redis;
+        o.KeyPrefix = prefix;
+    });
+}
 // A named mount (a library UI under /admin) with its own version, shared props, state cookie and error component.
 builder.Services.AddInertia("admin", o =>
 {
@@ -54,6 +75,9 @@ app.Map("/admin", admin =>
     admin.UseEndpoints(e => e.MapGet("/", () => Render("Admin/Index")));
 });
 app.UseInertia();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
 var configuredFastEndpoints = 0;
 app.UseFastEndpoints(c =>
 {
@@ -67,6 +91,14 @@ if (configuredFastEndpoints == 0)
 
 app.MapGet("/throw", (Func<IResult>)(() => throw new InvalidOperationException("smoke")));
 app.MapGet("/healthz", () => "ok");
+// A page record names its component (a static abstract member: no reflection under Native AOT).
+app.MapGet("/typed/{id:int}", (int id) => Render(new TypedPage(id))).WithName("typed.show");
+app.MapMethods("/secret", ["GET", "PUT"], () => Render("Secret")).RequireAuthorization();
+// A loader taking a scoped service, with server-rendered head tags.
+app.MapGet("/scoped", () => Render("Scoped", new InertiaProps
+{
+    ["greeting"] = Prop<Greeter, string>((greeter, ct) => Task.FromResult(greeter.Hello())),
+}).WithHead(h => h.Title("Scoped <AOT>").Meta("description", "scoped & head")));
 app.MapInertiaDevTools();
 app.MapInertia("/about", "About", new InertiaProps { ["since"] = 2026 });
 app.MapGet("/serialization", () => Render("Serialization", new SerializationPage()));
@@ -209,6 +241,16 @@ internal sealed class SmokeMaskConverter : JsonConverter<string>
 
 internal sealed record Stat(string Name, int Value);
 
+internal sealed class Greeter
+{
+    public string Hello() => "hello from a scoped service";
+}
+
+internal sealed record TypedPage(int Id) : IInertiaPage
+{
+    public static string Component => "Typed/Show";
+}
+
 internal sealed record LiveStats([property: JsonPropertyName("live")] Stat Live);
 
 internal static class SmokeEvents
@@ -254,6 +296,7 @@ public sealed class AliasItem
 [JsonSerializable(typeof(Dictionary<Guid, SerializationRow>))]
 [JsonSerializable(typeof(System.Collections.ObjectModel.ReadOnlyDictionary<DateTime, SerializationRow>))]
 [JsonSerializable(typeof(HomePage))]
+[JsonSerializable(typeof(TypedPage))]
 [JsonSerializable(typeof(Stat))]
 [JsonSerializable(typeof(Stat[]))]
 [JsonSerializable(typeof(AuthInfo))]

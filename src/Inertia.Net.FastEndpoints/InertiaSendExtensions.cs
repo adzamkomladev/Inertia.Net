@@ -21,6 +21,14 @@ public static class InertiaSendExtensions
         where TRequest : notnull =>
         send.ResultAsync(Inertia.Render(component, props));
 
+    /// <summary>Renders <paramref name="page"/> with the component it names. See <see cref="Inertia.Render{TPage}(TPage)"/>.</summary>
+    /// <param name="send">The endpoint's <c>Send</c> property.</param>
+    /// <param name="page">The typed page props.</param>
+    public static Task<Void> InertiaAsync<TRequest, TResponse, TPage>(this ResponseSender<TRequest, TResponse> send, TPage page)
+        where TRequest : notnull
+        where TPage : IInertiaPage =>
+        send.ResultAsync(Inertia.Render(page));
+
     /// <summary>A full page visit to <paramref name="url"/>: 409 with <c>X-Inertia-Location</c> for Inertia requests, otherwise a 302.</summary>
     public static Task<Void> InertiaLocationAsync<TRequest, TResponse>(this ResponseSender<TRequest, TResponse> send, string url)
         where TRequest : notnull =>

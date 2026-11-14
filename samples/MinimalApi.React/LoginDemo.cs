@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -15,7 +14,6 @@ internal static class LoginDemo
     {
         services.AddRateLimiter(options =>
         {
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.AddPolicy("login", http =>
             {
                 var validation = http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
@@ -41,31 +39,18 @@ internal static class LoginDemo
                     QueueLimit = 0,
                 });
             });
-            options.OnRejected = (context, _) =>
-            {
-                var http = context.HttpContext;
-                if (http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
-                    && InertiaPrecognition.IsPrecognitive(http.Request))
-                {
-                    http.Response.Headers[InertiaPrecognition.Header] = "true";
-                    http.Response.Headers.Append("Vary", InertiaPrecognition.Header);
-                }
-
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-                    http.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
-                return ValueTask.CompletedTask;
-            };
+            options.OnRejected = InertiaRateLimiting.OnRejected(); // Precognition: true on validation, the 429 error page on submit
         });
     }
 
     public static void MapRoutes(WebApplication app)
     {
-        app.MapGet("/login", () => Render("Login", new LoginPage(Volatile.Read(ref _submissions))));
+        app.MapGet("/login", () => Render(new LoginPage(Volatile.Read(ref _submissions)))).WithName("login");
         app.MapPost("/login", (LoginForm input) =>
         {
             Interlocked.Increment(ref _submissions);
             return Back().WithFlash("success", "Demo form submitted");
-        }).WithInertiaPrecognition().RequireRateLimiting("login");
+        }).WithInertiaPrecognition().RequireRateLimiting("login").WithName("login.store");
     }
 
     public static void Reset()
@@ -84,4 +69,8 @@ public sealed class LoginForm
     public string? Password { get; set; }
 }
 
-public sealed record LoginPage(int Submissions);
+/// <summary>The Login page's props; the record names its component, so <c>Render(new LoginPage(n))</c> needs no string.</summary>
+public sealed record LoginPage(int Submissions) : IInertiaPage
+{
+    public static string Component => "Login";
+}

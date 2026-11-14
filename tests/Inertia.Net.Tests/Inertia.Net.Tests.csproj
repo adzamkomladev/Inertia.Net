@@ -14,5 +14,8 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
+    <!-- Referenced as a library: the generator and analyzer are run on test compilations (AnalyzerTests). -->
+    <ProjectReference Include="..\..\src\Inertia.Net.Analyzers\Inertia.Net.Analyzers.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 </Project>

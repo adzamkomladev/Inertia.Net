@@ -339,6 +339,30 @@ req GET /admin/missing -H 'X-Inertia: true' -H 'X-Inertia-Version: admin-1'
 status_is 404
 has '"component":"Admin/Error"'
 
+# 18. A page record renders with the component it names.
+inertia GET /typed/7
+status_is 200
+has '"component":"Typed/Show"'
+has '"id":7'
+
+# 19. Scoped loaders and server head tags.
+inertia GET /scoped
+status_is 200
+has '"greeting":"hello from a scoped service"'
+has '"head":["<title data-inertia=\"title\">Scoped &lt;AOT&gt;</title>","<meta name=\"description\" content=\"scoped &amp; head\" data-inertia=\"description\">"]'
+req GET /scoped
+has '<title data-inertia="title">Scoped &lt;AOT&gt;</title>'
+has '<meta name="description" content="scoped &amp; head" data-inertia="description">'
+
+# 20. Cookie authentication: Inertia visits are redirected to the login page like browser requests; fetches get 401.
+inertia GET /secret
+status_is 302
+tr -d '\r' <"$T/h" | grep -qi '^Location: .*/login?ReturnUrl=%2Fsecret$' || fail "no redirect to the login page"
+inertia PUT /secret
+status_is 303
+req GET /secret -H 'X-Requested-With: XMLHttpRequest'
+status_is 401
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES smoke check(s) failed. App log:"
   cat "$T/app.log"

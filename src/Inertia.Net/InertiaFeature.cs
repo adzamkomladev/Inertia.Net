@@ -34,6 +34,19 @@ public sealed class InertiaFeature
 
     internal Dictionary<string, object?>? SharedProps { get; private set; }
 
+    private InertiaHead? _head;
+
+    /// <summary>
+    /// The head tags of the page rendered for this request (see <see cref="InertiaHead"/>): set shared defaults here from middleware;
+    /// <c>Render(...).WithHead(...)</c> replaces tags with the same key.
+    /// </summary>
+    public InertiaHead Head => _head ??= new InertiaHead();
+
+    internal InertiaHead? HeadOrNull => _head;
+
+    /// <summary>The head tags written in the page, for the root view when there is no SSR head.</summary>
+    internal string[]? HeadHtml { get; set; }
+
     /// <summary>Restored and pending flash data, as rendered on the page.</summary>
     internal Dictionary<string, object?>? FlashData => _flash;
 

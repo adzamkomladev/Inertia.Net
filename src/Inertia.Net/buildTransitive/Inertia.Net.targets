@@ -1,0 +1,17 @@
+<Project>
+  <!--
+    <InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>: after each build (dotnet build, and the build inside
+    dotnet publish) the app runs once with the inertia-types flag and writes InertiaOptions.TypeScript.OutputPath and RoutesOutputPath.
+    The app starts without listening on any port (Inertia.Net swaps in a server that never binds) and exits; its own startup code
+    and hosted services do run. A failure to write fails the build.
+  -->
+  <Target Name="InertiaGenerateTypes"
+          AfterTargets="Build"
+          Condition="'$(InertiaGenerateTypesOnBuild)' == 'true' and '$(OutputType)' == 'Exe' and '$(DesignTimeBuild)' != 'true' and '$(TargetPath)' != ''">
+    <PropertyGroup>
+      <_InertiaDotnet>$(DOTNET_HOST_PATH)</_InertiaDotnet>
+      <_InertiaDotnet Condition="'$(_InertiaDotnet)' == ''">dotnet</_InertiaDotnet>
+    </PropertyGroup>
+    <Exec Command="&quot;$(_InertiaDotnet)&quot; &quot;$(TargetPath)&quot; --inertia-types" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+</Project>

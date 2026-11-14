@@ -15,6 +15,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     private Dictionary<string, object?>? _viewData;
     private SsrMode? _ssrMode;
     private SsrCaching? _ssrCache; // one reference, set only by WithSsrCache()
+    private InertiaHead? _head;
 
     internal InertiaResult(string component, object? props)
     {
@@ -98,10 +99,22 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         return this;
     }
 
+    /// <summary>
+    /// Sets head tags for this page (see <see cref="InertiaHead"/>); they replace the request's shared tags
+    /// (<c>HttpContext.Inertia().Head</c>) with the same key: <c>.WithHead(h =&gt; h.Title(post.Title).Meta("description", post.Summary))</c>.
+    /// </summary>
+    public InertiaResult WithHead(Action<InertiaHead> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        configure(_head ??= new InertiaHead());
+        return this;
+    }
+
     /// <inheritdoc />
     public async Task ExecuteAsync(HttpContext httpContext)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
+        _head?.CopyTo(httpContext.Inertia().Head);
         var services = httpContext.RequestServices;
         var pageWriter = InertiaMountServices.PageWriter(httpContext)
             ?? throw new InvalidOperationException("Inertia.Net services are not registered. Call services.AddInertia() at startup.");

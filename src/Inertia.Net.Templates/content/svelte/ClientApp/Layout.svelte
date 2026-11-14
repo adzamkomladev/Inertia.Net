@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Link, page } from '@inertiajs/svelte'
   import type { Snippet } from 'svelte'
+  import { routes } from './types/routes'
 
   let { children }: { children: Snippet } = $props()
 </script>
@@ -10,8 +11,8 @@
   <header>
     <strong>{page.props.appName}</strong>
     <nav style="display: flex; gap: 12px; margin: 8px 0">
-      <Link href="/">Home</Link>
-      <Link href="/todos">Todos</Link>
+      <Link href={routes.home()}>Home</Link>
+      <Link href={routes.todos.index()}>Todos</Link>
     </nav>
     {#if page.flash.success}
       <p style="color: green">{page.flash.success}</p>

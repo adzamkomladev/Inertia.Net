@@ -5,9 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- Props are serialized through AppJsonContext (source-generated), which keeps the app ready for Native AOT. -->
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <!-- Build warning INERTIA002 when Render/MapInertia names a component with no file here. -->
+    <InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>
+    <!-- Uncomment to rewrite ClientApp/types on every build (the app starts once without listening, then exits). -->
+    <!-- <InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild> -->
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Inertia.Net" Version="1.8.0" />
+    <PackageReference Include="Inertia.Net" Version="1.9.0" />
   </ItemGroup>
   <!-- The client is built with npm (npm run build writes wwwroot/build); dotnet build never needs Node. -->
   <ItemGroup>

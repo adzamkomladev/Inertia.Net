@@ -1,8 +1,11 @@
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +34,35 @@ public interface IConformanceHost
 }
 
 /// <summary>Counts handler invocations, so tests can prove a handler did not run.</summary>
+/// <summary>A page record that names its component, rendered by every host at <c>/typed/{id:int}</c> (named <c>typed.show</c>).</summary>
+public sealed record TypedHostPage(int Id) : IInertiaPage
+{
+    public static string Component => "Typed/Show";
+}
+
+/// <summary>The body of <c>POST /typed</c> (named <c>typed.store</c>) on every host.</summary>
+public sealed class TypedStoreInput
+{
+    public int Id { get; set; }
+
+    public string? Title { get; set; }
+}
+
+/// <summary>Signs in the demo user for the cookie authentication tests (<c>POST /sign-in?role=...</c>).</summary>
+public static class AuthRoutes
+{
+    public static Task SignInAsync(HttpContext context)
+    {
+        var claims = new List<Claim> { new(ClaimTypes.Name, "ada") };
+        if (context.Request.Query["role"].ToString() is { Length: > 0 } role)
+        {
+            claims.Add(new(ClaimTypes.Role, role));
+        }
+
+        return context.SignInAsync("Cookies", new ClaimsPrincipal(new ClaimsIdentity(claims, "Cookies")));
+    }
+}
+
 public sealed class ConformanceCounters
 {
     private int _page;
@@ -48,6 +80,14 @@ public sealed record ConformanceSetup
     public bool UseSession { get; init; }
 
     public string? PathBase { get; init; }
+
+    public string EnvironmentName { get; init; } = Environments.Production;
+
+    /// <summary>Calls <c>UseInertiaErrorPages()</c> before <c>UseInertia()</c> (register them with <see cref="Services"/>).</summary>
+    public bool UseErrorPages { get; init; }
+
+    /// <summary>Middleware added right after <c>UseInertia()</c>.</summary>
+    public Action<WebApplication>? Middleware { get; init; }
 
     /// <summary>Runs after the host's services, e.g. to replace the SSR HTTP handler.</summary>
     public Action<IServiceCollection>? Services { get; init; }
@@ -75,7 +115,7 @@ public sealed class ConformanceApp : IAsyncDisposable
         where THost : IConformanceHost
     {
         setup ??= new ConformanceSetup();
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = ContentRoot, EnvironmentName = Environments.Production });
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = ContentRoot, EnvironmentName = setup.EnvironmentName });
         builder.WebHost.UseTestServer();
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         builder.Services.AddSingleton<ConformanceCounters>();
@@ -105,7 +145,20 @@ public sealed class ConformanceApp : IAsyncDisposable
             app.UseSession();
         }
 
+        if (setup.UseErrorPages)
+        {
+            app.UseInertiaErrorPages();
+        }
+
         app.UseInertia();
+        setup.Middleware?.Invoke(app);
+        if (app.Services.GetService<IAuthenticationSchemeProvider>() is not null)
+        {
+            // After the error pages, so a 403 from authorization renders the error component (WebApplication would add them first).
+            app.UseAuthentication();
+            app.UseAuthorization();
+        }
+
         THost.MapRoutes(app);
         await app.StartAsync(TestContext.Current.CancellationToken);
         return new ConformanceApp(app);

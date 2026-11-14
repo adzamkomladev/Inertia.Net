@@ -40,7 +40,7 @@ public class OverloadBindingTests
         for (var i = 0; i < props.Length; i++)
         {
             Assert.True(props[i].ValueType == typeof(int), $"props[{i}] bound with T = {props[i].ValueType}");
-            Assert.Equal(42, await props[i].ResolveAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(42, await props[i].ResolveAsync(null, TestContext.Current.CancellationToken));
         }
     }
 
@@ -61,7 +61,7 @@ public class OverloadBindingTests
     {
         using var cts = new CancellationTokenSource();
         CancellationToken seen = default;
-        await Defer(ct => { seen = ct; return Task.FromResult(1); }).ResolveAsync(cts.Token);
+        await Defer(ct => { seen = ct; return Task.FromResult(1); }).ResolveAsync(null, cts.Token);
         Assert.Equal(cts.Token, seen);
     }
 }

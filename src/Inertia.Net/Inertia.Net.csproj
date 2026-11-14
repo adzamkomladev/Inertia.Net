@@ -8,14 +8,22 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The source generator and analyzer (component names) ship in this package: analyzers/dotnet/cs. -->
+    <ProjectReference Include="..\Inertia.Net.Analyzers\Inertia.Net.Analyzers.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Include="..\Inertia.Net.Analyzers\bin\$(Configuration)\netstandard2.0\Inertia.Net.Analyzers.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Global usings for consumers (Inertia.Net + using static Inertia.Net.Inertia); see the file for the opt-out. -->
     <None Include="buildTransitive\Inertia.Net.props" Pack="true" PackagePath="buildTransitive\" />
+    <None Include="buildTransitive\Inertia.Net.targets" Pack="true" PackagePath="buildTransitive\" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Inertia.Net.Tests" />
     <InternalsVisibleTo Include="Inertia.Net.IntegrationTests" />
     <InternalsVisibleTo Include="Inertia.Net.Benchmarks" />
     <InternalsVisibleTo Include="Inertia.Net.EntityFrameworkCore" />
+    <InternalsVisibleTo Include="Inertia.Net.MongoDB" />
+    <InternalsVisibleTo Include="Inertia.Net.MongoDB.Tests" />
     <InternalsVisibleTo Include="Inertia.Net.Mvc" />
     <InternalsVisibleTo Include="Inertia.Net.FastEndpoints" />
   </ItemGroup>

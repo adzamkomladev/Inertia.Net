@@ -8,4 +8,14 @@
     <Using Include="Inertia.Net" />
     <Using Include="Inertia.Net.Inertia" Static="true" />
   </ItemGroup>
+
+  <!--
+    Compile-time component-name check (INERTIA002): set <InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory> and every
+    Render("Users/Index"), MapInertia and page record name is checked against the files there. Properties are evaluated before
+    items, so the property may be set in the project file after this import.
+  -->
+  <ItemGroup Condition="'$(InertiaPagesDirectory)' != ''">
+    <CompilerVisibleProperty Include="InertiaPagesDirectory" />
+    <AdditionalFiles Include="$(InertiaPagesDirectory)/**/*.tsx;$(InertiaPagesDirectory)/**/*.jsx;$(InertiaPagesDirectory)/**/*.ts;$(InertiaPagesDirectory)/**/*.js;$(InertiaPagesDirectory)/**/*.vue;$(InertiaPagesDirectory)/**/*.svelte" />
+  </ItemGroup>
 </Project>

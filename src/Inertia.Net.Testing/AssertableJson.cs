@@ -154,6 +154,21 @@ public abstract class AssertableJsonBase<TSelf> where TSelf : AssertableJsonBase
         return Self;
     }
 
+    /// <summary>
+    /// Asserts that the property is a route as the client takes it (<c>{ url, method }</c>, the shape of the generated <c>routes.ts</c>
+    /// functions), e.g. <c>WhereRoute("actions.delete", "/users/1", "delete")</c>. The method is compared ignoring case.
+    /// </summary>
+    public TSelf WhereRoute(string key, string url, string method = "get")
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        ArgumentNullException.ThrowIfNull(method);
+        var actual = Get(key);
+        if (actual is not JsonObject route || (string?)route["url"] is not { } actualUrl || (string?)route["method"] is not { } actualMethod
+            || actualUrl != url || !string.Equals(actualMethod, method, StringComparison.OrdinalIgnoreCase))
+            Fail($"Property [{Dot(key)}] expected to be the route {{ url: {url}, method: {method.ToLowerInvariant()} }} but was {Json.Show(actual)}.");
+        return Self;
+    }
+
     /// <summary>Asserts that the predicate accepts the property's value.</summary>
     public TSelf Where(string key, Func<JsonNode?, bool> predicate)
     {

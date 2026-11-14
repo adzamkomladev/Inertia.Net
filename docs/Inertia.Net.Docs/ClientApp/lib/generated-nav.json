@@ -99,7 +99,7 @@
       "slug": "installation",
       "url": "/docs/installation",
       "title": "Installation",
-      "description": "Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.",
+      "description": "Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.",
       "section": "Get started",
       "order": 3,
       "headings": [
@@ -310,6 +310,11 @@
         {
           "id": "parallel-props",
           "text": "Parallel props",
+          "depth": 3
+        },
+        {
+          "id": "scoped-services-in-loaders",
+          "text": "Scoped services in loaders",
           "depth": 3
         },
         {
@@ -550,6 +555,56 @@
       ]
     },
     {
+      "slug": "authentication",
+      "url": "/docs/authentication",
+      "title": "Authentication and rate limiting",
+      "description": "Redirect Inertia visits to the login page, send rate-limited forms back with a flash message, and start from the --auth template.",
+      "section": "Essentials",
+      "order": 8,
+      "headings": [
+        {
+          "id": "cookie-sign-in",
+          "text": "Cookie sign-in",
+          "depth": 2
+        },
+        {
+          "id": "rate-limiting",
+          "text": "Rate limiting",
+          "depth": 2
+        },
+        {
+          "id": "start-from-the-template",
+          "text": "Start from the template",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "head-tags",
+      "url": "/docs/head-tags",
+      "title": "Head tags",
+      "description": "Set the page title, meta and link tags on the server, in the first HTML response and on every visit.",
+      "section": "Essentials",
+      "order": 9,
+      "headings": [
+        {
+          "id": "a-title-template-and-per-request-tags",
+          "text": "A title template and per-request tags",
+          "depth": 2
+        },
+        {
+          "id": "on-the-client",
+          "text": "On the client",
+          "depth": 2
+        },
+        {
+          "id": "how-tags-are-keyed",
+          "text": "How tags are keyed",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "partial-reloads",
       "url": "/docs/partial-reloads",
       "title": "Partial reloads",
@@ -728,6 +783,11 @@
           "depth": 2
         },
         {
+          "id": "with-mongodb",
+          "text": "With MongoDB",
+          "depth": 2
+        },
+        {
           "id": "native-aot",
           "text": "Native AOT",
           "depth": 2
@@ -786,6 +846,11 @@
           "id": "who-may-join-a-channel",
           "text": "Who may join a channel",
           "depth": 3
+        },
+        {
+          "id": "reloading-scroll-and-merge-props",
+          "text": "Reloading scroll and merge props",
+          "depth": 2
         },
         {
           "id": "custom-transports",
@@ -1175,6 +1240,31 @@
       ]
     },
     {
+      "slug": "redis",
+      "url": "/docs/redis",
+      "title": "Redis cache",
+      "description": "Share cached props and SSR renders between app instances with the Inertia.Net.Redis cache store.",
+      "section": "Production",
+      "order": 9,
+      "headings": [
+        {
+          "id": "how-entries-are-stored",
+          "text": "How entries are stored",
+          "depth": 2
+        },
+        {
+          "id": "failures",
+          "text": "Failures",
+          "depth": 2
+        },
+        {
+          "id": "native-aot",
+          "text": "Native AOT",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "configuration",
       "url": "/docs/configuration",
       "title": "Configuration",
@@ -1275,13 +1365,48 @@
       ]
     },
     {
+      "slug": "typed-routes",
+      "url": "/docs/typed-routes",
+      "title": "Page records and typed routes",
+      "description": "Name a page's component once, generate a typed routes.ts for named endpoints, write the files at build time, and check component names at compile time.",
+      "section": "Reference",
+      "order": 3,
+      "headings": [
+        {
+          "id": "page-records",
+          "text": "Page records",
+          "depth": 2
+        },
+        {
+          "id": "typed-routes",
+          "text": "Typed routes",
+          "depth": 2
+        },
+        {
+          "id": "generating-at-build-time",
+          "text": "Generating at build time",
+          "depth": 2
+        },
+        {
+          "id": "compile-time-component-checks",
+          "text": "Compile-time component checks",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "testing",
       "url": "/docs/testing",
       "title": "Testing",
       "description": "Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.",
       "section": "Reference",
-      "order": 3,
+      "order": 4,
       "headings": [
+        {
+          "id": "test-host-recipe",
+          "text": "Test host recipe",
+          "depth": 2
+        },
         {
           "id": "request-helpers",
           "text": "Request helpers",
@@ -1320,7 +1445,7 @@
       "title": "DevTools",
       "description": "Record visits for the Inertia DevTools extension and catch missing page components during development.",
       "section": "Reference",
-      "order": 4,
+      "order": 5,
       "headings": [
         {
           "id": "enable-devtools",

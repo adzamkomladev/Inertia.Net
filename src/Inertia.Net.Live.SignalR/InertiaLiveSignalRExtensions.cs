@@ -1,3 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Inertia.Net.Live.SignalR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -33,9 +36,18 @@ public static class InertiaLiveSignalRExtensions
 
         services.AddSignalR().AddJsonProtocol(o =>
         {
-            if (!o.PayloadSerializerOptions.TypeInfoResolverChain.Contains(InertiaLiveJsonContext.Default))
+            var chain = o.PayloadSerializerOptions.TypeInfoResolverChain;
+            if (chain.Contains(InertiaLiveJsonContext.Default))
             {
-                o.PayloadSerializerOptions.TypeInfoResolverChain.Insert(0, InertiaLiveJsonContext.Default);
+                return;
+            }
+
+            // An empty chain means reflection for the app's other hubs; adding a context alone would switch that off.
+            var hadNone = chain.Count == 0 && o.PayloadSerializerOptions.TypeInfoResolver is null;
+            chain.Insert(0, InertiaLiveJsonContext.Default);
+            if (hadNone && JsonSerializer.IsReflectionEnabledByDefault)
+            {
+                chain.Add(ReflectionResolver());
             }
         });
         services.TryAddSingleton<IInertiaLiveBroadcaster, SignalRLiveBroadcaster>();
@@ -44,6 +56,11 @@ public static class InertiaLiveSignalRExtensions
             sp.GetRequiredService<IOptions<InertiaLiveSignalROptions>>().Value.AuthorizerFactory?.Invoke(sp) ?? DenyingLiveChannelAuthorizer.Instance);
         return builder;
     }
+
+    // Trimmed and AOT apps turn IsReflectionEnabledByDefault off, and the trimmer removes this call with the branch.
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Only called when JsonSerializer.IsReflectionEnabledByDefault is on.")]
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Only called when JsonSerializer.IsReflectionEnabledByDefault is on.")]
+    private static DefaultJsonTypeInfoResolver ReflectionResolver() => new();
 
     /// <summary>
     /// Maps <see cref="InertiaLiveHub"/> at <paramref name="pattern"/>. Connections are closed when their authentication expires, and a

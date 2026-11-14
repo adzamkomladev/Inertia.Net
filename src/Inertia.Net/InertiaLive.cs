@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
@@ -91,7 +92,7 @@ internal sealed class InertiaLiveBuilder(IServiceCollection services) : IInertia
     public IServiceCollection Services { get; } = services;
 }
 
-internal sealed class InertiaLive(InertiaPageWriter pageWriter, IServiceProvider services) : IInertiaLive
+internal sealed class InertiaLive(IServiceProvider services) : IInertiaLive
 {
     private IInertiaLiveBroadcaster? _broadcaster;
 
@@ -119,9 +120,12 @@ internal sealed class InertiaLive(InertiaPageWriter pageWriter, IServiceProvider
             return PublishAsync(@event, exceptSocketId, cancellationToken);
         }
 
-        // The page serializer options, so values match a reload byte for byte (naming policy, big integers, the app's contexts).
+        // The page serializer options, so values match a reload byte for byte (naming policy, big integers, the app's contexts); a
+        // process that publishes without AddInertia() (a worker) uses the app's HTTP JSON options.
         var type = typeof(TProps) == typeof(object) ? props.GetType() : typeof(TProps);
-        var info = pageWriter.SerializerOptions.GetTypeInfo(type);
+        var options = services.GetService<InertiaPageWriter>()?.SerializerOptions
+            ?? services.GetRequiredService<IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions>>().Value.SerializerOptions;
+        var info = options.GetTypeInfo(type);
         LiveEnvelope.ThrowIfInvalidProps(props, info);
         var payload = LiveEnvelope.Build(@event, writer => JsonSerializer.Serialize(writer, props, info));
         return Broadcaster.PublishAsync(new LiveMessage(@event, payload, exceptSocketId), cancellationToken);

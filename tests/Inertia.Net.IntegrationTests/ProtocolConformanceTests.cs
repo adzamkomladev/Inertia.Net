@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.IntegrationTests;
@@ -58,6 +59,42 @@ public abstract class ProtocolConformanceTests<THost>
     }
 
     private const string Base = "http://localhost";
+
+    [Fact]
+    public async Task A_page_record_renders_with_the_component_it_names()
+    {
+        await using var app = await StartAsync();
+        var page = await (await app.CreateClient().InertiaGetAsync("/typed/7")).PageAsync();
+        Assert.Equal("Typed/Show", (string?)page["component"]);
+        Assert.Equal(7, (int?)page["props"]!["id"]);
+    }
+
+    [Fact]
+    public async Task Routes_are_generated_from_the_named_endpoints_when_the_app_starts()
+    {
+        var path = Path.Join(Path.GetTempPath(), "inertia-routes-" + Guid.NewGuid().ToString("N"), "routes.ts");
+        try
+        {
+            // Written by the hosted service during StartAsync: the endpoints must already be known then, for every host.
+            await using var app = await StartAsync(new ConformanceSetup
+            {
+                EnvironmentName = "Development",
+                Inertia = o => o.TypeScript.RoutesOutputPath = path,
+            });
+            var routes = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+            Assert.Contains("definition: { methods: ['get'] as const, url: '/typed/{id}' }", routes, StringComparison.Ordinal);
+            Assert.Contains("args: { id: number } | [id: number] | number", routes, StringComparison.Ordinal);
+            Assert.Contains("typed: {\n    show: r", routes.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+            Assert.Contains("definition: { methods: ['post'] as const, url: '/typed' }", routes, StringComparison.Ordinal);
+            // Only the two named endpoints: FastEndpoints' class-derived names and unnamed endpoints are skipped.
+            Assert.Equal(2, Regex.Count(routes, @"^const r\d+ = ", RegexOptions.Multiline));
+            Assert.Contains("export interface RouteBodies {\n  'typed.store': TypedStoreInput\n}\n\nexport interface TypedStoreInput {\n  id: number\n  title: string | null\n}", routes.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+        }
+    }
 
     protected static Task<ConformanceApp> StartAsync(ConformanceSetup? setup = null) => ConformanceApp.StartAsync<THost>(setup);
 

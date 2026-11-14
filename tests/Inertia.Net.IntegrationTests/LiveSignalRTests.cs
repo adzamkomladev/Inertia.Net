@@ -250,6 +250,29 @@ public sealed class LiveSignalRTests
         Assert.Equal(expected, response.StatusCode);
     }
 
+    [Fact]
+    public async Task The_apps_own_hubs_still_serialize_their_types()
+    {
+        await using var app = await LiveApp.StartAsync();
+        await using var connection = new HubConnectionBuilder()
+            .WithUrl(new Uri(app.Server.BaseAddress, "/echo"), o =>
+            {
+                o.Transports = HttpTransportType.LongPolling;
+                o.HttpMessageHandlerFactory = _ => app.Server.CreateHandler();
+            })
+            .Build();
+        await connection.StartAsync(Ct);
+        var echoed = await connection.InvokeAsync<EchoMessage>(nameof(EchoHub.Echo), new EchoMessage("hi", 2), Ct);
+        Assert.Equal(new EchoMessage("hi", 2), echoed);
+    }
+
+    public sealed record EchoMessage(string Text, int Count);
+
+    private sealed class EchoHub : Hub
+    {
+        public EchoMessage Echo(EchoMessage message) => message;
+    }
+
     private static string? Event(JsonElement payload) => payload.GetProperty("__inertia").GetProperty("event").GetString();
 
     private sealed class OrdersOnly : ILiveChannelAuthorizer
@@ -277,6 +300,7 @@ public sealed class LiveSignalRTests
             app.UseInertia();
             app.UseInertiaAntiforgery(); // the hub is exempt: its origin check stands in for the token
             app.MapInertiaLiveHub();
+            app.MapHub<EchoHub>("/echo").DisableAntiforgery();
             try
             {
                 await app.StartAsync(Ct);

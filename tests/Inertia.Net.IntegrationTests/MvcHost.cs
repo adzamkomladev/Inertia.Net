@@ -27,6 +27,32 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
         return Render("Page", new InertiaProps { ["message"] = "hello" });
     }
 
+    [HttpGet("/typed/{id:int}", Name = "typed.show")]
+    public IResult Typed(int id) => Render(new TypedHostPage(id));
+
+    [HttpPost("/typed", Name = "typed.store")]
+    public IActionResult TypedStore([FromBody] TypedStoreInput input) => Redirect($"/typed/{input.Id}");
+
+    [HttpGet("/secret")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public IResult Secret() => Render("Secret");
+
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE")]
+    [Route("/secret")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public IResult SecretMutation() => Back();
+
+    [HttpGet("/secret/admin")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = "admin")]
+    public IResult Admin() => Render("Admin");
+
+    [HttpPost("/sign-in")]
+    public async Task<IActionResult> SignIn()
+    {
+        await AuthRoutes.SignInAsync(HttpContext);
+        return NoContent();
+    }
+
     [HttpGet("/users")]
     public IResult Users() => Render("Users");
 
@@ -166,6 +192,9 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
 
     [HttpGet("/mvc/razor")]
     public IResult Razor() => Render("Razor", new InertiaProps { ["message"] = "hello" }).WithViewData("title", "<Razor> & co");
+
+    [HttpGet("/mvc/razor-head")]
+    public IResult RazorHead() => Render("Razor").WithHead(h => h.Meta("description", "a & b"));
 
     // Larger than one 4 KiB decode chunk, with multi-byte characters that straddle chunk boundaries.
     internal static readonly string LargeText = string.Concat(Enumerable.Repeat("é😀a</script>", 5000));

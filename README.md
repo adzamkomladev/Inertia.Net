@@ -5,7 +5,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.8.0** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.0** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 ## Contents
 
@@ -20,26 +20,26 @@ Inertia.Net **1.8.0** is a .NET 10 and .NET 11 server adapter for the **Inertia.
 3. [Quick start](#quick-start): [Minimal API](#minimal-api), [MVC](#mvc), [FastEndpoints](#fastendpoints)
 4. [Client setup](#client-setup): [Vite config](#vite-config), [React](#react), [Vue](#vue), [Svelte](#svelte)
 5. [The root template](#the-root-template)
-6. [Props reference](#props-reference), [parallel props](#parallel-props) and [cached props](#cached-props)
+6. [Props reference](#props-reference), [parallel props](#parallel-props), [scoped services](#scoped-services-in-loaders) and [cached props](#cached-props) ([Redis](#redis))
 7. [Shared data](#shared-data)
 8. [Partial reloads](#partial-reloads)
 9. [Deferred props](#deferred-props)
 10. [Merging props](#merging-props)
 11. [Once props](#once-props)
 12. [Infinite scroll](#infinite-scroll)
-13. [Pagination](#pagination)
-14. [Live props](#live-props)
+13. [Pagination](#pagination) ([EF Core](#with-ef-core), [MongoDB](#with-mongodb))
+14. [Live props](#live-props) and [reloading scroll and merge props](#reloading-scroll-and-merge-props)
 15. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
 16. [Flash data](#flash-data)
-17. [Redirects, Location and Back](#redirects-location-and-back), [Error pages](#error-pages)
-18. [History encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
+17. [Redirects, Location and Back](#redirects-location-and-back), [Error pages](#error-pages), [Authentication and rate limiting](#authentication-and-rate-limiting)
+18. [Head tags](#head-tags) and [history encryption, clearing and fragments](#history-encryption-clearing-and-fragments)
 19. [Asset versioning](#asset-versioning)
 20. [Server-side rendering](#server-side-rendering): [failures](#when-the-server-fails), [several servers](#several-ssr-servers), [observability](#5-observability), [response cache](#6-response-cache)
 21. [Vite integration](#vite-integration)
 22. [CSRF and antiforgery](#csrf-and-antiforgery)
 23. [Deploying behind a proxy](#deploying-behind-a-proxy) and [multiple apps and libraries](#multiple-apps-and-libraries)
 24. [Native AOT](#native-aot)
-25. [TypeScript types](#typescript-types), [DevTools](#devtools) and [development checks](#development-checks)
+25. [TypeScript types](#typescript-types) ([page records](#page-records), [routes](#typed-routes), [build-time generation](#generating-at-build-time), [compile-time checks](#compile-time-component-checks)), [DevTools](#devtools) and [development checks](#development-checks)
 26. [Testing](#testing)
 27. [Performance](#performance)
 28. [Configuration reference](#configuration-reference)
@@ -88,7 +88,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.8.0
+dotnet new install Inertia.Net.Templates::1.9.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -202,15 +202,17 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.8.0
-dotnet add package Inertia.Net.Mvc --version 1.8.0 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.8.0 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.8.0 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.8.0 # live props over SignalR
+dotnet add package Inertia.Net --version 1.9.0
+dotnet add package Inertia.Net.Mvc --version 1.9.0 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.0 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.0 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.0 # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.0 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.0 # MongoDB pagination
 ```
 
-Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.8.0` for all Inertia.Net packages. Inertia.Net 1.8.0 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.0` for all Inertia.Net packages. Inertia.Net 1.9.0 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -806,6 +808,21 @@ return Render("Dashboard", new InertiaProps
 }).Parallel(),
 ```
 
+### Scoped services in loaders
+
+`Prop<TService, T>(...)` hands a loader a service from the request, without capturing it in a closure:
+
+```csharp
+["orders"] = Prop<AppDbContext, int>((db, ct) => db.Orders.CountAsync(ct)),
+["inbox"] = Prop<InboxService, Inbox>((inbox, ct) => inbox.LoadAsync(ct)).Defer(), // and .Optional(), .Cache(...), .Live(...)
+```
+
+- A loader that runs during the request gets the request's instance (the same `DbContext` the handler used).
+- A `.Parallel()` loader gets a scope of its own, so two parallel loaders never share a `DbContext`. The scope is disposed when the
+  loader finishes.
+- A [stale-while-revalidate](#cached-props) refresh runs after the response, in a new scope disposed when the refresh ends.
+- A service that is not registered fails the render with the prop's path and the service type.
+
 ### Cached props
 
 `.Cache(key, duration)` keeps a prop's value as JSON in the cache (by default the app's `IMemoryCache`). While the entry lives, the
@@ -863,7 +880,7 @@ stale value too. Past `duration + staleFor` the loader runs during the request a
 (before or after `AddInertia()`) to keep them elsewhere, e.g. in a cache every app instance shares:
 
 ```csharp
-builder.Services.AddSingleton<IInertiaCacheStore, MyRedisInertiaCacheStore>();
+builder.Services.AddSingleton<IInertiaCacheStore, MyCacheStore>();
 ```
 
 The store gets and sets byte arrays by `InertiaCacheKey` (a kind and a key; `ToString()` gives `inertia:prop:{key}` or
@@ -873,6 +890,23 @@ store only keeps each one for `InertiaCacheEntryOptions.Expiration`. Every entry
 logged (at most once every 30 seconds) and counts as a miss; `IInertiaCache` lets the exception through. A value in a format Inertia.Net
 does not know reads as a miss. Prop JSON outlives a deploy in a shared store: put a version in keys whose shape changes, or clear them
 on deploy.
+
+### Redis
+
+`Inertia.Net.Redis` keeps cached props and SSR renders in Redis, so every app instance shares them and one instance's
+`RemoveByTagAsync` clears them for all:
+
+```csharp
+builder.Services.AddInertiaRedisCache(o =>
+{
+    o.Configuration = "localhost:6379";   // or leave it null to use a registered IConnectionMultiplexer
+    o.KeyPrefix = "myapp:";               // default inertia.net:; on Redis Cluster use a hash tag such as {myapp}:
+});
+```
+
+Storing and removing an entry are single scripts, so an entry and its tag sets never disagree; removing a tag works in batches so
+a tag on every entry does not block the server. A server that cannot be reached makes renders run their loaders (logged, as a
+miss) and makes `IInertiaCache` removals throw. See the [package README](src/Inertia.Net.Redis/README.md).
 
 ### What each prop produces
 
@@ -1242,6 +1276,19 @@ Choose a stable, fully unique ordering: use a unique key, or add a unique tie-br
 
 The EF Core package is not marked Native AOT compatible. EF Core has its own compiled-model requirements; for Native AOT applications, use the core delegate paginators with an AOT-compatible data source instead.
 
+### With MongoDB
+
+`Inertia.Net.MongoDB` pages a `collection.Find(filter)` the same way:
+
+```csharp
+var page = await posts.Find(p => p.Published).SortByDescending(p => p.Id).ToPageAsync(request, ct: ct);
+var feed = await posts.Find(p => p.Published).ToCursorPageAsync(p => p.CreatedAt, p => p.Id, cursorRequest, descending: true, ct: ct);
+```
+
+The rules are those of the EF Core helpers: `ToPageAsync` needs a sorted find, `ToCursorPageAsync` an unsorted one (it adds the
+keyset condition to your filter and its own sort). Keys may also be `ObjectId`. MongoDB orders strings by their UTF-8 bytes. The
+driver does not support trimming, so neither does this package. See the [package README](src/Inertia.Net.MongoDB/README.md).
+
 ### Native AOT
 
 Register each closed page type, such as `[JsonSerializable(typeof(Page<PostDto>))]` and `[JsonSerializable(typeof(CursorPage<PostDto>))]`, in your app's `JsonSerializerContext` along with the item types. See [Native AOT](#native-aot).
@@ -1357,6 +1404,28 @@ createInertiaApp({ live: signalr() })
 Public channels are open; private, presence and encrypted-private channels need the authorizer's yes. The hub refuses other origins
 (403), closes connections when their authentication expires, and works with a Redis backplane or Azure SignalR Service. See the
 [package README](src/Inertia.Net.Live.SignalR/README.md) for the options, scale-out and security notes.
+
+### Reloading scroll and merge props
+
+A `Scroll(...)` or `Merge(...)` prop cannot be live: a live reload would merge the reloaded page into the list. Reload it from
+the page instead, with `ClientApp/lib/inertia-live-reload.ts` (in `dotnet new inertia` apps):
+
+```csharp
+o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+o.TypeScript.LiveEvents(Events.PostCreated);   // exported from routes.ts as liveEvents.PostCreated
+```
+
+```tsx
+import { liveReload } from '../lib/inertia-live-reload'
+import { live } from '../lib/live'                 // the value given to createInertiaApp({ live })
+import { liveEvents } from '../types/routes'
+
+useEffect(() => liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] }), [])
+```
+
+Events within `debounce` milliseconds (default 250) become one reload, a reload waits for a visit in flight, the scroll position is
+kept, and the client that caused the event (`exceptSocketId`) is not reloaded. `reset` replaces the prop instead of merging it, so
+the reload brings no duplicates.
 
 ### Other transports
 
@@ -1485,12 +1554,11 @@ app.MapPost("/users", (CreateUserInput input) => Results.Redirect("/users")).Wit
 
 Rate-limit both validation and submissions. Only grant a separate bounded validation bucket when `InertiaPrecognition.IsPrecognitive(request)` **and** the endpoint has `InertiaPrecognitionMetadata`; the header alone does not prove the handler will be skipped. On a 429, add `Precognition: true` for precognitive requests so the client recognizes the response; the request still rejects, so show a retry or error message. See the [Precognition guide](docs/Inertia.Net.Docs/content/docs/precognition.mdx) for a complete policy.
 
-The [sample login policy](samples/MinimalApi.React/LoginDemo.cs) uses a bounded sliding window for validation and a stricter fixed window for submissions. This excerpt omits its test-reset bookkeeping (add `using System.Threading.RateLimiting;`, `using Microsoft.AspNetCore.RateLimiting;` and `using System.Globalization;`):
+The [sample login policy](samples/MinimalApi.React/LoginDemo.cs) uses a bounded sliding window for validation and a stricter fixed window for submissions. This excerpt omits its test-reset bookkeeping (add `using System.Threading.RateLimiting;` and `using Microsoft.AspNetCore.RateLimiting;`):
 
 ```csharp
 builder.Services.AddRateLimiter(options =>
 {
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy("login", http =>
     {
         var validation = http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
@@ -1506,21 +1574,10 @@ builder.Services.AddRateLimiter(options =>
             PermitLimit = 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0,
         });
     });
-    options.OnRejected = (context, _) =>
-    {
-        var http = context.HttpContext;
-        if (http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
-            && InertiaPrecognition.IsPrecognitive(http.Request))
-        {
-            http.Response.Headers[InertiaPrecognition.Header] = "true";
-            http.Response.Headers.Append("Vary", InertiaPrecognition.Header);
-        }
-        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-            http.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
-        return ValueTask.CompletedTask;
-    };
+    // Precognition: true on validation; a rejected submission goes back with flash.error (or the 429 error page).
+    options.OnRejected = InertiaRateLimiting.OnRejected();
 });
-// After app.UseRouting(): app.UseRateLimiter();
+// After app.UseInertia(), so the flash message is saved: app.UseRateLimiter();
 // MapPost(...).WithInertiaPrecognition().RequireRateLimiting("login");
 ```
 
@@ -1694,6 +1751,73 @@ fallback and content negotiation. Existing ProblemDetails configuration and earl
 status-code responses remain unchanged. Loaded flash and validation state is consumed when an error page renders, as on any other page response.
 
 ---
+
+## Authentication and rate limiting
+
+**Cookie sign-in.** The cookie handler answers an Inertia visit with 401, because the client sends `X-Requested-With`. Call
+`UseInertiaRedirects()` so Inertia visits are redirected to the login page like browser requests (303 after a `POST`, `PUT`,
+`PATCH` or `DELETE`), while `fetch` calls and Precognition validation keep their 401. Access denied renders the 403 error page when
+`AddInertiaErrorPages()` handles 403, and redirects to `AccessDeniedPath` otherwise:
+
+```csharp
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/login";
+        o.UseInertiaRedirects();   // after assigning o.Events, if you do: it wraps the handlers set there
+    });
+
+app.UseInertiaErrorPages();   // before UseAuthentication(): a 403 renders the Error page
+app.UseInertia();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();         // after UseInertia(): see below
+app.UseInertiaAntiforgery();
+```
+
+**Rate limiting.** `InertiaRateLimiting.OnRejected()` answers a rejected request the way the client expects: an Inertia form
+submission is redirected back with a flash message (`flash.error` by default) and `Retry-After`; a Precognition request gets 429 with
+`Precognition: true`; anything else gets 429. With `AddInertiaErrorPages()` handling 429, Inertia requests get the error page instead.
+Call `UseRateLimiter()` after `UseInertia()`, so the flash message is saved.
+
+```csharp
+builder.Services.AddRateLimiter(o =>
+{
+    o.AddPolicy("login", http => InertiaPrecognition.IsPrecognitive(http.Request)
+        ? RateLimitPartition.GetNoLimiter("validation")
+        : RateLimitPartition.GetFixedWindowLimiter(http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+    o.OnRejected = InertiaRateLimiting.OnRejected("error", "Too many attempts. Try again later.");
+});
+app.MapPost("/login", ...).WithInertiaPrecognition().RequireRateLimiting("login");
+```
+
+`dotnet new inertia --auth` creates an app with both, a login page, a protected dashboard and the signed-in user shared as `auth.user`.
+
+## Head tags
+
+Set the page's `<title>`, meta and link tags on the server. They are in the first HTML response (no JavaScript needed, so crawlers
+and link previews see them) and travel with every visit as the `head` prop:
+
+```csharp
+return Render("Posts/Show", post).WithHead(h => h
+    .Title(post.Title)
+    .Meta("description", post.Summary)
+    .Property("og:image", post.ImageUrl)
+    .Link("canonical", $"https://example.com/posts/{post.Slug}"));
+
+builder.Services.AddInertia(o => o.Head.TitleTemplate = "{0} - My App");   // optional
+app.Use((http, next) => { http.Inertia().Head.Meta("robots", "noindex"); return next(http); });   // per request, e.g. middleware
+```
+
+```ts
+createInertiaApp({ serverHead: true })   // the client keeps the tags up to date on every visit
+```
+
+Put `@inertiaHead` (or `<inertia-head />` in Razor) before the template's own `<title>`. Values are HTML-encoded. Each tag is keyed
+(`data-inertia`) by `title`, the meta name or property, or the link rel; a later call with the same key replaces the tag, and
+`Remove(key)` drops one set earlier (e.g. by middleware). With SSR the server-rendered head is used, which the client builds from
+the same prop. `o.Head.PropName` renames the prop.
 
 ## History encryption, clearing and fragments
 
@@ -2367,6 +2491,64 @@ export default function Index({ users, stats }: InertiaPages['Users/Index']) { /
 - Number handling follows member settings, then type settings, then the global JSON options. Custom converter output is typed as
   `unknown` with a warning when its shape cannot be inferred.
 
+### Page records
+
+A record that implements `IInertiaPage` names its component once, so neither `Render` nor the TypeScript registration repeats it:
+
+```csharp
+public sealed record UsersPage(List<User> Users) : IInertiaPage
+{
+    public static string Component => "Users/Index";
+}
+
+return Render(new UsersPage(users));                 // component "Users/Index"
+o.TypeScript.Page<UsersPage>();                      // or AddGeneratedPages(): every IInertiaPage in the project, listed at compile time
+```
+
+`AddGeneratedPages()` is written by a source generator, so it needs no reflection and works under Native AOT. `PagesFrom(assembly)`
+does the same with reflection, for page records in another assembly.
+
+### Typed routes
+
+Set `RoutesOutputPath` and every named endpoint (`WithName`, a controller route name, or a FastEndpoints `Description(x => x.WithName(...))`)
+gets a typed function in `routes.ts`:
+
+```csharp
+o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+app.MapGet("/users/{id:int}", ...).WithName("users.show");
+app.MapPost("/users", (CreateUser input) => ...).WithName("users.store");
+```
+
+```tsx
+import { routes, type RouteBodies } from '../types/routes'
+<Link href={routes.users.show(user.id)}>...</Link>               // { url: '/users/1', method: 'get' }
+const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+form.submit(routes.users.store())
+routes.users.show.url(1, { query: { tab: 'posts' } })            // '/users/1?tab=posts'
+```
+
+Route parameters are typed from their constraints, optional and catch-all parameters are optional, every HTTP method of an endpoint
+has a variant (`routes.users.update.put(1)`), and `routeConfig.base` prefixes every URL (an app under a path base). `RouteBodies`
+holds the `[FromBody]` (or FastEndpoints request) type of each route that has one. Unnamed endpoints are skipped.
+`o.TypeScript.LiveEvents(...)` also exports [live event](#reloading-scroll-and-merge-props) names and channels as `liveEvents`.
+
+### Generating at build time
+
+Set `<InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>` in the project file, and every build (including the one inside
+`dotnet publish`) runs the app once with `--inertia-types` to write both files. The app starts without listening on any port and
+exits; a failure to write fails the build. In CI, compare the result with the committed files:
+
+```sh
+dotnet build -p:InertiaGenerateTypesOnBuild=true
+git diff --exit-code ClientApp/types
+```
+
+### Compile-time component checks
+
+Inertia.Net ships an analyzer. INERTIA001 reports two page records that claim one component. With
+`<InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>` in the project file, INERTIA002 reports a component name, in
+`Render("...")`, `MapInertia` or a page record, that has no page file there.
+
 ## DevTools
 
 The [Inertia DevTools](https://inertiajs.com/docs/v3/advanced/devtools) browser extension shows every visit, its props, headers and the
@@ -2438,7 +2620,10 @@ public class UsersTests(WebApplicationFactory<Program> factory) : IClassFixture<
 
 ### Assertions
 
-On the page: `Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)`, `HasLive(path, "private:orders.1", "OrderUpdated")` (channel as `"{type}:{name}"`).
+On the page: `Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)`, `HasLive(path, "private:orders.1", "OrderUpdated")` (channel as `"{type}:{name}"`), `HasHead("title", "Users - App")` ([head tags](#head-tags), keyed like their `data-inertia` attribute).
+
+For a `WebApplicationFactory` test host, pin `o.Version` and set `o.Ssr.Mode = SsrMode.Disabled` with `PostConfigure<InertiaOptions>`;
+the [package README](src/Inertia.Net.Testing/README.md#test-host-recipe) has the recipe.
 
 On props and nested scopes (dot paths, array indexes allowed): `Has(key)`, `Has(key, count)`, `Has(key, scope)`, `Has(key, count, firstItemScope)`, `HasAll`, `HasAny`, `Missing`, `MissingAll`, `Where(key, value)`, `Where(key, predicate)`, `WhereNot`, `WhereNull`, `WhereNotNull`, `WhereType(key, "string|null")`, `WhereAllType`, `WhereContains(key, ...)`, `Count`, `CountBetween`, `Each(scope)`, `First(scope)`, `Dump()`.
 

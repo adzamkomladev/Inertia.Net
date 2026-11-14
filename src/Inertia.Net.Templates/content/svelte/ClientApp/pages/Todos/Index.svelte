@@ -2,13 +2,14 @@
   import { Deferred, router, useForm } from '@inertiajs/svelte'
   import Layout from '../../Layout.svelte'
   import type { InertiaPages } from '../../types/inertia'
+  import { routes } from '../../types/routes'
 
   let { todos, stats }: InertiaPages['Todos/Index'] = $props()
 
   const form = useForm({ title: '' })
   const submit = (e: SubmitEvent) => {
     e.preventDefault()
-    form.post('/todos', { onSuccess: () => form.reset() })
+    form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
   }
 </script>
 
@@ -18,10 +19,10 @@
     {#each todos as todo (todo.id)}
       <li>
         <label style:text-decoration={todo.done ? 'line-through' : undefined}>
-          <input type="checkbox" checked={todo.done} onchange={() => router.patch(`/todos/${todo.id}/toggle`)} />
+          <input type="checkbox" checked={todo.done} onchange={() => router.visit(routes.todos.toggle(todo.id))} />
           {todo.title}
         </label>
-        <button onclick={() => router.delete(`/todos/${todo.id}`)}>Delete</button>
+        <button onclick={() => router.visit(routes.todos.destroy(todo.id))}>Delete</button>
       </li>
     {/each}
   </ul>

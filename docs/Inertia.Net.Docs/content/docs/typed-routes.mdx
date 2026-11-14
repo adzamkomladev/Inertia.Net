@@ -1,0 +1,80 @@
+---
+title: Page records and typed routes
+description: Name a page's component once, generate a typed routes.ts for named endpoints, write the files at build time, and check component names at compile time.
+section: Reference
+order: 3
+---
+
+These build on [TypeScript types](/docs/typescript): the same `o.TypeScript` options write both files.
+
+## Page records
+
+A record that implements `IInertiaPage` names its component once, so neither `Render` nor the TypeScript registration repeats it:
+
+```csharp
+public sealed record UsersPage(List<User> Users) : IInertiaPage
+{
+    public static string Component => "Users/Index";
+}
+
+return Render(new UsersPage(users));                 // component "Users/Index"
+o.TypeScript.Page<UsersPage>();                      // or AddGeneratedPages(): every IInertiaPage in the project, listed at compile time
+```
+
+`AddGeneratedPages()` is written by a source generator, so it needs no reflection and works under [Native AOT](/docs/native-aot). `PagesFrom(assembly)` does the same with reflection, for page records in another assembly.
+
+FastEndpoints' `Send.InertiaAsync(page)` takes a page record too.
+
+## Typed routes
+
+Set `RoutesOutputPath` and every named endpoint (`WithName`, a controller route name, or a FastEndpoints `Description(x => x.WithName(...))`) gets a typed function in `routes.ts`:
+
+```csharp
+o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+app.MapGet("/users/{id:int}", ...).WithName("users.show");
+app.MapPost("/users", (CreateUser input) => ...).WithName("users.store");
+```
+
+```tsx
+import { routes, type RouteBodies } from '../types/routes'
+<Link href={routes.users.show(user.id)}>...</Link>               // { url: '/users/1', method: 'get' }
+const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+form.submit(routes.users.store())
+routes.users.show.url(1, { query: { tab: 'posts' } })            // '/users/1?tab=posts'
+```
+
+- Route parameters are typed from their constraints; optional and catch-all parameters are optional.
+- Every HTTP method of an endpoint has a variant (`routes.users.update.put(1)`).
+- `routeConfig.base` prefixes every URL (an app under a path base).
+- `RouteBodies` holds the `[FromBody]` (or FastEndpoints request) type of each route that has one.
+- Unnamed endpoints are skipped.
+
+`o.TypeScript.LiveEvents(...)` also exports live event names and channels as `liveEvents`. See [Live props](/docs/live-props#reloading-scroll-and-merge-props).
+
+To assert a route sent as a prop in tests, use `WhereRoute(key, url, method)`. See [Testing](/docs/testing).
+
+## Generating at build time
+
+Set `<InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>` in the project file, and every build (including the one inside `dotnet publish`) runs the app once with `--inertia-types` to write both files. The app starts without listening on any port and exits; a failure to write fails the build. In CI, compare the result with the committed files:
+
+```sh
+dotnet build -p:InertiaGenerateTypesOnBuild=true
+git diff --exit-code ClientApp/types
+```
+
+## Compile-time component checks
+
+Inertia.Net ships an analyzer in the `Inertia.Net` package:
+
+| Rule | Reports |
+|---|---|
+| `INERTIA001` | Two page records that claim one component. |
+| `INERTIA002` | A component name, in `Render("...")`, `MapInertia` or a page record, that has no page file under `$(InertiaPagesDirectory)`. |
+
+`INERTIA002` runs when the project file sets the pages directory:
+
+```xml
+<PropertyGroup>
+  <InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>
+</PropertyGroup>
+```

@@ -59,6 +59,7 @@ public static class InertiaMvcExtensions
 
         builder.Services.AddSingleton(options);
         builder.AddMvcOptions(o => o.Filters.Add(new InertiaModelStateFilter()));
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IRouteBodySource, MvcRouteBodySource>());
 
         // ModelStateInvalidFilter (the [ApiController] 400) runs before global filters, so it is wrapped rather than followed.
         builder.Services.PostConfigure<ApiBehaviorOptions>(o =>
@@ -108,4 +109,12 @@ public static class InertiaControllerExtensions
         var component = $"{descriptor.ControllerName}/{descriptor.ActionName}";
         return descriptor.RouteValues.TryGetValue("area", out var area) && !string.IsNullOrEmpty(area) ? $"{area}/{component}" : component;
     }
+}
+
+/// <summary>The <c>[FromBody]</c> parameter of a controller action (also when <c>[ApiController]</c> inferred it), for <c>routes.ts</c>.</summary>
+internal sealed class MvcRouteBodySource : IRouteBodySource
+{
+    public Type? BodyType(Microsoft.AspNetCore.Http.Endpoint endpoint) =>
+        endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>()?.Parameters
+            .FirstOrDefault(p => p.BindingInfo?.BindingSource == Microsoft.AspNetCore.Mvc.ModelBinding.BindingSource.Body)?.ParameterType;
 }

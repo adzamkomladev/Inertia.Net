@@ -228,6 +228,8 @@ of the protocol; the payload is:
 
 **With SSR,** the SSR `body` already contains the script element plus `<div data-server-rendered="true" id="app">…</div>`. Echo it verbatim and do not emit a second script. The SSR `head` (`string[]`) is joined with `"\n"` and output wherever the `@inertiaHead` token appears.
 
+**Server head tags** (`WithHead`, `HttpContext.Inertia().Head`) are an ordinary shared prop, `head` by default (`string[]` of HTML tags, each with a `data-inertia` key), which the v3 client reads with `serverHead: true`. It is always included (like `Always`), also on partial reloads. Without SSR the same tags are joined with `"\n"` and written at `@inertiaHead`; with SSR the SSR `head` is written instead (the client renders it from the prop).
+
 ## 6. Validation errors
 
 - `props.errors` is always present.

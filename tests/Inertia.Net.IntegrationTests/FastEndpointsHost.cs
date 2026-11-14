@@ -23,8 +23,17 @@ public sealed class FastEndpointsHost : IConformanceHost
             t.Namespace == typeof(FastEndpointsRoutes.PageEndpoint).Namespace || t.DeclaringType == typeof(FastEndpointsTests));
     }
 
-    public static void MapRoutes(WebApplication app) =>
-        app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));
+    public static void MapRoutes(WebApplication app) => app.UseFastEndpoints(c => c.ConfigureInertia(AllowAnonymous));
+
+    // FastEndpoints keeps endpoint definitions for the process: the cookie authentication tests' endpoints keep their own
+    // requirements in every app that maps them, or a later app finds them anonymous.
+    public static void AllowAnonymous(EndpointDefinition ep)
+    {
+        if (!ep.EndpointType.Name.StartsWith("Secret", StringComparison.Ordinal))
+        {
+            ep.AllowAnonymous();
+        }
+    }
 }
 
 /// <summary>The route contract as FastEndpoints endpoints.</summary>
@@ -52,6 +61,73 @@ public static class FastEndpointsRoutes
         {
             counters.HitPage();
             await Send.InertiaAsync("Page", new InertiaProps { ["message"] = "hello" });
+        }
+    }
+
+    public sealed class TypedRequest
+    {
+        public int Id { get; set; }
+    }
+
+    public sealed class TypedEndpoint : Endpoint<TypedRequest>
+    {
+        public override void Configure()
+        {
+            Get("/typed/{id:int}");
+            Description(b => b.WithName("typed.show"));
+        }
+
+        public override Task HandleAsync(TypedRequest req, CancellationToken ct) => Send.InertiaAsync(new TypedHostPage(req.Id));
+    }
+
+    public sealed class TypedStoreEndpoint : Endpoint<TypedStoreInput>
+    {
+        public override void Configure()
+        {
+            Post("/typed");
+            Description(b => b.WithName("typed.store"));
+        }
+
+        public override Task HandleAsync(TypedStoreInput req, CancellationToken ct) => Send.RedirectAsync($"/typed/{req.Id}");
+    }
+
+    public sealed class SecretEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Get("/secret");
+
+        public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Secret");
+    }
+
+    public sealed class SecretMutationEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure()
+        {
+            Verbs(Mutations);
+            Routes("/secret");
+        }
+
+        public override Task HandleAsync(CancellationToken ct) => Send.InertiaBackAsync();
+    }
+
+    public sealed class SecretAdminEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure()
+        {
+            Get("/secret/admin");
+            Roles("admin");
+        }
+
+        public override Task HandleAsync(CancellationToken ct) => Send.InertiaAsync("Admin");
+    }
+
+    public sealed class SignInEndpoint : EndpointWithoutRequest
+    {
+        public override void Configure() => Post("/sign-in");
+
+        public override async Task HandleAsync(CancellationToken ct)
+        {
+            await AuthRoutes.SignInAsync(HttpContext);
+            await Send.NoContentAsync(ct);
         }
     }
 

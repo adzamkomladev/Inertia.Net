@@ -2,7 +2,7 @@
   <!-- Libraries (src/) and test projects build for every supported runtime; samples, docs, AotSmoke and Benchmarks stay on net10.0. -->
   <PropertyGroup>
     <_InertiaMultiTarget Condition="$(MSBuildProjectDirectory.StartsWith('$(MSBuildThisFileDirectory)src')) or $(MSBuildProjectName.EndsWith('Tests'))">true</_InertiaMultiTarget>
-    <_InertiaMultiTarget Condition="'$(MSBuildProjectName)' == 'Inertia.Net.Templates'">false</_InertiaMultiTarget>
+    <_InertiaMultiTarget Condition="'$(MSBuildProjectName)' == 'Inertia.Net.Templates' or '$(MSBuildProjectName)' == 'Inertia.Net.Analyzers'">false</_InertiaMultiTarget>
     <TargetFrameworks Condition="'$(_InertiaMultiTarget)' == 'true'">net10.0;net11.0</TargetFrameworks>
     <TargetFramework Condition="'$(_InertiaMultiTarget)' != 'true'">net10.0</TargetFramework>
   </PropertyGroup>
@@ -20,6 +20,10 @@
     <!-- The Web SDK warns when a non-packable web project is packed; solution-level pack packs only src/ (IsPackable=true there). -->
     <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
   </PropertyGroup>
+  <!-- Coverage for every test project, collected by eng/coverage.sh. -->
+  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+  </ItemGroup>
   <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>

@@ -62,9 +62,11 @@ channel authorizer allows the demo user's private channel `users.1` (the sample 
 | Route | Component | Contract |
 |---|---|---|
 | shared | every page | `inbox`: shared live prop `{unread}` on `LiveChannel.Private("users.1")`, event `InboxChanged`. |
-| `GET /live` | `Live/Index` | `counter`: live prop `{value}` on `LiveChannel.Public("counter")`, event `CounterChanged`, rendered in `data-testid="counter"`; `data-testid="counter-loading"` shows while `useProp('counter').loading`. `inbox.unread` in `data-testid="inbox"`. A checkbox `data-testid="hold-updates"` registers `router.on('live')` returning `false` for `counter`, and `data-testid="held"` counts the events it held back. |
+| `GET /live` | `Live/Index` | `counter`: live prop `{value}` on `LiveChannel.Public("counter")`, event `CounterChanged`, rendered in `data-testid="counter"`; `data-testid="counter-loading"` shows while `useProp('counter').loading`. `inbox.unread` in `data-testid="inbox"`. A checkbox `data-testid="hold-updates"` registers `router.on('live')` returning `false` for `counter`, and `data-testid="held"` counts the events it held back. `posts`: a `Scroll` prop of `{id, title}`, newest first (15 to start, page size 10), in `<InfiniteScroll data="posts">` rows `data-testid="live-post"`; the page calls `liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] })` (`ClientApp/lib/inertia-live-reload.ts`) to reload it when `PostCreated` arrives on `LiveChannel.Public("posts")`. A button `data-testid="add-post"` posts to `/live/posts`. |
+| `POST /live/posts` | n/a | Adds a post and publishes `PostCreated`, leaving out the sender's socket (`X-Socket-Id`), then redirects back. |
 | `POST /__e2e/live/increment` | n/a | Increments the counter and publishes `CounterChanged` without values (clients reload `counter`). |
 | `POST /__e2e/live/increment-with-value` | n/a | Increments the counter and publishes `CounterChanged` with `{ counter: { value } }` (clients apply it without a request). |
+| `POST /__e2e/live/posts?count=N` | n/a | Adds N posts (default 1), publishing `PostCreated` for each. |
 | `POST /__e2e/live/inbox` | n/a | Increments `unread` and publishes `InboxChanged` on `users.1`. |
 
 When the page sets `window.__e2e = true` before the app starts (the spec does, with `addInitScript`), the app exposes its hub

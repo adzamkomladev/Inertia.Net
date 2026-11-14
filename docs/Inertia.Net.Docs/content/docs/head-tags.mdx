@@ -1,0 +1,42 @@
+---
+title: Head tags
+description: Set the page title, meta and link tags on the server, in the first HTML response and on every visit.
+section: Essentials
+order: 9
+---
+
+Set the page's `<title>`, meta and link tags on the server. They are in the first HTML response (no JavaScript needed, so crawlers and link previews see them) and travel with every visit as the `head` prop.
+
+```csharp
+return Render("Posts/Show", post).WithHead(h => h
+    .Title(post.Title)
+    .Meta("description", post.Summary)
+    .Property("og:image", post.ImageUrl)
+    .Link("canonical", $"https://example.com/posts/{post.Slug}"));
+```
+
+## A title template and per-request tags
+
+```csharp
+builder.Services.AddInertia(o => o.Head.TitleTemplate = "{0} - My App");   // optional
+
+// per request, e.g. middleware
+app.Use((http, next) => { http.Inertia().Head.Meta("robots", "noindex"); return next(http); });
+```
+
+## On the client
+
+```ts
+createInertiaApp({ serverHead: true })   // the client keeps the tags up to date on every visit
+```
+
+Put `@inertiaHead` (or `<inertia-head />` in Razor) before the template's own `<title>`. See [the root template](/docs/pages-and-responses#the-root-template).
+
+## How tags are keyed
+
+- Values are HTML-encoded.
+- Each tag is keyed (`data-inertia`) by `title`, the meta name or property, or the link rel. A later call with the same key replaces the tag, and `Remove(key)` drops one set earlier (for example by middleware).
+- With SSR the server-rendered head is used, which the client builds from the same prop.
+- `o.Head.PropName` renames the prop.
+
+In tests, `HasHead("title", "Users - App")` asserts a tag. See [Testing](/docs/testing).

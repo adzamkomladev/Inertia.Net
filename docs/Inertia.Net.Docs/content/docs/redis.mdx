@@ -1,0 +1,43 @@
+---
+title: Redis cache
+description: Share cached props and SSR renders between app instances with the Inertia.Net.Redis cache store.
+section: Production
+order: 9
+---
+
+`Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all.
+
+```sh
+dotnet add package Inertia.Net.Redis --version 1.9.0
+```
+
+```csharp
+builder.Services.AddInertia();
+builder.Services.AddInertiaRedisCache(o =>
+{
+    o.Configuration = "localhost:6379"; // or leave it unset to use a registered IConnectionMultiplexer
+    o.KeyPrefix = "myapp:v1:";          // apps (and cache versions) sharing a server need different prefixes
+});
+```
+
+The default prefix is `inertia.net:`.
+
+## How entries are stored
+
+- Each entry is a Redis string with the entry's expiration. Each tag is a set of entry keys that lives as long as its longest entry, and each entry keeps an index of its tags.
+- Storing or removing an entry is one script, so a removal racing a store leaves the entry either removed or whole and still tagged.
+- Removing a tag works in batches, so a tag on every entry does not block the server.
+
+<Callout type="warning" title="Redis Cluster">
+Put a hash tag in the prefix (`{myapp}:`): an entry, its index and its tag sets change together in one script.
+</Callout>
+
+## Failures
+
+Failures are not swallowed. While a page renders, Inertia.Net logs a failing store (rate-limited) and renders without the cache: the loaders run, as on a miss. `IInertiaCache` calls throw, so a failed invalidation is not silent.
+
+## Native AOT
+
+The Redis store is not verified under [Native AOT](/docs/native-aot).
+
+See the [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Redis/README.md) and [Deploying behind a proxy](/docs/deploying#multi-instance-state) for the rest of the multi-instance setup.

@@ -160,6 +160,22 @@ public sealed class AssertableInertia : AssertableJsonBase<AssertableInertia>
         return this;
     }
 
+    /// <summary>
+    /// Asserts that the server head tags (<c>Render(...).WithHead(...)</c>) have the tag keyed <paramref name="key"/> (<c>title</c>, a meta
+    /// name or property, or a link rel), HTML-encoded as the page sends it; with <paramref name="contains"/>, that the tag contains it,
+    /// e.g. <c>HasHead("title", "Users - App")</c>. <paramref name="propName"/> is <c>InertiaHeadOptions.PropName</c>.
+    /// </summary>
+    public AssertableInertia HasHead(string key, string? contains = null, string propName = "head")
+    {
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        var marker = $"data-inertia=\"{System.Net.WebUtility.HtmlEncode(key)}\"";
+        var tags = (_page.Props[propName] as JsonArray ?? []).Select(t => (string?)t ?? "").ToArray();
+        var tag = tags.FirstOrDefault(t => t.Contains(marker, StringComparison.Ordinal));
+        if (tag is null) Fail($"Inertia head has no [{key}] tag; it has: {string.Join(", ", tags)}.");
+        else if (contains is not null && !tag.Contains(contains, StringComparison.Ordinal)) Fail($"Inertia head tag [{key}] expected to contain [{contains}] but was {tag}.");
+        return this;
+    }
+
     /// <summary>Asserts that <paramref name="path"/> is listed as a live prop.</summary>
     public AssertableInertia HasLive(string path)
     {

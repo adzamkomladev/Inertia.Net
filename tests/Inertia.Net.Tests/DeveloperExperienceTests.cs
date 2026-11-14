@@ -187,6 +187,7 @@ public sealed class DeveloperExperienceTests : IDisposable
               auth: {
                 user: TsUser
               }
+              head?: string[]
               now: string
               plans?: string[]
               requestId: unknown
@@ -216,7 +217,7 @@ public sealed class DeveloperExperienceTests : IDisposable
             new JsonSerializerOptions { TypeInfoResolver = TypeScriptJsonContext.Default },
             Configure(o => o.TypeScript.SharedProps<Flash>().Page<Unregistered>("Missing")));
         var ts = generator.Generate();
-        Assert.Contains("export interface SharedProps extends Flash {}", ts, StringComparison.Ordinal);
+        Assert.Contains("export interface SharedProps extends Flash {\n  head?: string[]\n}", ts, StringComparison.Ordinal);
         Assert.Contains("Missing: unknown", ts, StringComparison.Ordinal);
         Assert.Contains(generator.Warnings, w => w.Contains("Unregistered", StringComparison.Ordinal));
 

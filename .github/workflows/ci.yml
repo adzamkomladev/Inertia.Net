@@ -36,6 +36,34 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack Inertia.Net.slnx -c Release --no-build -warnaserror -o artifacts
 
+  # Every test project on net10.0 with Redis and MongoDB servers (build-test skips those tests: no REDIS_URL / MONGODB_URI there),
+  # measuring line coverage of the libraries. MIN is the 1.9.0 level minus two points, so coverage cannot fall silently.
+  data-stores:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:8.2-alpine
+        ports: ["6379:6379"]
+      mongo:
+        image: mongo:8.0
+        ports: ["27017:27017"]
+    env:
+      REDIS_URL: localhost:6379
+      MONGODB_URI: mongodb://localhost:27017
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x # the net10.0 targets run on the .NET 10 runtime
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22 # managed SSR tests start Node
+      - run: dotnet build Inertia.Net.slnx -c Release -warnaserror
+      - run: bash eng/coverage.sh
+        env:
+          MIN: "93.8" # 95.81% at 1.9.0, minus two points
+
   # Native AOT publish of tests/Inertia.Net.AotSmoke (any IL2xxx/IL3xxx warning fails), then protocol smoke checks on the binary.
   aot-smoke:
     runs-on: ubuntu-latest
@@ -124,10 +152,8 @@ jobs:
       fail-fast: false
       matrix:
         framework: [react, vue, svelte]
-        tfm: [net10.0]
-        include:
-          - framework: react
-            tfm: net11.0
+        tfm: [net10.0, net11.0]
+        auth: [false, true]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -147,15 +173,31 @@ jobs:
       - name: Create the app
         run: |
           dotnet new install "$RUNNER_TEMP/packages/Inertia.Net.Templates.$VERSION.nupkg"
-          dotnet new inertia -n Starter -o "$RUNNER_TEMP/Starter" --framework ${{ matrix.framework }} --tfm ${{ matrix.tfm }}
+          dotnet new inertia -n Starter -o "$RUNNER_TEMP/Starter" --framework ${{ matrix.framework }} --tfm ${{ matrix.tfm }} --auth ${{ matrix.auth }}
           cd "$RUNNER_TEMP/Starter"
           dotnet new nugetconfig
           dotnet nuget add source "$RUNNER_TEMP/packages" -n local
       - name: Build the app
         working-directory: ${{ runner.temp }}/Starter
         run: dotnet build -warnaserror
+      - name: Generated types and routes are current
+        working-directory: ${{ runner.temp }}/Starter
+        run: |
+          # Rewrites ClientApp/types at build time (the app starts once without listening), then compares with the template's copy.
+          dotnet build -warnaserror -p:InertiaGenerateTypesOnBuild=true
+          TYPES=src/Inertia.Net.Templates/content/${{ matrix.auth && 'auth/common' || 'common' }}/ClientApp/types
+          git diff --no-index --exit-code "$GITHUB_WORKSPACE/$TYPES" ClientApp/types
       - name: Build the client
         working-directory: ${{ runner.temp }}/Starter
         run: |
           npm install --no-audit --no-fund
           npm run build
+      - name: Sign-in smoke test
+        if: matrix.auth && matrix.tfm == 'net10.0'
+        working-directory: tests/e2e
+        env:
+          STARTER_DIR: ${{ runner.temp }}/Starter
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test -c template/playwright.config.ts

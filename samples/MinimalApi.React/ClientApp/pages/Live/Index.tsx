@@ -1,12 +1,15 @@
-import { router, useProp } from '@inertiajs/react'
+import { InfiniteScroll, router, useProp } from '@inertiajs/react'
 import { useEffect, useState } from 'react'
 import Layout from '../../Layout'
+import { liveReload } from '../../lib/inertia-live-reload'
+import { live } from '../../lib/live'
+import { liveEvents, routes } from '../../types/routes'
 
 interface Counter {
   value: number
 }
 
-export default function Index() {
+export default function Index({ posts }: { posts: { data: { id: number; title: string }[] } }) {
   // A live prop reads like any other; useProp also says when a live reload is in flight.
   const counter = useProp<Counter>('counter')
   const inbox = useProp<{ unread: number }>('inbox')
@@ -23,6 +26,9 @@ export default function Index() {
     })
   }, [hold])
 
+  // posts is a scroll prop, which cannot be Live(): reload it when PostCreated arrives, replacing the pages already loaded.
+  useEffect(() => liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] }), [])
+
   return (
     <Layout>
       <h1>Live</h1>
@@ -38,6 +44,17 @@ export default function Index() {
         updates
       </label>{' '}
       {hold && <span data-testid="held">{held} held</span>}
+      <h2>Posts</h2>
+      <button type="button" data-testid="add-post" onClick={() => router.post(routes.live.posts.store().url, {}, { preserveScroll: true })}>
+        Add post
+      </button>
+      <InfiniteScroll data="posts">
+        {posts.data.map((post) => (
+          <article key={post.id} data-testid="live-post" style={{ height: 120, borderBottom: '1px solid #ccc' }}>
+            {post.title}
+          </article>
+        ))}
+      </InfiniteScroll>
     </Layout>
   )
 }

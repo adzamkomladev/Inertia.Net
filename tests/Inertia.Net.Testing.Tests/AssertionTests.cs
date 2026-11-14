@@ -179,6 +179,34 @@ public class AssertionTests
     }
 
     [Fact]
+    public async Task Head_assertions()
+    {
+        var page = new AssertableInertia(await ParsingTests.JsonResponse("""
+            {"component":"A","url":"/","props":{"head":["<title data-inertia=\"title\">Users - App</title>",
+              "<meta property=\"og:title\" content=\"Tom &amp; Jerry\" data-inertia=\"og:title\">"]}}
+            """).GetInertiaPageAsync(TestContext.Current.CancellationToken));
+        page.HasHead("title").HasHead("title", "Users - App").HasHead("og:title", "Tom &amp; Jerry");
+        Assert.Equal("Inertia head tag [title] expected to contain [Posts] but was <title data-inertia=\"title\">Users - App</title>.",
+            Assert.Throws<InertiaAssertionException>(() => page.HasHead("title", "Posts")).Message);
+        Assert.StartsWith("Inertia head has no [description] tag", Assert.Throws<InertiaAssertionException>(() => page.HasHead("description")).Message);
+        Assert.Equal("Inertia head has no [title] tag; it has: .", Assert.Throws<InertiaAssertionException>(() => Make().HasHead("title")).Message);
+    }
+
+    [Fact]
+    public async Task Route_assertions()
+    {
+        var page = new AssertableInertia(await ParsingTests.JsonResponse("""
+            {"component":"A","url":"/","props":{"edit":{"url":"/users/1/edit","method":"get"},"actions":{"delete":{"url":"/users/1","method":"delete"}},"name":"x"}}
+            """).GetInertiaPageAsync(TestContext.Current.CancellationToken));
+        page.WhereRoute("edit", "/users/1/edit").WhereRoute("actions.delete", "/users/1", "DELETE")
+            .Has("actions", a => a.WhereRoute("delete", "/users/1", "delete"));
+        Assert.Equal("""Property [actions.delete] expected to be the route { url: /users/1, method: post } but was {"url":"/users/1","method":"delete"}.""",
+            Assert.Throws<InertiaAssertionException>(() => page.WhereRoute("actions.delete", "/users/1", "post")).Message);
+        Assert.Throws<InertiaAssertionException>(() => page.WhereRoute("name", "x"));
+        Assert.Throws<InertiaAssertionException>(() => page.WhereRoute("edit", "/users/2/edit"));
+    }
+
+    [Fact]
     public void Dump_returns_scope_json()
     {
         Assert.Contains("\"search\": \"a\"", Make().Dump());

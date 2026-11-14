@@ -5,6 +5,8 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,6 +26,8 @@ public sealed class InertiaTypeScriptOptions
 
     internal Type? FlashDataType { get; private set; }
 
+    internal List<LiveEvent> LiveEventList { get; } = [];
+
     /// <summary>
     /// The file to write, relative to the content root, e.g. <c>ClientApp/types/inertia.d.ts</c>. It is written when the app starts in
     /// Development, and only when its content changed. Null (the default) writes nothing. Run the app with <c>--inertia-types</c>
@@ -31,13 +35,49 @@ public sealed class InertiaTypeScriptOptions
     /// </summary>
     public string? OutputPath { get; set; }
 
+    /// <summary>
+    /// The <c>routes.ts</c> file to write, relative to the content root, e.g. <c>ClientApp/types/routes.ts</c>: one function per named
+    /// endpoint (<c>WithName("todos.show")</c> becomes <c>routes.todos.show(1)</c>, returning <c>{ url, method }</c>), written like
+    /// <see cref="OutputPath"/>. Unnamed endpoints are skipped. Null (the default) writes nothing.
+    /// </summary>
+    public string? RoutesOutputPath { get; set; }
+
     /// <summary>Declares that <paramref name="component"/> renders with props of type <typeparamref name="TProps"/>, listed in <c>InertiaPages</c>.</summary>
     /// <typeparam name="TProps">The typed props object passed to <c>Render</c>; register it in the app's JSON context under Native AOT.</typeparam>
     public InertiaTypeScriptOptions Page<TProps>(string component)
     {
         ArgumentException.ThrowIfNullOrEmpty(component);
-        Pages.Add((component, typeof(TProps)));
+        AddPage(component, typeof(TProps));
         return this;
+    }
+
+    /// <summary>Declares the page <typeparamref name="TPage"/> under the component it names (<see cref="IInertiaPage.Component"/>).</summary>
+    public InertiaTypeScriptOptions Page<TPage>() where TPage : IInertiaPage => Page<TPage>(TPage.Component);
+
+    /// <summary>
+    /// Declares every public <see cref="IInertiaPage"/> type in <paramref name="assembly"/>, as <see cref="Page{TPage}()"/> does for one.
+    /// It uses reflection; under trimming, register pages one by one with <see cref="Page{TPage}()"/>.
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Scans the assembly for IInertiaPage types; use Page<TPage>() when trimming.")]
+    public InertiaTypeScriptOptions PagesFrom(System.Reflection.Assembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        foreach (var type in assembly.GetExportedTypes().Where(t => !t.IsAbstract && !t.IsGenericTypeDefinition && typeof(IInertiaPage).IsAssignableFrom(t)).OrderBy(t => t.FullName, StringComparer.Ordinal))
+        {
+            // The interface map finds the Component getter also when the type implements it explicitly.
+            var map = type.GetInterfaceMap(typeof(IInertiaPage));
+            AddPage((string)map.TargetMethods[0].Invoke(null, null)!, type);
+        }
+
+        return this;
+    }
+
+    private void AddPage(string component, Type props)
+    {
+        if (!Pages.Contains((component, props)))
+        {
+            Pages.Add((component, props));
+        }
     }
 
     /// <summary>
@@ -48,6 +88,22 @@ public sealed class InertiaTypeScriptOptions
     public InertiaTypeScriptOptions SharedProps<TShared>()
     {
         SharedPropsType = typeof(TShared);
+        return this;
+    }
+
+    /// <summary>
+    /// Exports <paramref name="events"/> from <see cref="RoutesOutputPath"/> as <c>liveEvents</c>, keyed by event name
+    /// (<c>liveEvents.OrderUpdated</c> is <c>{ name, channel: { type, name } }</c>), so the client subscribes without retyping them.
+    /// </summary>
+    public InertiaTypeScriptOptions LiveEvents(params LiveEvent[] events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        foreach (var e in events)
+        {
+            ArgumentNullException.ThrowIfNull(e);
+            if (!LiveEventList.Contains(e)) LiveEventList.Add(e);
+        }
+
         return this;
     }
 
@@ -84,53 +140,99 @@ internal sealed partial class InertiaTypeScriptWriter(
     IHostEnvironment environment,
     InertiaPageWriter pageWriter,
     ILogger<InertiaTypeScriptWriter> logger,
-    IHostApplicationLifetime? lifetime = null) : IHostedService
+    IHostApplicationLifetime? lifetime = null,
+    IServiceProvider? services = null) : IHostedService
 {
     internal const string GenerateFlag = "--inertia-types";
 
-    internal bool GenerateOnly { get; init; } = Environment.GetCommandLineArgs().Contains(GenerateFlag, StringComparer.Ordinal);
+    /// <summary>True when the process was started with <c>--inertia-types</c>.</summary>
+    internal static bool IsGenerateOnly { get; } = Environment.GetCommandLineArgs().Contains(GenerateFlag, StringComparer.Ordinal);
+
+    internal bool GenerateOnly { get; init; } = IsGenerateOnly;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (GenerateOnly)
+        if (!GenerateOnly && !environment.IsDevelopment())
         {
-            if (!Write())
-            {
-                Environment.ExitCode = 1;
-            }
-
-            // Stopping inside StartAsync cancels the other hosted services and the host throws; stop once started instead.
-            lifetime?.ApplicationStarted.Register(lifetime.StopApplication);
             return Task.CompletedTask;
         }
 
-        if (environment.IsDevelopment())
+        var typescript = options.Value.TypeScript;
+        // Routes come from the app's endpoints, which all mounts share; the default mount writes them.
+        var routes = options.Value.Mount is null ? typescript.RoutesOutputPath : null;
+        var written = true;
+        if (GenerateOnly && typescript.OutputPath is not { Length: > 0 } && routes is not { Length: > 0 })
         {
-            Write();
+            LogNoOutputPath(logger);
+            written = false;
+        }
+
+        if (typescript.OutputPath is { Length: > 0 } output)
+        {
+            written &= WriteFile(output, warnings =>
+            {
+                var generator = new TypeScriptGenerator(pageWriter.SerializerOptions, options.Value);
+                var content = generator.Generate();
+                warnings.AddRange(generator.Warnings);
+                return content;
+            });
+        }
+
+        // Endpoints are complete only once the server has built its pipeline, which happens after the app's hosted services start
+        // (WebApplication registers the web host last). Stopping inside StartAsync would also make the host throw.
+        // The routes file is written even when the declarations file was not.
+        if (lifetime is null)
+        {
+            var routesWritten = WriteRoutes(routes);
+            Finish(written && routesWritten);
+        }
+        else
+        {
+            lifetime.ApplicationStarted.Register(() =>
+            {
+                var routesWritten = WriteRoutes(routes);
+                Finish(written && routesWritten);
+            });
         }
 
         return Task.CompletedTask;
     }
 
-    private bool Write()
+    private void Finish(bool written)
     {
-        if (options.Value.TypeScript.OutputPath is not { Length: > 0 } output)
+        if (GenerateOnly)
         {
-            if (GenerateOnly)
+            if (!written)
             {
-                LogNoOutputPath(logger);
-                return false;
+                Environment.ExitCode = 1;
             }
 
-            return true;
+            lifetime?.StopApplication();
+        }
+    }
+
+    private bool WriteRoutes(string? routes) => routes is not { Length: > 0 } || WriteFile(routes, warnings =>
+    {
+        var generator = new RoutesGenerator(new TypeScriptGenerator(pageWriter.SerializerOptions, options.Value, RoutesGenerator.ReservedNames),
+            services?.GetServices<IRouteBodySource>() ?? [], options.Value.TypeScript.LiveEventList);
+        var content = generator.Generate(services?.GetService<EndpointDataSource>()?.Endpoints ?? []);
+        warnings.AddRange(generator.Warnings);
+        if (generator.Unnamed > 0)
+        {
+            LogUnnamed(logger, generator.Unnamed);
         }
 
-        var path = Path.GetFullPath(output, environment.ContentRootPath); // an absolute OutputPath is used as is
+        return content;
+    });
+
+    private bool WriteFile(string output, Func<List<string>, string> generate)
+    {
+        var path = Path.GetFullPath(output, environment.ContentRootPath); // an absolute path is used as is
         try
         {
-            var generator = new TypeScriptGenerator(pageWriter.SerializerOptions, options.Value);
-            var content = generator.Generate();
-            foreach (var warning in generator.Warnings)
+            var warnings = new List<string>();
+            var content = generate(warnings);
+            foreach (var warning in warnings)
             {
                 LogWarning(logger, warning);
             }
@@ -161,7 +263,10 @@ internal sealed partial class InertiaTypeScriptWriter(
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inertia TypeScript declarations: {Warning}")]
     private static partial void LogWarning(ILogger logger, string warning);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "--inertia-types was given but InertiaOptions.TypeScript.OutputPath is not set; no declarations were written.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Inertia routes: {Count} unnamed endpoints were skipped; name an endpoint (WithName) to generate its route.")]
+    private static partial void LogUnnamed(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "--inertia-types was given but neither InertiaOptions.TypeScript.OutputPath nor RoutesOutputPath is set; nothing was written.")]
     private static partial void LogNoOutputPath(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inertia TypeScript declarations could not be written to {Path}.")]
@@ -169,10 +274,10 @@ internal sealed partial class InertiaTypeScriptWriter(
 }
 
 /// <summary>Maps JSON contracts to TypeScript declarations.</summary>
-internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOptions, InertiaOptions options)
+internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOptions, InertiaOptions options, IEnumerable<string>? reservedNames = null)
 {
     private readonly Dictionary<Type, string> _names = [];
-    private readonly HashSet<string> _usedNames = new(StringComparer.Ordinal) { "InertiaPages", "SharedProps", "FlashData" };
+    private readonly HashSet<string> _usedNames = new(reservedNames ?? ["InertiaPages", "SharedProps", "FlashData"], StringComparer.Ordinal);
     private readonly Queue<Type> _pending = new();
     private readonly StringBuilder _declarations = new();
 
@@ -195,7 +300,7 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
         head.Append("export interface SharedProps ");
         if (typescript.SharedPropsType is { } shared)
         {
-            head.Append("extends ").Append(Reference(shared)).Append(" {}\n\n");
+            head.Append("extends ").Append(Reference(shared)).Append(" {\n  ").Append(Key(options.Head.PropName)).Append("?: string[]\n}\n\n");
         }
         else
         {
@@ -207,13 +312,7 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
             head.Append("export interface FlashData extends ").Append(Reference(flash)).Append(" {}\n\n");
         }
 
-        // Types referenced by the declarations above, then by those, and so on.
-        while (_pending.TryDequeue(out var type))
-        {
-            Declare(type);
-        }
-
-        head.Append(_declarations);
+        head.Append(Declarations());
         head.Append("declare module '@inertiajs/core' {\n  export interface InertiaConfig {\n    sharedPageProps: SharedProps\n");
         if (typescript.FlashDataType is not null)
         {
@@ -222,6 +321,19 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
 
         head.Append("    errorValueType: ").Append(options.WithAllErrors ? "string[]" : "string").Append("\n  }\n}\n");
         return head.ToString();
+    }
+
+    /// <summary>The declarations of the named types referenced so far, then of the types those reference, and so on.</summary>
+    internal string Declarations()
+    {
+        while (_pending.TryDequeue(out var type))
+        {
+            Declare(type);
+        }
+
+        var text = _declarations.ToString();
+        _declarations.Clear();
+        return text;
     }
 
     // The shared props given to InertiaOptions.Share, with dot keys nested like the page JSON nests them.
@@ -253,6 +365,7 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
                 });
         }
 
+        root.TryAdd(options.Head.PropName, (Optional: true, Type: "string[]")); // InertiaHead tags, sent when a page sets any
         return Literal(root, "");
 
         string Literal(SortedDictionary<string, object> node, string indent)
@@ -569,4 +682,36 @@ internal sealed class TypeScriptGenerator(JsonSerializerOptions serializerOption
         name.Length > 0 && !char.IsAsciiDigit(name[0]) && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '$');
 
     private static string Quote(string text) => "'" + text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal) + "'";
+}
+
+/// <summary>
+/// The server under <c>--inertia-types</c>: the app starts (so its endpoints are known) but listens on nothing, so the declarations
+/// can be written during a build or publish (<c>InertiaGenerateTypesOnBuild</c>) without binding a port.
+/// </summary>
+internal sealed class GenerateOnlyServer : Microsoft.AspNetCore.Hosting.Server.IServer
+{
+    public Microsoft.AspNetCore.Http.Features.IFeatureCollection Features { get; } = CreateFeatures();
+
+    public Task StartAsync<TContext>(Microsoft.AspNetCore.Hosting.Server.IHttpApplication<TContext> application, CancellationToken cancellationToken)
+        where TContext : notnull => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public void Dispose()
+    {
+    }
+
+    private static Microsoft.AspNetCore.Http.Features.FeatureCollection CreateFeatures()
+    {
+        var features = new Microsoft.AspNetCore.Http.Features.FeatureCollection();
+        features.Set<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>(new NoAddresses());
+        return features;
+    }
+
+    private sealed class NoAddresses : Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature
+    {
+        public ICollection<string> Addresses { get; } = [];
+
+        public bool PreferHostingUrls { get; set; }
+    }
 }

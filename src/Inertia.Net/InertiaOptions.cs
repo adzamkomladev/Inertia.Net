@@ -78,6 +78,9 @@ public sealed class InertiaOptions
     /// <summary>Prop resolution settings.</summary>
     public InertiaPropsOptions Props { get; } = new();
 
+    /// <summary>Server-managed head tags (see <see cref="InertiaHead"/>).</summary>
+    public InertiaHeadOptions Head { get; } = new();
+
     /// <summary>Shares a prop with every page. Page props with the same key win.</summary>
     public InertiaOptions Share(string key, object? value)
     {

@@ -4,7 +4,7 @@
     <IsPackable>true</IsPackable>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <Version>1.8.0</Version>
+    <Version>1.9.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Authors>Inertia.Net contributors</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -20,8 +20,8 @@
     <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Templates pack source files without a library API. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" Condition="'$(MSBuildProjectName)' != 'Inertia.Net.Templates'" />
+    <!-- Templates pack source files without a library API; the analyzers ship inside Inertia.Net and have none either. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" Condition="'$(MSBuildProjectName)' != 'Inertia.Net.Templates' and '$(MSBuildProjectName)' != 'Inertia.Net.Analyzers'" />
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

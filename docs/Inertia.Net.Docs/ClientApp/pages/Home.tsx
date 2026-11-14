@@ -4,7 +4,7 @@ import { useState, type ComponentProps, type ComponentType, type SVGProps } from
 import { ReactLogo, SvelteLogo, VueLogo } from '../components/icons/FrameworkLogos'
 import { GithubIcon } from '../components/icons/GithubIcon'
 import { InstallCommand } from '../components/InstallCommand'
-import { Seo } from '../components/Seo'
+import { routes } from '../types/routes'
 import { SiteHeader } from '../components/SiteHeader'
 import { cn } from '../lib/utils'
 import ClientSnippet from '../snippets/home-client.mdx'
@@ -99,7 +99,7 @@ function Footer() {
       <div className="mx-auto flex max-w-[1100px] flex-col gap-4 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>Inertia.Net is MIT licensed. This site is built with it.</p>
         <ul className="flex flex-wrap gap-x-5 gap-y-2">
-          <li><Link href="/docs/introduction" className="hover:text-foreground">Docs</Link></li>
+          <li><Link href={routes.docs.show.url('introduction')} className="hover:text-foreground">Docs</Link></li>
           <li><a href="https://github.com/adzamkomladev/Inertia.Net" target="_blank" rel="noreferrer" className="hover:text-foreground">GitHub</a></li>
           <li><a href="https://www.nuget.org/packages/Inertia.Net" target="_blank" rel="noreferrer" className="hover:text-foreground">NuGet</a></li>
           <li><a href="https://github.com/adzamkomladev/Inertia.Net-Samples" target="_blank" rel="noreferrer" className="hover:text-foreground">Samples</a></li>
@@ -112,11 +112,6 @@ function Footer() {
 export default function Home() {
   return (
     <div className="min-h-screen">
-      <Seo
-        title="Inertia.Net — React, Vue and Svelte for ASP.NET Core"
-        description="Inertia.Net lets .NET developers build React, Vue and Svelte frontends on ASP.NET Core without writing a separate API."
-        type="website"
-      />
       <SiteHeader />
 
       <main>
@@ -131,7 +126,7 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
-                  href="/docs/quick-start"
+                  href={routes.docs.show.url('quick-start')}
                   className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   Get started
@@ -230,7 +225,7 @@ export default function Home() {
               Give your coding agent the conventions it needs to add pages, props and forms correctly. The agent guide has a ready-made <code className="font-mono text-[0.9em]">AGENTS.md</code> section, and the whole documentation is available as plain text.
             </p>
             <div className="mt-6 flex flex-wrap gap-3 text-sm">
-              <Link href="/docs/ai-agents" className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-4 font-medium transition-colors hover:bg-accent">
+              <Link href={routes.docs.show.url('ai-agents')} className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-4 font-medium transition-colors hover:bg-accent">
                 Read the agent guide
                 <ArrowRight className="size-4" />
               </Link>

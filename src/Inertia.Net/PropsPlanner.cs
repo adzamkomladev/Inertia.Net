@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Inertia.Net;
@@ -16,14 +17,16 @@ internal sealed partial class PropsPlanner : IDisposable
 {
     private readonly CancellationTokenSource _cancellation;
     private readonly InertiaPageWriter _owner;
+    private readonly IServiceProvider _services;
     private readonly List<Planned> _planned = [];
     private SemaphoreSlim? _gate;
     private int _startable; // planned props that are not duplicates
     private volatile bool _failed;
 
-    public PropsPlanner(InertiaPageWriter owner, CancellationToken requestAborted)
+    public PropsPlanner(InertiaPageWriter owner, IServiceProvider services, CancellationToken requestAborted)
     {
         _owner = owner;
+        _services = services;
         _cancellation = requestAborted.CanBeCanceled ? CancellationTokenSource.CreateLinkedTokenSource(requestAborted) : new CancellationTokenSource();
     }
 
@@ -172,9 +175,12 @@ internal sealed partial class PropsPlanner : IDisposable
 
         try
         {
+            // A parallel loader runs beside the others, so a scoped one gets its own scope (its own DbContext).
+            await using var scope = planned.Prop.UsesServices ? _services.CreateAsyncScope() : default(AsyncServiceScope?);
+            var services = scope?.ServiceProvider;
             return await (planned.Prop.Caching is null
-                ? planned.Prop.ResolveAsync(cancellationToken)
-                : _owner.LoadCachedPropAsync(planned.Prop, cancellationToken));
+                ? planned.Prop.ResolveAsync(services, cancellationToken)
+                : _owner.LoadCachedPropAsync(planned.Prop, services, cancellationToken));
         }
         catch (Exception ex) when (!planned.Prop.ShouldRescue && !(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
         {

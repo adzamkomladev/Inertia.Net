@@ -90,7 +90,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.0
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -116,6 +116,29 @@ Both results contain the selected group in `data`. A cursor is a marker: send it
 Choose a stable, fully unique ordering: use a unique key, or add a unique tie-breaker when the first key can repeat. Nullable keys are unsupported. The cursor codec supports the types listed above, but EF translation and ordering for each type depend on the database provider; for example, SQLite needs a suitable value conversion to order `DateTimeOffset`. The name from a bound request or `From(...)` is used for the corresponding page parameter; an explicit `pageName` or `cursorName` argument takes precedence.
 
 The EF Core package is not marked Native AOT compatible. EF Core has its own compiled-model requirements; for Native AOT applications, use the core delegate paginators with an AOT-compatible data source instead.
+
+## With MongoDB
+
+`Inertia.Net.MongoDB` builds the same `Page<T>` and `CursorPage<T>` values from a `collection.Find(filter)`:
+
+```sh
+dotnet add package Inertia.Net.MongoDB --version 1.9.0
+```
+
+```csharp
+["users"] = await users.Find(u => u.Active).SortBy(u => u.Name).ThenBy(u => u.Id)
+    .ToPageAsync(PageRequest.From(http.Request.Query), ct: ct),
+["feed"] = Scroll(await posts.Find(p => p.Published)
+    .ToCursorPageAsync(p => p.CreatedAt, p => p.Id, CursorRequest.From(http), descending: true, ct: ct)),
+```
+
+The rules are those of the EF Core helpers:
+
+- `ToPageAsync` needs a sorted find (skip and limit are replaced) and counts the filter with `CountDocuments` unless `countTotal: false`.
+- `ToCursorPageAsync` needs an unsorted find: it adds the keyset condition to the find's filter and sorts by the key (and tie-breaker). Keys may be `ObjectId` (held in the cursor as its 24-character string), `int`, `long`, `string`, `Guid`, `DateTime`, `DateTimeOffset`, `decimal`, `double` or `bool`. A tampered or unparseable cursor starts at the first page.
+- MongoDB orders strings by their UTF-8 bytes.
+
+The MongoDB driver does not support trimming or Native AOT, so neither does this package. See the [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.MongoDB/README.md).
 
 ## Native AOT
 

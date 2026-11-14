@@ -31,6 +31,10 @@ Publish with `IInertiaLive` as usual; every subscriber of the channel gets the e
 await live.PublishAsync(OrderEvents.Updated(id), exceptSocketId: context.InertiaRequest().SocketId);
 ```
 
+A process that only publishes (a worker, a queue consumer) needs `AddInertiaLive().AddSignalR()` and no `AddInertia()`. The app's
+own hubs keep working: the hub's JSON metadata is added in front of SignalR's resolver chain, and the reflection fallback stays
+when the app set none.
+
 ## Client
 
 Add `@microsoft/signalr` with your package manager: `npm install @microsoft/signalr`, `bun add @microsoft/signalr`, `pnpm add @microsoft/signalr` or `yarn add @microsoft/signalr`.
@@ -132,3 +136,10 @@ client's built-in `pusher()` or `echo()` transport and implement `IInertiaLiveBr
 this package.
 
 Documentation: <https://github.com/adzamkomladev/Inertia.Net#live-props>
+
+## Scroll and merge props
+
+A `Scroll(...)` or `Merge(...)` prop cannot be live. `ClientApp/lib/inertia-live-reload.ts` (in `dotnet new inertia` apps, or copy
+[the file](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Templates/content/common/ClientApp/lib/inertia-live-reload.ts))
+reloads it when an event arrives: `liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] })`, with `live`
+the value given to `createInertiaApp({ live })`. See [Reloading scroll and merge props](https://github.com/adzamkomladev/Inertia.Net#reloading-scroll-and-merge-props).

@@ -11,6 +11,7 @@ builder.Services.AddInertia(o =>
     o.Share("appName", "Inertia.Net Sample");
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
     o.Pages.Directory = "ClientApp/pages"; // Development only: rendering a component without a page file fails fast
+    o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts"; // Development only: one typed function per named endpoint
 });
 builder.Services.AddResponseCompression(); // gzip and Brotli for the page JSON and HTML (see the README on HTTPS)
 // Keep development diagnostics unless the browser tests explicitly enable error pages.

@@ -74,6 +74,27 @@ public sealed class RefreshQueueTests
     }
 
     [Fact]
+    public async Task A_failing_refresh_is_logged_and_releases_its_claim()
+    {
+        var harness = new Harness();
+        var worker = harness.Services.GetRequiredService<InertiaRefreshQueue>();
+        var released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await worker.StartAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            worker.Enqueue(new RefreshWork(_ => throw new InvalidOperationException("loader failed"), () => released.TrySetResult(), "prop"));
+            await released.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            await worker.StopAsync(CancellationToken.None);
+        }
+
+        Assert.Equal(0, worker.PendingCount);
+        Assert.Single(harness.Logs.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("refresh failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_hung_refresh_does_not_hold_up_the_others()
     {
         var harness = new Harness();

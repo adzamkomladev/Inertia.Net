@@ -15,19 +15,29 @@ internal static class InertiaErrorPages
     public static Task HandleStatusCodeAsync(StatusCodeContext context) =>
         TryRenderAsync(context.HttpContext, null).AsTask();
 
-    internal static async ValueTask<bool> TryRenderAsync(HttpContext context, Exception? exception)
+    /// <summary>The request's mount renders an error component for <paramref name="status"/> (registered, listed, enabled here).</summary>
+    internal static bool Handles(HttpContext context, int status) => Options(context, status) is not null;
+
+    private static InertiaErrorPagesOptions? Options(HttpContext context, int status)
     {
         var services = context.RequestServices;
         // Each mount renders only the error components it registered: another mount's would not exist in its bundle.
         var mount = InertiaMountServices.Mount(context);
-        if (services.GetService<InertiaErrorPagesRegistration>()?.Mounts.Contains(mount ?? "") != true) return false;
+        if (services.GetService<InertiaErrorPagesRegistration>()?.Mounts.Contains(mount ?? "") != true) return null;
         var options = mount is null
             ? services.GetRequiredService<IOptions<InertiaErrorPagesOptions>>().Value
             : services.GetRequiredService<IOptionsMonitor<InertiaErrorPagesOptions>>().Get(mount);
-        var status = context.Response.StatusCode;
-        if (context.Response.HasStarted || status is 409 or 419 || !options.StatusCodes.Contains(status)
+        return status is 409 or 419 || !options.StatusCodes.Contains(status)
             || (!options.EnabledInDevelopment && services.GetRequiredService<IHostEnvironment>().IsDevelopment())
-            || !IsPageRequest(context.Request)) return false;
+            ? null
+            : options;
+    }
+
+    internal static async ValueTask<bool> TryRenderAsync(HttpContext context, Exception? exception)
+    {
+        var services = context.RequestServices;
+        var status = context.Response.StatusCode;
+        if (context.Response.HasStarted || Options(context, status) is not { } options || !IsPageRequest(context.Request)) return false;
 
         var component = options.Components.GetValueOrDefault(status, options.Component);
         var props = new InertiaProps { ["status"] = status };

@@ -87,7 +87,7 @@ The page lists every listener, including those of props it left out:
 | `Once` | Yes | A once prop the client already holds stays subscribed. |
 | `Rescue`, `Parallel` | Yes | A rescued prop stays subscribed; the next event fetches it again. |
 | `Cache` | Yes | Publishing does not evict the cache. Remove the entry with `IInertiaCache` first. |
-| `Merge`, `DeepMerge`, `Scroll` | No | A live prop is replaced whole, so these throw `InvalidOperationException`. |
+| `Merge`, `DeepMerge`, `Scroll` | No | A live prop is replaced whole, so these throw `InvalidOperationException`. Reload them from the page instead: see [Reloading scroll and merge props](#reloading-scroll-and-merge-props). |
 
 A live prop inside an array reloads its whole array, as every [partial reload](/docs/partial-reloads) of an array descendant does. Prefer keyed objects for lists that change often.
 
@@ -227,6 +227,25 @@ SignalR groups live on one server. Behind several instances, add a Redis backpla
 </Callout>
 
 The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.SignalR/README.md) lists the client options, how channels map to SignalR groups, and the security notes.
+
+## Reloading scroll and merge props
+
+A `Scroll(...)` or `Merge(...)` prop cannot be live: a live reload would merge the reloaded page into the list. Reload it from the page instead, with `ClientApp/lib/inertia-live-reload.ts` (in `dotnet new inertia` apps):
+
+```csharp
+o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+o.TypeScript.LiveEvents(Events.PostCreated);   // exported from routes.ts as liveEvents.PostCreated
+```
+
+```tsx
+import { liveReload } from '../lib/inertia-live-reload'
+import { live } from '../lib/live'                 // the value given to createInertiaApp({ live })
+import { liveEvents } from '../types/routes'
+
+useEffect(() => liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] }), [])
+```
+
+Events within `debounce` milliseconds (default 250) become one reload, a reload waits for a visit in flight, the scroll position is kept, and the client that caused the event (`exceptSocketId`) is not reloaded. `reset` replaces the prop instead of merging it, so the reload brings no duplicates. The SignalR client transport delivers a channel's events to every subscriber. See [Typed routes](/docs/typed-routes) for `routes.ts`.
 
 ## Custom transports
 

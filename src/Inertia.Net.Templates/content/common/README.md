@@ -30,6 +30,7 @@ your row to write `wwwroot/build`, then publish with `dotnet publish -c Release`
 | `app.html` | The HTML shell of the first visit (`@vite`, `@inertiaHead`, `@inertia`) |
 | `ClientApp/pages` | One component per page: `Render("Todos/Index")` renders `ClientApp/pages/Todos/Index` |
 | `ClientApp/lib/inertia-signalr.ts` | The client transport for live props over SignalR (off until you enable it) |
+| `ClientApp/lib/inertia-live-reload.ts` | `liveReload(live, event, { only, reset })`: reloads `Scroll`/`Merge` props, which cannot be live, when an event arrives |
 | `ClientApp/types/inertia.d.ts` | Types for the pages, shared props and flash data, rewritten from the C# types when the app starts in Development |
 
 The template disables reflection-based JSON serialization. Use named DTOs and register their source-generated JSON metadata; anonymous values require reflection-enabled serialization.
@@ -40,4 +41,6 @@ The template disables reflection-based JSON serialization. Use named DTOs and re
 - Install the Inertia DevTools browser extension: the app records requests for it in Development.
 - Live props (props that refresh when the server broadcasts an event): add the `Inertia.Net.Live.SignalR` package, call
   `builder.Services.AddInertiaLive().AddSignalR()` and `app.MapInertiaLiveHub()`, add `@microsoft/signalr` with your package manager, then uncomment `live: signalr()` in `ClientApp/app`.
+  For a `Scroll(...)` or `Merge(...)` feed, register its event with `o.TypeScript.LiveEvents(...)` and call
+  `liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] })` from the page (`liveEvents` is in `routes.ts`).
 - Server-side rendering, once props, infinite scroll and the rest are in the Inertia.Net README.

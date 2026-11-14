@@ -31,6 +31,17 @@ test('Link navigation is an XHR visit, not a page load', async ({ page }) => {
   expect(await marker(page)).toBe('alive')
 })
 
+test('nav links are built by the generated routes.ts and navigate', async ({ page }) => {
+  await page.goto('/')
+  // The layout links use routes.home(), routes.users.index(), ... from ClientApp/types/routes.ts (named endpoints).
+  for (const [id, href] of [['nav-home', '/'], ['nav-users', '/users'], ['nav-contacts', '/contacts/create'], ['nav-feed', '/feed']]) {
+    // Compared as a path: the Svelte adapter writes the href as an absolute URL.
+    expect(await page.getByTestId(id).evaluate((a) => new URL((a as HTMLAnchorElement).href).pathname)).toBe(href)
+  }
+  await page.getByTestId('nav-contacts').click()
+  await expect(page).toHaveURL(/\/contacts\/create$/)
+})
+
 test('form validation errors, then success redirect with flash', async ({ page }) => {
   await page.goto('/contacts/create')
   await page.getByTestId('submit').click()
