@@ -11,6 +11,7 @@ internal static class PaginationProbe
 {
     internal static async Task RunAsync(string? output = null)
     {
+        await CountRoundTripsAsync();
         var fixture = new PaginationBenchmarks();
         fixture.Setup();
         try
@@ -94,6 +95,20 @@ internal static class PaginationProbe
         finally
         {
             fixture.Cleanup();
+        }
+    }
+
+    // Database round trips per offset page with a total count, 10 per page: a 5-row list, then pages of a 25-row list.
+    private static async Task CountRoundTripsAsync()
+    {
+        foreach (var (name, page, rows) in new[] { ("single", 1, 5), ("first", 1, 25), ("middle", 2, 25), ("last", 3, 25), ("past end", 4, 25) })
+        {
+            var source = Enumerable.Range(1, rows).ToArray();
+            int fetches = 0, counts = 0;
+            await Pagination.PaginateAsync<int>(new PageRequest(page, 10),
+                (skip, take, _) => { fetches++; return Task.FromResult<IReadOnlyList<int>>([.. source.Skip(skip).Take(take)]); },
+                _ => { counts++; return Task.FromResult((long)source.Length); });
+            Console.WriteLine($"Offset {name} page: {fetches} fetch, {counts} count");
         }
     }
 
