@@ -50,6 +50,24 @@ public sealed class PaginationTests
         Assert.False(noCount.HasMore);
     }
 
+    [Theory]
+    [InlineData(1, 5, false)] // a single page
+    [InlineData(1, 25, true)]
+    [InlineData(2, 25, true)]
+    [InlineData(3, 25, false)] // the last page
+    [InlineData(4, 25, true)] // past the end: no rows to count from
+    [InlineData(1, 0, false)] // an empty list
+    public async Task The_count_runs_only_when_the_page_does_not_give_the_total(int page, int rows, bool counted)
+    {
+        var source = Enumerable.Range(1, rows).ToArray();
+        var countCalls = 0;
+        var result = await Pagination.PaginateAsync<int>(new PageRequest(page, 10),
+            (skip, take, _) => Task.FromResult<IReadOnlyList<int>>(source.Skip(skip).Take(take).ToArray()),
+            _ => { countCalls++; return Task.FromResult((long)source.Length); }, ct: TestContext.Current.CancellationToken);
+        Assert.Equal(counted ? 1 : 0, countCalls);
+        Assert.Equal(rows, result.Total);
+    }
+
     [Fact]
     public async Task Parsed_parameter_names_flow_to_metadata_and_explicit_names_win()
     {
