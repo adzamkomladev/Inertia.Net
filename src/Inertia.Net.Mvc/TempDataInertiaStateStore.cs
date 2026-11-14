@@ -75,7 +75,7 @@ internal sealed class TempDataInertiaStateStore(
     }
 
     // The session provider reads the session synchronously, which blocks a thread on a distributed store (Redis, SQL Server).
-    // Load it asynchronously first (a no-op once loaded); a failing store is left to that read, which tolerates it as before.
+    // Load it asynchronously first (a no-op once loaded).
     private async ValueTask LoadSessionAsync(HttpContext httpContext)
     {
         if (_sessionProvider && httpContext.Features.Get<ISessionFeature>()?.Session is { } session)
@@ -86,6 +86,7 @@ internal sealed class TempDataInertiaStateStore(
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                // Ignored on purpose: the provider's own synchronous read then sees the failing store and tolerates it, as before.
             }
         }
     }
