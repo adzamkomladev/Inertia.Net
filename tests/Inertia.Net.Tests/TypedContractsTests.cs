@@ -190,7 +190,7 @@ public sealed class TypedContractsTests
               OrderUpdated: { name: 'OrderUpdated', channel: { type: 'private', name: 'orders.1' } },
               'it\'s': { name: 'it\'s', channel: { type: 'public', name: 'feed' } },
             } as const
-            """, ts, StringComparison.Ordinal);
+            """.ReplaceLineEndings("\n"), ts, StringComparison.Ordinal);
         Assert.Single(generator.Warnings);
         Assert.DoesNotContain("liveEvents", new RoutesGenerator().Generate([]), StringComparison.Ordinal);
     }
