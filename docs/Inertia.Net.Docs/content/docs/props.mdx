@@ -97,6 +97,20 @@ A parallel loader must not use the request's `DbContext` or other non-thread-saf
 }).Parallel(),
 ```
 
+### Scoped services in loaders
+
+`Prop<TService, T>(...)` hands a loader a service from the request, without capturing it in a closure:
+
+```csharp
+["orders"] = Prop<AppDbContext, int>((db, ct) => db.Orders.CountAsync(ct)),
+["inbox"] = Prop<InboxService, Inbox>((inbox, ct) => inbox.LoadAsync(ct)).Defer(), // and .Optional(), .Cache(...), .Live(...)
+```
+
+- A loader that runs during the request gets the request's instance (the same `DbContext` the handler used).
+- A `.Parallel()` loader gets a scope of its own, so two parallel loaders never share a `DbContext`. The scope is disposed when the loader finishes.
+- A [stale-while-revalidate](#cached-props) refresh runs after the response, in a new scope disposed when the refresh ends.
+- A service that is not registered fails the render with the prop's path and the service type.
+
 ## Deferred props
 
 `Defer` leaves the prop out of the first response and lists it under `deferredProps`. The client asks for each group as soon as the page is mounted.
@@ -197,6 +211,8 @@ builder.Services.AddSingleton<IInertiaCacheStore, MyRedisInertiaCacheStore>();
 ```
 
 The store gets and sets byte arrays by `InertiaCacheKey`, removes by key and by tag, and reads unknown formats as a miss. While a page renders, a store that throws is logged (at most once every 30 seconds) and counts as a miss; `IInertiaCache` lets the exception through.
+
+For a store shared by every app instance, `Inertia.Net.Redis` registers one with `AddInertiaRedisCache(...)`. See [Redis cache](/docs/redis).
 
 ## Typed page props
 

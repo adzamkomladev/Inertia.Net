@@ -2,7 +2,7 @@
 title: Testing
 description: Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
 section: Reference
-order: 3
+order: 4
 ---
 
 `Inertia.Net.Testing` has Laravel-style fluent assertions over Inertia responses and `HttpClient` helpers. It parses both JSON responses (`X-Inertia: true`) and the first-visit HTML `<script data-page>`, and decodes `$bigint` values. Failures throw `InertiaAssertionException` with a readable message, so it works with any test framework.
@@ -44,6 +44,20 @@ using var response = await _client.InertiaGetAsync("/missing");
 await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
 ```
 
+## Test host recipe
+
+With `WebApplicationFactory<Program>`, pin the asset version so requests need no first visit to learn it, and turn SSR off so tests need no Node server:
+
+```csharp
+builder.ConfigureTestServices(services => services.PostConfigure<InertiaOptions>(o =>
+{
+    o.Version = "test";              // then client.InertiaGetAsync(url, version: "test")
+    o.Ssr.Mode = SsrMode.Disabled;
+}));
+```
+
+For form posts, read the XSRF token from a page response with `GetXsrfToken()` and send it with `WithXsrfToken()` (see [Testing a form with antiforgery](#testing-a-form-with-antiforgery)). A cookie-keeping client (`factory.CreateClient(new() { AllowAutoRedirect = false, HandleCookies = true })`) holds the antiforgery cookie and the sign-in cookie between requests.
+
 ## Request helpers
 
 | Helper | Purpose |
@@ -55,13 +69,23 @@ await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
 
 ## Page assertions
 
-`Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)` and `HasLive(path, channel, event)` for [live props](/docs/live-props) (the channel as `"{type}:{name}"`, e.g. `private:orders.1`).
+`Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)` and `HasLive(path, channel, event)` for [live props](/docs/live-props) (the channel as `"{type}:{name}"`, e.g. `private:orders.1`), and `HasHead(key)` or `HasHead(key, contains)` for [head tags](/docs/head-tags), keyed like the tags' `data-inertia` attribute (`title`, a meta name or property, a link rel):
+
+```csharp
+await response.AssertInertiaAsync(page => page.HasHead("title", "Users - App").HasHead("description"));
+```
 
 ## Prop assertions
 
 On props and nested scopes (dot paths and array indexes allowed):
 
 `Has(key)`, `Has(key, count)`, `Has(key, scope)`, `Has(key, count, firstItemScope)`, `HasAll`, `HasAny`, `Missing`, `MissingAll`, `Where(key, value)`, `Where(key, predicate)`, `WhereNot`, `WhereNull`, `WhereNotNull`, `WhereType(key, "string|null")`, `WhereAllType`, `WhereContains(key, ...)`, `Count`, `CountBetween`, `Each(scope)`, `First(scope)` and `Dump()`.
+
+`WhereRoute(key, url, method)` asserts a route sent as a prop in the client's `{ url, method }` shape, which is what the generated [`routes.ts`](/docs/typed-routes) functions return. The method defaults to `get` and is compared ignoring case:
+
+```csharp
+await response.AssertInertiaAsync(page => page.WhereRoute("actions.delete", "/users/1", "delete"));
+```
 
 **Strict interaction tracking.** Like Laravel, a nested scope fails when it contains properties you did not assert, unless you end it with `Etc()`. The root scope is not checked automatically: call `.Interacted()` at the end to enforce that every top-level prop was asserted.
 

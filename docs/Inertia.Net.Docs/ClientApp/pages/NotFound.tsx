@@ -1,16 +1,11 @@
 import { Link } from '@inertiajs/react'
 import { ArrowLeft } from 'lucide-react'
-import { Seo } from '../components/Seo'
 import { SiteHeader } from '../components/SiteHeader'
+import { routes } from '../types/routes'
 
 export default function NotFound() {
   return (
     <div className="min-h-screen">
-      <Seo
-        title="Page not found — Inertia.Net"
-        description="The requested page is not part of the Inertia.Net documentation."
-        noIndex
-      />
       <SiteHeader />
       <main>
         <div className="relative mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-6 py-20 text-center">
@@ -21,13 +16,13 @@ export default function NotFound() {
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link
-              href="/docs/introduction"
+              href={routes.docs.show.url('introduction')}
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <ArrowLeft className="size-4" />
               Back to the docs
             </Link>
-            <Link href="/" className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-accent">
+            <Link href={routes.home.url()} className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-accent">
               Home
             </Link>
           </div>

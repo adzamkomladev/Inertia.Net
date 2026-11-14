@@ -217,7 +217,7 @@ Inertia is not a framework and not a new frontend library. It is a small protoco
 
 URL: https://inertia-dotnet.temtem.dev/docs/installation
 
-> Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
+> Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.
 
 Inertia.Net is split into small packages. Install the core package and one optional backend integration.
 
@@ -228,19 +228,23 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
 | `Inertia.Net.Live.SignalR` | you deliver [live props](/docs/live-props) over SignalR: hub, channel authorization and broadcaster |
 | `Inertia.Net.EntityFrameworkCore` | you page EF Core queries with numbered or cursor pagination |
+| `Inertia.Net.Redis` | you share [cached props](/docs/props#cached-props) and SSR renders between app instances through Redis |
+| `Inertia.Net.MongoDB` | you page MongoDB finds with numbered or cursor [pagination](/docs/pagination#with-mongodb) |
 | `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.8.0
-dotnet add package Inertia.Net.Mvc --version 1.8.0            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.8.0  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.8.0        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.8.0   # live props over SignalR
+dotnet add package Inertia.Net --version 1.9.0
+dotnet add package Inertia.Net.Mvc --version 1.9.0            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.0  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.0        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.0   # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.0          # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.0        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.8.0 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.0 implements Inertia.js v3.
 
 ## Requirements
 
@@ -263,12 +267,12 @@ Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.8.0
+dotnet new install Inertia.Net.Templates::1.9.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
 
-Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
+Choose `--framework vue` or `--framework svelte` for another client, and add `--auth` for cookie sign-in (see [Authentication](/docs/authentication)). The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
 
 Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
 
@@ -321,7 +325,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/first-10-minutes
 Create the React starter (choose `vue` or `svelte` for another client; add `--tfm net11.0` to target .NET 11 instead of .NET 10):
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.8.0
+dotnet new install Inertia.Net.Templates::1.9.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -1020,6 +1024,8 @@ public sealed record UsersPage(List<User> Users, string Title);
 app.MapGet("/users", () => Render("Users/Index", new UsersPage(users, "Users")));
 ```
 
+A record that implements `IInertiaPage` names its component, so `Render(new UsersPage(...))` needs no component string. See [Page records](/docs/typed-routes#page-records).
+
 Every page has an `errors` prop (an empty object when there are no errors). Key order is `errors`, shared props, then page props.
 
 ## Per-response options
@@ -1257,6 +1263,20 @@ A parallel loader must not use the request's `DbContext` or other non-thread-saf
 }).Parallel(),
 ```
 
+### Scoped services in loaders
+
+`Prop<TService, T>(...)` hands a loader a service from the request, without capturing it in a closure:
+
+```csharp
+["orders"] = Prop<AppDbContext, int>((db, ct) => db.Orders.CountAsync(ct)),
+["inbox"] = Prop<InboxService, Inbox>((inbox, ct) => inbox.LoadAsync(ct)).Defer(), // and .Optional(), .Cache(...), .Live(...)
+```
+
+- A loader that runs during the request gets the request's instance (the same `DbContext` the handler used).
+- A `.Parallel()` loader gets a scope of its own, so two parallel loaders never share a `DbContext`. The scope is disposed when the loader finishes.
+- A [stale-while-revalidate](#cached-props) refresh runs after the response, in a new scope disposed when the refresh ends.
+- A service that is not registered fails the render with the prop's path and the service type.
+
 ## Deferred props
 
 `Defer` leaves the prop out of the first response and lists it under `deferredProps`. The client asks for each group as soon as the page is mounted.
@@ -1357,6 +1377,8 @@ builder.Services.AddSingleton<IInertiaCacheStore, MyRedisInertiaCacheStore>();
 ```
 
 The store gets and sets byte arrays by `InertiaCacheKey`, removes by key and by tag, and reads unknown formats as a miss. While a page renders, a store that throws is logged (at most once every 30 seconds) and counts as a miss; `IInertiaCache` lets the exception through.
+
+For a store shared by every app instance, `Inertia.Net.Redis` registers one with `AddInertiaRedisCache(...)`. See [Redis cache](/docs/redis).
 
 ## Typed page props
 
@@ -1928,6 +1950,163 @@ Validation redirects keep their existing behavior. A required SSR failure can be
 
 ---
 
+# Authentication and rate limiting
+
+URL: https://inertia-dotnet.temtem.dev/docs/authentication
+
+> Redirect Inertia visits to the login page, send rate-limited forms back with a flash message, and start from the --auth template.
+
+## Cookie sign-in
+
+The cookie handler answers an Inertia visit with 401, because the client sends `X-Requested-With`. Call `UseInertiaRedirects()` so Inertia visits are redirected to the login page like browser requests (303 after a `POST`, `PUT`, `PATCH` or `DELETE`), while `fetch` calls and Precognition validation keep their 401. Access denied renders the 403 error page when `AddInertiaErrorPages()` handles 403, and redirects to `AccessDeniedPath` otherwise.
+
+```csharp
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/login";
+        o.UseInertiaRedirects();   // after assigning o.Events, if you do: it wraps the handlers set there
+    });
+
+app.UseInertiaErrorPages();   // before UseAuthentication(): a 403 renders the Error page
+app.UseInertia();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();         // after UseInertia(): see below
+app.UseInertiaAntiforgery();
+```
+
+See [Error pages](/docs/error-pages) for the 403 and 429 pages.
+
+## Rate limiting
+
+`InertiaRateLimiting.OnRejected()` answers a rejected request the way the client expects:
+
+- An Inertia form submission is redirected back with a flash message (`flash.error` by default) and `Retry-After`.
+- A Precognition request gets 429 with `Precognition: true`.
+- Anything else gets 429. With `AddInertiaErrorPages()` handling 429, Inertia requests get the error page instead.
+
+```csharp
+builder.Services.AddRateLimiter(o =>
+{
+    o.AddPolicy("login", http => InertiaPrecognition.IsPrecognitive(http.Request)
+        ? RateLimitPartition.GetNoLimiter("validation")
+        : RateLimitPartition.GetFixedWindowLimiter(http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+    o.OnRejected = InertiaRateLimiting.OnRejected("error", "Too many attempts. Try again later.");
+});
+
+app.MapPost("/login", ...).WithInertiaPrecognition().RequireRateLimiting("login");
+```
+
+<Callout type="warning" title="Call UseRateLimiter() after UseInertia()">
+Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected submission is saved.
+</Callout>
+
+## Start from the template
+
+`dotnet new inertia --auth` creates an app with both:
+
+```sh
+dotnet new install Inertia.Net.Templates::1.9.0
+dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
+```
+
+- A `/login` page (demo@example.com / password) whose form checks fields with [Precognition](/docs/precognition).
+- A protected `/dashboard`, and logout.
+- The signed-in user shared as `auth.user`.
+- A sign-in rate limit that sends the form back with a flash message.
+- Inertia visits to a protected page are redirected to the login page (`UseInertiaRedirects()`). Signing in returns to the page that asked for it (`ReturnUrl`, local paths only).
+
+The cookie handler sends signed-out visitors to `/login?ReturnUrl=/the/page`, and the login form posts the value back. Replace the in-memory `UserStore` with ASP.NET Core Identity or your user database.
+
+---
+
+# Head tags
+
+URL: https://inertia-dotnet.temtem.dev/docs/head-tags
+
+> Set the page title, meta and link tags on the server, in the first HTML response and on every visit.
+
+Set the page's `<title>`, meta and link tags on the server. They are in the first HTML response (no JavaScript needed, so crawlers and link previews see them) and travel with every visit as the `head` prop.
+
+```csharp
+return Render("Posts/Show", post).WithHead(h => h
+    .Title(post.Title)
+    .Meta("description", post.Summary)
+    .Property("og:image", post.ImageUrl)
+    .Link("canonical", $"https://example.com/posts/{post.Slug}"));
+```
+
+## A title template and per-request tags
+
+```csharp
+builder.Services.AddInertia(o => o.Head.TitleTemplate = "{0} - My App");   // optional
+
+// per request, e.g. middleware
+app.Use((http, next) => { http.Inertia().Head.Meta("robots", "noindex"); return next(http); });
+```
+
+## On the client
+
+```ts
+createInertiaApp({ serverHead: true })   // the client keeps the tags up to date on every visit
+```
+
+Put `@inertiaHead` (or `<inertia-head />` in Razor) before the template's own `<title>`. See [the root template](/docs/pages-and-responses#the-root-template).
+
+## How tags are keyed
+
+- Values are HTML-encoded.
+- Each tag is keyed (`data-inertia`) by `title`, the meta name or property, or the link rel. A later call with the same key replaces the tag, and `Remove(key)` drops one set earlier (for example by middleware).
+- With SSR the server-rendered head is used, which the client builds from the same prop.
+- `o.Head.PropName` renames the prop.
+
+In tests, `HasHead("title", "Users - App")` asserts a tag. See [Testing](/docs/testing).
+
+---
+
+# Modal routes
+
+URL: https://inertia-dotnet.temtem.dev/docs/modal-routes
+
+> Serve a page that opens in an InertiaUI Modal, and render a direct visit as the page under the modal with the modal open.
+
+`Modal(...)` serves a page that opens in an [InertiaUI Modal](https://inertiaui.com/inertia-modal/docs) (`@inertiaui/modal-react` or `@inertiaui/modal-vue` 3.x; there is no Svelte client):
+
+```csharp
+app.MapGet("/users/{id:int}/edit", (int id) => Modal("Users/Edit", new { user = users.Find(id) }).WithBaseUrl("/users"))
+    .WithName("users.edit");
+```
+
+- A `<ModalLink href="/users/1/edit">` request gets the modal's page, which the client shows over the current page.
+- A direct visit (a shared link, a reload) renders the page under the modal with the modal open, and the modal's URL as the page URL. The page under it is the first of the client's `X-InertiaUI-Modal-Base-Url` header, the `Referer` and `WithBaseUrl(...)` that is on this host and is not the modal's own path; its endpoint runs in-process as a GET. With none, or no endpoint at that URL, the modal renders as a normal page.
+- `Back()` from a form in the modal returns to the page under the modal, so validation errors show in the modal's form.
+
+## MVC, FastEndpoints and page records
+
+`Modal(...)` is a result like `Render(...)`: return it from an MVC action, or send it from FastEndpoints with `Send.ResultAsync(...)`. It also takes a [page record](/docs/typed-routes#page-records):
+
+```csharp
+return Modal(new EditUserPage(user));
+```
+
+## Middleware order
+
+The page under the modal runs through the middleware after `UseInertia()`, so put `UseAuthorization()` after `UseInertia()`: an endpoint that needs authorization then redirects to the login page as it would on a visit. With `UseAuthorization()` before `UseInertia()`, a base page that needs authorization fails instead. Middleware before `UseInertia()` does not run twice.
+
+<Callout type="tip" title="Signing in">
+[Authentication](/docs/authentication) covers `UseInertiaRedirects()`, which turns the cookie handler's 401 into a redirect to the login page for Inertia visits.
+</Callout>
+
+## Client setup
+
+Set up the client as the InertiaUI docs describe: React wraps the app with `renderApp(App, props)` in `createInertiaApp`'s `setup` (and the SSR entry), Vue passes `withApp: (app) => withInertiaModal(app)`. The styled `<Modal>` expects Tailwind CSS; `<HeadlessModal>` leaves the styling to you.
+
+See `samples/MinimalApi.React` and `samples/Mvc.Vue` (`Users/Edit`) for working examples.
+
+---
+
 # Partial reloads
 
 URL: https://inertia-dotnet.temtem.dev/docs/partial-reloads
@@ -2389,7 +2568,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.0
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -2415,6 +2594,29 @@ Both results contain the selected group in `data`. A cursor is a marker: send it
 Choose a stable, fully unique ordering: use a unique key, or add a unique tie-breaker when the first key can repeat. Nullable keys are unsupported. The cursor codec supports the types listed above, but EF translation and ordering for each type depend on the database provider; for example, SQLite needs a suitable value conversion to order `DateTimeOffset`. The name from a bound request or `From(...)` is used for the corresponding page parameter; an explicit `pageName` or `cursorName` argument takes precedence.
 
 The EF Core package is not marked Native AOT compatible. EF Core has its own compiled-model requirements; for Native AOT applications, use the core delegate paginators with an AOT-compatible data source instead.
+
+## With MongoDB
+
+`Inertia.Net.MongoDB` builds the same `Page<T>` and `CursorPage<T>` values from a `collection.Find(filter)`:
+
+```sh
+dotnet add package Inertia.Net.MongoDB --version 1.9.0
+```
+
+```csharp
+["users"] = await users.Find(u => u.Active).SortBy(u => u.Name).ThenBy(u => u.Id)
+    .ToPageAsync(PageRequest.From(http.Request.Query), ct: ct),
+["feed"] = Scroll(await posts.Find(p => p.Published)
+    .ToCursorPageAsync(p => p.CreatedAt, p => p.Id, CursorRequest.From(http), descending: true, ct: ct)),
+```
+
+The rules are those of the EF Core helpers:
+
+- `ToPageAsync` needs a sorted find (skip and limit are replaced) and counts the filter with `CountDocuments` unless `countTotal: false`.
+- `ToCursorPageAsync` needs an unsorted find: it adds the keyset condition to the find's filter and sorts by the key (and tie-breaker). Keys may be `ObjectId` (held in the cursor as its 24-character string), `int`, `long`, `string`, `Guid`, `DateTime`, `DateTimeOffset`, `decimal`, `double` or `bool`. A tampered or unparseable cursor starts at the first page.
+- MongoDB orders strings by their UTF-8 bytes.
+
+The MongoDB driver does not support trimming or Native AOT, so neither does this package. See the [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.MongoDB/README.md).
 
 ## Native AOT
 
@@ -2521,7 +2723,7 @@ The page lists every listener, including those of props it left out:
 | `Once` | Yes | A once prop the client already holds stays subscribed. |
 | `Rescue`, `Parallel` | Yes | A rescued prop stays subscribed; the next event fetches it again. |
 | `Cache` | Yes | Publishing does not evict the cache. Remove the entry with `IInertiaCache` first. |
-| `Merge`, `DeepMerge`, `Scroll` | No | A live prop is replaced whole, so these throw `InvalidOperationException`. |
+| `Merge`, `DeepMerge`, `Scroll` | No | A live prop is replaced whole, so these throw `InvalidOperationException`. Reload them from the page instead: see [Reloading scroll and merge props](#reloading-scroll-and-merge-props). |
 
 A live prop inside an array reloads its whole array, as every [partial reload](/docs/partial-reloads) of an array descendant does. Prefer keyed objects for lists that change often.
 
@@ -2661,6 +2863,25 @@ SignalR groups live on one server. Behind several instances, add a Redis backpla
 </Callout>
 
 The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.SignalR/README.md) lists the client options, how channels map to SignalR groups, and the security notes.
+
+## Reloading scroll and merge props
+
+A `Scroll(...)` or `Merge(...)` prop cannot be live: a live reload would merge the reloaded page into the list. Reload it from the page instead, with `ClientApp/lib/inertia-live-reload.ts` (in `dotnet new inertia` apps):
+
+```csharp
+o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+o.TypeScript.LiveEvents(Events.PostCreated);   // exported from routes.ts as liveEvents.PostCreated
+```
+
+```tsx
+import { liveReload } from '../lib/inertia-live-reload'
+import { live } from '../lib/live'                 // the value given to createInertiaApp({ live })
+import { liveEvents } from '../types/routes'
+
+useEffect(() => liveReload(live, liveEvents.PostCreated, { only: ['posts'], reset: ['posts'] }), [])
+```
+
+Events within `debounce` milliseconds (default 250) become one reload, a reload waits for a visit in flight, the scroll position is kept, and the client that caused the event (`exceptSocketId`) is not reloaded. `reset` replaces the prop instead of merging it, so the reload brings no duplicates. The SignalR client transport delivers a channel's events to every subscriber. See [Typed routes](/docs/typed-routes) for `routes.ts`.
 
 ## Custom transports
 
@@ -3836,6 +4057,51 @@ Mounts are adapter configuration: the Inertia protocol on the wire does not chan
 
 ---
 
+# Redis cache
+
+URL: https://inertia-dotnet.temtem.dev/docs/redis
+
+> Share cached props and SSR renders between app instances with the Inertia.Net.Redis cache store.
+
+`Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all.
+
+```sh
+dotnet add package Inertia.Net.Redis --version 1.9.0
+```
+
+```csharp
+builder.Services.AddInertia();
+builder.Services.AddInertiaRedisCache(o =>
+{
+    o.Configuration = "localhost:6379"; // or leave it unset to use a registered IConnectionMultiplexer
+    o.KeyPrefix = "myapp:v1:";          // apps (and cache versions) sharing a server need different prefixes
+});
+```
+
+The default prefix is `inertia.net:`.
+
+## How entries are stored
+
+- Each entry is a Redis string with the entry's expiration. Each tag is a set of entry keys that lives as long as its longest entry, and each entry keeps an index of its tags.
+- Storing or removing an entry is one script, so a removal racing a store leaves the entry either removed or whole and still tagged.
+- Removing a tag works in batches, so a tag on every entry does not block the server.
+
+<Callout type="warning" title="Redis Cluster">
+Put a hash tag in the prefix (`{myapp}:`): an entry, its index and its tag sets change together in one script.
+</Callout>
+
+## Failures
+
+Failures are not swallowed. While a page renders, Inertia.Net logs a failing store (rate-limited) and renders without the cache: the loaders run, as on a miss. `IInertiaCache` calls throw, so a failed invalidation is not silent.
+
+## Native AOT
+
+The Redis store is not verified under [Native AOT](/docs/native-aot).
+
+See the [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Redis/README.md) and [Deploying behind a proxy](/docs/deploying#multi-instance-state) for the rest of the multi-instance setup.
+
+---
+
 # Configuration
 
 URL: https://inertia-dotnet.temtem.dev/docs/configuration
@@ -3983,6 +4249,8 @@ URL: https://inertia-dotnet.temtem.dev/docs/typescript
 
 Inertia.Net can write TypeScript declarations for typed page props, shared props and flash data. They follow the app's JSON contracts (the HTTP JSON options and their source-generated contexts), so names, nullability and enum values match the page JSON.
 
+To name a page's component once with a page record, or to generate a typed `routes.ts` for your named endpoints, see [Page records and typed routes](/docs/typed-routes).
+
 ## Configure generation
 
 ```csharp
@@ -4080,6 +4348,88 @@ Props and MVC validation error keys use the HTTP `JsonOptions`. FastEndpoints er
 
 ---
 
+# Page records and typed routes
+
+URL: https://inertia-dotnet.temtem.dev/docs/typed-routes
+
+> Name a page's component once, generate a typed routes.ts for named endpoints, write the files at build time, and check component names at compile time.
+
+These build on [TypeScript types](/docs/typescript): the same `o.TypeScript` options write both files.
+
+## Page records
+
+A record that implements `IInertiaPage` names its component once, so neither `Render` nor the TypeScript registration repeats it:
+
+```csharp
+public sealed record UsersPage(List<User> Users) : IInertiaPage
+{
+    public static string Component => "Users/Index";
+}
+
+return Render(new UsersPage(users));                 // component "Users/Index"
+o.TypeScript.Page<UsersPage>();                      // or AddGeneratedPages(): every IInertiaPage in the project, listed at compile time
+```
+
+`AddGeneratedPages()` is written by a source generator, so it needs no reflection and works under [Native AOT](/docs/native-aot). `PagesFrom(assembly)` does the same with reflection, for page records in another assembly.
+
+FastEndpoints' `Send.InertiaAsync(page)` and [`Modal(page)`](/docs/modal-routes) take a page record too.
+
+## Typed routes
+
+Set `RoutesOutputPath` and every named endpoint (`WithName`, a controller route name, or a FastEndpoints `Description(x => x.WithName(...))`) gets a typed function in `routes.ts`:
+
+```csharp
+o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+app.MapGet("/users/{id:int}", ...).WithName("users.show");
+app.MapPost("/users", (CreateUser input) => ...).WithName("users.store");
+```
+
+```tsx
+import { routes, type RouteBodies } from '../types/routes'
+<Link href={routes.users.show(user.id)}>...</Link>               // { url: '/users/1', method: 'get' }
+const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+form.submit(routes.users.store())
+routes.users.show.url(1, { query: { tab: 'posts' } })            // '/users/1?tab=posts'
+```
+
+- Route parameters are typed from their constraints; optional and catch-all parameters are optional.
+- Every HTTP method of an endpoint has a variant (`routes.users.update.put(1)`).
+- `routeConfig.base` prefixes every URL (an app under a path base).
+- `RouteBodies` holds the `[FromBody]` (or FastEndpoints request) type of each route that has one.
+- Unnamed endpoints are skipped.
+
+`o.TypeScript.LiveEvents(...)` also exports live event names and channels as `liveEvents`. See [Live props](/docs/live-props#reloading-scroll-and-merge-props).
+
+To assert a route sent as a prop in tests, use `WhereRoute(key, url, method)`. See [Testing](/docs/testing).
+
+## Generating at build time
+
+Set `<InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>` in the project file, and every build (including the one inside `dotnet publish`) runs the app once with `--inertia-types` to write both files. The app starts without listening on any port and exits; a failure to write fails the build. In CI, compare the result with the committed files:
+
+```sh
+dotnet build -p:InertiaGenerateTypesOnBuild=true
+git diff --exit-code ClientApp/types
+```
+
+## Compile-time component checks
+
+Inertia.Net ships an analyzer in the `Inertia.Net` package:
+
+| Rule | Reports |
+|---|---|
+| `INERTIA001` | Two page records that claim one component. |
+| `INERTIA002` | A component name, in `Render("...")`, `MapInertia` or a page record, that has no page file under `$(InertiaPagesDirectory)`. |
+
+`INERTIA002` runs when the project file sets the pages directory:
+
+```xml
+<PropertyGroup>
+  <InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>
+</PropertyGroup>
+```
+
+---
+
 # Testing
 
 URL: https://inertia-dotnet.temtem.dev/docs/testing
@@ -4125,6 +4475,20 @@ using var response = await _client.InertiaGetAsync("/missing");
 await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
 ```
 
+## Test host recipe
+
+With `WebApplicationFactory<Program>`, pin the asset version so requests need no first visit to learn it, and turn SSR off so tests need no Node server:
+
+```csharp
+builder.ConfigureTestServices(services => services.PostConfigure<InertiaOptions>(o =>
+{
+    o.Version = "test";              // then client.InertiaGetAsync(url, version: "test")
+    o.Ssr.Mode = SsrMode.Disabled;
+}));
+```
+
+For form posts, read the XSRF token from a page response with `GetXsrfToken()` and send it with `WithXsrfToken()` (see [Testing a form with antiforgery](#testing-a-form-with-antiforgery)). A cookie-keeping client (`factory.CreateClient(new() { AllowAutoRedirect = false, HandleCookies = true })`) holds the antiforgery cookie and the sign-in cookie between requests.
+
 ## Request helpers
 
 | Helper | Purpose |
@@ -4136,13 +4500,23 @@ await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
 
 ## Page assertions
 
-`Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)` and `HasLive(path, channel, event)` for [live props](/docs/live-props) (the channel as `"{type}:{name}"`, e.g. `private:orders.1`).
+`Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)` and `HasLive(path, channel, event)` for [live props](/docs/live-props) (the channel as `"{type}:{name}"`, e.g. `private:orders.1`), and `HasHead(key)` or `HasHead(key, contains)` for [head tags](/docs/head-tags), keyed like the tags' `data-inertia` attribute (`title`, a meta name or property, a link rel):
+
+```csharp
+await response.AssertInertiaAsync(page => page.HasHead("title", "Users - App").HasHead("description"));
+```
 
 ## Prop assertions
 
 On props and nested scopes (dot paths and array indexes allowed):
 
 `Has(key)`, `Has(key, count)`, `Has(key, scope)`, `Has(key, count, firstItemScope)`, `HasAll`, `HasAny`, `Missing`, `MissingAll`, `Where(key, value)`, `Where(key, predicate)`, `WhereNot`, `WhereNull`, `WhereNotNull`, `WhereType(key, "string|null")`, `WhereAllType`, `WhereContains(key, ...)`, `Count`, `CountBetween`, `Each(scope)`, `First(scope)` and `Dump()`.
+
+`WhereRoute(key, url, method)` asserts a route sent as a prop in the client's `{ url, method }` shape, which is what the generated [`routes.ts`](/docs/typed-routes) functions return. The method defaults to `get` and is compared ignoring case:
+
+```csharp
+await response.AssertInertiaAsync(page => page.WhereRoute("actions.delete", "/users/1", "delete"));
+```
 
 **Strict interaction tracking.** Like Laravel, a nested scope fails when it contains properties you did not assert, unless you end it with `Etc()`. The root scope is not checked automatically: call `.Interacted()` at the end to enforce that every top-level prop was asserted.
 
@@ -4456,7 +4830,7 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.8.0
+dotnet new install Inertia.Net.Templates::1.9.0
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install

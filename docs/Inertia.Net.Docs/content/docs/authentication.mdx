@@ -1,0 +1,70 @@
+---
+title: Authentication and rate limiting
+description: Redirect Inertia visits to the login page, send rate-limited forms back with a flash message, and start from the --auth template.
+section: Essentials
+order: 8
+---
+
+## Cookie sign-in
+
+The cookie handler answers an Inertia visit with 401, because the client sends `X-Requested-With`. Call `UseInertiaRedirects()` so Inertia visits are redirected to the login page like browser requests (303 after a `POST`, `PUT`, `PATCH` or `DELETE`), while `fetch` calls and Precognition validation keep their 401. Access denied renders the 403 error page when `AddInertiaErrorPages()` handles 403, and redirects to `AccessDeniedPath` otherwise.
+
+```csharp
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/login";
+        o.UseInertiaRedirects();   // after assigning o.Events, if you do: it wraps the handlers set there
+    });
+
+app.UseInertiaErrorPages();   // before UseAuthentication(): a 403 renders the Error page
+app.UseInertia();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();         // after UseInertia(): see below
+app.UseInertiaAntiforgery();
+```
+
+See [Error pages](/docs/error-pages) for the 403 and 429 pages.
+
+## Rate limiting
+
+`InertiaRateLimiting.OnRejected()` answers a rejected request the way the client expects:
+
+- An Inertia form submission is redirected back with a flash message (`flash.error` by default) and `Retry-After`.
+- A Precognition request gets 429 with `Precognition: true`.
+- Anything else gets 429. With `AddInertiaErrorPages()` handling 429, Inertia requests get the error page instead.
+
+```csharp
+builder.Services.AddRateLimiter(o =>
+{
+    o.AddPolicy("login", http => InertiaPrecognition.IsPrecognitive(http.Request)
+        ? RateLimitPartition.GetNoLimiter("validation")
+        : RateLimitPartition.GetFixedWindowLimiter(http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+    o.OnRejected = InertiaRateLimiting.OnRejected("error", "Too many attempts. Try again later.");
+});
+
+app.MapPost("/login", ...).WithInertiaPrecognition().RequireRateLimiting("login");
+```
+
+<Callout type="warning" title="Call UseRateLimiter() after UseInertia()">
+Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected submission is saved.
+</Callout>
+
+## Start from the template
+
+`dotnet new inertia --auth` creates an app with both:
+
+```sh
+dotnet new install Inertia.Net.Templates::1.9.0
+dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
+```
+
+- A `/login` page (demo@example.com / password) whose form checks fields with [Precognition](/docs/precognition).
+- A protected `/dashboard`, and logout.
+- The signed-in user shared as `auth.user`.
+- A sign-in rate limit that sends the form back with a flash message.
+- Inertia visits to a protected page are redirected to the login page (`UseInertiaRedirects()`). Signing in returns to the page that asked for it (`ReturnUrl`, local paths only).
+
+The cookie handler sends signed-out visitors to `/login?ReturnUrl=/the/page`, and the login form posts the value back. Replace the in-memory `UserStore` with ASP.NET Core Identity or your user database.

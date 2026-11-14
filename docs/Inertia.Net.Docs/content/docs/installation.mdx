@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
+description: Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.
 section: Get started
 order: 3
 ---
@@ -14,19 +14,23 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
 | `Inertia.Net.Live.SignalR` | you deliver [live props](/docs/live-props) over SignalR: hub, channel authorization and broadcaster |
 | `Inertia.Net.EntityFrameworkCore` | you page EF Core queries with numbered or cursor pagination |
+| `Inertia.Net.Redis` | you share [cached props](/docs/props#cached-props) and SSR renders between app instances through Redis |
+| `Inertia.Net.MongoDB` | you page MongoDB finds with numbered or cursor [pagination](/docs/pagination#with-mongodb) |
 | `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.8.0
-dotnet add package Inertia.Net.Mvc --version 1.8.0            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.8.0  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.8.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.8.0        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.8.0   # live props over SignalR
+dotnet add package Inertia.Net --version 1.9.0
+dotnet add package Inertia.Net.Mvc --version 1.9.0            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.0  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.0        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.0   # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.0          # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.0        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.8.0 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.0 implements Inertia.js v3.
 
 ## Requirements
 
@@ -49,12 +53,12 @@ Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.8.0
+dotnet new install Inertia.Net.Templates::1.9.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
 
-Choose `--framework vue` or `--framework svelte` for another client. The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
+Choose `--framework vue` or `--framework svelte` for another client, and add `--auth` for cookie sign-in (see [Authentication](/docs/authentication)). The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
 
 Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
 

@@ -4,10 +4,10 @@ import { useMemo } from 'react'
 import { DocsLayout } from '../../components/DocsLayout'
 import { mdxComponents } from '../../components/Mdx'
 import { PageFooter } from '../../components/PageFooter'
-import { Seo } from '../../components/Seo'
 import { InlineContents } from '../../components/TableOfContents'
 import { getHeadings, getPage } from '../../lib/content'
 import { getDocModule } from '../../lib/page-content'
+import { routes } from '../../types/routes'
 
 export default function Show({ slug }: { slug: string }) {
   const page = getPage(slug)
@@ -20,7 +20,7 @@ export default function Show({ slug }: { slug: string }) {
         <p className="text-sm font-medium text-primary">404</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Page not found</h1>
         <p className="mt-3 text-muted-foreground">The documentation page “{slug}” does not exist.</p>
-        <Link href="/docs/introduction" className="mt-6 inline-flex text-sm font-medium text-primary hover:underline">
+        <Link href={routes.docs.show.url('introduction')} className="mt-6 inline-flex text-sm font-medium text-primary hover:underline">
           Back to the documentation
         </Link>
       </div>
@@ -31,15 +31,9 @@ export default function Show({ slug }: { slug: string }) {
 
   return (
     <>
-      <Seo
-        title={`${page.title} — Inertia.Net Docs`}
-        description={page.description ?? `Inertia.Net documentation: ${page.title}`}
-        type="article"
-        section={page.section}
-      />
       <DocsLayout page={page} headings={headings}>
         <nav className="mb-5 flex items-center gap-1.5 text-[13px] text-muted-foreground" aria-label="Breadcrumb">
-          <Link href="/docs/introduction" className="transition-colors hover:text-foreground">
+          <Link href={routes.docs.show.url('introduction')} className="transition-colors hover:text-foreground">
             Docs
           </Link>
           <ChevronRight className="size-3.5 text-muted-foreground/60" />

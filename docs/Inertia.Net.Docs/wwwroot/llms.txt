@@ -8,7 +8,7 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 
 - [Introduction](https://inertia-dotnet.temtem.dev/docs/introduction): Inertia.Net is a .NET 10 and .NET 11 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
 - [Why Inertia?](https://inertia-dotnet.temtem.dev/docs/why-inertia): What Inertia is, how it compares to React, Vue or Svelte with a Web API, and the features and prop types Inertia.Net adds.
-- [Installation](https://inertia-dotnet.temtem.dev/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints or SignalR package, and the testing helpers.
+- [Installation](https://inertia-dotnet.temtem.dev/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.
 - [First 10 minutes](https://inertia-dotnet.temtem.dev/docs/first-10-minutes): Start a template app, try its validated form, and test the redirect.
 - [Client setup](https://inertia-dotnet.temtem.dev/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
 - [Quick start](https://inertia-dotnet.temtem.dev/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
@@ -23,6 +23,9 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [Flash data](https://inertia-dotnet.temtem.dev/docs/flash-data): Carry a one-time message, toast or typed value across a redirect.
 - [Redirects and history](https://inertia-dotnet.temtem.dev/docs/redirects-and-history): Redirects, Back, Location, history encryption, clearing and URL fragments.
 - [Error pages](https://inertia-dotnet.temtem.dev/docs/error-pages): Render routing failures and unhandled exceptions as Inertia pages, with shared props and the original status.
+- [Authentication and rate limiting](https://inertia-dotnet.temtem.dev/docs/authentication): Redirect Inertia visits to the login page, send rate-limited forms back with a flash message, and start from the --auth template.
+- [Head tags](https://inertia-dotnet.temtem.dev/docs/head-tags): Set the page title, meta and link tags on the server, in the first HTML response and on every visit.
+- [Modal routes](https://inertia-dotnet.temtem.dev/docs/modal-routes): Serve a page that opens in an InertiaUI Modal, and render a direct visit as the page under the modal with the modal open.
 
 ## Loading data
 
@@ -45,11 +48,13 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [Native AOT](https://inertia-dotnet.temtem.dev/docs/native-aot): Publish a Native AOT Inertia.Net app with source-generated JSON metadata.
 - [Performance](https://inertia-dotnet.temtem.dev/docs/performance): Memory and hosting guidance, payload limits and the design choices behind the adapter.
 - [Multiple apps and libraries](https://inertia-dotnet.temtem.dev/docs/mounts): Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
+- [Redis cache](https://inertia-dotnet.temtem.dev/docs/redis): Share cached props and SSR renders between app instances with the Inertia.Net.Redis cache store.
 
 ## Reference
 
 - [Configuration](https://inertia-dotnet.temtem.dev/docs/configuration): InertiaOptions, Vite, SSR, props, state and the middleware and result API.
 - [TypeScript types](https://inertia-dotnet.temtem.dev/docs/typescript): Generate declarations for page props, shared props and flash data from your .NET contracts.
+- [Page records and typed routes](https://inertia-dotnet.temtem.dev/docs/typed-routes): Name a page's component once, generate a typed routes.ts for named endpoints, write the files at build time, and check component names at compile time.
 - [Testing](https://inertia-dotnet.temtem.dev/docs/testing): Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
 - [DevTools](https://inertia-dotnet.temtem.dev/docs/devtools): Record visits for the Inertia DevTools extension and catch missing page components during development.
 - [Troubleshooting](https://inertia-dotnet.temtem.dev/docs/troubleshooting): Common errors, their causes, and how to fix them.

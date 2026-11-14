@@ -1,0 +1,39 @@
+---
+title: Modal routes
+description: Serve a page that opens in an InertiaUI Modal, and render a direct visit as the page under the modal with the modal open.
+section: Essentials
+order: 10
+---
+
+`Modal(...)` serves a page that opens in an [InertiaUI Modal](https://inertiaui.com/inertia-modal/docs) (`@inertiaui/modal-react` or `@inertiaui/modal-vue` 3.x; there is no Svelte client):
+
+```csharp
+app.MapGet("/users/{id:int}/edit", (int id) => Modal("Users/Edit", new { user = users.Find(id) }).WithBaseUrl("/users"))
+    .WithName("users.edit");
+```
+
+- A `<ModalLink href="/users/1/edit">` request gets the modal's page, which the client shows over the current page.
+- A direct visit (a shared link, a reload) renders the page under the modal with the modal open, and the modal's URL as the page URL. The page under it is the first of the client's `X-InertiaUI-Modal-Base-Url` header, the `Referer` and `WithBaseUrl(...)` that is on this host and is not the modal's own path; its endpoint runs in-process as a GET. With none, or no endpoint at that URL, the modal renders as a normal page.
+- `Back()` from a form in the modal returns to the page under the modal, so validation errors show in the modal's form.
+
+## MVC, FastEndpoints and page records
+
+`Modal(...)` is a result like `Render(...)`: return it from an MVC action, or send it from FastEndpoints with `Send.ResultAsync(...)`. It also takes a [page record](/docs/typed-routes#page-records):
+
+```csharp
+return Modal(new EditUserPage(user));
+```
+
+## Middleware order
+
+The page under the modal runs through the middleware after `UseInertia()`, so put `UseAuthorization()` after `UseInertia()`: an endpoint that needs authorization then redirects to the login page as it would on a visit. With `UseAuthorization()` before `UseInertia()`, a base page that needs authorization fails instead. Middleware before `UseInertia()` does not run twice.
+
+<Callout type="tip" title="Signing in">
+[Authentication](/docs/authentication) covers `UseInertiaRedirects()`, which turns the cookie handler's 401 into a redirect to the login page for Inertia visits.
+</Callout>
+
+## Client setup
+
+Set up the client as the InertiaUI docs describe: React wraps the app with `renderApp(App, props)` in `createInertiaApp`'s `setup` (and the SSR entry), Vue passes `withApp: (app) => withInertiaModal(app)`. The styled `<Modal>` expects Tailwind CSS; `<HeadlessModal>` leaves the styling to you.
+
+See `samples/MinimalApi.React` and `samples/Mvc.Vue` (`Users/Edit`) for working examples.
