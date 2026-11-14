@@ -12,7 +12,7 @@ namespace Inertia.Net.HostingProbe;
 /// </summary>
 internal static class Bench
 {
-    private sealed record Scenario(string Name, string Mode, string Path, bool InertiaVisit);
+    private sealed record Scenario(string Name, string Mode, string Path, bool InertiaVisit, bool SignIn = false);
 
     private sealed record Build(string Name, bool Aot, bool ServerGc);
 
@@ -28,6 +28,8 @@ internal static class Bench
         new("Plain HTML shell", "plain", "/users", false),
         new("Inertia visit (JSON)", "inertia", "/users", true),
         new("Inertia first load (HTML)", "inertia", "/users", false),
+        // A small app: cookie sign-in, and the signed-in user's 25 todos from SQLite (EF Core on JIT, Microsoft.Data.Sqlite on AOT).
+        new("Todo app visit (SQLite, cookie auth)", "todo", "/todos", true, SignIn: true),
     ];
 
     private static readonly Build[] Builds =
@@ -45,6 +47,9 @@ internal static class Bench
         var connections = Option(options, "--connections", 64);
         var repeat = Option(options, "--repeat", 3);
         var cpus = options.SkipWhile(o => o != "--server-cpus").Skip(1).FirstOrDefault() ?? "0-3";
+        // --only <text>: run only the scenarios whose name contains the text, e.g. --only Todo.
+        var only = options.SkipWhile(o => o != "--only").Skip(1).FirstOrDefault();
+        var scenarios = Scenarios.Where(s => only is null || s.Name.Contains(only, StringComparison.OrdinalIgnoreCase)).ToArray();
         var report = new StringBuilder();
         report.AppendLine(CultureInfo.InvariantCulture, $"{connections} keep-alive connections, {warmup} s warmup, {seconds} s measured, {repeat} rounds; each round starts a fresh server process for every row, in table order. Server on CPUs {cpus}. Medians across rounds.");
         report.AppendLine();
@@ -56,7 +61,7 @@ internal static class Bench
         {
             foreach (var build in Builds)
             {
-                foreach (var scenario in Scenarios)
+                foreach (var scenario in scenarios)
                 {
                     var client = Process.GetCurrentProcess().TotalProcessorTime;
                     var result = await RunOnceAsync(build, scenario, build.Aot ? aotBinary : jitDll, cpus, warmup, seconds, connections);
@@ -70,7 +75,7 @@ internal static class Bench
 
         foreach (var build in Builds)
         {
-            foreach (var scenario in Scenarios)
+            foreach (var scenario in scenarios)
             {
                 var runs = results[(build, scenario)];
                 report.AppendLine(FormattableString.Invariant(
@@ -120,8 +125,18 @@ internal static class Bench
             }
 
             var startupMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            var cookie = "";
+            if (scenario.SignIn)
+            {
+                await using var login = await Connection.OpenAsync(endpoint);
+                login.CaptureCookie = true;
+                if (await login.SendAsync(Encoding.ASCII.GetBytes("GET /probe-login HTTP/1.1\r\nHost: probe\r\n\r\n")) != 204 || login.LastSetCookie is null)
+                    throw new InvalidOperationException("Sign-in failed.");
+                cookie = $"Cookie: {login.LastSetCookie}\r\n";
+            }
+
             var request = Encoding.ASCII.GetBytes(
-                $"GET {scenario.Path} HTTP/1.1\r\nHost: probe\r\nAccept: text/html, application/json\r\n" +
+                $"GET {scenario.Path} HTTP/1.1\r\nHost: probe\r\nAccept: text/html, application/json\r\n" + cookie +
                 (scenario.InertiaVisit ? "X-Inertia: true\r\nX-Inertia-Version: 1\r\n" : "") + "\r\n");
             long bytes;
             await using (var first = await Connection.OpenAsync(endpoint))
@@ -261,6 +276,10 @@ internal static class Bench
 
         public long LastBodyBytes { get; private set; }
 
+        public bool CaptureCookie { get; set; }
+
+        public string? LastSetCookie { get; private set; }
+
         public static async Task<Connection> OpenAsync(IPEndPoint endpoint)
         {
             var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
@@ -281,6 +300,13 @@ internal static class Bench
             await _socket.SendAsync(request, SocketFlags.None);
             var headerEnd = await FindAsync(HeaderEnd);
             var (status, length, chunked) = ParseHeaders(_buffer.AsSpan(_start, headerEnd - _start));
+            if (CaptureCookie)
+            {
+                var headers = Encoding.ASCII.GetString(_buffer, _start, headerEnd - _start);
+                var at = headers.IndexOf("\r\nSet-Cookie: ", StringComparison.OrdinalIgnoreCase);
+                LastSetCookie = at < 0 ? null : headers[(at + 14)..].Split(';')[0];
+            }
+
             _start = headerEnd + 4;
             long body = 0;
             if (length >= 0)

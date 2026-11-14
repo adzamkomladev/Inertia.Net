@@ -1,9 +1,12 @@
 // Hosting cost of Inertia.Net next to a plain Minimal API that serves the same data: process RSS, requests per second and latency.
-// `serve` runs one server (PROBE_MODE=plain or inertia); `bench` drives published JIT and Native AOT builds of it from a separate
+// `serve` runs one server (PROBE_MODE=plain, inertia, or todo: a small todo app with cookie sign-in and SQLite); `bench` drives published JIT and Native AOT builds of it from a separate
 // process over raw keep-alive sockets. eng/hosting-probe.sh publishes both builds and pins server and client to separate CPUs.
+using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Inertia.Net.HostingProbe;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 if (args is ["bench", var jitDll, var aotBinary, var output, .. var rest])
 {
@@ -12,22 +15,56 @@ if (args is ["bench", var jitDll, var aotBinary, var output, .. var rest])
 }
 
 var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
-builder.Logging.ClearProviders();
+if (Environment.GetEnvironmentVariable("PROBE_LOG") != "1") builder.Logging.ClearProviders();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, ProbeJsonContext.Default));
-var inertia = Environment.GetEnvironmentVariable("PROBE_MODE") == "inertia";
+var mode = Environment.GetEnvironmentVariable("PROBE_MODE");
+var todo = mode == "todo";
+var inertia = mode == "inertia" || todo;
 if (inertia)
 {
     builder.Services.AddInertia(o =>
     {
         o.Version = "1";
         o.Share("appName", "Probe");
-        o.Share("auth", new Auth("ada@example.com"));
+        if (todo)
+        {
+            o.Share("auth", ctx => new Auth(ctx.User.Identity?.Name ?? ""));
+        }
+        else
+        {
+            o.Share("auth", new Auth("ada@example.com"));
+        }
     });
+}
+
+if (todo)
+{
+    builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o => o.UseInertiaRedirects());
+    builder.Services.AddAuthorization();
+    TodoStore.Add(builder.Services);
 }
 
 var app = builder.Build();
 app.MapGet("/healthz", () => "ok");
-if (inertia)
+if (todo)
+{
+    app.UseInertia();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    // Signs in user 1 without a form, so the load client can pick up the auth cookie with one request.
+    app.MapGet("/probe-login", async (HttpContext http) =>
+    {
+        var user = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "1"), new Claim(ClaimTypes.Name, "ada@example.com")], CookieAuthenticationDefaults.AuthenticationScheme);
+        await http.SignInAsync(new ClaimsPrincipal(user));
+        http.Response.StatusCode = StatusCodes.Status204NoContent;
+    });
+    // ClaimsPrincipal as well as HttpContext: a lambda taking only HttpContext and returning a Task binds to the RequestDelegate
+    // overload, which discards the returned result.
+    app.MapGet("/todos", async (ClaimsPrincipal user, HttpContext http) =>
+        Render("Todos/Index", new InertiaProps { ["todos"] = await TodoStore.ForUserAsync(http.RequestServices, int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!, System.Globalization.CultureInfo.InvariantCulture)) }))
+        .RequireAuthorization();
+}
+else if (inertia)
 {
     app.UseInertia();
     // One route answers both: the first visit gets HTML, an Inertia visit (X-Inertia: true) gets the page JSON.
@@ -56,6 +93,7 @@ namespace Inertia.Net.HostingProbe
     [JsonSerializable(typeof(User[]))]
     [JsonSerializable(typeof(Auth))]
     [JsonSerializable(typeof(UsersPage))]
+    [JsonSerializable(typeof(Todo[]))]
     internal sealed partial class ProbeJsonContext : JsonSerializerContext;
 
     internal static class Data
