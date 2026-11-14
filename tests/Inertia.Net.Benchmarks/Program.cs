@@ -7,6 +7,8 @@ if (args is ["--process-memory", var processMode, var processOutput]) { await Pr
 if (args is ["--render-probe"]) { await RenderProbe.RunAsync(); return; }
 if (args is ["--mvc-probe"]) { MvcProbe.Run(); return; }
 if (args is ["--payload-probe"]) { await PayloadProbe.RunAsync(); return; }
+if (args is ["--feature-probe"]) { await FeatureProbe.RunAsync(check: false); return; }
+if (args is ["--feature-probe", var featureRows]) { await FeatureProbe.RunAsync(check: featureRows == "check", featureRows); return; }
 if (args is ["--cache-probe"]) { await CacheProbe.RunAsync(); return; }
 if (args is ["--pagination-check"])
 {

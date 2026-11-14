@@ -186,12 +186,15 @@ public sealed class SsrGatewayTests
     public async Task Posts_the_page_json_to_render()
     {
         var handler = Ok();
-        var html = await GetAsync(Create(handler, s => s.Urls.Add("http://ssr.test:1234/")));
+        var harness = Create(handler, s => s.Urls.Add("http://ssr.test:1234/"));
+        var html = await GetAsync(harness);
+        await GetAsync(harness); // the content type header value is shared between requests
 
-        var request = Assert.Single(handler.Requests);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.All(handler.Requests, r => Assert.Equal("application/json; charset=utf-8", r.ContentType));
+        var request = handler.Requests[0];
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("http://ssr.test:1234/render", request.Uri.ToString());
-        Assert.Equal("application/json; charset=utf-8", request.ContentType);
         var page = Harness.ParsePage(await GetAsync(new Harness(), "/"));
         Assert.True(System.Text.Json.Nodes.JsonNode.DeepEquals(page, System.Text.Json.Nodes.JsonNode.Parse(request.Body)));
         Assert.Contains("data-server-rendered", html, StringComparison.Ordinal);

@@ -10,7 +10,8 @@ namespace Inertia.Net;
 /// </summary>
 public sealed class InertiaHead
 {
-    private readonly Dictionary<string, (Kind Kind, string Name, string Value)> _tags = new(StringComparer.Ordinal);
+    // A list, not a dictionary: a head has a handful of tags, and a list keeps them in first-set order even after a removal.
+    private readonly List<(string Key, Kind Kind, string Name, string Value)> _tags = new(8);
 
     private enum Kind
     {
@@ -26,7 +27,21 @@ public sealed class InertiaHead
     }
 
     /// <summary>Whether no tag has been set.</summary>
-    public bool IsEmpty => !_tags.Values.Any(t => t.Kind != Kind.Removed);
+    public bool IsEmpty => Count == 0;
+
+    private int Count
+    {
+        get
+        {
+            var count = 0;
+            foreach (var (_, kind, _, _) in _tags)
+            {
+                if (kind != Kind.Removed) count++;
+            }
+
+            return count;
+        }
+    }
 
     /// <summary>Sets the page title, formatted with <see cref="InertiaHeadOptions.TitleTemplate"/> when one is set.</summary>
     public InertiaHead Title(string title) => Set("title", Kind.Title, "title", title);
@@ -47,7 +62,7 @@ public sealed class InertiaHead
     public InertiaHead Remove(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
-        _tags[key] = (Kind.Removed, key, "");
+        Put((key, Kind.Removed, key, ""));
         return this;
     }
 
@@ -55,21 +70,44 @@ public sealed class InertiaHead
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(value);
-        _tags[key] = (kind, name, value);
+        Put((key, kind, name, value));
         return this;
+    }
+
+    private void Put((string Key, Kind Kind, string Name, string Value) tag)
+    {
+        var i = IndexOf(tag.Key);
+        if (i < 0)
+        {
+            _tags.Add(tag);
+        }
+        else
+        {
+            _tags[i] = tag;
+        }
+    }
+
+    private int IndexOf(string key)
+    {
+        for (var i = 0; i < _tags.Count; i++)
+        {
+            if (string.Equals(_tags[i].Key, key, StringComparison.Ordinal)) return i;
+        }
+
+        return -1;
     }
 
     internal void CopyTo(InertiaHead target)
     {
-        foreach (var (key, tag) in _tags)
+        foreach (var tag in _tags)
         {
-            if (tag.Kind == Kind.Removed)
+            if (tag.Kind != Kind.Removed)
             {
-                target._tags.Remove(key);
+                target.Put(tag);
             }
-            else
+            else if (target.IndexOf(tag.Key) is >= 0 and var i)
             {
-                target._tags[key] = tag;
+                target._tags.RemoveAt(i);
             }
         }
     }
@@ -78,8 +116,9 @@ public sealed class InertiaHead
     internal string[] ToHtml(string? titleTemplate)
     {
         var encoder = HtmlEncoder.Default;
-        var html = new List<string>(_tags.Count);
-        foreach (var (key, (kind, name, value)) in _tags)
+        var html = new string[Count];
+        var i = 0;
+        foreach (var (key, kind, name, value) in _tags)
         {
             if (kind == Kind.Removed)
             {
@@ -87,16 +126,16 @@ public sealed class InertiaHead
             }
 
             var dataKey = encoder.Encode(key);
-            html.Add(kind switch
+            html[i++] = kind switch
             {
                 Kind.Title => $"<title data-inertia=\"{dataKey}\">{encoder.Encode(titleTemplate is null ? value : string.Format(System.Globalization.CultureInfo.InvariantCulture, titleTemplate, value))}</title>",
                 Kind.Meta => $"<meta name=\"{encoder.Encode(name)}\" content=\"{encoder.Encode(value)}\" data-inertia=\"{dataKey}\">",
                 Kind.Property => $"<meta property=\"{encoder.Encode(name)}\" content=\"{encoder.Encode(value)}\" data-inertia=\"{dataKey}\">",
                 _ => $"<link rel=\"{encoder.Encode(name)}\" href=\"{encoder.Encode(value)}\" data-inertia=\"{dataKey}\">",
-            });
+            };
         }
 
-        return [.. html];
+        return html;
     }
 }
 

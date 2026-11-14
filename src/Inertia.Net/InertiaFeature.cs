@@ -42,7 +42,11 @@ public sealed class InertiaFeature
     /// </summary>
     public InertiaHead Head => _head ??= new InertiaHead();
 
-    internal InertiaHead? HeadOrNull => _head;
+    internal InertiaHead? HeadOrNull
+    {
+        get => _head;
+        set => _head = value;
+    }
 
     /// <summary>The head tags written in the page, for the root view when there is no SSR head.</summary>
     internal string[]? HeadHtml { get; set; }

@@ -1,5 +1,63 @@
 # Inertia.Net benchmark results
 
+## 1.9.1 patch performance work — 2026-11-14
+
+The items of [plan-performance-1.9.1-2026-11.md](../../docs/plan-performance-1.9.1-2026-11.md). The workloads are warm and
+in-process, with a reused `HttpContext` and the body written to `Stream.Null`. The host is a Linux 6.8 x64 VM with 8 logical CPUs
+and other services running, using the net10.0 runtime. Allocation figures are exact. Timings are the third of three runs and are
+noisy, so only differences well beyond that noise are claimed. "Before" is `main` at `9df898d` (v1.9.0) with the probes added.
+`--feature-probe check` prints the HTML and JSON with five head tags and five live props, and that output is byte-identical
+before and after.
+
+### Probe rows
+
+`--feature-probe` builds the props for every request (`BenchApp.Props20()` plus `WithHead(...)` with title, meta, two properties
+and a link), so its base rows sit above the `--render-probe` rows. The difference between rows is what each feature costs.
+
+| Workload (probe) | Item | Before | After |
+|---|---|---:|---:|
+| HTML, 20 props + 5 head tags, cost over no head (`--feature-probe`) | B1 | +3,608 B | **+1,432 B** |
+| JSON, 20 props + 5 head tags, cost over no head (`--feature-probe`) | B1 | +2,512 B | **+1,432 B** |
+| 5 lazy props with `.Live(evt)`, cost per live prop (`--feature-probe`) | B2 | 333 B | **136 B** |
+| GET through `UseInertiaAntiforgery()`, not a page load (`--feature-probe`) | C1 | 24 B | **0 B** |
+| Uncached SSR render, in-memory server (`--cache-probe` `ssr render`) | C2 | 2,848 B | **2,752 B** |
+| Typed hub authorizer, options factory alone (`--feature-probe`) | C5 | 24 B, 0.21-0.23 µs | 24 B, **0.06-0.08 µs** |
+| Typed hub authorizer, resolved in a new scope (`--feature-probe`) | C5 | 336 B, 0.78-0.86 µs | 336 B, **0.38-0.46 µs** |
+| Hub origin check, origin third in `AllowedOrigins` (`--feature-probe`) | C6 | 832 B, 2.1 µs | **200 B, 0.8-1.0 µs** |
+| MVC Razor root view around the view, no-op executor (`--feature-probe`) | C9 | 1,160 B, 2.2 µs | **800 B, 0.6-0.8 µs** |
+| `PreserveBigIntegers`, 100 DOM rows with names, decimals, big ints (`--bigint-dom-probe`) | C11 | 43,200 B | **18,400 B** |
+| `PreserveBigIntegers`, 500 safe integer tokens (`--bigint-dom-probe`, control) | C11 | 0 B | 0 B |
+| JSON / POCO / partial / HTML renders, 20 props (`--render-probe`, control) | — | 1,744 / 1,560 / 576 / 1,808 B | unchanged |
+| Cached prop hit / tagged / stale, SSR cached / stale (`--cache-probe`, control) | — | 568 / 632 / 584 / 672 / 672 B | unchanged |
+
+### Measured outside the benchmark project
+
+These need a server, EF Core or Roslyn. Each was run as a scratch console against the same build, before and after the change.
+
+| Workload | Item | Before | After |
+|---|---|---:|---:|
+| Redis tag set after 1,000 entries with a 200 ms TTL expired, then 1,000 writes of one live entry (Redis 8.2, `Inertia.Net.Redis.Tests`) | A1 | 1,001 members | **1 member** |
+| Offset pages with a count, 10 per page (`--pagination-probe`): single page / first / middle / last / past the end | A2 | 1 / 1 / 1 / 1 / 1 count | **0** / 1 / 1 / **0** / 1 count |
+| `SetAsync` with one tag against Redis 8.2, 5,000 writes | C10 | 1,736 B | **1,432 B** |
+| `SetAsync` with three tags (control) | C10 | 2,096 B | 2,096 B |
+| EF Core `ToCursorPageAsync` with a cursor, string key + int tie-breaker, provider stubbed | C7 | 16,152 B | **5,328 B** |
+| EF Core `ToCursorPageAsync` with a cursor, int key, provider stubbed | C7 | 8,713 B | **3,464 B** |
+| `InertiaPagesGenerator.IsPage` over 2,000 types with three interfaces each | C8 | 472 KB per pass | **100 KB per pass** |
+
+### Dropped and confirmed items
+
+- **A3** (TempData session load) was confirmed before it was fixed. A distributed cache whose synchronous `Get` throws made the
+  session provider lose the flash: `DistributedSession.Load()` logged the blocking read and the next page had no `flash`. With the
+  fix, the session is loaded asynchronously before TempData reads or writes it, so no synchronous read happens on that path.
+  `Session_tempdata_is_loaded_without_a_blocking_session_store_read` covers it.
+- **C3** (check `IsRefreshing` before `TryBeginRefresh` on a stale SSR hit) was dropped. There is no allocation change. With eight
+  threads rendering one stale SSR page, the medians over seven interleaved runs were 147k req/s without the check and 150k req/s
+  with it, within this host's noise. Single runs ranged from 95k to 172k req/s.
+- **C4** (a ready flag instead of the lock and `Process.HasExited` in `SsrNodeProcess`) was dropped. Four `lock` and `HasExited`
+  checks against running processes cost about 166 ns per render, about 0.09% of a 150-180 µs uncached in-process SSR render.
+  That is under the plan's 1% bar before any real Node render time is added.
+- **C8**: replacing `Any(...)` with a loop in the generator made no allocation difference, so that part was not kept.
+
 ## Pagination helpers — 2026-11-04
 
 The hand-written baseline and `Scroll(Pagination.Paginate(...))` construct and render page 3 (20 rows) of the same 10,000-item

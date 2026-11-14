@@ -17,6 +17,9 @@ internal sealed class RazorInertiaRootView(IActionResultExecutor<ViewResult> exe
     // Shared: the provider caches the metadata it builds, so one per render rebuilt the model's metadata on every render.
     private static readonly EmptyModelMetadataProvider MetadataProvider = new();
 
+    // Shared: a new one builds a GUID id and two dictionaries, and the view engine only reads its (empty) route values.
+    private static readonly ActionDescriptor NoAction = new();
+
     public async ValueTask RenderAsync(InertiaRootViewContext context)
     {
         var http = context.HttpContext;
@@ -30,7 +33,7 @@ internal sealed class RazorInertiaRootView(IActionResultExecutor<ViewResult> exe
         try
         {
             await executor.ExecuteAsync(
-                new ActionContext(http, http.GetRouteData(), new ActionDescriptor()),
+                new ActionContext(http, http.GetRouteData(), NoAction),
                 new ViewResult { ViewName = context.RootView, ViewData = viewData });
         }
         finally

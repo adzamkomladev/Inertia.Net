@@ -21,7 +21,10 @@ public static class Pagination
     }
 
     /// <summary>Pages data fetched by a delegate, optionally including a total count.</summary>
-    /// <remarks>Offsets above <c>int.MaxValue</c> return an empty page without fetching; the optional count still runs.</remarks>
+    /// <remarks>
+    /// The count runs only when the page does not already give the total: it is skipped on a first page with no more rows and on a
+    /// last page that has rows. Offsets above <c>int.MaxValue</c> return an empty page without fetching; the optional count still runs.
+    /// </remarks>
     public static async Task<Page<T>> PaginateAsync<T>(PageRequest request,
         Func<int, int, CancellationToken, Task<IReadOnlyList<T>>> fetch,
         Func<CancellationToken, Task<long>>? count = null, string? pageName = null, CancellationToken ct = default)
@@ -36,7 +39,9 @@ public static class Pagination
             : await fetch((int)skip, request.PerPage + 1, ct).ConfigureAwait(false);
         var hasMore = rows.Count > request.PerPage;
         var data = Trim(rows, request.PerPage, false);
-        var total = count is null ? (long?)null : await count(ct).ConfigureAwait(false);
+        var total = count is null ? (long?)null
+            : !hasMore && (data.Count > 0 || skip == 0) ? skip + data.Count
+            : await count(ct).ConfigureAwait(false);
         return new Page<T>(data, request.Page, request.PerPage, total, hasMore, pageName ?? request.PageName);
     }
 

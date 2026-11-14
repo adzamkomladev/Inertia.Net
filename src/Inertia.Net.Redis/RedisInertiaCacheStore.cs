@@ -43,6 +43,10 @@ internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
         redis.call('DEL', index)
         redis.call('SET', entry, ARGV[1], 'PX', ARGV[2])
         for i = 3, #KEYS do
+          -- An entry that expires on its own stays in its tag sets; sweep two members per add to keep long-lived sets bounded.
+          for _, old in ipairs(redis.call('SRANDMEMBER', KEYS[i], 2)) do
+            if redis.call('EXISTS', ARGV[3] .. old) == 0 then redis.call('SREM', KEYS[i], old) end
+          end
           redis.call('SADD', index, ARGV[i + 2])
           redis.call('SADD', KEYS[i], member)
           local ttl = redis.call('PTTL', KEYS[i])
@@ -108,16 +112,21 @@ internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
         }
 
         var member = key.ToString();
-        var tags = options.Tags.Distinct(StringComparer.Ordinal).ToArray();
-        var keys = new RedisKey[tags.Length + 2];
-        var args = new RedisValue[tags.Length + 4];
+        var tags = options.Tags;
+        if (tags.Count > 1)
+        {
+            tags = tags.Distinct(StringComparer.Ordinal).ToArray();
+        }
+
+        var keys = new RedisKey[tags.Count + 2];
+        var args = new RedisValue[tags.Count + 4];
         keys[0] = Prefix + member;
         keys[1] = Prefix + "tags:" + member;
         args[0] = value;
         args[1] = ttl;
         args[2] = Prefix;
         args[3] = ttl;
-        for (var i = 0; i < tags.Length; i++)
+        for (var i = 0; i < tags.Count; i++)
         {
             keys[i + 2] = Prefix + "tag:" + tags[i];
             args[i + 4] = tags[i];

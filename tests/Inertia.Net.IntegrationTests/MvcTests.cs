@@ -241,8 +241,13 @@ public sealed class MvcRazorTests
     public async Task With_root_view_names_another_razor_view()
     {
         await using var app = await StartAsync();
-        var html = await HtmlAsync(app.CreateClient(), "/mvc/razor-other");
+        var client = app.CreateClient();
+        var html = await HtmlAsync(client, "/mvc/razor-other");
         Assert.StartsWith("<html><body>other root:<script data-page=\"app\"", html, StringComparison.Ordinal);
+
+        // Every render shares one action descriptor: the two views keep apart in either order.
+        Assert.Contains("<title>&lt;Razor&gt; &amp; co</title>", await HtmlAsync(client), StringComparison.Ordinal);
+        Assert.StartsWith("<html><body>other root:", await HtmlAsync(client, "/mvc/razor-other"), StringComparison.Ordinal);
     }
 
     /// <summary>A scriptable stand-in for the SSR server.</summary>

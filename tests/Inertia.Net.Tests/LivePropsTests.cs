@@ -24,6 +24,32 @@ public class LivePropsTests
         JsonAssert.Equal("""{"name":"Ada","role":"admin"}""", page["props"]!["auth"]);
     }
 
+    [Fact]
+    public async Task Two_listeners_nested_live_props_and_a_loader_returning_a_live_prop_each_get_one_entry()
+    {
+        var other = new LiveEvent("OrderShipped", LiveChannel.Private("orders.1"));
+        var harness = new Harness();
+        for (var render = 0; render < 2; render++) // a pooled writer must not carry entries into the next render
+        {
+            var page = await harness.PageAsync(new InertiaProps
+            {
+                ["order"] = Inertia.Prop(() => 1).Live(OrderUpdated).Live(other),
+                ["panel"] = new InertiaProps { ["count"] = Inertia.Prop(() => 2).Live(OrderUpdated) },
+                ["swapped"] = Inertia.Prop(() => Inertia.Prop(() => 3).Live(other)).Live(OrderUpdated),
+            });
+            JsonAssert.Equal("""
+                {
+                  "order":{"listeners":[{"channel":{"name":"orders.1","type":"private"},"events":["OrderUpdated","OrderShipped"]}]},
+                  "panel.count":{"listeners":[{"channel":{"name":"orders.1","type":"private"},"events":["OrderUpdated"]}]},
+                  "swapped":{"listeners":[{"channel":{"name":"orders.1","type":"private"},"events":["OrderShipped"]}]}
+                }
+                """, page["liveProps"]);
+            Assert.Equal(3, (int?)page["props"]!["swapped"]);
+        }
+
+        Assert.Null((await harness.PageAsync(new InertiaProps { ["a"] = 1 }))["liveProps"]);
+    }
+
     [Theory]
     [InlineData(LiveChannelType.Public, "public")]
     [InlineData(LiveChannelType.Private, "private")]

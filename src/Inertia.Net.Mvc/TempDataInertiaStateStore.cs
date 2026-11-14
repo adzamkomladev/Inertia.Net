@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Options;
@@ -28,44 +29,65 @@ internal sealed class TempDataInertiaStateStore(
         _ => null,
     };
 
-    public ValueTask<byte[]?> LoadAsync(HttpContext httpContext)
+    private readonly bool _sessionProvider = provider is SessionStateTempDataProvider;
+
+    public async ValueTask<byte[]?> LoadAsync(HttpContext httpContext)
     {
         // No TempData cookie (or session cookie): nothing to load, so the provider (a decrypt, or a session store read) is skipped.
         if (_requiredCookie is not null && !httpContext.Request.Cookies.ContainsKey(_requiredCookie))
         {
-            return ValueTask.FromResult<byte[]?>(null);
+            return null;
         }
+
+        await LoadSessionAsync(httpContext);
 
         // Peek, not read: a read marks the key for removal, and MVC's SaveTempDataFilter (which runs before the middleware decides
         // to carry the state on) would then delete it. The middleware calls ClearAsync when the state is consumed.
         if (factory.GetTempData(httpContext).Peek(Key) is not string value)
         {
-            return ValueTask.FromResult<byte[]?>(null);
+            return null;
         }
 
         try
         {
-            return ValueTask.FromResult<byte[]?>(Convert.FromBase64String(value));
+            return Convert.FromBase64String(value);
         }
         catch (FormatException)
         {
-            return ValueTask.FromResult<byte[]?>([]);
+            return [];
         }
     }
 
-    public ValueTask SaveAsync(HttpContext httpContext, byte[] state)
+    public async ValueTask SaveAsync(HttpContext httpContext, byte[] state)
     {
+        await LoadSessionAsync(httpContext);
         var tempData = factory.GetTempData(httpContext);
         tempData[Key] = Convert.ToBase64String(state);
         tempData.Save();
-        return ValueTask.CompletedTask;
     }
 
-    public ValueTask ClearAsync(HttpContext httpContext)
+    public async ValueTask ClearAsync(HttpContext httpContext)
     {
+        await LoadSessionAsync(httpContext);
         var tempData = factory.GetTempData(httpContext);
         tempData.Remove(Key);
         tempData.Save();
-        return ValueTask.CompletedTask;
+    }
+
+    // The session provider reads the session synchronously, which blocks a thread on a distributed store (Redis, SQL Server).
+    // Load it asynchronously first (a no-op once loaded).
+    private async ValueTask LoadSessionAsync(HttpContext httpContext)
+    {
+        if (_sessionProvider && httpContext.Features.Get<ISessionFeature>()?.Session is { } session)
+        {
+            try
+            {
+                await session.LoadAsync(httpContext.RequestAborted);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Ignored on purpose: the provider's own synchronous read then sees the failing store and tolerates it, as before.
+            }
+        }
     }
 }

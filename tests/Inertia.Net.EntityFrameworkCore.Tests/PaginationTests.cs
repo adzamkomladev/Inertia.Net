@@ -32,7 +32,8 @@ public sealed class PaginationTests
         Assert.Equal(25L, page.Total);
         Assert.Equal(3L, page.LastPage);
         Assert.Equal(hasMore, page.HasMore);
-        Assert.Equal(number == int.MaxValue ? 1 : 2, fixture.Sql.Commands.Count);
+        // The last page gives the total, so it skips the count; an offset past int.MaxValue skips the rows query.
+        Assert.Equal(number is int.MaxValue or 3 ? 1 : 2, fixture.Sql.Commands.Count);
     }
 
     [Fact]

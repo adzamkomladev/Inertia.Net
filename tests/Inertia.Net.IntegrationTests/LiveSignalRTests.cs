@@ -165,6 +165,34 @@ public sealed class LiveSignalRTests
     }
 
     [Fact]
+    public void A_typed_authorizer_is_created_per_scope_with_constructor_injection()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddScoped<ScopedDependency>();
+        services.AddInertiaLive().AddSignalR(o => o.Authorize<InjectedAuthorizer>());
+        using var provider = services.BuildServiceProvider();
+        using var first = provider.CreateScope();
+        using var second = provider.CreateScope();
+
+        var a = Assert.IsType<InjectedAuthorizer>(first.ServiceProvider.GetRequiredService<ILiveChannelAuthorizer>());
+        var b = Assert.IsType<InjectedAuthorizer>(second.ServiceProvider.GetRequiredService<ILiveChannelAuthorizer>());
+        Assert.NotSame(a, b);
+        Assert.Same(first.ServiceProvider.GetRequiredService<ScopedDependency>(), a.Dependency);
+        Assert.Same(second.ServiceProvider.GetRequiredService<ScopedDependency>(), b.Dependency);
+    }
+
+    private sealed class ScopedDependency;
+
+    private sealed class InjectedAuthorizer(ScopedDependency dependency) : ILiveChannelAuthorizer
+    {
+        public ScopedDependency Dependency { get; } = dependency;
+
+        public ValueTask<bool> AuthorizeAsync(HubCallerContext context, LiveChannel channel, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(false);
+    }
+
+    [Fact]
     public async Task A_custom_authorizer_allows_private_channels_and_can_cover_public_ones()
     {
         await using var app = await LiveApp.StartAsync(o =>
@@ -248,6 +276,27 @@ public sealed class LiveSignalRTests
 
         using var response = await app.Server.CreateClient().SendAsync(request, Ct);
         Assert.Equal(expected, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Allowed_origins_changed_after_the_first_check_are_honored()
+    {
+        await using var app = await LiveApp.StartAsync(o => o.AllowedOrigins.Add("https://trusted.example"));
+        var allowed = app.Server.Services.GetRequiredService<IOptions<InertiaLiveSignalROptions>>().Value.AllowedOrigins;
+        async Task<HttpStatusCode> NegotiateAsync(string origin)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/inertia-live/negotiate?negotiateVersion=1");
+            request.Headers.TryAddWithoutValidation("Origin", origin);
+            using var response = await app.Server.CreateClient().SendAsync(request, Ct);
+            return response.StatusCode;
+        }
+
+        Assert.Equal(HttpStatusCode.OK, await NegotiateAsync("https://trusted.example"));
+        Assert.Equal(HttpStatusCode.Forbidden, await NegotiateAsync("https://later.example"));
+        allowed.Add("https://later.example");
+        Assert.Equal(HttpStatusCode.OK, await NegotiateAsync("https://later.example"));
+        allowed[0] = "https://other.example";
+        Assert.Equal(HttpStatusCode.Forbidden, await NegotiateAsync("https://trusted.example"));
     }
 
     [Fact]

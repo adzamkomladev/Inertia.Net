@@ -198,7 +198,9 @@ public abstract class InertiaProp
     public InertiaProp Live(LiveEvent @event)
     {
         ArgumentNullException.ThrowIfNull(@event);
-        return Live(@event.Channel, @event.Name);
+        ThrowIfMerge(); // the event's name and channel were validated when it was created
+        (LiveSpec ??= new LiveSpec()).Listeners.Add((@event.Channel, @event.Name));
+        return this;
     }
 
     /// <summary>Makes the prop live on <paramref name="channel"/> for each of <paramref name="events"/>. See <see cref="Live(LiveEvent)"/>.</summary>
@@ -225,11 +227,7 @@ public abstract class InertiaProp
             }
         }
 
-        if (IsMerge)
-        {
-            throw new InvalidOperationException(LiveMergeMessage);
-        }
-
+        ThrowIfMerge();
         var spec = LiveSpec ??= new LiveSpec();
         foreach (var name in events)
         {
@@ -257,6 +255,14 @@ public abstract class InertiaProp
         ArgumentOutOfRangeException.ThrowIfGreaterThan(ms, int.MaxValue, nameof(window));
         LiveSpec.ThrottleMs = (int)ms;
         return this;
+    }
+
+    private void ThrowIfMerge()
+    {
+        if (IsMerge)
+        {
+            throw new InvalidOperationException(LiveMergeMessage);
+        }
     }
 
     private const string LiveMergeMessage = "Live updates are not supported on merge props (including deep-merge and scroll props): a live prop is reloaded whole.";

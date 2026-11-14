@@ -42,7 +42,7 @@ internal sealed partial class PropsWriter
     private Dictionary<string, List<string>>? _deferredProps;
     private Dictionary<string, (ScrollMetadata Metadata, bool Reset)>? _scrollProps;
     private Dictionary<string, (string Prop, long? ExpiresAt)>? _onceProps;
-    private Dictionary<string, LiveSpec>? _liveProps;
+    private List<(string Path, LiveSpec Spec)>? _liveProps; // kept across renders: cleared, not dropped
     private PropsPlanner? _planner;
     private IServiceProvider? _services;
 
@@ -86,7 +86,8 @@ internal sealed partial class PropsWriter
         _deferredProps = null;
         _scrollProps = null;
         _onceProps = null;
-        _liveProps = null;
+        if (_liveProps is { Capacity: > 64 }) _liveProps = null;
+        else _liveProps?.Clear();
         _planner = null;
         if (_path.Length > MaxRetainedPath)
         {
@@ -315,7 +316,7 @@ internal sealed partial class PropsWriter
             _writer.WriteEndObject();
         }
 
-        if (_liveProps is not null)
+        if (_liveProps is { Count: > 0 })
         {
             WriteLiveProps(_liveProps);
         }
@@ -323,7 +324,7 @@ internal sealed partial class PropsWriter
 
     // {path: {listeners: [{channel: {name, type}, events}], throttle?}}: listeners grouped by channel key in declaration order, events
     // de-duplicated within a channel (HasLiveUpdates::addLiveListener).
-    private void WriteLiveProps(Dictionary<string, LiveSpec> liveProps)
+    private void WriteLiveProps(List<(string Path, LiveSpec Spec)> liveProps)
     {
         _writer.WriteStartObject("liveProps");
         foreach (var (path, spec) in liveProps)
@@ -1001,7 +1002,19 @@ internal sealed partial class PropsWriter
             return;
         }
 
-        (_liveProps ??= new(StringComparer.Ordinal))[new string(Path)] = prop.LiveSpec!;
+        // A path is collected again when a loader returns a live prop: the returned prop's listeners replace the first ones in place.
+        var live = _liveProps ??= [];
+        var path = Path;
+        for (var i = 0; i < live.Count; i++)
+        {
+            if (path.SequenceEqual(live[i].Path))
+            {
+                live[i] = (live[i].Path, prop.LiveSpec!);
+                return;
+            }
+        }
+
+        live.Add((new string(path), prop.LiveSpec!));
     }
 
     private bool PathMatchesPartialRequest()

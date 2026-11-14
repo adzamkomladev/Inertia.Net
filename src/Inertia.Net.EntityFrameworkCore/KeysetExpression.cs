@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inertia.Net;
@@ -7,6 +8,21 @@ internal readonly record struct KeysetKey(LambdaExpression Selector, object? Val
 
 internal static class KeysetExpression
 {
+    // Found once: Expression.Call by name searches every overload on each cursor page.
+    private static readonly MethodInfo EfParameter = typeof(EF).GetMethod(nameof(EF.Parameter))!;
+    private static readonly MethodInfo OrderBy = QueryableMethod(nameof(Queryable.OrderBy));
+    private static readonly MethodInfo OrderByDescending = QueryableMethod(nameof(Queryable.OrderByDescending));
+    private static readonly MethodInfo ThenBy = QueryableMethod(nameof(Queryable.ThenBy));
+    private static readonly MethodInfo ThenByDescending = QueryableMethod(nameof(Queryable.ThenByDescending));
+    private static readonly MethodInfo StringCompareTo = typeof(string).GetMethod(nameof(IComparable.CompareTo), [typeof(string)])!;
+    private static readonly MethodInfo GuidCompareTo = typeof(Guid).GetMethod(nameof(IComparable.CompareTo), [typeof(Guid)])!;
+    private static readonly MethodInfo DateTimeCompareTo = typeof(DateTime).GetMethod(nameof(IComparable.CompareTo), [typeof(DateTime)])!;
+    private static readonly MethodInfo DateTimeOffsetCompareTo = typeof(DateTimeOffset).GetMethod(nameof(IComparable.CompareTo), [typeof(DateTimeOffset)])!;
+
+    // The (source, keySelector) overload, without the IComparer one.
+    private static MethodInfo QueryableMethod(string name) =>
+        typeof(Queryable).GetMethods().Single(m => m.Name == name && m.GetParameters().Length == 2);
+
     internal static IQueryable<T> Apply<T>(IQueryable<T> query, IReadOnlyList<KeysetKey> keys, bool hasCursor, bool before)
     {
         if (hasCursor)
@@ -17,7 +33,7 @@ internal static class KeysetExpression
             foreach (var key in keys)
             {
                 var left = new ReplaceParameter(key.Selector.Parameters[0], parameter).Visit(key.Selector.Body)!;
-                var right = Expression.Call(typeof(EF), nameof(EF.Parameter), [left.Type], Expression.Constant(key.Value, left.Type));
+                var right = Expression.Call(EfParameter.MakeGenericMethod(left.Type), Expression.Constant(key.Value, left.Type));
                 var comparison = Compare(left, right, key.Descending == before);
                 var term = prefix is null ? comparison : Expression.AndAlso(prefix, comparison);
                 predicate = predicate is null ? term : Expression.OrElse(predicate, term);
@@ -33,9 +49,9 @@ internal static class KeysetExpression
             var key = keys[index];
             var descending = key.Descending != before;
             var method = index == 0
-                ? descending ? nameof(Queryable.OrderByDescending) : nameof(Queryable.OrderBy)
-                : descending ? nameof(Queryable.ThenByDescending) : nameof(Queryable.ThenBy);
-            var expression = Expression.Call(typeof(Queryable), method, [typeof(T), key.Selector.ReturnType],
+                ? descending ? OrderByDescending : OrderBy
+                : descending ? ThenByDescending : ThenBy;
+            var expression = Expression.Call(method.MakeGenericMethod(typeof(T), key.Selector.ReturnType),
                 query.Expression, Expression.Quote(key.Selector));
             query = query.Provider.CreateQuery<T>(expression);
         }
@@ -50,15 +66,21 @@ internal static class KeysetExpression
             left = Expression.Condition(left, Expression.Constant(1), Expression.Constant(0));
             right = Expression.Condition(right, Expression.Constant(1), Expression.Constant(0));
         }
-        else if (left.Type == typeof(string) || left.Type == typeof(Guid)
-            || left.Type == typeof(DateTime) || left.Type == typeof(DateTimeOffset))
+        else if (CompareTo(left.Type) is { } compareTo)
         {
-            left = Expression.Call(left, left.Type.GetMethod(nameof(IComparable.CompareTo), [left.Type])!, right);
+            left = Expression.Call(left, compareTo, right);
             right = Expression.Constant(0);
         }
 
         return greater ? Expression.GreaterThan(left, right) : Expression.LessThan(left, right);
     }
+
+    private static MethodInfo? CompareTo(Type type) =>
+        type == typeof(string) ? StringCompareTo
+        : type == typeof(Guid) ? GuidCompareTo
+        : type == typeof(DateTime) ? DateTimeCompareTo
+        : type == typeof(DateTimeOffset) ? DateTimeOffsetCompareTo
+        : null;
 
     private sealed class ReplaceParameter(ParameterExpression source, ParameterExpression replacement) : ExpressionVisitor
     {

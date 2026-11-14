@@ -114,7 +114,18 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     public async Task ExecuteAsync(HttpContext httpContext)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
-        _head?.CopyTo(httpContext.Inertia().Head);
+        if (_head is not null)
+        {
+            var feature = httpContext.Inertia();
+            if (feature.HeadOrNull is { } shared)
+            {
+                _head.CopyTo(shared);
+            }
+            else
+            {
+                feature.HeadOrNull = _head; // no shared tags to merge into: the page's own tags are the head (Removed entries are skipped)
+            }
+        }
         var services = httpContext.RequestServices;
         var pageWriter = InertiaMountServices.PageWriter(httpContext)
             ?? throw new InvalidOperationException("Inertia.Net services are not registered. Call services.AddInertia() at startup.");

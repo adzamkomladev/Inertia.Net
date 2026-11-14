@@ -46,6 +46,27 @@ public sealed class HeadTests : IDisposable
     }
 
     [Fact]
+    public async Task A_page_head_without_shared_tags_drops_its_removals_and_a_reused_result_renders_the_same()
+    {
+        var harness = new Harness();
+        var result = Render("TestComponent", null).WithHead(h => h.Meta("a", "1").Meta("b", "2").Remove("a").Meta("c", "3").Meta("a", "4").Remove("x"));
+        string[] expected =
+        [
+            "<meta name=\"a\" content=\"4\" data-inertia=\"a\">",
+            "<meta name=\"b\" content=\"2\" data-inertia=\"b\">",
+            "<meta name=\"c\" content=\"3\" data-inertia=\"c\">",
+        ];
+        Assert.Equal(expected, Head(Harness.ParsePage(await Harness.ExecuteAsync(harness.Context(), result))));
+        Assert.Equal(expected, Head(Harness.ParsePage(await Harness.ExecuteAsync(harness.Context(), result))));
+
+        // Merged into shared tags: a removal in the page drops the shared tag, a replaced shared tag keeps its place.
+        var context = harness.Context();
+        context.Inertia().Head.Meta("x", "shared").Meta("b", "shared");
+        Assert.Equal(["<meta name=\"b\" content=\"2\" data-inertia=\"b\">", "<meta name=\"a\" content=\"4\" data-inertia=\"a\">", "<meta name=\"c\" content=\"3\" data-inertia=\"c\">"],
+            Head(Harness.ParsePage(await Harness.ExecuteAsync(context, result))));
+    }
+
+    [Fact]
     public async Task Without_tags_there_is_no_prop_and_the_template_needs_a_title()
     {
         var harness = new Harness(o => o.Head.TitleTemplate = "{0} - App");

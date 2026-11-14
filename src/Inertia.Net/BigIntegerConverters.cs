@@ -34,6 +34,12 @@ internal static class BigIntegerConverters
                 writer.WriteStartObject();
                 foreach (var property in element.EnumerateObject())
                 {
+                    if (IsVerbatim(property.Value))
+                    {
+                        property.WriteTo(writer); // the name as it is, without a string for it
+                        continue;
+                    }
+
                     writer.WritePropertyName(property.Name);
                     WriteElement(writer, property.Value);
                 }
@@ -44,28 +50,42 @@ internal static class BigIntegerConverters
                 foreach (var item in element.EnumerateArray()) WriteElement(writer, item);
                 writer.WriteEndArray();
                 break;
-            case JsonValueKind.Number:
-                if (element.TryGetInt64(out var safe) && safe >= -MaxSafeInteger && safe <= MaxSafeInteger)
-                {
-                    element.WriteTo(writer);
-                    break;
-                }
-
-                var text = element.GetRawText();
-                if (BigInteger.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var number)
-                    && BigInteger.Abs(number) > MaxSafeInteger)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("$bigint", number.ToString(CultureInfo.InvariantCulture));
-                    writer.WriteEndObject();
-                }
-                else element.WriteTo(writer);
+            case JsonValueKind.Number when IsUnsafeInteger(element, out var number):
+                writer.WriteStartObject();
+                writer.WriteString("$bigint", number.ToString(CultureInfo.InvariantCulture));
+                writer.WriteEndObject();
                 break;
             default:
                 element.WriteTo(writer);
                 break;
         }
     }
+
+    // Whether WriteElement writes the value as it is: anything but an object, an array or an integer beyond ±(2^53−1).
+    private static bool IsVerbatim(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Object or JsonValueKind.Array => false,
+        JsonValueKind.Number => !IsUnsafeInteger(element, out _),
+        _ => true,
+    };
+
+    private static bool IsUnsafeInteger(JsonElement element, out BigInteger number)
+    {
+        number = default;
+        if (element.TryGetInt64(out var safe) && safe >= -MaxSafeInteger && safe <= MaxSafeInteger)
+        {
+            return false;
+        }
+
+        // A fraction or an exponent is not an integer token: skip the parse (and the raw text string it used to need).
+        var raw = System.Runtime.InteropServices.JsonMarshal.GetRawUtf8Value(element);
+        return raw.IndexOfAny((byte)'.', (byte)'e', (byte)'E') < 0
+            && TryParse(raw, out number)
+            && BigInteger.Abs(number) > MaxSafeInteger;
+    }
+
+    private static bool TryParse<T>(ReadOnlySpan<byte> utf8, out T number) where T : INumberBase<T> =>
+        T.TryParse(utf8, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out number!);
 
     internal static void WriteNode(Utf8JsonWriter writer, JsonNode node, JsonSerializerOptions options)
     {
