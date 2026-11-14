@@ -29,9 +29,9 @@ internal sealed partial class LiveOrigin(ILogger<LiveOrigin> logger)
             return true;
         }
 
-        foreach (var allowed in allowedOrigins)
+        foreach (var allowedUri in Parse(allowedOrigins))
         {
-            if (Uri.TryCreate(allowed, UriKind.Absolute, out var allowedUri) && SameOrigin(uri, allowedUri))
+            if (allowedUri is not null && SameOrigin(uri, allowedUri))
             {
                 return true;
             }
@@ -45,6 +45,43 @@ internal sealed partial class LiveOrigin(ILogger<LiveOrigin> logger)
         }
 
         return false;
+    }
+
+    // The allowed origins parsed once; parsed again if the list is replaced or changed.
+    private ParsedOrigins? _parsed;
+
+    private Uri?[] Parse(IList<string> allowedOrigins)
+    {
+        var parsed = Volatile.Read(ref _parsed);
+        if (parsed is null || !parsed.Matches(allowedOrigins))
+        {
+            var values = allowedOrigins.ToArray();
+            parsed = new ParsedOrigins(allowedOrigins, values,
+                Array.ConvertAll(values, value => Uri.TryCreate(value, UriKind.Absolute, out var uri) ? uri : null));
+            Volatile.Write(ref _parsed, parsed);
+        }
+
+        return parsed.Uris;
+    }
+
+    private sealed class ParsedOrigins(IList<string> source, string[] values, Uri?[] uris)
+    {
+        public Uri?[] Uris { get; } = uris;
+
+        public bool Matches(IList<string> allowedOrigins)
+        {
+            if (!ReferenceEquals(source, allowedOrigins) || values.Length != allowedOrigins.Count)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < values.Length; i++)
+            {
+                if (!string.Equals(values[i], allowedOrigins[i], StringComparison.Ordinal)) return false;
+            }
+
+            return true;
+        }
     }
 
     [LoggerMessage(LogLevel.Warning, "A live-props connection was refused because its HTTPS Origin uses the request's host but the request scheme is HTTP. Behind a TLS-terminating proxy, configure UseForwardedHeaders() before mapping the hub; otherwise configure InertiaLiveSignalROptions.AllowedOrigins explicitly.")]

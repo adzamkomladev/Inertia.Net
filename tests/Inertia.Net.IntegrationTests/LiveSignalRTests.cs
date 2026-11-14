@@ -279,6 +279,27 @@ public sealed class LiveSignalRTests
     }
 
     [Fact]
+    public async Task Allowed_origins_changed_after_the_first_check_are_honored()
+    {
+        await using var app = await LiveApp.StartAsync(o => o.AllowedOrigins.Add("https://trusted.example"));
+        var allowed = app.Server.Services.GetRequiredService<IOptions<InertiaLiveSignalROptions>>().Value.AllowedOrigins;
+        async Task<HttpStatusCode> NegotiateAsync(string origin)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/inertia-live/negotiate?negotiateVersion=1");
+            request.Headers.TryAddWithoutValidation("Origin", origin);
+            using var response = await app.Server.CreateClient().SendAsync(request, Ct);
+            return response.StatusCode;
+        }
+
+        Assert.Equal(HttpStatusCode.OK, await NegotiateAsync("https://trusted.example"));
+        Assert.Equal(HttpStatusCode.Forbidden, await NegotiateAsync("https://later.example"));
+        allowed.Add("https://later.example");
+        Assert.Equal(HttpStatusCode.OK, await NegotiateAsync("https://later.example"));
+        allowed[0] = "https://other.example";
+        Assert.Equal(HttpStatusCode.Forbidden, await NegotiateAsync("https://trusted.example"));
+    }
+
+    [Fact]
     public async Task The_apps_own_hubs_still_serialize_their_types()
     {
         await using var app = await LiveApp.StartAsync();
