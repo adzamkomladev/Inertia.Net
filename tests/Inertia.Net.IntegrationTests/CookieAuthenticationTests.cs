@@ -8,6 +8,7 @@ public sealed class MinimalApiCookieAuthenticationTests : CookieAuthenticationTe
 
 public sealed class MvcCookieAuthenticationTests : CookieAuthenticationTests<MvcHost>;
 
+[Collection("FastEndpoints")] // FastEndpoints keeps its configuration in statics
 public sealed class FastEndpointsCookieAuthenticationTests : CookieAuthenticationTests<FastEndpointsHost>;
 
 /// <summary>

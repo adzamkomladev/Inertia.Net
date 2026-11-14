@@ -270,6 +270,8 @@ public sealed class MountIsolationTests
 }
 
 /// <summary>The named mount <c>sp</c> under <c>Map("/dashboard")</c> serving MVC controllers or FastEndpoints endpoints.</summary>
+// The FastEndpoints case keeps its configuration in statics: run with the other FastEndpoints apps, never concurrently.
+[Collection("FastEndpoints")]
 public sealed class MountHostParityTests
 {
     private static async Task<WebApplication> StartAsync(string host)

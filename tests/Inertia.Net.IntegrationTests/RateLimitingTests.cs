@@ -11,6 +11,7 @@ public sealed class MinimalApiRateLimitingTests : RateLimitingTests<MinimalApiHo
 
 public sealed class MvcRateLimitingTests : RateLimitingTests<MvcHost>;
 
+[Collection("FastEndpoints")] // FastEndpoints keeps its configuration in statics
 public sealed class FastEndpointsRateLimitingTests : RateLimitingTests<FastEndpointsHost>;
 
 /// <summary><see cref="InertiaRateLimiting.OnRejected"/>: one permit per hour for POST, none limited for GET.</summary>
