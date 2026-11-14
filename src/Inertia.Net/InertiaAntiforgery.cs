@@ -143,11 +143,13 @@ public static class InertiaAntiforgeryApplicationBuilderExtensions
     // Only set when this middleware took care of the request: a request exempted by ShouldValidate is left to UseAntiforgery().
     private const string AntiforgeryMiddlewareInvokedKey = "__AntiforgeryMiddlewareWithEndpointInvoked";
 
+    private static readonly object True = true; // boxed once, not per request
+
     private static void MarkHandled(HttpContext httpContext)
     {
         if (httpContext.GetEndpoint() is not null)
         {
-            httpContext.Items[AntiforgeryMiddlewareInvokedKey] = true;
+            httpContext.Items[AntiforgeryMiddlewareInvokedKey] = True;
         }
     }
 
