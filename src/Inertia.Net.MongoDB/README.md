@@ -11,7 +11,7 @@ values as `Inertia.Net.EntityFrameworkCore`, built from `IFindFluent<T, T>`.
 ```
 
 - `ToPageAsync` needs a sorted find (skip and limit are replaced) and counts the filter with `CountDocuments` unless
-  `countTotal: false`.
+  `countTotal: false`, or the page already gives the total (a first page with no more rows, a last page with rows).
 - `ToCursorPageAsync` needs an unsorted find: it adds the keyset condition to the find's filter and sorts by the key (and
   tie-breaker). Keys may be `ObjectId` (held in the cursor as its 24-character string), `int`, `long`, `string`, `Guid`,
   `DateTime`, `DateTimeOffset`, `decimal`, `double` or `bool`. A tampered or unparseable cursor starts at the first page.
