@@ -107,6 +107,35 @@ public sealed class RedisCacheStoreTests
     }
 
     [Fact]
+    public async Task Tag_sets_shed_the_members_of_expired_entries_as_new_entries_are_written()
+    {
+        const int Expired = 1000;
+        await using var app = App();
+        var store = Store(app);
+        await store.SetAsync(Key("live"), [1], Entry(null, InertiaCacheTags.Props), Ct); // keeps the tag set alive
+        for (var i = 0; i < Expired; i++)
+        {
+            await store.SetAsync(Key($"k{i}"), [1], Entry(TimeSpan.FromMilliseconds(200), InertiaCacheTags.Props), Ct);
+        }
+
+        await Task.Delay(500, Ct);
+        await store.SetAsync(Key("live"), [1], Entry(null, "other"), Ct); // a set without the tag leaves it alone
+        for (var i = 0; i < Expired; i++)
+        {
+            await store.SetAsync(Key("live"), [1], Entry(null, InertiaCacheTags.Props), Ct);
+        }
+
+        using var redis = await ConnectionMultiplexer.ConnectAsync(Url!);
+        var members = await redis.GetDatabase().SetMembersAsync(_prefix + "tag:" + InertiaCacheTags.Props);
+        Assert.InRange(members.Length, 1, Expired / 10);
+        Assert.Contains(members, m => m == Key("live").ToString());
+
+        // The live entry is still invalidated by its tag.
+        await store.RemoveByTagAsync(InertiaCacheTags.Props, Ct);
+        Assert.Null(await store.GetAsync(Key("live"), Ct));
+    }
+
+    [Fact]
     public async Task A_set_racing_a_tag_removal_is_either_removed_or_kept_whole()
     {
         await using var app = App();

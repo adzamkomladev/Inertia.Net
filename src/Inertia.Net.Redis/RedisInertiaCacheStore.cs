@@ -43,6 +43,10 @@ internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
         redis.call('DEL', index)
         redis.call('SET', entry, ARGV[1], 'PX', ARGV[2])
         for i = 3, #KEYS do
+          -- An entry that expires on its own stays in its tag sets; sweep two members per add to keep long-lived sets bounded.
+          for _, old in ipairs(redis.call('SRANDMEMBER', KEYS[i], 2)) do
+            if redis.call('EXISTS', ARGV[3] .. old) == 0 then redis.call('SREM', KEYS[i], old) end
+          end
           redis.call('SADD', index, ARGV[i + 2])
           redis.call('SADD', KEYS[i], member)
           local ttl = redis.call('PTTL', KEYS[i])
