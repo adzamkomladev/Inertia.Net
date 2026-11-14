@@ -115,6 +115,9 @@ app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));
 
 ## Error bags in the client
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 const form = useForm({ name: '', email: '' })
 
@@ -126,6 +129,48 @@ const form = useForm({ name: '', email: '' })
   <p>{form.errors.email}</p>
 </form>
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { useForm } from '@inertiajs/vue3'
+
+const form = useForm({ name: '', email: '' })
+</script>
+
+<template>
+  <form @submit.prevent="form.post('/users', { errorBag: 'createUser' })">
+    <input v-model="form.email" />
+    <p>{{ form.errors.email }}</p>
+  </form>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { useForm } from '@inertiajs/svelte'
+
+  const form = useForm({ name: '', email: '' })
+
+  function submit(event: SubmitEvent) {
+    event.preventDefault()
+    form.post('/users', { errorBag: 'createUser' })
+  }
+</script>
+
+<form onsubmit={submit}>
+  <input bind:value={form.email} />
+  <p>{form.errors.email}</p>
+</form>
+```
+
+  </Tab>
+</Tabs>
 
 ## All errors for a field
 

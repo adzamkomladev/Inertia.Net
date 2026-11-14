@@ -51,7 +51,10 @@ var page = await Pagination.PaginateAsync(
     ct: cancellationToken);
 ```
 
-For a React pager, use Inertia links and preserve any other filters your app needs:
+For a pager, use Inertia links and preserve any other filters your app needs:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 import { Link } from '@inertiajs/react'
@@ -62,6 +65,52 @@ import { Link } from '@inertiajs/react'
   </Link>
 ))}
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { Link } from '@inertiajs/vue3'
+
+defineProps<{ page: { currentPage: number; lastPage: number | null; pageName: string } }>()
+</script>
+
+<template>
+  <template v-if="page.lastPage != null">
+    <Link
+      v-for="n in page.lastPage"
+      :key="n"
+      :href="`?${page.pageName}=${n}`"
+      :aria-current="n === page.currentPage ? 'page' : undefined"
+    >
+      {{ n }}
+    </Link>
+  </template>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { Link } from '@inertiajs/svelte'
+
+  let { page }: { page: { currentPage: number; lastPage: number | null; pageName: string } } = $props()
+</script>
+
+{#if page.lastPage != null}
+  {#each Array.from({ length: page.lastPage }, (_, i) => i + 1) as n (n)}
+    <Link href={`?${page.pageName}=${n}`} aria-current={n === page.currentPage ? 'page' : undefined}>
+      {n}
+    </Link>
+  {/each}
+{/if}
+```
+
+  </Tab>
+</Tabs>
 
 ## Cursors
 

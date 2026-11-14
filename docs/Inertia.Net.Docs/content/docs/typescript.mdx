@@ -57,6 +57,9 @@ declare module '@inertiajs/core' {
 }
 ```
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 import type { InertiaPages } from '../../types/inertia'
 
@@ -64,6 +67,31 @@ export default function Index({ users, stats }: InertiaPages['Users/Index']) {
   // ...
 }
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import type { InertiaPages } from '../../types/inertia'
+
+const { users, stats } = defineProps<InertiaPages['Users/Index']>()
+</script>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import type { InertiaPages } from '../../types/inertia'
+
+  let { users, stats }: InertiaPages['Users/Index'] = $props()
+</script>
+```
+
+  </Tab>
+</Tabs>
 
 ## Shared props
 

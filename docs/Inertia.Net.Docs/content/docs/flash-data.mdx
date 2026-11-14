@@ -26,13 +26,49 @@ return Back().WithFlash("toast", "Saved");
 }
 ```
 
-Read it with `usePage().flash` or the `onFlash` visit callback:
+Read it from the page's `flash` (`usePage().flash`, or `page.flash` in Svelte) or the `onFlash` visit callback:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 const { flash } = usePage()
 
 {flash.toast && <Toast {...flash.toast} />}
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { usePage } from '@inertiajs/vue3'
+import Toast from './Toast.vue'
+
+const page = usePage()
+</script>
+
+<template>
+  <Toast v-if="page.flash.toast" v-bind="page.flash.toast" />
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { page } from '@inertiajs/svelte'
+  import Toast from './Toast.svelte'
+</script>
+
+{#if page.flash.toast}
+  <Toast {...page.flash.toast} />
+{/if}
+```
+
+  </Tab>
+</Tabs>
 
 <Callout type="info" title="Typed flash data">
 The TypeScript generator can type `page.flash`. `FlashData<T>()` takes the whole flash object, so for the `toast` above use `record Flash(Toast? Toast)` and call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript#flash-data).
@@ -44,7 +80,7 @@ Inertia forms keep their input on the client after `Back().WithErrors(...)`; the
 return Back().WithFlash("old", new InertiaProps { ["email"] = email });
 ```
 
-On the next page, read `usePage().flash.old` and use the email to refill the field. Never flash passwords, tokens or other secrets.
+On the next page, read `flash.old` from the page and use the email to refill the field. Never flash passwords, tokens or other secrets.
 
 ## Where state is kept
 

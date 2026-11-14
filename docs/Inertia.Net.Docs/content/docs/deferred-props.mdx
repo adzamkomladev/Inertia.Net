@@ -31,6 +31,9 @@ Props in the same group load in one request. Different groups load in parallel r
 
 ## The client
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 import { Deferred } from '@inertiajs/react'
 
@@ -39,7 +42,48 @@ import { Deferred } from '@inertiajs/react'
 </Deferred>
 ```
 
-Vue uses `<Deferred data="stats">` from `@inertiajs/vue3`; Svelte uses the matching component from `@inertiajs/svelte`.
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { Deferred } from '@inertiajs/vue3'
+import Spinner from './Spinner.vue'
+import Stats from './Stats.vue'
+</script>
+
+<template>
+  <Deferred data="stats">
+    <template #fallback>
+      <Spinner />
+    </template>
+    <Stats />
+  </Deferred>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { Deferred } from '@inertiajs/svelte'
+  import Spinner from './Spinner.svelte'
+  import Stats from './Stats.svelte'
+</script>
+
+<Deferred data="stats">
+  {#snippet fallback()}
+    <Spinner />
+  {/snippet}
+  <Stats />
+</Deferred>
+```
+
+  </Tab>
+</Tabs>
+
+The fallback is a prop in React, a `#fallback` slot in Vue and a `fallback` snippet in Svelte.
 
 ## Combining with other props
 

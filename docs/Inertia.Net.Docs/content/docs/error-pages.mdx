@@ -32,7 +32,10 @@ Create the named components in your client pages directory. Each receives `statu
 shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
 responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.
 
-For example, `ClientApp/pages/Error.tsx`:
+For example, `ClientApp/pages/Error.tsx` (`Error.vue` for Vue, `Error.svelte` for Svelte):
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 export default function Error({ status }: { status: number }) {
@@ -44,6 +47,47 @@ export default function Error({ status }: { status: number }) {
   return <main><h1>{status}: {title}</h1><a href="/">Return home</a></main>
 }
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue'
+
+const props = defineProps<{ status: number }>()
+const title = computed(() =>
+  props.status === 404 ? 'Page not found'
+    : props.status === 403 ? 'Access denied'
+    : props.status === 503 ? 'Service unavailable'
+    : 'Something went wrong',
+)
+</script>
+
+<template>
+  <main><h1>{{ status }}: {{ title }}</h1><a href="/">Return home</a></main>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  let { status }: { status: number } = $props()
+  const title = $derived(
+    status === 404 ? 'Page not found'
+      : status === 403 ? 'Access denied'
+      : status === 503 ? 'Service unavailable'
+      : 'Something went wrong',
+  )
+</script>
+
+<main><h1>{status}: {title}</h1><a href="/">Return home</a></main>
+```
+
+  </Tab>
+</Tabs>
 
 The handler answers requests with `X-Inertia` or an `Accept: text/html` navigation. It preserves the error status: XHR receives a
 JSON page with `X-Inertia: true`; the first visit receives the normal root template. Root views and SSR work as for any other

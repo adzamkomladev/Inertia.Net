@@ -13,7 +13,7 @@ ForgetMeNot is a small todo app, but it uses the same pieces as a real product: 
 - A code editor
 - A terminal
 
-No database server is required. ForgetMeNot uses SQLite, and the template already gives you a working React app.
+No database server is required. ForgetMeNot uses SQLite, and the template already gives you a working React, Vue or Svelte app.
 </Callout>
 
 Commands below use Bun; npm, pnpm and Yarn work as alternatives. The production example uses Bun as its SSR runtime.
@@ -33,7 +33,7 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 
 ## 1. Start from the template
 
-Install the templates once, then create the app:
+Install the templates once, then create the app. The commands use React; pass `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below:
 
 ```sh
 dotnet new install Inertia.Net.Templates::1.9.1
@@ -69,6 +69,8 @@ ClientApp/pages/Home.tsx
 ClientApp/pages/Todos/Index.tsx
 ```
 
+For Vue and Svelte the entry is `ClientApp/app.ts` and the components end in `.vue` or `.svelte`.
+
 The template already has Inertia, Vite, a deferred prop, a form and validation. We are going to grow it into a full app.
 
 ## 2. Make it look good with shadcn/ui
@@ -77,14 +79,39 @@ The template uses a tiny inline-style layout. Replace it with Tailwind and shadc
 
 Install the packages:
 
+<Tabs>
+  <Tab label="React">
+
 ```sh
 bun add -d tailwindcss @tailwindcss/vite
 bun add class-variance-authority clsx tailwind-merge lucide-react
 ```
 
-For npm use `npm install -D tailwindcss @tailwindcss/vite` and `npm install class-variance-authority clsx tailwind-merge lucide-react`. For pnpm or Yarn substitute `pnpm add -D` / `pnpm add` or `yarn add -D` / `yarn add`.
+  </Tab>
+  <Tab label="Vue">
+
+```sh
+bun add -d tailwindcss @tailwindcss/vite
+bun add class-variance-authority clsx tailwind-merge lucide-vue-next
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```sh
+bun add -d tailwindcss @tailwindcss/vite
+bun add class-variance-authority clsx tailwind-merge @lucide/svelte
+```
+
+  </Tab>
+</Tabs>
+
+For npm use `npm install -D tailwindcss @tailwindcss/vite` and `npm install` with the same runtime packages as your tab. For pnpm or Yarn substitute `pnpm add -D` / `pnpm add` or `yarn add -D` / `yarn add`.
 
 Update `vite.config.ts`:
+
+<Tabs>
+  <Tab label="React">
 
 ```ts
 import path from 'node:path'
@@ -100,6 +127,43 @@ export default defineConfig({
 })
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+import path from 'node:path'
+import tailwindcss from '@tailwindcss/vite'
+// ...your existing imports
+
+export default defineConfig({
+  plugins: [vue(), tailwindcss(), inertia(), hotFile()],
+  resolve: {
+    alias: { '@': path.resolve(import.meta.dirname, 'ClientApp') },
+  },
+  // ...the rest stays the same
+})
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+import path from 'node:path'
+import tailwindcss from '@tailwindcss/vite'
+// ...your existing imports
+
+export default defineConfig({
+  plugins: [svelte(), tailwindcss(), inertia(), hotFile()],
+  resolve: {
+    alias: { '@': path.resolve(import.meta.dirname, 'ClientApp') },
+  },
+  // ...the rest stays the same
+})
+```
+
+  </Tab>
+</Tabs>
+
 Add these two properties inside `compilerOptions` in `tsconfig.json`:
 
 ```json
@@ -113,11 +177,14 @@ Add these two properties inside `compilerOptions` in `tsconfig.json`:
 }
 ```
 
-Create `ClientApp/app.css` and import it from `ClientApp/app.tsx`:
+Create `ClientApp/app.css` and import it from the client entry (`ClientApp/app.tsx` for React, `ClientApp/app.ts` for Vue and Svelte):
 
 ```css
 @import "tailwindcss";
 ```
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 // ClientApp/app.tsx
@@ -127,25 +194,93 @@ import { createInertiaApp } from '@inertiajs/react'
 createInertiaApp()
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```ts
+// ClientApp/app.ts
+import './app.css'
+import { createInertiaApp } from '@inertiajs/vue3'
+
+createInertiaApp()
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```ts
+// ClientApp/app.ts
+import './app.css'
+import { createInertiaApp } from '@inertiajs/svelte'
+
+createInertiaApp()
+```
+
+  </Tab>
+</Tabs>
+
 Now initialize shadcn/ui from the project directory:
+
+<Tabs>
+  <Tab label="React">
 
 ```sh
 bunx --bun shadcn@latest init
 ```
 
-For npm, pnpm or Yarn use `npx shadcn@latest init`, `pnpm dlx shadcn@latest init` or `yarn dlx shadcn@latest init`. Accept the defaults. When it asks for the CSS file, choose `ClientApp/app.css`; when it asks for the import alias, use `@/`. Then add the components we need:
+  </Tab>
+  <Tab label="Vue">
+
+```sh
+bunx --bun shadcn-vue@latest init
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```sh
+bunx --bun shadcn-svelte@latest init
+```
+
+  </Tab>
+</Tabs>
+
+For npm, pnpm or Yarn replace `bunx --bun` with `npx`, `pnpm dlx` or `yarn dlx`. React uses shadcn/ui; Vue and Svelte use its ports, [shadcn-vue](https://www.shadcn-vue.com) and [shadcn-svelte](https://www.shadcn-svelte.com). Accept the defaults. When it asks for the CSS file, choose `ClientApp/app.css`; when it asks for the import alias, use `@/`. Then add the components we need:
+
+<Tabs>
+  <Tab label="React">
 
 ```sh
 bunx --bun shadcn@latest add button card input label badge checkbox separator
 ```
 
-For the add command use `npx shadcn@latest add ...`, `pnpm dlx shadcn@latest add ...` or `yarn dlx shadcn@latest add ...` with the same component names.
+  </Tab>
+  <Tab label="Vue">
+
+```sh
+bunx --bun shadcn-vue@latest add button card input label badge checkbox separator
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```sh
+bunx --bun shadcn-svelte@latest add button card input label badge checkbox separator
+```
+
+  </Tab>
+</Tabs>
+
+For the add command make the same `bunx --bun` replacement and keep the component names.
 
 <Callout type="tip" title="Checkpoint">
-`ClientApp/components/ui/` should now contain `button.tsx`, `card.tsx`, `input.tsx` and the other components. If the CLI asks a question you do not understand, choose the default; you can always rerun it.
+`ClientApp/components/ui/` should now contain the components: `button.tsx`, `card.tsx`, `input.tsx` and so on for React, or one folder per component (`button/`, `card/`, ...) for Vue and Svelte. If the CLI asks a question you do not understand, choose the default; you can always rerun it.
 </Callout>
 
-Replace `ClientApp/Layout.tsx` with the shared shell:
+Replace `ClientApp/Layout.tsx` (`Layout.vue` or `Layout.svelte`) with the shared shell:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 import { Link, usePage } from '@inertiajs/react'
@@ -198,7 +333,112 @@ export default function Layout({ children }: { children: ReactNode }) {
 }
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { Link, usePage } from '@inertiajs/vue3'
+import { LogOut, NotebookPen, UserRound } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+
+const page = usePage()
+</script>
+
+<template>
+  <div class="min-h-screen bg-background text-foreground">
+    <header class="border-b">
+      <div class="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4">
+        <Link href="/" class="flex items-center gap-2 font-semibold">
+          <NotebookPen class="size-5 text-primary" />
+          ForgetMeNot
+        </Link>
+
+        <nav class="ml-auto flex items-center gap-2">
+          <template v-if="page.props.auth">
+            <Button as-child variant="ghost" size="sm"><Link href="/todos">My lists</Link></Button>
+            <span class="hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
+              <UserRound class="size-4" /> {{ page.props.auth.displayName }}
+            </span>
+            <Button as-child variant="ghost" size="sm">
+              <Link href="/logout" method="post" as="button"><LogOut class="size-4" /> Sign out</Link>
+            </Button>
+          </template>
+          <template v-else>
+            <Button as-child variant="ghost" size="sm"><Link href="/login">Sign in</Link></Button>
+            <Button as-child size="sm"><Link href="/register">Create account</Link></Button>
+          </template>
+        </nav>
+      </div>
+    </header>
+
+    <div
+      v-if="page.flash.success"
+      class="border-b bg-emerald-50 px-4 py-2 text-center text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+    >
+      {{ page.flash.success }}
+    </div>
+
+    <main class="mx-auto max-w-5xl px-4 py-10"><slot /></main>
+  </div>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { Link, page } from '@inertiajs/svelte'
+  import { LogOut, NotebookPen, UserRound } from '@lucide/svelte'
+  import type { Snippet } from 'svelte'
+  import { buttonVariants } from '@/components/ui/button'
+
+  let { children }: { children: Snippet } = $props()
+</script>
+
+<div class="min-h-screen bg-background text-foreground">
+  <header class="border-b">
+    <div class="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4">
+      <Link href="/" class="flex items-center gap-2 font-semibold">
+        <NotebookPen class="size-5 text-primary" />
+        ForgetMeNot
+      </Link>
+
+      <nav class="ml-auto flex items-center gap-2">
+        {#if page.props.auth}
+          <Link href="/todos" class={buttonVariants({ variant: 'ghost', size: 'sm' })}>My lists</Link>
+          <span class="hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
+            <UserRound class="size-4" /> {page.props.auth.displayName}
+          </span>
+          <Link href="/logout" method="post" as="button" class={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            <LogOut class="size-4" /> Sign out
+          </Link>
+        {:else}
+          <Link href="/login" class={buttonVariants({ variant: 'ghost', size: 'sm' })}>Sign in</Link>
+          <Link href="/register" class={buttonVariants({ size: 'sm' })}>Create account</Link>
+        {/if}
+      </nav>
+    </div>
+  </header>
+
+  {#if page.flash.success}
+    <div class="border-b bg-emerald-50 px-4 py-2 text-center text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+      {page.flash.success}
+    </div>
+  {/if}
+
+  <main class="mx-auto max-w-5xl px-4 py-10">{@render children()}</main>
+</div>
+```
+
+  </Tab>
+</Tabs>
+
 And replace the template home page with a friendly landing page:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 // ClientApp/pages/Home.tsx
@@ -239,6 +479,95 @@ export default function Home() {
   )
 }
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Home.vue -->
+<script setup lang="ts">
+import { Link } from '@inertiajs/vue3'
+import { ArrowRight, CheckCircle2 } from 'lucide-vue-next'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import Layout from '../Layout.vue'
+
+const features = ['Private by default', 'One public link', 'Reminders that fire once']
+</script>
+
+<template>
+  <Layout>
+    <section class="mx-auto max-w-3xl py-16 text-center">
+      <Badge variant="secondary">Inertia.Net sample</Badge>
+      <h1 class="mt-6 text-balance text-5xl font-semibold tracking-tight">
+        Remember everything. Share what matters.
+      </h1>
+      <p class="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
+        Private lists, public links, due dates and reminders — built with ASP.NET Core and Inertia.
+      </p>
+      <div class="mt-8 flex justify-center gap-3">
+        <Button as-child size="lg"><Link href="/register">Create an account <ArrowRight class="size-4" /></Link></Button>
+        <Button as-child size="lg" variant="outline"><Link href="/login">Sign in</Link></Button>
+      </div>
+    </section>
+
+    <div class="grid gap-4 sm:grid-cols-3">
+      <Card v-for="text in features" :key="text">
+        <CardContent class="flex items-center gap-2 p-5 text-sm">
+          <CheckCircle2 class="size-4 text-primary" /> {{ text }}
+        </CardContent>
+      </Card>
+    </div>
+  </Layout>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Home.svelte -->
+<script lang="ts">
+  import { Link } from '@inertiajs/svelte'
+  import { ArrowRight, CheckCircle2 } from '@lucide/svelte'
+  import { Badge } from '@/components/ui/badge'
+  import { buttonVariants } from '@/components/ui/button'
+  import * as Card from '@/components/ui/card'
+  import Layout from '../Layout.svelte'
+
+  const features = ['Private by default', 'One public link', 'Reminders that fire once']
+</script>
+
+<Layout>
+  <section class="mx-auto max-w-3xl py-16 text-center">
+    <Badge variant="secondary">Inertia.Net sample</Badge>
+    <h1 class="mt-6 text-balance text-5xl font-semibold tracking-tight">
+      Remember everything. Share what matters.
+    </h1>
+    <p class="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
+      Private lists, public links, due dates and reminders — built with ASP.NET Core and Inertia.
+    </p>
+    <div class="mt-8 flex justify-center gap-3">
+      <Link href="/register" class={buttonVariants({ size: 'lg' })}>Create an account <ArrowRight class="size-4" /></Link>
+      <Link href="/login" class={buttonVariants({ size: 'lg', variant: 'outline' })}>Sign in</Link>
+    </div>
+  </section>
+
+  <div class="grid gap-4 sm:grid-cols-3">
+    {#each features as text (text)}
+      <Card.Root>
+        <Card.Content class="flex items-center gap-2 p-5 text-sm">
+          <CheckCircle2 class="size-4 text-primary" /> {text}
+        </Card.Content>
+      </Card.Root>
+    {/each}
+  </div>
+</Layout>
+```
+
+  </Tab>
+</Tabs>
 
 ## 3. Give the app a clean structure
 
@@ -708,6 +1037,9 @@ public static class AuthEndpoints
 
 The login page uses `useForm` and shadcn components:
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 // ClientApp/pages/Auth/Login.tsx
 import { Link, useForm } from '@inertiajs/react'
@@ -761,6 +1093,116 @@ export default function Login() {
   )
 }
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Auth/Login.vue -->
+<script setup lang="ts">
+import { Link, useForm } from '@inertiajs/vue3'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import Layout from '../../Layout.vue'
+
+const form = useForm({ email: '', password: '' })
+
+const submit = () => form.post('/login', { onFinish: () => form.reset('password') })
+</script>
+
+<template>
+  <Layout>
+    <Card class="mx-auto mt-12 max-w-md">
+      <CardHeader>
+        <CardTitle>Welcome back</CardTitle>
+        <CardDescription>Sign in to see your lists and reminders.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form class="space-y-4" @submit.prevent="submit">
+          <div class="space-y-2">
+            <Label for="email">Email</Label>
+            <Input id="email" v-model="form.email" type="email" />
+            <p v-if="form.errors.email" class="text-sm text-red-600">{{ form.errors.email }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="password">Password</Label>
+            <Input id="password" v-model="form.password" type="password" />
+            <p v-if="form.errors.password" class="text-sm text-red-600">{{ form.errors.password }}</p>
+          </div>
+
+          <Button type="submit" class="w-full" :disabled="form.processing">
+            {{ form.processing ? 'Signing in...' : 'Sign in' }}
+          </Button>
+
+          <p class="text-center text-sm text-muted-foreground">
+            New here? <Link href="/register" class="font-medium text-foreground underline">Create an account</Link>
+          </p>
+        </form>
+      </CardContent>
+    </Card>
+  </Layout>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Auth/Login.svelte -->
+<script lang="ts">
+  import { Link, useForm } from '@inertiajs/svelte'
+  import { Button } from '@/components/ui/button'
+  import * as Card from '@/components/ui/card'
+  import { Input } from '@/components/ui/input'
+  import { Label } from '@/components/ui/label'
+  import Layout from '../../Layout.svelte'
+
+  const form = useForm({ email: '', password: '' })
+
+  const submit = (event: SubmitEvent) => {
+    event.preventDefault()
+    form.post('/login', { onFinish: () => form.reset('password') })
+  }
+</script>
+
+<Layout>
+  <Card.Root class="mx-auto mt-12 max-w-md">
+    <Card.Header>
+      <Card.Title>Welcome back</Card.Title>
+      <Card.Description>Sign in to see your lists and reminders.</Card.Description>
+    </Card.Header>
+    <Card.Content>
+      <form onsubmit={submit} class="space-y-4">
+        <div class="space-y-2">
+          <Label for="email">Email</Label>
+          <Input id="email" type="email" bind:value={form.email} />
+          {#if form.errors.email}<p class="text-sm text-red-600">{form.errors.email}</p>{/if}
+        </div>
+
+        <div class="space-y-2">
+          <Label for="password">Password</Label>
+          <Input id="password" type="password" bind:value={form.password} />
+          {#if form.errors.password}<p class="text-sm text-red-600">{form.errors.password}</p>{/if}
+        </div>
+
+        <Button type="submit" class="w-full" disabled={form.processing}>
+          {form.processing ? 'Signing in...' : 'Sign in'}
+        </Button>
+
+        <p class="text-center text-sm text-muted-foreground">
+          New here? <Link href="/register" class="font-medium text-foreground underline">Create an account</Link>
+        </p>
+      </form>
+    </Card.Content>
+  </Card.Root>
+</Layout>
+```
+
+  </Tab>
+</Tabs>
 
 The register page is the same pattern with `displayName`, `email` and `password`.
 
@@ -849,7 +1291,10 @@ static async Task<TodoStats> LoadStats(AppDbContext db, int userId, Cancellation
 }
 ```
 
-The dashboard React page uses `Card`, `Badge` and `Deferred`:
+The dashboard page uses `Card`, `Badge` and `Deferred`:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 // ClientApp/pages/Todos/Index.tsx
@@ -934,6 +1379,192 @@ export default function Index({ lists, reminders, stats }: Props) {
 }
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Todos/Index.vue -->
+<script setup lang="ts">
+import { Deferred, Link, useForm } from '@inertiajs/vue3'
+import { Plus } from 'lucide-vue-next'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import Layout from '../../Layout.vue'
+
+defineProps<{
+  lists: { id: number; title: string; isPublic: boolean; total: number; open: number }[]
+  reminders?: { id: number; title: string; remindAt: string }[]
+  stats?: { open: number; done: number; dueToday: number }
+}>()
+
+const form = useForm({ title: '' })
+const submit = () => form.post('/lists', { onSuccess: () => form.reset() })
+</script>
+
+<template>
+  <Layout>
+    <div class="flex items-end justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-semibold tracking-tight">Your lists</h1>
+        <p class="mt-1 text-muted-foreground">Private by default. Share a list when you want to.</p>
+      </div>
+    </div>
+
+    <div class="mt-8 grid gap-4 sm:grid-cols-2">
+      <Link v-for="list in lists" :key="list.id" :href="`/todos/${list.id}`">
+        <Card class="transition-colors hover:border-primary/40">
+          <CardHeader>
+            <div class="flex items-center justify-between gap-2">
+              <CardTitle>{{ list.title }}</CardTitle>
+              <Badge :variant="list.isPublic ? 'default' : 'secondary'">{{ list.isPublic ? 'Public' : 'Private' }}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent class="text-sm text-muted-foreground">
+            {{ list.open }} open of {{ list.total }}
+          </CardContent>
+        </Card>
+      </Link>
+    </div>
+
+    <Card class="mt-8">
+      <CardHeader><CardTitle>New list</CardTitle></CardHeader>
+      <CardContent>
+        <form class="flex gap-2" @submit.prevent="submit">
+          <Input v-model="form.title" placeholder="Weekend plans" />
+          <Button type="submit" :disabled="form.processing"><Plus class="size-4" /> Add</Button>
+        </form>
+        <p v-if="form.errors.title" class="mt-2 text-sm text-red-600">{{ form.errors.title }}</p>
+      </CardContent>
+    </Card>
+
+    <div class="mt-8 grid gap-4 sm:grid-cols-2">
+      <Deferred data="stats">
+        <template #fallback><p class="text-sm text-muted-foreground">Counting...</p></template>
+        <Card>
+          <CardHeader><CardTitle>Overview</CardTitle></CardHeader>
+          <CardContent class="text-sm text-muted-foreground">
+            {{ stats?.open }} open · {{ stats?.done }} done · {{ stats?.dueToday }} due today
+          </CardContent>
+        </Card>
+      </Deferred>
+
+      <Deferred data="reminders">
+        <template #fallback><p class="text-sm text-muted-foreground">Loading reminders...</p></template>
+        <Card>
+          <CardHeader><CardTitle>Upcoming reminders</CardTitle></CardHeader>
+          <CardContent>
+            <template v-if="reminders?.length">
+              <p v-for="reminder in reminders" :key="reminder.id" class="text-sm">{{ reminder.title }}</p>
+            </template>
+            <p v-else class="text-sm text-muted-foreground">Nothing scheduled.</p>
+          </CardContent>
+        </Card>
+      </Deferred>
+    </div>
+  </Layout>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Todos/Index.svelte -->
+<script lang="ts">
+  import { Deferred, Link, useForm } from '@inertiajs/svelte'
+  import { Plus } from '@lucide/svelte'
+  import { Badge } from '@/components/ui/badge'
+  import { Button } from '@/components/ui/button'
+  import * as Card from '@/components/ui/card'
+  import { Input } from '@/components/ui/input'
+  import Layout from '../../Layout.svelte'
+
+  interface Props {
+    lists: { id: number; title: string; isPublic: boolean; total: number; open: number }[]
+    reminders?: { id: number; title: string; remindAt: string }[]
+    stats?: { open: number; done: number; dueToday: number }
+  }
+
+  let { lists, reminders, stats }: Props = $props()
+
+  const form = useForm({ title: '' })
+
+  const submit = (event: SubmitEvent) => {
+    event.preventDefault()
+    form.post('/lists', { onSuccess: () => form.reset() })
+  }
+</script>
+
+<Layout>
+  <div class="flex items-end justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight">Your lists</h1>
+      <p class="mt-1 text-muted-foreground">Private by default. Share a list when you want to.</p>
+    </div>
+  </div>
+
+  <div class="mt-8 grid gap-4 sm:grid-cols-2">
+    {#each lists as list (list.id)}
+      <Link href={`/todos/${list.id}`}>
+        <Card.Root class="transition-colors hover:border-primary/40">
+          <Card.Header>
+            <div class="flex items-center justify-between gap-2">
+              <Card.Title>{list.title}</Card.Title>
+              <Badge variant={list.isPublic ? 'default' : 'secondary'}>{list.isPublic ? 'Public' : 'Private'}</Badge>
+            </div>
+          </Card.Header>
+          <Card.Content class="text-sm text-muted-foreground">
+            {list.open} open of {list.total}
+          </Card.Content>
+        </Card.Root>
+      </Link>
+    {/each}
+  </div>
+
+  <Card.Root class="mt-8">
+    <Card.Header><Card.Title>New list</Card.Title></Card.Header>
+    <Card.Content>
+      <form onsubmit={submit} class="flex gap-2">
+        <Input bind:value={form.title} placeholder="Weekend plans" />
+        <Button type="submit" disabled={form.processing}><Plus class="size-4" /> Add</Button>
+      </form>
+      {#if form.errors.title}<p class="mt-2 text-sm text-red-600">{form.errors.title}</p>{/if}
+    </Card.Content>
+  </Card.Root>
+
+  <div class="mt-8 grid gap-4 sm:grid-cols-2">
+    <Deferred data="stats">
+      {#snippet fallback()}<p class="text-sm text-muted-foreground">Counting...</p>{/snippet}
+      <Card.Root>
+        <Card.Header><Card.Title>Overview</Card.Title></Card.Header>
+        <Card.Content class="text-sm text-muted-foreground">
+          {stats?.open} open · {stats?.done} done · {stats?.dueToday} due today
+        </Card.Content>
+      </Card.Root>
+    </Deferred>
+
+    <Deferred data="reminders">
+      {#snippet fallback()}<p class="text-sm text-muted-foreground">Loading reminders...</p>{/snippet}
+      <Card.Root>
+        <Card.Header><Card.Title>Upcoming reminders</Card.Title></Card.Header>
+        <Card.Content>
+          {#each reminders ?? [] as reminder (reminder.id)}
+            <p class="text-sm">{reminder.title}</p>
+          {:else}
+            <p class="text-sm text-muted-foreground">Nothing scheduled.</p>
+          {/each}
+        </Card.Content>
+      </Card.Root>
+    </Deferred>
+  </div>
+</Layout>
+```
+
+  </Tab>
+</Tabs>
+
 ## 9. Load items in pages
 
 These snippets live inside `MapTodoEndpoints` in `Endpoints/TodoEndpoints.cs`.
@@ -976,8 +1607,6 @@ app.MapGet("/todos/{id:int}", async (
 }).AddEndpointFilter<RequireSessionUser>();
 ```
 
-The React page asks for the next page as the user scrolls:
-
 Add the write endpoints:
 
 ```csharp
@@ -1016,7 +1645,10 @@ app.MapPatch("/items/{id:int}", async (
 }).AddEndpointFilter<RequireSessionUser>();
 ```
 
-The React page asks for the next page as the user scrolls:
+The page asks for the next page as the user scrolls:
+
+<Tabs>
+  <Tab label="React">
 
 ```tsx
 // ClientApp/pages/Todos/Show.tsx
@@ -1074,6 +1706,120 @@ export default function Show({ list, items }: Props) {
 }
 ```
 
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Todos/Show.vue -->
+<script setup lang="ts">
+import { InfiniteScroll, router, useForm } from '@inertiajs/vue3'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import Layout from '../../Layout.vue'
+
+const props = defineProps<{
+  list: { id: number; title: string }
+  items: { data: { id: number; title: string; isDone: boolean; dueAt: string | null }[] }
+}>()
+
+const form = useForm({ title: '', dueAt: '', remindAt: '' })
+
+const submit = () => form.post(`/todos/${props.list.id}/items`, { onSuccess: () => form.reset() })
+</script>
+
+<template>
+  <Layout>
+    <h1 class="text-3xl font-semibold tracking-tight">{{ list.title }}</h1>
+    <p class="mt-1 text-muted-foreground">Loaded in pages, merged as you scroll.</p>
+
+    <Card class="mt-6">
+      <CardContent class="p-4">
+        <form class="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto]" @submit.prevent="submit">
+          <Input v-model="form.title" placeholder="What needs doing?" />
+          <Input v-model="form.dueAt" type="datetime-local" aria-label="Due date" />
+          <Input v-model="form.remindAt" type="datetime-local" aria-label="Remind me" />
+          <Button type="submit" :disabled="form.processing">Add</Button>
+        </form>
+        <p v-if="form.errors.title" class="mt-2 text-sm text-red-600">{{ form.errors.title }}</p>
+      </CardContent>
+    </Card>
+
+    <InfiniteScroll data="items" class="mt-8 space-y-3">
+      <Card v-for="item in items.data" :key="item.id">
+        <CardContent class="flex items-center gap-3 p-4">
+          <Checkbox :model-value="item.isDone" @update:model-value="router.patch(`/items/${item.id}`)" />
+          <span :class="item.isDone ? 'text-muted-foreground line-through' : ''">{{ item.title }}</span>
+          <span v-if="item.dueAt" class="ml-auto text-xs text-muted-foreground">{{ new Date(item.dueAt).toLocaleDateString() }}</span>
+        </CardContent>
+      </Card>
+    </InfiniteScroll>
+  </Layout>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Todos/Show.svelte -->
+<script lang="ts">
+  import { InfiniteScroll, router, useForm } from '@inertiajs/svelte'
+  import { Checkbox } from '@/components/ui/checkbox'
+  import { Button } from '@/components/ui/button'
+  import * as Card from '@/components/ui/card'
+  import { Input } from '@/components/ui/input'
+  import Layout from '../../Layout.svelte'
+
+  interface Props {
+    list: { id: number; title: string }
+    items: { data: { id: number; title: string; isDone: boolean; dueAt: string | null }[] }
+  }
+
+  let { list, items }: Props = $props()
+
+  const form = useForm({ title: '', dueAt: '', remindAt: '' })
+
+  const submit = (event: SubmitEvent) => {
+    event.preventDefault()
+    form.post(`/todos/${list.id}/items`, { onSuccess: () => form.reset() })
+  }
+</script>
+
+<Layout>
+  <h1 class="text-3xl font-semibold tracking-tight">{list.title}</h1>
+  <p class="mt-1 text-muted-foreground">Loaded in pages, merged as you scroll.</p>
+
+  <Card.Root class="mt-6">
+    <Card.Content class="p-4">
+      <form onsubmit={submit} class="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto]">
+        <Input placeholder="What needs doing?" bind:value={form.title} />
+        <Input type="datetime-local" bind:value={form.dueAt} aria-label="Due date" />
+        <Input type="datetime-local" bind:value={form.remindAt} aria-label="Remind me" />
+        <Button type="submit" disabled={form.processing}>Add</Button>
+      </form>
+      {#if form.errors.title}<p class="mt-2 text-sm text-red-600">{form.errors.title}</p>{/if}
+    </Card.Content>
+  </Card.Root>
+
+  <InfiniteScroll data="items" class="mt-8 space-y-3">
+    {#each items.data as item (item.id)}
+      <Card.Root>
+        <Card.Content class="flex items-center gap-3 p-4">
+          <Checkbox checked={item.isDone} onCheckedChange={() => router.patch(`/items/${item.id}`)} />
+          <span class={item.isDone ? 'text-muted-foreground line-through' : ''}>{item.title}</span>
+          {#if item.dueAt}<span class="ml-auto text-xs text-muted-foreground">{new Date(item.dueAt).toLocaleDateString()}</span>{/if}
+        </Card.Content>
+      </Card.Root>
+    {/each}
+  </InfiniteScroll>
+</Layout>
+```
+
+  </Tab>
+</Tabs>
+
 `Scroll` merges the `data` array and tells `InfiniteScroll` which URL parameter to use. The browser only renders the pages it has requested.
 
 <Callout type="tip" title="Checkpoint">
@@ -1127,6 +1873,9 @@ static string NewPublicSlug() =>
 
 The public page is the same `InfiniteScroll` pattern, wrapped in a clean card:
 
+<Tabs>
+  <Tab label="React">
+
 ```tsx
 // ClientApp/pages/Public/Show.tsx
 import { InfiniteScroll } from '@inertiajs/react'
@@ -1158,6 +1907,77 @@ export default function PublicShow({ list, items }: Props) {
   )
 }
 ```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Public/Show.vue -->
+<script setup lang="ts">
+import { InfiniteScroll } from '@inertiajs/vue3'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Layout from '../../Layout.vue'
+
+defineProps<{
+  list: { title: string; owner: string; openCount: number }
+  items: { data: { id: number; title: string; dueAt: string | null }[] }
+}>()
+</script>
+
+<template>
+  <Layout>
+    <Badge variant="secondary">Public list</Badge>
+    <h1 class="mt-4 text-4xl font-semibold tracking-tight">{{ list.title }}</h1>
+    <p class="mt-2 text-muted-foreground">Shared by {{ list.owner }} · {{ list.openCount }} open items</p>
+
+    <InfiniteScroll data="items" class="mt-8 space-y-3">
+      <Card v-for="item in items.data" :key="item.id">
+        <CardHeader><CardTitle class="text-base">{{ item.title }}</CardTitle></CardHeader>
+        <CardContent v-if="item.dueAt" class="text-sm text-muted-foreground">Due {{ new Date(item.dueAt).toLocaleDateString() }}</CardContent>
+      </Card>
+    </InfiniteScroll>
+  </Layout>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Public/Show.svelte -->
+<script lang="ts">
+  import { InfiniteScroll } from '@inertiajs/svelte'
+  import { Badge } from '@/components/ui/badge'
+  import * as Card from '@/components/ui/card'
+  import Layout from '../../Layout.svelte'
+
+  interface Props {
+    list: { title: string; owner: string; openCount: number }
+    items: { data: { id: number; title: string; dueAt: string | null }[] }
+  }
+
+  let { list, items }: Props = $props()
+</script>
+
+<Layout>
+  <Badge variant="secondary">Public list</Badge>
+  <h1 class="mt-4 text-4xl font-semibold tracking-tight">{list.title}</h1>
+  <p class="mt-2 text-muted-foreground">Shared by {list.owner} · {list.openCount} open items</p>
+
+  <InfiniteScroll data="items" class="mt-8 space-y-3">
+    {#each items.data as item (item.id)}
+      <Card.Root>
+        <Card.Header><Card.Title class="text-base">{item.title}</Card.Title></Card.Header>
+        {#if item.dueAt}<Card.Content class="text-sm text-muted-foreground">Due {new Date(item.dueAt).toLocaleDateString()}</Card.Content>{/if}
+      </Card.Root>
+    {/each}
+  </InfiniteScroll>
+</Layout>
+```
+
+  </Tab>
+</Tabs>
 
 Put the `/p/{slug}` handler in `Endpoints/PublicEndpoints.cs` inside `MapPublicEndpoints`, then add it to the route table. Open the URL in a private browser window to prove no session is needed.
 
