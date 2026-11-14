@@ -65,6 +65,39 @@ public sealed class MinimalApiTempDataSessionHost : IConformanceHost
     public static void MapRoutes(WebApplication app) => MinimalApiHost.MapRoutes(app);
 }
 
+/// <summary>The session provider over a distributed cache that only answers asynchronously, like a remote store must be used.</summary>
+public sealed class MinimalApiTempDataAsyncSessionHost : IConformanceHost
+{
+    public static bool UsesSession => true;
+
+    public static bool StateInCookie => false;
+
+    public static void ConfigureServices(IServiceCollection services)
+    {
+        MinimalApiTempDataSessionHost.ConfigureServices(services);
+        services.AddSingleton<Microsoft.Extensions.Caching.Distributed.IDistributedCache, AsyncOnlyDistributedCache>();
+    }
+
+    public static void MapRoutes(WebApplication app) => MinimalApiHost.MapRoutes(app);
+
+    private sealed class AsyncOnlyDistributedCache(Microsoft.Extensions.Options.IOptions<Microsoft.Extensions.Caching.Memory.MemoryDistributedCacheOptions> options)
+        : Microsoft.Extensions.Caching.Distributed.IDistributedCache
+    {
+        private readonly Microsoft.Extensions.Caching.Distributed.MemoryDistributedCache _inner = new(options);
+
+        public byte[]? Get(string key) => throw new InvalidOperationException("A blocking read of the session store.");
+        public Task<byte[]?> GetAsync(string key, CancellationToken token = default) => _inner.GetAsync(key, token);
+        public void Refresh(string key) => throw new InvalidOperationException("A blocking refresh of the session store.");
+        public Task RefreshAsync(string key, CancellationToken token = default) => _inner.RefreshAsync(key, token);
+        public void Remove(string key) => throw new InvalidOperationException("A blocking removal from the session store.");
+        public Task RemoveAsync(string key, CancellationToken token = default) => _inner.RemoveAsync(key, token);
+        public void Set(string key, byte[] value, Microsoft.Extensions.Caching.Distributed.DistributedCacheEntryOptions options) =>
+            throw new InvalidOperationException("A blocking write to the session store.");
+        public Task SetAsync(string key, byte[] value, Microsoft.Extensions.Caching.Distributed.DistributedCacheEntryOptions options, CancellationToken token = default) =>
+            _inner.SetAsync(key, value, options, token);
+    }
+}
+
 public sealed class MvcTempDataCookieConformanceTests : ProtocolConformanceTests<MvcTempDataCookieHost>;
 
 public sealed class MvcTempDataSessionConformanceTests : ProtocolConformanceTests<MvcTempDataSessionHost>;
@@ -214,6 +247,19 @@ public sealed class TempDataStateStoreTests
         var stale = await client.InertiaGetAsync("/page", r => r.Headers.Add(InertiaHeaders.Version, "stale"));
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
 
+        var page = await (await client.InertiaGetAsync("/page")).PageAsync();
+        JsonAssert.Equal("""{"success":"Saved Ann"}""", page["flash"]);
+        JsonAssert.Missing(await (await client.InertiaGetAsync("/page")).PageAsync(), "flash");
+    }
+
+    [Fact]
+    public async Task Session_tempdata_is_loaded_without_a_blocking_session_store_read()
+    {
+        await using var app = await ConformanceApp.StartAsync<MinimalApiTempDataAsyncSessionHost>();
+        var client = app.CreateClient();
+        await client.InertiaGetAsync("/page"); // establishes the session cookie
+
+        await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
         var page = await (await client.InertiaGetAsync("/page")).PageAsync();
         JsonAssert.Equal("""{"success":"Saved Ann"}""", page["flash"]);
         JsonAssert.Missing(await (await client.InertiaGetAsync("/page")).PageAsync(), "flash");
