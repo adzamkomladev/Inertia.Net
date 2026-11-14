@@ -7,6 +7,52 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-14
+
+### Added
+
+- Page records: a type implementing `IInertiaPage` names its component (`static string Component`), so `Render(new UsersPage(...))`,
+  `o.TypeScript.Page<UsersPage>()` and FastEndpoints' `Send.InertiaAsync(page)` need no component string. `AddGeneratedPages()`
+  (source-generated, AOT-safe) and `PagesFrom(assembly)` register every page record at once.
+- Typed routes: `o.TypeScript.RoutesOutputPath` writes `routes.ts` with a typed function per named endpoint on Minimal API, MVC and
+  FastEndpoints (`routes.users.show(1)` is `{ url, method }`), a variant per HTTP method, query strings, a path-base prefix, and
+  `RouteBodies` with each route's request-body type.
+- `<InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>` writes the TypeScript files after every build, including the one
+  in `dotnet publish`; the app runs without listening on a port.
+- An analyzer in the `Inertia.Net` package: INERTIA001 (two page records claim one component) and INERTIA002 (a component with no
+  page file under `$(InertiaPagesDirectory)`).
+- Cookie authentication: `CookieAuthenticationOptions.UseInertiaRedirects()` redirects Inertia visits to the login page (302, or 303
+  after POST, PUT, PATCH and DELETE) instead of the cookie handler's 401, and renders the 403 error page on access denied when error
+  pages handle 403.
+- Rate limiting: `InertiaRateLimiting.OnRejected()` sends a rejected Inertia submission back with a flash message and `Retry-After`,
+  answers Precognition with `Precognition: true`, and leaves 429 to the error pages when they handle it.
+- Scoped services in loaders: `Prop<TService, T>((service, ct) => ...)` gets the request's instance; parallel loaders and
+  stale-while-revalidate refreshes get a scope of their own.
+- Server head tags: `Render(...).WithHead(h => h.Title(...).Meta(...).Property(...).Link(...))`, `HttpContext.Inertia().Head`, and
+  `o.Head.TitleTemplate`. The tags are in the first HTML response without SSR and travel as the `head` prop for the client's
+  `serverHead: true`.
+- `Inertia.Net.Redis`: a Redis `IInertiaCacheStore` for cached props and SSR renders shared by every app instance
+  (`AddInertiaRedisCache`).
+- `Inertia.Net.MongoDB`: `ToPageAsync` and `ToCursorPageAsync` for MongoDB finds, with `ObjectId` keys.
+- Reloading scroll and merge props on a live event: `ClientApp/lib/inertia-live-reload.ts` in the templates
+  (`liveReload(live, event, { only, reset })`), and `o.TypeScript.LiveEvents(...)` exports event names and channels from
+  `routes.ts`. The SignalR client transport now delivers a channel's events to every subscriber.
+- `dotnet new inertia --auth`: cookie sign-in with a login page (Precognition), a protected dashboard, logout, `auth.user` and a
+  sign-in rate limit, for React, Vue and Svelte.
+  Signing in returns to the page that asked for it (`ReturnUrl`, local paths only).
+- Modal routes for InertiaUI Modal 3.x (React and Vue): `Modal(component, props).WithBaseUrl(...)` answers the modal client's request
+  with the modal page, and renders a direct visit as the page under the modal with the modal open. `Back()` prefers the modal's
+  `X-InertiaUI-Modal-Base-Url` header, so a form in a modal returns to it with its errors.
+- `Inertia.Net.Testing`: `HasHead(key, contains)`, `WhereRoute(key, url, method)` for `{ url, method }` props, and a test-host recipe
+  in the package README.
+
+### Fixed
+
+- `AddInertiaLive().AddSignalR()` put its JSON metadata in front of SignalR's resolver chain, which turned
+  off reflection for the app's other hubs: their methods failed to serialize app types. The reflection fallback is now kept when the
+  app had not set a resolver (and reflection is enabled).
+- `AddInertiaLive()` needed `AddInertia()` even in a process that only publishes.
+
 ## [1.8.0] - 2026-11-13
 
 ### Added

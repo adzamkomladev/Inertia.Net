@@ -228,6 +228,8 @@ of the protocol; the payload is:
 
 **With SSR,** the SSR `body` already contains the script element plus `<div data-server-rendered="true" id="app">…</div>`. Echo it verbatim and do not emit a second script. The SSR `head` (`string[]`) is joined with `"\n"` and output wherever the `@inertiaHead` token appears.
 
+**Server head tags** (`WithHead`, `HttpContext.Inertia().Head`) are an ordinary shared prop, `head` by default (`string[]` of HTML tags, each with a `data-inertia` key), which the v3 client reads with `serverHead: true`. It is always included (like `Always`), also on partial reloads. Without SSR the same tags are joined with `"\n"` and written at `@inertiaHead`; with SSR the SSR `head` is written instead (the client renders it from the prop).
+
 ## 6. Validation errors
 
 - `props.errors` is always present.
@@ -293,6 +295,20 @@ The React refresh preamble is:
 
 Named mounts (`AddInertia(name, ...)` with `UseInertia(name)`) are adapter configuration, not a protocol change: each mount
 runs this protocol unchanged with its own options, asset version and state cookie.
+
+## Modal routes (InertiaUI Modal 3.x)
+
+There is no written protocol; this follows `inertiaui/modal` 3.1 (`Modal.php`, `DispatchBaseUrlRequest.php`, `Redirector.php`).
+
+- A request with `X-InertiaUI-Modal: <id>` gets the modal's page JSON with `mergeProps`, `deferredProps` and `cache` moved under `meta`
+  (`{}` when none). Other page fields are unchanged.
+- Any other request resolves the base URL: the first of `X-InertiaUI-Modal-Base-Url`, `Referer` and the configured base whose path is
+  not the request's. Unlike Laravel, a candidate must be on the request's host (scheme not compared, like `Back()`) and under `PathBase`.
+  The base endpoint is matched with the pipeline's routing and run as a GET through the middleware after `UseInertia()`, with the
+  shared prop `_inertiaui_modal` = the modal's page JSON (as above) plus `id: null` and `baseUrl` (absolute). The base page's `url` is
+  the modal request's URL. A base endpoint that returns a modal renders it as a page. With no base URL, or no endpoint at it, the modal
+  renders as a page (not moved under `meta`).
+- `Back()` and the middleware's empty-response redirect prefer a same-host `X-InertiaUI-Modal-Base-Url` over the `Referer`.
 
 ## Deliberate deviations from Laravel
 

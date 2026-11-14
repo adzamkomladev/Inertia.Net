@@ -56,6 +56,29 @@ Error pages: non-2xx Inertia responses are parsed too; `.Status(404)` asserts th
 Live props: `page.LiveProps` holds the `liveProps` metadata, and `HasLive("order")` or
 `HasLive("order", "private:orders.1", "OrderUpdated")` (channel as `"{type}:{name}"`) assert it.
 
+Server head tags (`Render(...).WithHead(...)`): `HasHead("title", "Users - App")` or `HasHead("description")`, keyed like the
+tags' `data-inertia` attribute (`title`, a meta name or property, a link rel).
+
+Routes sent as props in the client's `{ url, method }` shape (what the generated `routes.ts` functions return):
+`WhereRoute("actions.delete", "/users/1", "delete")`; the method defaults to `get` and is compared ignoring case.
+
+## Test host recipe
+
+With `WebApplicationFactory<Program>`, pin the asset version so requests need no first visit to learn it, and turn SSR off so tests
+need no Node server:
+
+```csharp
+builder.ConfigureTestServices(services => services.PostConfigure<InertiaOptions>(o =>
+{
+    o.Version = "test";              // then client.InertiaGetAsync(url, version: "test")
+    o.Ssr.Mode = SsrMode.Disabled;
+}));
+```
+
+For form posts, read the XSRF token from a page response with `GetXsrfToken()` and send it with `WithXsrfToken()` (above); a
+cookie-keeping client (`factory.CreateClient(new() { AllowAutoRedirect = false, HandleCookies = true })`) holds the antiforgery
+cookie and the sign-in cookie between requests.
+
 Nested scopes fail on properties you did not assert unless you call `Etc()`. Call `Interacted()` to enforce the same at the root.
 
 Documentation: <https://github.com/adzamkomladev/Inertia.Net#testing>
