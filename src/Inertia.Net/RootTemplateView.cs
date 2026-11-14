@@ -132,7 +132,12 @@ internal sealed class RootTemplateView : IInertiaRootView
                     }
                     else if (http.Features.Get<InertiaFeature>()?.HeadHtml is { } tags)
                     {
-                        writer.Write(System.Text.Encoding.UTF8.GetBytes(string.Join('\n', tags))); // the client keeps them up to date
+                        // the client keeps them up to date
+                        for (var i = 0; i < tags.Length; i++)
+                        {
+                            if (i > 0) writer.Write("\n"u8);
+                            Utf8Output.Write(writer, tags[i]);
+                        }
                     }
 
                     break;
