@@ -252,7 +252,8 @@ public sealed class SsrCacheTests
         var harness = new Harness(o =>
         {
             o.Ssr.Mode = mode;
-            o.Ssr.Timeout = TimeSpan.FromMilliseconds(50);
+            // Also bounds the retry's first (cold) HTTP call below, so it cannot be a few milliseconds.
+            o.Ssr.Timeout = TimeSpan.FromMilliseconds(500);
             o.Ssr.Cache.Duration = TimeSpan.FromMinutes(1);
         }, configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
         var cache = harness.Services.GetRequiredService<InertiaCaching>();

@@ -86,7 +86,8 @@ internal sealed partial class SsrNodeProcess(
             WarnAboutPlainHttpRemotes(ssr);
         }
 
-        if (ssr is not { Mode: not SsrMode.Disabled, NodeProcess: { } node })
+        // --inertia-types only writes files and exits: no renderer is needed.
+        if (InertiaTypeScriptWriter.IsGenerateOnly || ssr is not { Mode: not SsrMode.Disabled, NodeProcess: { } node })
         {
             return;
         }

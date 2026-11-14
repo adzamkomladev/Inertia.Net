@@ -84,3 +84,5 @@ static Inertia.Net.Testing.InertiaPage.ParseAsync(System.Net.Http.HttpResponseMe
 static Inertia.Net.Testing.InertiaXsrfExtensions.GetXsrfToken(this System.Net.Http.HttpResponseMessage! response, string! cookieName = "XSRF-TOKEN") -> string!
 static Inertia.Net.Testing.InertiaXsrfExtensions.WithXsrfToken(this System.Net.Http.HttpRequestMessage! request, System.Net.Http.HttpResponseMessage! pageResponse, string! cookieName = "XSRF-TOKEN", string! headerName = "X-XSRF-TOKEN") -> System.Net.Http.HttpRequestMessage!
 static Inertia.Net.Testing.InertiaXsrfExtensions.WithXsrfToken(this System.Net.Http.HttpRequestMessage! request, string! token, string! headerName = "X-XSRF-TOKEN") -> System.Net.Http.HttpRequestMessage!
+Inertia.Net.Testing.AssertableInertia.HasHead(string! key, string? contains = null, string! propName = "head") -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.AssertableJsonBase<TSelf>.WhereRoute(string! key, string! url, string! method = "get") -> TSelf!

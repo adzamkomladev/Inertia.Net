@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Inertia.Net;
@@ -43,6 +44,7 @@ internal sealed partial class PropsWriter
     private Dictionary<string, (string Prop, long? ExpiresAt)>? _onceProps;
     private Dictionary<string, LiveSpec>? _liveProps;
     private PropsPlanner? _planner;
+    private IServiceProvider? _services;
 
     public PropsWriter(InertiaPageWriter owner) => _owner = owner;
 
@@ -55,7 +57,7 @@ internal sealed partial class PropsWriter
     /// Starts a render into <paramref name="buffer"/> and returns its JSON writer, kept for the next render with the same options. With
     /// <paramref name="plan"/> the walk starts the <see cref="InertiaProp.Parallel"/> loaders first.
     /// </summary>
-    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, bool plan, CancellationToken cancellationToken)
+    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, bool plan, IServiceProvider services, CancellationToken cancellationToken)
     {
         var writer = htmlSafe
             ? _htmlWriter ??= new Utf8JsonWriter(buffer, _owner.HtmlWriterOptions)
@@ -63,6 +65,7 @@ internal sealed partial class PropsWriter
         writer.Reset(buffer);
         _writer = writer;
         _request = request;
+        _services = services;
         _isPartial = string.Equals(request.PartialComponent, component, StringComparison.Ordinal);
         _cancellationToken = cancellationToken;
         _plan = plan;
@@ -76,6 +79,7 @@ internal sealed partial class PropsWriter
     public void Clear()
     {
         _request = default;
+        _services = null;
         _cancellationToken = default;
         _mergeProps = _prependProps = _deepMergeProps = _matchPropsOn = null;
         _uncommon = null;
@@ -245,7 +249,7 @@ internal sealed partial class PropsWriter
     }
 
     private void Prefetch(InertiaProp prop, string key, Task<CachedProp?>? lookup) =>
-        (_planner ??= new PropsPlanner(_owner, _cancellationToken)).Add(prop, _pathLength == key.Length ? key : new string(Path), lookup);
+        (_planner ??= new PropsPlanner(_owner, _services!, _cancellationToken)).Add(prop, _pathLength == key.Length ? key : new string(Path), lookup);
 
     /// <summary>
     /// Writes sharedProps through liveProps, in protocol order, omitting empty ones. The shared keys are the first
@@ -601,6 +605,7 @@ internal sealed partial class PropsWriter
     {
         if (_uncommon?.Refreshes is { } refreshes && refreshes.Claim())
         {
+            refreshes.Scopes = httpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
             httpContext.Response.OnCompleted(static state =>
             {
                 var pending = (PropRefreshes)state;
@@ -794,8 +799,12 @@ internal sealed partial class PropsWriter
             var cancellationToken = _planner?.Token ?? _cancellationToken;
             var value = await (_planner is not null && _planner.TryTake(prop, out var started)
                 ? new ValueTask<object?>(started)
-                : cached ? _owner.LoadCachedPropAsync(prop, cancellationToken) : prop.ResolveAsync(cancellationToken));
+                : cached ? _owner.LoadCachedPropAsync(prop, _services, cancellationToken) : prop.ResolveAsync(_services, cancellationToken));
             return value is InertiaPageWriter.RescuedCachedProp rescued ? Rescue(rescued.Exception) : (true, value);
+        }
+        catch (MissingPropServiceException ex)
+        {
+            throw new InvalidOperationException($"The prop '{new string(Path)}' loads with {ex.ServiceType}, which is not registered.", ex);
         }
         catch (Exception ex) when (!cached && prop.ShouldRescue
             && !(ex is OperationCanceledException && (_cancellationToken.IsCancellationRequested || _planner is { Failed: true })))
@@ -1153,6 +1162,9 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
 {
     private readonly List<(InertiaProp Prop, string Path)> _props = [];
 
+    /// <summary>Creates the scope of a scoped loader (<c>Prop&lt;TService, T&gt;</c>), disposed when it finishes.</summary>
+    public IServiceScopeFactory? Scopes { get; set; }
+
     public void Add(InertiaProp prop, string path) => _props.Add((prop, path));
 
     /// <summary>Keeps the props whose refresh this response claims (a key read twice, or refreshing elsewhere, is dropped); false for none.</summary>
@@ -1184,7 +1196,17 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
                 }
 
                 var stamp = owner.Caching.InvalidationStamp;
-                var value = await prop.ResolveAsync(cancellationToken);
+                object? value;
+                if (prop.UsesServices)
+                {
+                    await using var scope = Scopes!.CreateAsyncScope();
+                    value = await prop.ResolveAsync(scope.ServiceProvider, cancellationToken);
+                }
+                else
+                {
+                    value = await prop.ResolveAsync(null, cancellationToken);
+                }
+
                 var entry = owner.CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, path, out _);
                 await owner.Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken, stamp);
             }

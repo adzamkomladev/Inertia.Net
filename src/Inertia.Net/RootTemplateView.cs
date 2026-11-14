@@ -130,6 +130,10 @@ internal sealed class RootTemplateView : IInertiaRootView
                     {
                         writer.Write(head.Head.Span);
                     }
+                    else if (http.Features.Get<InertiaFeature>()?.HeadHtml is { } tags)
+                    {
+                        writer.Write(System.Text.Encoding.UTF8.GetBytes(string.Join('\n', tags))); // the client keeps them up to date
+                    }
 
                     break;
                 case RootTemplate.Kind.Body:

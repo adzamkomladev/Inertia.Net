@@ -15,6 +15,10 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     private Dictionary<string, object?>? _viewData;
     private SsrMode? _ssrMode;
     private SsrCaching? _ssrCache; // one reference, set only by WithSsrCache()
+    private InertiaHead? _head;
+
+    /// <summary>Set by a modal route answering InertiaUI Modal's request: the page JSON moves its prop metadata under <c>meta</c>.</summary>
+    internal bool ModalMeta { get; set; }
 
     internal InertiaResult(string component, object? props)
     {
@@ -98,10 +102,22 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         return this;
     }
 
+    /// <summary>
+    /// Sets head tags for this page (see <see cref="InertiaHead"/>); they replace the request's shared tags
+    /// (<c>HttpContext.Inertia().Head</c>) with the same key: <c>.WithHead(h =&gt; h.Title(post.Title).Meta("description", post.Summary))</c>.
+    /// </summary>
+    public InertiaResult WithHead(Action<InertiaHead> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        configure(_head ??= new InertiaHead());
+        return this;
+    }
+
     /// <inheritdoc />
     public async Task ExecuteAsync(HttpContext httpContext)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
+        _head?.CopyTo(httpContext.Inertia().Head);
         var services = httpContext.RequestServices;
         var pageWriter = InertiaMountServices.PageWriter(httpContext)
             ?? throw new InvalidOperationException("Inertia.Net services are not registered. Call services.AddInertia() at startup.");
@@ -132,11 +148,12 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
 
         if (request.IsInertia)
         {
+            var json = ModalMeta ? InertiaModalResult.ModalPage(page.WrittenMemory.Span, pageWriter.JsonWriterOptions) : page.WrittenMemory;
             response.Headers[InertiaHeaders.Inertia] = "true";
             response.ContentType = "application/json; charset=utf-8";
-            response.ContentLength = page.WrittenMemory.Length;
-            await response.BodyWriter.WriteAsync(page.WrittenMemory, httpContext.RequestAborted);
-            metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: true, partial, pageWriter.Options.Mount);
+            response.ContentLength = json.Length;
+            await response.BodyWriter.WriteAsync(json, httpContext.RequestAborted);
+            metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, json.Length, json: true, partial, pageWriter.Options.Mount);
             return;
         }
 

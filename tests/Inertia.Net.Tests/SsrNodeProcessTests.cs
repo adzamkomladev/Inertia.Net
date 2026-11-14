@@ -36,7 +36,7 @@ public sealed class SsrNodeProcessTests
         }).listen(Number(process.env.INERTIA_SSR_PORT), process.env.FIXTURE_HOST ?? '127.0.0.1')
         """;
 
-    private static readonly bool NodeAvailable = CheckNode();
+    internal static readonly bool NodeAvailable = CheckNode();
 
     private static bool CheckNode()
     {

@@ -45,8 +45,11 @@ public abstract class InertiaProp
     /// <summary>Whether the prop has a <see cref="Task{TResult}"/> or <see cref="ValueTask{TResult}"/> loader.</summary>
     internal abstract bool HasAsyncLoader { get; }
 
-    /// <summary>Returns the constant value or runs the loader.</summary>
-    internal abstract ValueTask<object?> ResolveAsync(CancellationToken cancellationToken);
+    /// <summary>Whether the loader resolves a service (<c>Prop&lt;TService, T&gt;</c>), so a resolve outside the request needs a scope.</summary>
+    internal virtual bool UsesServices => false;
+
+    /// <summary>Returns the constant value or runs the loader; <paramref name="services"/> is the scope a scoped loader resolves from.</summary>
+    internal abstract ValueTask<object?> ResolveAsync(IServiceProvider? services, CancellationToken cancellationToken);
 
     /// <summary>Resolves the prop once: the client keeps it and skips it on later visits.</summary>
     /// <param name="key">Custom once key (defaults to the prop path).</param>
@@ -127,7 +130,8 @@ public abstract class InertiaProp
     /// Starts the loader before the props walk reaches it, concurrently with the other parallel props of the render (at most
     /// <see cref="InertiaPropsOptions.MaxConcurrency"/> at a time). Props are resolved one after another unless marked, because loaders
     /// commonly share request-scoped services that are not thread-safe: a parallel loader must not use the request's <c>DbContext</c>
-    /// (use <c>IDbContextFactory</c> or a scope of its own) or touch the <c>HttpContext</c>.
+    /// (use <c>IDbContextFactory</c> or a scope of its own) or touch the <c>HttpContext</c>. A <c>Prop&lt;TService, T&gt;</c> loader gets
+    /// a scope of its own here, so its service is not the request's instance.
     /// Top-level props and props in literal objects (<see cref="InertiaProps"/> and other string-keyed dictionaries) start early; elsewhere
     /// the prop resolves in turn. Loaders of props that are not part of the response are never started.
     /// </summary>
@@ -160,7 +164,7 @@ public abstract class InertiaProp
     /// Caches the value like <see cref="Cache(string, TimeSpan)"/>, and once <paramref name="duration"/> has passed keeps serving it for
     /// <paramref name="staleFor"/> more (stale-while-revalidate): a request that reads a stale value gets it at once, and the loader runs
     /// on a bounded background worker after that response has been sent, to store a fresh value. The loader must use singleton services
-    /// or create its own scope; request-scoped services and HttpContext cannot be used. One refresh runs per key
+    /// or create its own scope (a <c>Prop&lt;TService, T&gt;</c> loader gets one); the HttpContext cannot be used. One refresh runs per key
     /// and app instance at a time; a refresh that fails keeps the stale value. Past both times the loader runs during the request again.
     /// </summary>
     /// <param name="key">The cache key, unique to the value; keys live in their own space, apart from the app's cache keys.</param>
@@ -330,13 +334,33 @@ internal sealed class InertiaProp<T> : InertiaProp
         return new(default, loader);
     }
 
+    internal static InertiaProp<T> FromScopedLoader<TService>(Func<TService, CancellationToken, ValueTask<T>> loader)
+        where TService : notnull
+    {
+        ArgumentNullException.ThrowIfNull(loader);
+        return new(default, new Func<IServiceProvider?, CancellationToken, ValueTask<T>>((services, cancellationToken) =>
+            loader(services?.GetService(typeof(TService)) is TService service ? service : throw new MissingPropServiceException(typeof(TService)), cancellationToken)));
+    }
+
     internal override Type ValueType => typeof(T);
 
-    internal override bool HasAsyncLoader => _loader is Func<CancellationToken, ValueTask<T>>;
+    internal override bool HasAsyncLoader => _loader is Func<CancellationToken, ValueTask<T>> or Func<IServiceProvider?, CancellationToken, ValueTask<T>>;
 
-    internal override async ValueTask<object?> ResolveAsync(CancellationToken cancellationToken) =>
-        _loader is null ? _value : _loader is Func<T> syncLoader ? syncLoader()
-            : await ((Func<CancellationToken, ValueTask<T>>)_loader)(cancellationToken);
+    internal override bool UsesServices => _loader is Func<IServiceProvider?, CancellationToken, ValueTask<T>>;
+
+    internal override async ValueTask<object?> ResolveAsync(IServiceProvider? services, CancellationToken cancellationToken) => _loader switch
+    {
+        null => _value,
+        Func<T> syncLoader => syncLoader(),
+        Func<CancellationToken, ValueTask<T>> loader => await loader(cancellationToken),
+        _ => await ((Func<IServiceProvider?, CancellationToken, ValueTask<T>>)_loader)(services, cancellationToken),
+    };
+}
+
+/// <summary>A scoped loader's service is not registered; the props writer rethrows it naming the prop path.</summary>
+internal sealed class MissingPropServiceException(Type serviceType) : InvalidOperationException($"No service of type '{serviceType}' is registered.")
+{
+    public Type ServiceType { get; } = serviceType;
 }
 
 /// <summary>

@@ -10,6 +10,7 @@
   <ItemGroup>
     <!-- FastEndpoints 9 (net11.0) made Void a struct: the three Task<Void> signatures are declared per framework. -->
     <AdditionalFiles Include="PublicAPI\$(TargetFramework)\PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI\$(TargetFramework)\PublicAPI.Unshipped.txt" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Inertia.Net\Inertia.Net.csproj" />

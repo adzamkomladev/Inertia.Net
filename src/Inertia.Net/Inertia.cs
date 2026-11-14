@@ -36,6 +36,22 @@ public static class Inertia
     /// <inheritdoc cref="Prop{T}(Func{CancellationToken, ValueTask{T}})"/>
     public static InertiaProp Prop<T>(Func<T> loader) => InertiaProp<T>.FromLoader(loader);
 
+    /// <summary>
+    /// A prop whose loader takes a service: during a request it comes from the request's services (the endpoint's scoped instances);
+    /// a <see cref="InertiaProp.Parallel"/> loader and a stale-while-revalidate refresh after the response each get a scope of their own,
+    /// disposed when the loader finishes. Use it for shared props: <c>o.Share("unread", Prop&lt;Inbox, int&gt;((inbox, ct) =&gt; inbox.UnreadAsync(ct)))</c>.
+    /// </summary>
+    public static InertiaProp Prop<TService, T>(Func<TService, CancellationToken, Task<T>> loader)
+        where TService : notnull
+    {
+        ArgumentNullException.ThrowIfNull(loader);
+        return InertiaProp<T>.FromScopedLoader<TService>((service, cancellationToken) => new ValueTask<T>(loader(service, cancellationToken)));
+    }
+
+    /// <inheritdoc cref="Prop{TService, T}(Func{TService, CancellationToken, Task{T}})"/>
+    public static InertiaProp Prop<TService, T>(Func<TService, CancellationToken, ValueTask<T>> loader)
+        where TService : notnull => InertiaProp<T>.FromScopedLoader(loader);
+
     /// <summary>A prop that is never sent on the first load, only when a partial reload asks for it.</summary>
     [OverloadResolutionPriority(CtValueTask)]
     public static InertiaProp Optional<T>(Func<CancellationToken, ValueTask<T>> loader) => WithLoad(InertiaProp<T>.FromLoader(loader), PropLoad.Optional);
@@ -220,6 +236,19 @@ public static class Inertia
     /// <param name="component">The client-side page component name.</param>
     /// <param name="props">An <see cref="InertiaProps"/>/dictionary, or a typed page-props object.</param>
     public static InertiaResult Render(string component, object? props = null) => new(component, props);
+
+    /// <summary>Renders <paramref name="page"/> with the component it names (<see cref="IInertiaPage.Component"/>).</summary>
+    /// <param name="page">The typed page props.</param>
+    public static InertiaResult Render<TPage>(TPage page) where TPage : IInertiaPage => new(TPage.Component, page);
+
+    /// <summary>
+    /// A page opened in an InertiaUI Modal: the modal client gets the modal's page, a direct visit gets the base page with the modal
+    /// open. See <see cref="InertiaModalResult"/>.
+    /// </summary>
+    public static InertiaModalResult Modal(string component, object? props = null) => new(component, props);
+
+    /// <summary>Opens <paramref name="page"/> in an InertiaUI Modal with the component it names. See <see cref="InertiaModalResult"/>.</summary>
+    public static InertiaModalResult Modal<TPage>(TPage page) where TPage : IInertiaPage => new(TPage.Component, page);
 
     /// <summary>A full page visit to <paramref name="url"/>: 409 with <c>X-Inertia-Location</c> for Inertia requests, otherwise a 302.</summary>
     public static InertiaLocationResult Location(string url) => new(url);

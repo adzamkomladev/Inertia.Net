@@ -26,6 +26,17 @@ public sealed class MinimalApiHost : IConformanceHost
         });
 
         app.MapGet("/users", () => Render("Users"));
+        app.MapGet("/secret", () => Render("Secret")).RequireAuthorization();
+        app.MapMethods("/secret", Mutations, () => Back()).RequireAuthorization();
+        app.MapGet("/secret/admin", () => Render("Admin")).RequireAuthorization(p => p.RequireRole("admin"));
+        app.MapPost("/sign-in", async (HttpContext context) =>
+        {
+            await AuthRoutes.SignInAsync(context);
+            return Results.NoContent();
+        });
+        app.MapGet("/typed/{id:int}", (int id) => Render(new TypedHostPage(id))).WithName("typed.show");
+        app.MapPost("/typed", ([FromBody] TypedStoreInput input) => Results.Redirect($"/typed/{input.Id}")).WithName("typed.store");
+        app.MapGet("/modal/{id:int}", (int id, string? @base) => ModalRoute.Open(id, @base));
         app.MapMethods("/back-test", [HttpMethods.Post, HttpMethods.Put], () => Back());
 
         app.MapGet("/café", () => Render("Page"));

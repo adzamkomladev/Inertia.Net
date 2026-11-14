@@ -117,6 +117,9 @@ internal sealed class InertiaPageWriter
     /// <summary>The Development pages check, or null while it is off (no per-render lookup).</summary>
     public PageComponentCheck? Pages { get; }
 
+    /// <summary>Renders the base page of modal routes; set by <c>UseInertia()</c>.</summary>
+    public ModalDispatcher? Modals { get; set; }
+
     /// <summary>Writer options whose output is valid JSON and safe inside a <c>&lt;script&gt;</c> element.</summary>
     public JsonWriterOptions HtmlWriterOptions => _htmlWriterOptions;
 
@@ -147,7 +150,7 @@ internal sealed class InertiaPageWriter
 
             // A component runs the planning walk until a render shows it has no Parallel() props, and again once a render meets one.
             var plan = InertiaProp.ParallelUsed && hints?.UsesParallel != false;
-            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestAborted);
+            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestServices, httpContext.RequestAborted);
 
             writer.WriteStartObject();
             writer.WriteString("component", component);
@@ -156,7 +159,11 @@ internal sealed class InertiaPageWriter
             propsWriter.ScheduleRefreshes(httpContext);
             rootInfo?.OnSerialized?.Invoke(props!);
             feature = httpContext.Features.Get<InertiaFeature>();
-            if (Options.UrlResolver is { } resolveUrl)
+            if (feature?.PageUrl is { } pageUrl)
+            {
+                writer.WriteString("url", pageUrl);
+            }
+            else if (Options.UrlResolver is { } resolveUrl)
             {
                 writer.WriteString("url", resolveUrl(httpContext));
             }
@@ -493,6 +500,12 @@ internal sealed class InertiaPageWriter
             }
         }
 
+        if (feature?.HeadOrNull is { IsEmpty: false } head)
+        {
+            feature.HeadHtml = head.ToHtml(Options.Head.TitleTemplate);
+            Set(Options.Head.PropName, Inertia.Always(feature.HeadHtml), typeof(object), shared: true);
+        }
+
         switch (props)
         {
             case null:
@@ -726,7 +739,7 @@ internal sealed class InertiaPageWriter
     internal readonly record struct RescuedCachedProp(Exception Exception);
 
     // The claim lasts through storage, so a parallel loader publishes its value before another request can load the same key.
-    internal async ValueTask<object?> LoadCachedPropAsync(InertiaProp prop, CancellationToken cancellationToken)
+    internal async ValueTask<object?> LoadCachedPropAsync(InertiaProp prop, IServiceProvider? services, CancellationToken cancellationToken)
     {
         var caching = prop.Caching!;
         if (!Caching.TryBeginFill(caching.StoreKey, out var completion))
@@ -736,14 +749,14 @@ internal sealed class InertiaPageWriter
             if (await Caching.GetPropAsync(caching, cancellationToken) is { } stored) return stored;
 
             // The fill stored nothing (it failed, was rescued or cancelled): load at once rather than queue behind the other waiters.
-            return await LoadAndStoreAsync(prop, null, cancellationToken);
+            return await LoadAndStoreAsync(prop, services, null, cancellationToken);
         }
 
         try
         {
             // Another fill may have finished between the caller's lookup and this claim.
             if (await Caching.GetPropAsync(caching, cancellationToken) is { } hit) return hit;
-            return await LoadAndStoreAsync(prop, completion, cancellationToken);
+            return await LoadAndStoreAsync(prop, services, completion, cancellationToken);
         }
         finally
         {
@@ -751,7 +764,7 @@ internal sealed class InertiaPageWriter
         }
     }
 
-    private async ValueTask<object?> LoadAndStoreAsync(InertiaProp prop, TaskCompletionSource<byte[]?>? completion, CancellationToken cancellationToken)
+    private async ValueTask<object?> LoadAndStoreAsync(InertiaProp prop, IServiceProvider? services, TaskCompletionSource<byte[]?>? completion, CancellationToken cancellationToken)
     {
         var caching = prop.Caching!;
         cancellationToken.ThrowIfCancellationRequested();
@@ -759,7 +772,7 @@ internal sealed class InertiaPageWriter
         object? value;
         try
         {
-            value = await prop.ResolveAsync(cancellationToken);
+            value = await prop.ResolveAsync(services, cancellationToken);
         }
         catch (Exception ex) when (prop.ShouldRescue && !(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
         {

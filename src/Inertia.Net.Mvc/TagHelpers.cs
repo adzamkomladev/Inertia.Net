@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
@@ -31,7 +32,10 @@ public sealed class InertiaTagHelper : TagHelper
     }
 }
 
-/// <summary><c>&lt;inertia-head /&gt;</c>: the head tags from the SSR server; empty when SSR is off or failed.</summary>
+/// <summary>
+/// <c>&lt;inertia-head /&gt;</c>: the head tags from the SSR server; when SSR is off or failed, the server-managed head tags
+/// (<see cref="InertiaHead"/>), if any.
+/// </summary>
 [HtmlTargetElement("inertia-head")]
 public sealed class InertiaHeadTagHelper : TagHelper
 {
@@ -45,7 +49,9 @@ public sealed class InertiaHeadTagHelper : TagHelper
     {
         var ssr = await RazorInertiaRootView.GetSsrAsync(ViewContext.HttpContext);
         output.TagName = null;
-        output.Content.SetHtmlContent(new Utf8HtmlContent(ssr?.Head ?? ReadOnlyMemory<byte>.Empty));
+        output.Content.SetHtmlContent(ssr is { } render ? new Utf8HtmlContent(render.Head)
+            : ViewContext.HttpContext.Features.Get<InertiaFeature>()?.HeadHtml is { } tags ? new HtmlString(string.Join('\n', tags))
+            : new Utf8HtmlContent(ReadOnlyMemory<byte>.Empty));
     }
 }
 

@@ -635,3 +635,41 @@ static Inertia.Net.InertiaServiceCollectionExtensions.AddInertia(this Microsoft.
 static Inertia.Net.InertiaServiceCollectionExtensions.AddInertiaErrorPages(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<Inertia.Net.InertiaErrorPagesOptions!>? configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Inertia.Net.InertiaSsrHealthChecksBuilderExtensions.AddInertiaSsrForMount(this Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder! builder, string! mount, string? name = null, Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus? failureStatus = null, System.Collections.Generic.IEnumerable<string!>? tags = null, System.TimeSpan? timeout = null) -> Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder!
 Inertia.Net.InertiaOptions.Share<T>(string! key, System.Func<Microsoft.AspNetCore.Http.HttpContext!, T>! factory) -> Inertia.Net.InertiaOptions!
+Inertia.Net.IInertiaPage
+Inertia.Net.InertiaTypeScriptOptions.Page<TPage>() -> Inertia.Net.InertiaTypeScriptOptions!
+Inertia.Net.InertiaTypeScriptOptions.PagesFrom(System.Reflection.Assembly! assembly) -> Inertia.Net.InertiaTypeScriptOptions!
+Inertia.Net.IInertiaPage.Component.get -> string!
+static Inertia.Net.Inertia.Render<TPage>(TPage page) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaTypeScriptOptions.RoutesOutputPath.get -> string?
+Inertia.Net.InertiaTypeScriptOptions.RoutesOutputPath.set -> void
+Inertia.Net.InertiaCookieAuthenticationExtensions
+Inertia.Net.InertiaRateLimiting
+static Inertia.Net.InertiaCookieAuthenticationExtensions.UseInertiaRedirects(this Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions! options) -> Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions!
+static Inertia.Net.InertiaRateLimiting.OnRejected(string! flashKey = "error", string! message = "Too many attempts. Try again later.") -> System.Func<Microsoft.AspNetCore.RateLimiting.OnRejectedContext!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>!
+static Inertia.Net.Inertia.Prop<TService, T>(System.Func<TService, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! loader) -> Inertia.Net.InertiaProp!
+static Inertia.Net.Inertia.Prop<TService, T>(System.Func<TService, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! loader) -> Inertia.Net.InertiaProp!
+Inertia.Net.InertiaFeature.Head.get -> Inertia.Net.InertiaHead!
+Inertia.Net.InertiaHead
+Inertia.Net.InertiaHead.IsEmpty.get -> bool
+Inertia.Net.InertiaHead.Link(string! rel, string! href) -> Inertia.Net.InertiaHead!
+Inertia.Net.InertiaHead.Meta(string! name, string! content) -> Inertia.Net.InertiaHead!
+Inertia.Net.InertiaHead.Property(string! property, string! content) -> Inertia.Net.InertiaHead!
+Inertia.Net.InertiaHead.Remove(string! key) -> Inertia.Net.InertiaHead!
+Inertia.Net.InertiaHead.Title(string! title) -> Inertia.Net.InertiaHead!
+Inertia.Net.InertiaHeadOptions
+Inertia.Net.InertiaHeadOptions.InertiaHeadOptions() -> void
+Inertia.Net.InertiaHeadOptions.PropName.get -> string!
+Inertia.Net.InertiaHeadOptions.PropName.set -> void
+Inertia.Net.InertiaHeadOptions.TitleTemplate.get -> string?
+Inertia.Net.InertiaHeadOptions.TitleTemplate.set -> void
+Inertia.Net.InertiaOptions.Head.get -> Inertia.Net.InertiaHeadOptions!
+Inertia.Net.InertiaResult.WithHead(System.Action<Inertia.Net.InertiaHead!>! configure) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaTypeScriptOptions.LiveEvents(params Inertia.Net.LiveEvent![]! events) -> Inertia.Net.InertiaTypeScriptOptions!
+Inertia.Net.InertiaModalResult
+Inertia.Net.InertiaModalResult.BaseUrl.get -> string?
+Inertia.Net.InertiaModalResult.Component.get -> string!
+Inertia.Net.InertiaModalResult.ExecuteAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext) -> System.Threading.Tasks.Task!
+Inertia.Net.InertiaModalResult.Props.get -> object?
+Inertia.Net.InertiaModalResult.WithBaseUrl(string! baseUrl) -> Inertia.Net.InertiaModalResult!
+static Inertia.Net.Inertia.Modal(string! component, object? props = null) -> Inertia.Net.InertiaModalResult!
+static Inertia.Net.Inertia.Modal<TPage>(TPage page) -> Inertia.Net.InertiaModalResult!

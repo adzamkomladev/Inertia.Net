@@ -71,3 +71,20 @@ internal sealed class InertiaPreProcessor(Config config) : IGlobalPreProcessor
             : InertiaValidationFilter.Back(httpContext, errors));
     }
 }
+
+/// <summary>Tells <c>routes.ts</c> generation which names FastEndpoints generated (it names every endpoint after its class).</summary>
+internal sealed class FastEndpointsRouteSource : IRouteBodySource
+{
+    // Runs when the app first touches this package (Send.InertiaAsync, ConfigureInertia), which has no service registration to hook.
+#pragma warning disable CA2255
+    [ModuleInitializer]
+#pragma warning restore CA2255
+    internal static void Register() => RoutesGenerator.Registered.TryAdd(typeof(FastEndpointsRouteSource), new FastEndpointsRouteSource());
+
+    public Type? BodyType(Microsoft.AspNetCore.Http.Endpoint endpoint) => null;
+
+    // The generated name is the class's full name without dots, prefixed with the verb when the endpoint has several.
+    public bool IsGeneratedName(Microsoft.AspNetCore.Http.Endpoint endpoint, string name) =>
+        endpoint.Metadata.GetMetadata<EndpointDefinition>()?.EndpointType.FullName is { } type
+        && name.Contains(type.Replace(".", "", StringComparison.Ordinal), StringComparison.Ordinal);
+}

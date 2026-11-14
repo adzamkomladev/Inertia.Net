@@ -11,11 +11,18 @@ internal sealed class InertiaOptionsValidator : IValidateOptions<InertiaOptions>
         Check(options.Pagination.DefaultPerPage >= 1 && options.Pagination.DefaultPerPage <= options.Pagination.MaxPerPage, "Pagination requires 1 <= DefaultPerPage <= MaxPerPage.");
         Check(options.Pagination.MaxPerPage < int.MaxValue, "Pagination.MaxPerPage must be less than Int32.MaxValue to allow over-fetching.");
         Check(options.Props.MaxConcurrency > 0, "Props.MaxConcurrency must be positive.");
+        Check(!string.IsNullOrEmpty(options.Head.PropName), "Head.PropName must not be empty.");
+        Check(options.Head.TitleTemplate is null || options.Head.TitleTemplate.Contains("{0}", StringComparison.Ordinal), "Head.TitleTemplate must contain {0}.");
         Check(options.Vite.PrefetchConcurrency > 0, "Vite.PrefetchConcurrency must be positive.");
         Check(options.Pages.Extensions.All(e => e is ['.', _, ..]), "Pages.Extensions entries must start with '.', e.g. \".tsx\".");
         Check(!string.IsNullOrWhiteSpace(options.State.PreviousUrlCookieName), "State.PreviousUrlCookieName must not be empty.");
         Check(!string.Equals(options.State.PreviousUrlCookieName, options.State.CookieName, StringComparison.Ordinal),
             "State.PreviousUrlCookieName must differ from State.CookieName.");
+        foreach (var duplicate in options.TypeScript.Pages.GroupBy(p => p.Component, StringComparer.Ordinal).Where(g => g.Count() > 1))
+        {
+            Check(false, $"TypeScript page '{duplicate.Key}' is registered with more than one type: {string.Join(", ", duplicate.Select(p => p.Props.FullName))}.");
+        }
+
         var ssr = options.Ssr;
         Check(IsDeadline(ssr.Timeout, allowZero: false), "Ssr.Timeout must be positive and supported by CancellationTokenSource, or Timeout.InfiniteTimeSpan.");
         Check(ssr.ConnectTimeout == Timeout.InfiniteTimeSpan || (ssr.ConnectTimeout > TimeSpan.Zero && ssr.ConnectTimeout.TotalMilliseconds <= int.MaxValue),

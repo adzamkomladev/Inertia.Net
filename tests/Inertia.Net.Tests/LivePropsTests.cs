@@ -166,6 +166,24 @@ public class LivePropsTests
     }
 
     [Fact]
+    public async Task A_process_that_only_publishes_needs_no_AddInertia()
+    {
+        var broadcaster = new RecordingBroadcaster();
+        var services = new ServiceCollection();
+        services.AddOptions();
+        services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, LiveTestJsonContext.Default));
+        services.AddInertiaLive();
+        services.AddSingleton<IInertiaLiveBroadcaster>(broadcaster);
+        var live = services.BuildServiceProvider().GetRequiredService<IInertiaLive>();
+
+        await live.PublishAsync(OrderUpdated, cancellationToken: Ct);
+        await live.PublishAsync(OrderUpdated, new OrderProps(new User("Ann")), cancellationToken: Ct);
+
+        Assert.Equal(2, broadcaster.Messages.Count);
+        Assert.Equal("""{"__inertia":{"event":"OrderUpdated","props":{"order":{"name":"Ann","email":null}}}}""", broadcaster.Messages[1].Payload.GetRawText());
+    }
+
+    [Fact]
     public void AddInertiaLive_is_idempotent()
     {
         var services = new ServiceCollection();

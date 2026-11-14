@@ -210,6 +210,22 @@ public sealed class MvcRazorTests
         Assert.Contains("""<script data-page="app" type="application/json">""", html, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task The_head_tag_helper_writes_server_head_tags_unless_ssr_rendered_the_head(bool ssrRendered)
+    {
+        await using var app = await StartAsync();
+        var ssr = app.App.Services.GetRequiredService<FakeSsr>();
+        ssr.Result = ssrRendered ? new SsrRender("<title>SSR title</title>", "<div id=\"app\">ssr body</div>") : null;
+
+        var html = await HtmlAsync(app.CreateClient(), "/mvc/razor-head");
+
+        const string tag = "<meta name=\"description\" content=\"a &amp; b\" data-inertia=\"description\">";
+        Assert.Equal(ssrRendered ? 0 : 1, html.Split(tag).Length - 1);
+        Assert.Equal(ssrRendered, html.Contains("<title>SSR title</title>", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Required_ssr_failure_in_the_razor_root_view_throws_before_any_html_is_sent()
     {

@@ -76,6 +76,11 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<SsrNodeProcess>();
         services.AddHostedService(sp => sp.GetRequiredService<SsrNodeProcess>()); // no-op unless o.Ssr.UseNodeProcess()
         services.AddHostedService<InertiaTypeScriptWriter>(); // no-op unless o.TypeScript.OutputPath is set, in Development
+        if (InertiaTypeScriptWriter.IsGenerateOnly)
+        {
+            // Registered after the web host's server, so it wins: the app builds its endpoints but never listens.
+            services.AddSingleton<Microsoft.AspNetCore.Hosting.Server.IServer, GenerateOnlyServer>();
+        }
         services.TryAddSingleton<VersionProvider>();
         services.AddDataProtection();
         services.TryAddSingleton<IInertiaStateStore>(sp => sp.GetRequiredService<IOptions<InertiaOptions>>().Value.State.UsesSession
