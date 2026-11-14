@@ -12,7 +12,8 @@ namespace Inertia.Net.Benchmarks;
 /// <summary>
 /// <c>--feature-probe</c>: the per-request cost of the 1.6-1.9 features. The 20-prop page with five head tags (HTML and JSON), five
 /// lazy props with and without <c>.Live(evt)</c>, resolving a typed live-channel authorizer as the hub does per invocation (in a new
-/// scope, and the options' factory alone), the hub's origin check for an origin third in <c>AllowedOrigins</c>, and a GET
+/// scope, and the options' factory alone), the hub's origin check for an origin third in <c>AllowedOrigins</c>, what the MVC Razor root view adds around
+/// the view, and a GET
 /// through <c>UseInertiaAntiforgery()</c> that is not a page load. <c>--feature-probe check</c> prints the bodies instead, to compare
 /// output before and after a change; <c>--feature-probe {text}</c> runs only the rows whose name contains the text.
 /// </summary>
@@ -61,6 +62,9 @@ internal static class FeatureProbe
         var crossOrigin = BenchApp.CreateContext(hubServices, "/live/negotiate");
         crossOrigin.Request.Headers.Origin = "https://app.example.com";
 
+        var razor = new Mvc.RazorInertiaRootView(new NoViewExecutor());
+        var razorContext = new InertiaRootViewContext(new DefaultHttpContext(), "Users/Index", "App", InertiaRootViewContext.EmptyViewData, "{}"u8.ToArray(), "app");
+
         var antiforgeryServices = BenchApp.CreateServices(configureServices: s => s.AddAntiforgery(o => o.HeaderName = "X-XSRF-TOKEN"));
         var app = new ApplicationBuilder(antiforgeryServices);
         app.UseInertiaAntiforgery();
@@ -93,6 +97,7 @@ internal static class FeatureProbe
                 if (!origin.IsAllowed(crossOrigin.Request, allowedOrigins)) throw new InvalidOperationException("The origin is allowed.");
                 return Task.CompletedTask;
             });
+            await MeasureAsync(repetition, "razor root view", 1000000, null, _ => razor.RenderAsync(razorContext).AsTask());
             await MeasureAsync(repetition, "antiforgery GET", 200000, api, c => pipeline(c));
         }
     }
@@ -137,6 +142,12 @@ internal static class FeatureProbe
         context.Features.Set<InertiaFeature>(null);
         context.Response.Headers.Clear();
         return run(context);
+    }
+
+    // The view itself is not rendered: the row is what the root view adds around Razor.
+    private sealed class NoViewExecutor : Microsoft.AspNetCore.Mvc.Infrastructure.IActionResultExecutor<Microsoft.AspNetCore.Mvc.ViewResult>
+    {
+        public Task ExecuteAsync(Microsoft.AspNetCore.Mvc.ActionContext context, Microsoft.AspNetCore.Mvc.ViewResult result) => Task.CompletedTask;
     }
 
     private sealed class BenchAuthorizer(IServiceProvider services) : ILiveChannelAuthorizer
