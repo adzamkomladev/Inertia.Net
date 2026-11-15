@@ -1,0 +1,6 @@
+src/shared/
+node_modules/
+.output/
+.tanstack/
+dist/
+src/routeTree.gen.ts
