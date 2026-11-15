@@ -147,10 +147,13 @@ namespace Inertia.Net.HostingProbe
     internal static class SsrOutcomes
     {
         // Counts every inertia.ssr.outcomes measurement, so the bench can tell a server-rendered response from a fallback.
+        // Held for the life of the process: disposing it would stop the counts.
+        private static MeterListener? s_listener;
+
         public static ConcurrentDictionary<string, long> Listen()
         {
             var counts = new ConcurrentDictionary<string, long>();
-            var listener = new MeterListener
+            var listener = s_listener = new MeterListener
             {
                 InstrumentPublished = (instrument, l) =>
                 {
@@ -168,7 +171,7 @@ namespace Inertia.Net.HostingProbe
 
                 counts.AddOrUpdate($"{outcome}/{reason}", value, (_, total) => total + value);
             });
-            listener.Start(); // the listener stays registered (and alive) until the process exits
+            listener.Start();
             return counts;
         }
     }

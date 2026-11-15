@@ -366,8 +366,9 @@ internal static class Bench
                 {
                     var html = Encoding.UTF8.GetString(connection.LastBody!);
                     if (!html.Contains("data-server-rendered", StringComparison.Ordinal)) throw new InvalidOperationException($"{path} was not server-rendered.");
-                    ElementCounts[path] = CountElements(html);
-                    Console.WriteLine(FormattableString.Invariant($"{path}: {ElementCounts[path]:N0} server-rendered elements in <body>"));
+                    var count = CountElements(html);
+                    ElementCounts[path] = count;
+                    Console.WriteLine(FormattableString.Invariant($"{path}: {count:N0} server-rendered elements in <body>"));
                 }
             }
         }
@@ -506,9 +507,11 @@ internal static class Bench
     private static List<int> Descendants(int root)
     {
         var parents = new Dictionary<int, List<int>>();
-        foreach (var dir in Directory.EnumerateDirectories("/proc"))
+        var processes = Directory.EnumerateDirectories("/proc")
+            .Select(dir => (Dir: dir, Pid: int.TryParse(Path.GetFileName(dir), CultureInfo.InvariantCulture, out var pid) ? pid : -1))
+            .Where(p => p.Pid >= 0);
+        foreach (var (dir, pid) in processes)
         {
-            if (!int.TryParse(Path.GetFileName(dir), CultureInfo.InvariantCulture, out var pid)) continue;
             try
             {
                 var stat = File.ReadAllText($"{dir}/stat");
