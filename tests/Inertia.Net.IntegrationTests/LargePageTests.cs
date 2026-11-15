@@ -13,6 +13,7 @@ public sealed class LargePageTests
     [Theory]
     [InlineData(32 * 1024 - 200)]
     [InlineData(200 * 1024 + 7)]
+    [InlineData(1536 * 1024 + 3)] // past the pooled size: the page buffer is allocated, not rented
     public async Task A_large_json_page_arrives_whole(int length)
     {
         var text = string.Create(length, 0, static (span, _) =>

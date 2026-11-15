@@ -614,7 +614,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     /// </summary>
     internal static SsrRender? ParseRender(ReadOnlySpan<byte> json)
     {
-        var output = ArrayPool<byte>.Shared.Rent(Math.Max(json.Length, 1));
+        var output = PooledBufferWriter.Rent(Math.Max(json.Length, 1));
         try
         {
             var reader = new Utf8JsonReader(json);
@@ -663,7 +663,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         {
             if (output is not null)
             {
-                ArrayPool<byte>.Shared.Return(output);
+                PooledBufferWriter.Return(output);
             }
         }
     }

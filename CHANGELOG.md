@@ -38,6 +38,9 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
   - One cached lookup per value type instead of two, and plain values are written without going through the async prop walk.
 - Inertia (JSON) responses larger than 32 KB are written to the client in 32 KB pieces instead of in one call, so a large page no
   longer has a second full copy in the server's response buffers while it is being sent.
+- Page and SSR buffers larger than 1 MB are no longer kept in the shared array pool after the request. Before, one very large page
+  kept that much memory reserved for the life of the process; now the memory is freed once the page is sent. Pages under 1 MB
+  are unchanged.
 - Cursor pagination with a key selector that is not a plain member chain (`x => x.CreatedAt.Date`) interprets the selector instead
   of compiling it on every request.
 - The performance page attributes the memory difference at rest to ASP.NET Core Data Protection, which `AddInertia` registers;

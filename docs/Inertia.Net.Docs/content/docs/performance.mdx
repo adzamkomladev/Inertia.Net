@@ -115,7 +115,7 @@ Inertia.Net uses the generated code only when the output would be exactly the sa
 
 ## Payload size
 
-Inertia.Net builds the whole page in memory before sending the first byte. A loader failure therefore never leaves a half-written `200` response. Each active request keeps its whole page in memory while sending it. The server sends Inertia (JSON) responses in 32 KB pieces, so its send buffers do not hold a second full copy of a large page.
+Inertia.Net builds the whole page in memory before sending the first byte. A loader failure therefore never leaves a half-written `200` response. Each active request keeps its whole page in memory while sending it. The server sends Inertia (JSON) responses in 32 KB pieces, so its send buffers do not hold a second full copy of a large page. Buffers for pages under 1 MB are reused between requests. Larger ones are freed after the response, so one unusually large page does not keep that memory reserved for the life of the app.
 
 Keep pages well under a megabyte:
 
