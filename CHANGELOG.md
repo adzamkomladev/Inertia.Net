@@ -30,6 +30,14 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
   are still logged and counted. An app that wants them back calls
   `services.AddHttpClient(InertiaSsr.HttpClientName).AddDefaultLogger()` after `AddInertia`.
 - Lines the managed SSR process writes to stdout and stderr are logged truncated to 2 KB, as SSR errors already are.
+- Faster page rendering, with byte-identical output:
+  - Values that cannot hold props (strings, numbers, records, lists of records) are serialized through the app's source-generated
+    `JsonSerializerContext` when it is first in `TypeInfoResolverChain` and its settings match the app's JSON options, as in
+    `dotnet new inertia`. System.Text.Json then runs the generated code instead of its general-purpose converters. Apps without a
+    context, or whose context's settings differ, are unchanged.
+  - One cached lookup per value type instead of two, and plain values are written without going through the async prop walk.
+- Inertia (JSON) responses larger than 32 KB are written to the client in 32 KB pieces instead of in one call, so a large page no
+  longer has a second full copy in the server's response buffers while it is being sent.
 - Cursor pagination with a key selector that is not a plain member chain (`x => x.CreatedAt.Date`) interprets the selector instead
   of compiling it on every request.
 - The performance page attributes the memory difference at rest to ASP.NET Core Data Protection, which `AddInertia` registers;

@@ -65,10 +65,11 @@ sealed class DashboardRootView : IInertiaRootView
 {
     public async ValueTask RenderAsync(InertiaRootViewContext context)
     {
-        var html = context.HttpContext.Response;
-        await html.WriteAsync("<!doctype html><html><head><script type=\"module\" src=\"/dashboard/app.js\"></script></head><body>");
-        await html.WriteAsync(context.GetBodyHtml()); // the page script and root element
-        await html.WriteAsync("</body></html>");
+        var writer = context.HttpContext.Response.BodyWriter;
+        writer.Write("<!doctype html><html><head><script type=\"module\" src=\"/dashboard/app.js\"></script></head><body>"u8);
+        context.WriteBody(writer); // the page script and root element, written straight to the response
+        writer.Write("</body></html>"u8);
+        await writer.FlushAsync(context.HttpContext.RequestAborted);
     }
 }
 ```

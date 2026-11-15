@@ -35,7 +35,7 @@ All runs were on a GitHub-hosted `ubuntu-24.04` runner (AMD EPYC 9V74, 4 vCPUs) 
 
 What this means for an app:
 
-- **Memory.** On JIT, the Inertia rows use about 13 MB more at rest and 14–19 MB more at peak under load. On Native AOT they use about 4 MB more at rest and 6–13 MB more at peak. Almost all of the difference at rest is ASP.NET Core Data Protection, which `AddInertia` registers for its state cookie: a plain app that only adds `AddDataProtection()` measured 12 MB more on JIT and 5 MB more on Native AOT. Inertia.Net itself is about 1 MB at rest. An app with cookie sign-in, antiforgery or sessions already loads Data Protection.
+- **Memory.** Compared with the plain apps, the Inertia rows use about 13 MB more at rest and 14–19 MB more at peak under load on JIT. On Native AOT they use about 4 MB more at rest and 6–13 MB more at peak. Almost all of the difference at rest comes from ASP.NET Core Data Protection. `AddInertia` registers it for its state cookie. Adding only `AddDataProtection()` to a plain app increased memory use by 12 MB on JIT and 5 MB on Native AOT. Inertia.Net itself uses about 1 MB at rest. An app with cookie sign-in, antiforgery or sessions already loads Data Protection.
 - **CPU.** An Inertia response costs 5–8 µs more server CPU than a hand-written JSON or HTML endpoint on JIT, and 9–14 µs more on Native AOT. On these do-nothing handlers that is 12–31% fewer requests per second. A handler that spends 1 ms on a database query loses under 1.5%.
 - **A real handler.** The todo rows read the signed-in user's 25 todos from SQLite on every request. The database work, not Inertia, sets their cost: 206–446 µs of CPU per request, against Inertia's 34–44 µs in total. On JIT the EF Core build serves 4,411 requests per second; the Native AOT build, which uses `Microsoft.Data.Sqlite` directly, serves 9,387.
 - **Latency.** Under 64 concurrent connections, p99 stays below 3 ms in every build without a database.
@@ -78,7 +78,8 @@ A few things to plan for:
 
 For containers:
 
-- Set a memory limit rather than relying on the host.
+- Set a memory limit for the container instead of relying on the host. .NET uses this limit to size its heap.
+- Keep the default server GC with dynamic adaptation (DATAS). DATAS has been on by default since .NET 9. In the hosting probe, turning it off (`DOTNET_GCDynamicAdaptationMode=0`) raised peak memory from 84 MB to 126 MB on JIT and from 47 MB to 122 MB on Native AOT.
 - Leave headroom for the GC, the OS page cache and request bursts.
 - Expect SSR to add a second process. If the Bun renderer is optional, `SsrMode.Preferred` lets the app fall back to client rendering when it is unavailable.
 - Profile with real page sizes. A dashboard with deferred props and a paginated feed behaves very differently from a page that serializes every row.
@@ -91,9 +92,30 @@ dotnet run -c Release --project tests/Inertia.Net.Benchmarks -- --filter '*'
 
 Targeted probes: `--render-probe`, `--ssr-probe`, `--mvc-probe`, `--payload-probe` and `--cache-probe`.
 
+## Make rendering faster: register your JSON context first
+
+Inertia.Net uses System.Text.Json to write props as JSON. If your app has a source-generated `JsonSerializerContext`, register it first in `TypeInfoResolverChain`. Inertia.Net then uses the generated code for plain values (records, lists of records, strings, numbers) instead of System.Text.Json's general-purpose path. In the hosting probe, this reduced CPU work per Inertia request by about 16% on JIT and 20% on Native AOT.
+
+`dotnet new inertia` already does this. In your own app:
+
+```csharp
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
+
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)] // the same settings as ASP.NET Core's JSON options
+[JsonSerializable(typeof(TodoDto[]))]
+internal sealed partial class AppJsonContext : JsonSerializerContext;
+```
+
+Inertia.Net uses the generated code only when the output would be exactly the same. It checks this for you and falls back to System.Text.Json's general-purpose path when:
+
+- the context is not first in `TypeInfoResolverChain`
+- its settings differ from your app's JSON options (for example, omitting `JsonSerializerDefaults.Web` gives PascalCase instead of camelCase names)
+- your JSON options have custom converters, or `PreserveBigIntegers` is on
+- a type has a property name with characters other than letters, digits, `_`, `-`, `.` and `$`
+
 ## Payload size
 
-The page JSON is fully buffered before the first byte is sent, so a failing loader never produces a half-written `200`. Each concurrent request therefore holds its whole page in memory (pooled, and sized from the component's recent pages).
+Inertia.Net builds the whole page in memory before sending the first byte. A loader failure therefore never leaves a half-written `200` response. Each active request keeps its whole page in memory while sending it. The server sends Inertia (JSON) responses in 32 KB pieces, so its send buffers do not hold a second full copy of a large page.
 
 Keep pages well under a megabyte:
 
@@ -110,7 +132,7 @@ Keep pages well under a megabyte:
 - **Pooled buffers.** The page is written to a pooled `IBufferWriter<byte>`, and the path tracker is a pooled `char[]`. A path becomes a string only when metadata needs it.
 - **Version check before the handler.** A stale client costs one header comparison and a `409`.
 - **No per-request mutable singletons.** Per-request state lives in an `InertiaFeature` on `HttpContext.Features`, so concurrent requests cannot leak history or flash settings into one another.
-- **Plain DTOs take the fast path.** A POCO, list or typed dictionary is walked only when its type can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements; cached per type). Everything else is one `Serialize` call.
+- **Plain DTOs take the fast path.** Inertia.Net checks whether a POCO, list or typed dictionary can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements). It caches this result per type and checks the contents for props only for those types. Everything else uses one `Serialize` call, through your [generated JSON context](#make-rendering-faster-register-your-json-context-first) when it writes the same output.
 - **UTF-8 throughout.** SSR output and the MVC tag helpers write UTF-8 bytes; nothing large is materialized as a .NET string.
 - **Cached assets.** The Vite manifest is parsed once, the root template is parsed once into pre-encoded UTF-8 segments, and the production tags are pre-rendered per entry set and path base. The version is a precomputed string compared ordinally. A missing manifest, template or SSR bundle is re-checked at most once per second.
 - **Sync loaders stay sync.** `Func<T>` loaders are not wrapped in closures.
