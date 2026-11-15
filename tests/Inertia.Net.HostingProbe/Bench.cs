@@ -201,6 +201,54 @@ internal static class Bench
         Console.WriteLine(report);
     }
 
+    /// <summary>
+    /// <c>load &lt;url&gt;</c>: drives one URL of any HTTP/1.1 server (benchmarks/frameworks/run.sh uses it for every framework) and prints
+    /// one JSON line. Options: --connections, --rate (0: closed loop), --warmup, --seconds, --header "Name: value" (repeatable),
+    /// --expect &lt;text&gt; (a 200 without it counts as an error) and --cgroup &lt;dir&gt; (the server container's cgroup v2 directory:
+    /// CPU time per request from cpu.stat and peak memory.current sampled every 100 ms while measuring).
+    /// </summary>
+    public static async Task LoadUrlAsync(string[] options)
+    {
+        var uri = new Uri(options[0]);
+        string? Value(string name) => options.SkipWhile(o => o != name).Skip(1).FirstOrDefault();
+        var headers = string.Concat(options.Select((o, i) => o == "--header" && i + 1 < options.Length ? options[i + 1] + "\r\n" : ""));
+        var request = Encoding.ASCII.GetBytes($"GET {uri.PathAndQuery} HTTP/1.1\r\nHost: {uri.Authority}\r\n{headers}\r\n");
+        var expect = Value("--expect") is { } text ? Encoding.UTF8.GetBytes(text) : null;
+        var cgroup = Value("--cgroup");
+        long cpuStart = 0, cpuEnd = 0, peak = 0;
+        using var sampling = new CancellationTokenSource();
+        var sampler = Task.CompletedTask;
+        var load = await LoadAsync(new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port), request, Option(options, "--connections", 16), Option(options, "--rate", 0),
+            Option(options, "--warmup", 3), Option(options, "--seconds", 10),
+            () =>
+            {
+                if (cgroup is null) return;
+                cpuStart = CgroupCpuMicros(cgroup);
+                sampler = Task.Run(async () =>
+                {
+                    while (!sampling.IsCancellationRequested)
+                    {
+                        peak = Math.Max(peak, long.Parse(File.ReadAllText(Path.Combine(cgroup, "memory.current")), CultureInfo.InvariantCulture));
+                        await Task.Delay(100);
+                    }
+                });
+            },
+            () =>
+            {
+                if (cgroup is null) return;
+                cpuEnd = CgroupCpuMicros(cgroup);
+                sampling.Cancel();
+            },
+            expect);
+        await sampler;
+        var requests = load.Rps * load.Seconds;
+        Console.WriteLine(JsonSerializer.Serialize(new LoadReport(Math.Round(load.Rps, 1), Math.Round(load.P50Ms, 3), Math.Round(load.P95Ms, 3), Math.Round(load.P99Ms, 3),
+            Math.Round(load.P999Ms, 3), load.Errors, requests > 0 ? Math.Round((cpuEnd - cpuStart) / requests, 1) : 0, Math.Round(peak / 1048576.0, 1)), ProbeJsonContext.Default.LoadReport));
+    }
+
+    private static long CgroupCpuMicros(string cgroup) =>
+        long.Parse(File.ReadLines(Path.Combine(cgroup, "cpu.stat")).First(l => l.StartsWith("usage_usec ", StringComparison.Ordinal))[11..], CultureInfo.InvariantCulture);
+
     private static async Task<Result> RunOnceAsync(Build build, Scenario scenario, string program, string cpus, int warmup, int seconds, int connections, int[] rates)
     {
         var port = FreePort();
@@ -401,7 +449,7 @@ internal static class Bench
     /// arrives (saturation). Otherwise the connections together send <paramref name="rate"/> requests per second on a schedule, and a request
     /// sent late because the previous response had not arrived counts its latency from when it was due.
     /// </summary>
-    private static async Task<Load> LoadAsync(IPEndPoint endpoint, byte[] request, int connections, int rate, int warmup, int seconds, Action? measureStart, Action? measureEnd)
+    private static async Task<Load> LoadAsync(IPEndPoint endpoint, byte[] request, int connections, int rate, int warmup, int seconds, Action? measureStart, Action? measureEnd, byte[]? expect = null)
     {
         var measuring = false;
         var stop = false;
@@ -413,38 +461,48 @@ internal static class Bench
         var workers = Enumerable.Range(0, connections).Select(c => Task.Run(async () =>
         {
             var histogram = histograms[c] = new long[Buckets];
-            await using var connection = await Connection.OpenAsync(endpoint);
-            var due = origin + interval * c / connections; // spread the connections' schedules across one interval
-            while (!Volatile.Read(ref stop))
+            try
             {
-                long begin;
-                if (interval > 0)
+                await using var connection = await Connection.OpenAsync(endpoint);
+                connection.CaptureBody = expect is not null;
+                var due = origin + interval * c / connections; // spread the connections' schedules across one interval
+                while (!Volatile.Read(ref stop))
                 {
-                    var now = Stopwatch.GetTimestamp();
-                    if (due > now)
+                    long begin;
+                    if (interval > 0)
                     {
-                        await Task.Delay(Stopwatch.GetElapsedTime(now, due));
-                        // On time: the response before this one came back before it was due, so any lateness here is timer slack, not the server.
-                        begin = Stopwatch.GetTimestamp();
+                        var now = Stopwatch.GetTimestamp();
+                        if (due > now)
+                        {
+                            await Task.Delay(Stopwatch.GetElapsedTime(now, due));
+                            // On time: the response before this one came back before it was due, so any lateness here is timer slack, not the server.
+                            begin = Stopwatch.GetTimestamp();
+                        }
+                        else
+                        {
+                            begin = due;
+                        }
+
+                        due += interval;
                     }
                     else
                     {
-                        begin = due;
+                        begin = Stopwatch.GetTimestamp();
                     }
 
-                    due += interval;
+                    var record = Volatile.Read(ref measuring);
+                    var status = await connection.SendAsync(request);
+                    if (!record || Volatile.Read(ref stop)) continue;
+                    // With expect: a 200 whose body lacks the marker (e.g. a page that was not server-rendered) counts as an error too.
+                    if (status != 200 || (expect is not null && connection.LastBody.AsSpan().IndexOf(expect) < 0)) { errors[c]++; continue; }
+                    histogram[Math.Min(Bucket(Stopwatch.GetElapsedTime(begin).TotalMicroseconds), Buckets - 1)]++;
+                    counts[c]++;
                 }
-                else
-                {
-                    begin = Stopwatch.GetTimestamp();
-                }
-
-                var record = Volatile.Read(ref measuring);
-                var status = await connection.SendAsync(request);
-                if (!record || Volatile.Read(ref stop)) continue;
-                if (status != 200) { errors[c]++; continue; }
-                histogram[Math.Min(Bucket(Stopwatch.GetElapsedTime(begin).TotalMicroseconds), Buckets - 1)]++;
-                counts[c]++;
+            }
+            catch (Exception e) when (e is IOException or SocketException)
+            {
+                // A refused or dropped connection is an error, not a crash: the connection stops and the run reports it.
+                errors[c]++;
             }
         })).ToArray();
 

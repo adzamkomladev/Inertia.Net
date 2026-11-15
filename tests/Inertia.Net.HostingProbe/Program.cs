@@ -1,6 +1,7 @@
 // Hosting cost of Inertia.Net next to a plain Minimal API that serves the same data: process RSS, requests per second and latency.
 // `serve` runs one server (PROBE_MODE=plain, inertia, or todo: a small todo app with cookie sign-in and SQLite); `bench` drives published JIT and Native AOT builds of it from a separate
 // process over raw keep-alive sockets. eng/hosting-probe.sh publishes both builds and pins server and client to separate CPUs.
+// `load <url>` drives one URL of any server and prints a JSON line (benchmarks/frameworks/run.sh).
 // PROBE_MODE=ssr serves the React pages in ClientApp: PROBE_SSR=off|node|bun picks client rendering or a managed SSR process,
 // PROBE_SSR_CACHE=1 caches the anonymous home page's render, and /__metrics reports GC counters and SSR outcomes.
 using System.Collections.Concurrent;
@@ -15,6 +16,12 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 if (args is ["bench", var jitDll, var aotBinary, var output, .. var rest])
 {
     await Bench.RunAsync(jitDll, aotBinary, output, rest);
+    return;
+}
+
+if (args is ["load", .. var loadOptions])
+{
+    await Bench.LoadUrlAsync(loadOptions);
     return;
 }
 
@@ -135,6 +142,9 @@ namespace Inertia.Net.HostingProbe
 
     public sealed record TodoRow(int Id, string Title, string Note, bool Done, string[] Tags, string Assignee, DateTime DueAt, int Priority, int Progress);
 
+    /// <summary>One <c>load</c> run: latency in ms, server CPU µs per request and peak memory in MB (0 without --cgroup).</summary>
+    public sealed record LoadReport(double Rps, double P50Ms, double P95Ms, double P99Ms, double P999Ms, long Errors, double CpuMicrosPerRequest, double PeakMb);
+
     public sealed record PageInfo(int Page, int PerPage, int Total);
 
     public sealed record Filters(string Status, string Search);
@@ -186,6 +196,7 @@ namespace Inertia.Net.HostingProbe
     [JsonSerializable(typeof(Filters))]
     [JsonSerializable(typeof(Feature[]))]
     [JsonSerializable(typeof(ProbeMetrics))]
+    [JsonSerializable(typeof(LoadReport))]
     internal sealed partial class ProbeJsonContext : JsonSerializerContext;
 
     internal static class Data
