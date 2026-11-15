@@ -1,0 +1,106 @@
+---
+title: Page records
+description: Optional typed page props that name their component once, generate their TypeScript type, and can hold the handler that renders them.
+section: Type safety
+order: 1
+---
+
+`Render("Users/Index", new InertiaProps { ... })` is the default way to render a page, and it stays fully supported. See [Pages and responses](/docs/pages-and-responses). A page record is an opt-in alternative for when you want the props typed end to end: the record lists the props, names its component once, and becomes the TypeScript type of the page. You can mix both styles in one app, page by page.
+
+## Declare a page record
+
+A record that implements `IInertiaPage` names its component once, so neither `Render` nor the TypeScript registration repeats it:
+
+```csharp
+public sealed record UsersPage(List<User> Users) : IInertiaPage
+{
+    public static string Component => "Users/Index";
+}
+
+return Render(new UsersPage(users));                 // component "Users/Index"
+o.TypeScript.Page<UsersPage>();                      // or AddGeneratedPages(): every IInertiaPage in the project, listed at compile time
+```
+
+`AddGeneratedPages()` is written by a source generator, so it needs no reflection and works under [Native AOT](/docs/native-aot). `PagesFrom(assembly)` does the same with reflection, for page records in another assembly. See [TypeScript types](/docs/typescript) for the generated file.
+
+A property can hold any prop factory. Give an `InertiaProp` its type with `InertiaPropType` so the TypeScript declaration is not `unknown`:
+
+```csharp
+public sealed record TodosPage(List<Todo> Todos, [property: InertiaPropType(typeof(TodoStats))] InertiaProp Stats) : IInertiaPage
+{
+    public static string Component => "Todos/Index";
+}
+
+return Render(new TodosPage(todos, Defer(() => store.Stats())));
+```
+
+Every host renders a page record the same way:
+
+```csharp
+// Minimal API
+app.MapGet("/users", (AppDb db) => Render(new UsersPage(db.Users.ToList())));
+
+// MVC
+[HttpGet("/users")]
+public IResult Index() => Render(new UsersPage(db.Users.ToList()));
+
+// FastEndpoints, inside HandleAsync
+await Send.InertiaAsync(new UsersPage(users));
+```
+
+## Handle the request in the page record
+
+`IInertiaPage` only names the component; the library never calls into the record. Because a record can have static methods, you can still keep the GET handler next to the props it fills, and map the method itself as the endpoint. Its parameters bind like any Minimal API handler: route values, query strings, services, `ClaimsPrincipal` and `CancellationToken`.
+
+```csharp
+public sealed record TodosPage(List<Todo> Todos, string Filter, [property: InertiaPropType(typeof(TodoStats))] InertiaProp Stats) : IInertiaPage
+{
+    public static string Component => "Todos/Index";
+
+    public static InertiaResult Handle(string? filter, TodoStore store) =>
+        Render(new TodosPage(store.All(filter), filter ?? "all", Defer(() => store.Stats())));
+}
+
+app.MapGet("/todos", TodosPage.Handle).WithName("todos.index");
+```
+
+A handler can be async and return another result when there is no page to show:
+
+```csharp
+public sealed record UserShowPage(User User, [property: InertiaPropType(typeof(List<Post>))] InertiaProp Posts) : IInertiaPage
+{
+    public static string Component => "Users/Show";
+
+    public static async Task<IResult> Handle(int id, AppDb db, CancellationToken ct) =>
+        await db.Users.FindAsync([id], ct) is { } user
+            ? Render(new UserShowPage(user, Defer(() => db.Posts.Where(p => p.UserId == id).ToListAsync(ct))))
+            : Results.NotFound();
+}
+
+app.MapGet("/users/{id:int}", UserShowPage.Handle).WithName("users.show");
+```
+
+Method groups go through the Request Delegate Generator like lambdas do, so this works under [Native AOT](/docs/native-aot).
+
+Keep `POST`, `PUT` and `DELETE` handlers with the rest of their feature rather than on the record: they validate input and [redirect](/docs/redirects-and-history), so they do not render this page.
+
+## Where the route lives
+
+The route pattern and its name stay on the endpoint (`MapGet(...).WithName(...)`), not on the record. One component is often rendered by more than one endpoint, such as a form page shown by `GET /users/create` and by `GET /users/{id}/edit`, and an endpoint can render different components. [Typed routes](/docs/typed-routes) are generated from endpoint names, so a named endpoint gets its `routes.ts` function whichever style renders it.
+
+## Compile-time component checks
+
+Inertia.Net ships an analyzer in the `Inertia.Net` package:
+
+| Rule | Reports |
+|---|---|
+| `INERTIA001` | Two page records that claim one component. |
+| `INERTIA002` | A component name, in `Render("...")`, `MapInertia` or a page record, that has no page file under `$(InertiaPagesDirectory)`. |
+
+`INERTIA002` runs when the project file sets the pages directory:
+
+```xml
+<PropertyGroup>
+  <InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>
+</PropertyGroup>
+```
