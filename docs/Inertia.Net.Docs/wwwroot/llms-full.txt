@@ -300,17 +300,17 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.1
-dotnet add package Inertia.Net.Mvc --version 1.9.1            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.1  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.1 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.1        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.1   # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.1          # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.1        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.2
+dotnet add package Inertia.Net.Mvc --version 1.9.2            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.2  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.2 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.2        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.2   # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.2          # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.2        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.1 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.2 implements Inertia.js v3.
 
 ## Requirements
 
@@ -333,7 +333,7 @@ Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.1
+dotnet new install Inertia.Net.Templates::1.9.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -391,7 +391,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/first-10-minutes
 Create the React starter (choose `vue` or `svelte` for another client; add `--tfm net11.0` to target .NET 11 instead of .NET 10):
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.1
+dotnet new install Inertia.Net.Templates::1.9.2
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -2469,7 +2469,7 @@ Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected
 `dotnet new inertia --auth` creates an app with both:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.1
+dotnet new install Inertia.Net.Templates::1.9.2
 dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
 ```
 
@@ -3149,7 +3149,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.1
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.2
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3181,7 +3181,7 @@ The EF Core package is not marked Native AOT compatible. EF Core has its own com
 `Inertia.Net.MongoDB` builds the same `Page<T>` and `CursorPage<T>` values from a `collection.Find(filter)`:
 
 ```sh
-dotnet add package Inertia.Net.MongoDB --version 1.9.1
+dotnet add package Inertia.Net.MongoDB --version 1.9.2
 ```
 
 ```csharp
@@ -5350,7 +5350,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/redis
 `Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all.
 
 ```sh
-dotnet add package Inertia.Net.Redis --version 1.9.1
+dotnet add package Inertia.Net.Redis --version 1.9.2
 ```
 
 ```csharp
@@ -5931,7 +5931,7 @@ This guide is for someone who has not built an Inertia app before. Run the comma
 Install the templates once, then create the app. The commands use React; pass `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.1
+dotnet new install Inertia.Net.Templates::1.9.2
 dotnet new inertia -n ForgetMeNot --framework react
 cd ForgetMeNot
 bun install

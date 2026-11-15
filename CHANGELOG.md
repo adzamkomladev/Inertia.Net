@@ -7,6 +7,8 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-11-15
+
 ### Security
 
 - DevTools: without an `Authorize` callback, the read API also refuses a request that carries `X-Forwarded-For`, `Forwarded`,
