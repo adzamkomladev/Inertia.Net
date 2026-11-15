@@ -16,11 +16,16 @@ internal static class Bench
 
     private sealed record Build(string Name, bool Aot, bool ServerGc);
 
-    private sealed record Result(double Rps, double P50Ms, double P99Ms, double RestMb, double PeakMb, double AfterMb, double Cores, double StartupMs, long Bytes, long Errors)
+    private sealed record Result(double Rps, double P50Ms, double P95Ms, double P99Ms, double RestMb, double PeakMb, double AfterMb, double Cores, double StartupMs, long Bytes, long Errors, RateResult[] Rates)
     {
         // Server CPU time per request: holds up better than req/s when other work on the machine takes CPU from the client or server.
         public double CpuMicros => Cores * 1_000_000 / Rps;
     }
+
+    // Latency at a fixed request rate, from when each request was due rather than when it was sent (no coordinated omission).
+    private sealed record RateResult(int Target, double Rps, double P50Ms, double P95Ms, double P99Ms, long Errors);
+
+    private sealed record Load(double Rps, double P50Ms, double P95Ms, double P99Ms, long Errors, double Seconds);
 
     private static readonly Scenario[] Scenarios =
     [
@@ -49,12 +54,15 @@ internal static class Bench
         var cpus = options.SkipWhile(o => o != "--server-cpus").Skip(1).FirstOrDefault() ?? "0-3";
         // --only <text>: run only the scenarios whose name contains the text, e.g. --only Todo.
         var only = options.SkipWhile(o => o != "--only").Skip(1).FirstOrDefault();
+        // --rates 1000,4000: after the saturation run, hold each rate for --seconds on the same server process (server GC builds only).
+        var rates = (options.SkipWhile(o => o != "--rates").Skip(1).FirstOrDefault() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(r => int.Parse(r, CultureInfo.InvariantCulture)).ToArray();
         var scenarios = Scenarios.Where(s => only is null || s.Name.Contains(only, StringComparison.OrdinalIgnoreCase)).ToArray();
         var report = new StringBuilder();
         report.AppendLine(CultureInfo.InvariantCulture, $"{connections} keep-alive connections, {warmup} s warmup, {seconds} s measured, {repeat} rounds; each round starts a fresh server process for every row, in table order. Server on CPUs {cpus}. Medians across rounds.");
         report.AppendLine();
-        report.AppendLine("| Build | Scenario | Response | Req/s | p50 ms | p99 ms | Server CPU per request | RSS at rest | Peak RSS under load | RSS after load | Startup |");
-        report.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        report.AppendLine("| Build | Scenario | Response | Req/s | p50 ms | p95 ms | p99 ms | Server CPU per request | RSS at rest | Peak RSS under load | RSS after load | Startup |");
+        report.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         // Rounds outermost, so a slow patch on a shared machine hits every row of a round rather than all rounds of one row.
         var results = new Dictionary<(Build, Scenario), List<Result>>();
         for (var i = 0; i < repeat; i++)
@@ -64,10 +72,16 @@ internal static class Bench
                 foreach (var scenario in scenarios)
                 {
                     var client = Process.GetCurrentProcess().TotalProcessorTime;
-                    var result = await RunOnceAsync(build, scenario, build.Aot ? aotBinary : jitDll, cpus, warmup, seconds, connections);
+                    var result = await RunOnceAsync(build, scenario, build.Aot ? aotBinary : jitDll, cpus, warmup, seconds, connections, build.ServerGc ? rates : []);
                     var clientCores = (Process.GetCurrentProcess().TotalProcessorTime - client).TotalSeconds / (warmup + seconds);
                     Console.WriteLine(FormattableString.Invariant(
-                        $"{build.Name} | {scenario.Name} | round {i + 1}: {result.Rps:F0} req/s, p50 {result.P50Ms:F2} ms, p99 {result.P99Ms:F2} ms, rest {result.RestMb:F1} MB, peak {result.PeakMb:F1} MB, after {result.AfterMb:F1} MB, server {result.Cores:F2} cores ({result.CpuMicros:F0} µs/request), client ~{clientCores:F2} cores, startup {result.StartupMs:F0} ms, errors {result.Errors}"));
+                        $"{build.Name} | {scenario.Name} | round {i + 1}: {result.Rps:F0} req/s, p50 {result.P50Ms:F2} ms, p95 {result.P95Ms:F2} ms, p99 {result.P99Ms:F2} ms, rest {result.RestMb:F1} MB, peak {result.PeakMb:F1} MB, after {result.AfterMb:F1} MB, server {result.Cores:F2} cores ({result.CpuMicros:F0} µs/request), client ~{clientCores:F2} cores, startup {result.StartupMs:F0} ms, errors {result.Errors}"));
+                    foreach (var rate in result.Rates)
+                    {
+                        Console.WriteLine(FormattableString.Invariant(
+                            $"{build.Name} | {scenario.Name} | round {i + 1} at {rate.Target} req/s: {rate.Rps:F0} req/s, p50 {rate.P50Ms:F2} ms, p95 {rate.P95Ms:F2} ms, p99 {rate.P99Ms:F2} ms, errors {rate.Errors}"));
+                    }
+
                     (results.TryGetValue((build, scenario), out var list) ? list : results[(build, scenario)] = []).Add(result);
                 }
             }
@@ -79,7 +93,31 @@ internal static class Bench
             {
                 var runs = results[(build, scenario)];
                 report.AppendLine(FormattableString.Invariant(
-                    $"| {build.Name} | {scenario.Name} | {runs[0].Bytes:N0} B | {Median(runs, r => r.Rps):N0} | {Median(runs, r => r.P50Ms):F2} | {Median(runs, r => r.P99Ms):F2} | {Median(runs, r => r.CpuMicros):F0} µs | {Median(runs, r => r.RestMb):F0} MB | {Median(runs, r => r.PeakMb):F0} MB | {Median(runs, r => r.AfterMb):F0} MB | {Median(runs, r => r.StartupMs):F0} ms |"));
+                    $"| {build.Name} | {scenario.Name} | {runs[0].Bytes:N0} B | {Median(runs, r => r.Rps):N0} | {Median(runs, r => r.P50Ms):F2} | {Median(runs, r => r.P95Ms):F2} | {Median(runs, r => r.P99Ms):F2} | {Median(runs, r => r.CpuMicros):F0} µs | {Median(runs, r => r.RestMb):F0} MB | {Median(runs, r => r.PeakMb):F0} MB | {Median(runs, r => r.AfterMb):F0} MB | {Median(runs, r => r.StartupMs):F0} ms |"));
+            }
+        }
+
+        if (rates.Length > 0)
+        {
+            report.AppendLine();
+            report.AppendLine(CultureInfo.InvariantCulture, $"Latency at a fixed rate: {connections} connections send on a schedule for {seconds} s per rate, right after the saturation run on the same server process. A request's latency counts from when it was due, so time spent waiting behind a slow response is included. \"Overloaded\" means the server could not keep up with the rate.");
+            report.AppendLine();
+            report.AppendLine("| Build | Scenario | Rate | p50 ms | p95 ms | p99 ms |");
+            report.AppendLine("|---|---|---:|---:|---:|---:|");
+            foreach (var build in Builds.Where(b => b.ServerGc))
+            {
+                foreach (var scenario in scenarios)
+                {
+                    var runs = results[(build, scenario)];
+                    for (var r = 0; r < rates.Length; r++)
+                    {
+                        var at = runs.Select(run => run.Rates[r]).ToList();
+                        // Behind schedule: the queue grows for the whole run, so its percentiles only measure the run's length.
+                        report.AppendLine(Median(at, a => a.Rps) < rates[r] * 0.97
+                            ? FormattableString.Invariant($"| {build.Name} | {scenario.Name} | {rates[r]:N0} req/s | overloaded | overloaded | overloaded |")
+                            : FormattableString.Invariant($"| {build.Name} | {scenario.Name} | {rates[r]:N0} req/s | {Median(at, a => a.P50Ms):F2} | {Median(at, a => a.P95Ms):F2} | {Median(at, a => a.P99Ms):F2} |"));
+                    }
+                }
             }
         }
 
@@ -88,7 +126,7 @@ internal static class Bench
         Console.WriteLine(report);
     }
 
-    private static async Task<Result> RunOnceAsync(Build build, Scenario scenario, string program, string cpus, int warmup, int seconds, int connections)
+    private static async Task<Result> RunOnceAsync(Build build, Scenario scenario, string program, string cpus, int warmup, int seconds, int connections, int[] rates)
     {
         var port = FreePort();
         var start = new ProcessStartInfo("taskset") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
@@ -148,11 +186,7 @@ internal static class Bench
             await Task.Delay(2000);
             var restMb = RssMb(server.Id);
 
-            var measuring = false;
             var stop = false;
-            var histograms = new long[connections][];
-            var counts = new long[connections];
-            var errors = new long[connections];
             var peakMb = restMb;
             var sampler = Task.Run(async () =>
             {
@@ -162,51 +196,103 @@ internal static class Bench
                     await Task.Delay(100);
                 }
             });
-            var workers = Enumerable.Range(0, connections).Select(c => Task.Run(async () =>
-            {
-                var histogram = histograms[c] = new long[MaxMicros + 1];
-                await using var connection = await Connection.OpenAsync(endpoint);
-                while (!Volatile.Read(ref stop))
-                {
-                    var record = Volatile.Read(ref measuring);
-                    var begin = Stopwatch.GetTimestamp();
-                    var status = await connection.SendAsync(request);
-                    if (!record || Volatile.Read(ref stop)) continue;
-                    if (status != 200) { errors[c]++; continue; }
-                    var micros = (long)Stopwatch.GetElapsedTime(begin).TotalMicroseconds;
-                    histogram[Math.Min(micros, MaxMicros)]++;
-                    counts[c]++;
-                }
-            })).ToArray();
-
-            await Task.Delay(TimeSpan.FromSeconds(warmup));
-            var cpuBefore = CpuTicks(server.Id);
-            var measured = Stopwatch.GetTimestamp();
-            Volatile.Write(ref measuring, true);
-            await Task.Delay(TimeSpan.FromSeconds(seconds));
-            var elapsed = Stopwatch.GetElapsedTime(measured).TotalSeconds;
-            var cpuAfter = CpuTicks(server.Id);
+            long cpuBefore = 0, cpuAfter = 0;
+            var load = await LoadAsync(endpoint, request, connections, 0, warmup, seconds, () => cpuBefore = CpuTicks(server.Id), () => cpuAfter = CpuTicks(server.Id));
             Volatile.Write(ref stop, true);
-            await Task.WhenAll(workers);
             await sampler;
             await Task.Delay(3000);
             var afterMb = RssMb(server.Id);
 
-            var merged = new long[MaxMicros + 1];
-            foreach (var histogram in histograms)
+            var rateResults = new List<RateResult>();
+            foreach (var rate in rates)
             {
-                for (var i = 0; i < merged.Length; i++) merged[i] += histogram[i];
+                var atRate = await LoadAsync(endpoint, request, connections, rate, 2, seconds, null, null);
+                rateResults.Add(new RateResult(rate, atRate.Rps, atRate.P50Ms, atRate.P95Ms, atRate.P99Ms, atRate.Errors));
             }
 
-            var total = counts.Sum();
-            return new Result(total / elapsed, Percentile(merged, total, 0.50) / 1000.0, Percentile(merged, total, 0.99) / 1000.0, restMb, peakMb, afterMb,
-                (cpuAfter - cpuBefore) / 100.0 / elapsed, startupMs, bytes, errors.Sum());
+            return new Result(load.Rps, load.P50Ms, load.P95Ms, load.P99Ms, restMb, peakMb, afterMb,
+                (cpuAfter - cpuBefore) / 100.0 / load.Seconds, startupMs, bytes, load.Errors, [.. rateResults]);
         }
         finally
         {
             server.Kill(entireProcessTree: true);
             await server.WaitForExitAsync();
         }
+    }
+
+    /// <summary>
+    /// Puts <paramref name="connections"/> keep-alive connections under load for <paramref name="warmup"/> + <paramref name="seconds"/> seconds and
+    /// measures the last <paramref name="seconds"/>. With <paramref name="rate"/> 0 each connection sends its next request as soon as a response
+    /// arrives (saturation). Otherwise the connections together send <paramref name="rate"/> requests per second on a schedule, and a request
+    /// sent late because the previous response had not arrived counts its latency from when it was due.
+    /// </summary>
+    private static async Task<Load> LoadAsync(IPEndPoint endpoint, byte[] request, int connections, int rate, int warmup, int seconds, Action? measureStart, Action? measureEnd)
+    {
+        var measuring = false;
+        var stop = false;
+        var histograms = new long[connections][];
+        var counts = new long[connections];
+        var errors = new long[connections];
+        var interval = rate > 0 ? Stopwatch.Frequency * connections / rate : 0;
+        var origin = Stopwatch.GetTimestamp();
+        var workers = Enumerable.Range(0, connections).Select(c => Task.Run(async () =>
+        {
+            var histogram = histograms[c] = new long[MaxMicros + 1];
+            await using var connection = await Connection.OpenAsync(endpoint);
+            var due = origin + interval * c / connections; // spread the connections' schedules across one interval
+            while (!Volatile.Read(ref stop))
+            {
+                long begin;
+                if (interval > 0)
+                {
+                    var now = Stopwatch.GetTimestamp();
+                    if (due > now)
+                    {
+                        await Task.Delay(Stopwatch.GetElapsedTime(now, due));
+                        // On time: the response before this one came back before it was due, so any lateness here is timer slack, not the server.
+                        begin = Stopwatch.GetTimestamp();
+                    }
+                    else
+                    {
+                        begin = due;
+                    }
+
+                    due += interval;
+                }
+                else
+                {
+                    begin = Stopwatch.GetTimestamp();
+                }
+
+                var record = Volatile.Read(ref measuring);
+                var status = await connection.SendAsync(request);
+                if (!record || Volatile.Read(ref stop)) continue;
+                if (status != 200) { errors[c]++; continue; }
+                var micros = (long)Stopwatch.GetElapsedTime(begin).TotalMicroseconds;
+                histogram[Math.Min(micros, MaxMicros)]++;
+                counts[c]++;
+            }
+        })).ToArray();
+
+        await Task.Delay(TimeSpan.FromSeconds(warmup));
+        measureStart?.Invoke();
+        var measured = Stopwatch.GetTimestamp();
+        Volatile.Write(ref measuring, true);
+        await Task.Delay(TimeSpan.FromSeconds(seconds));
+        var elapsed = Stopwatch.GetElapsedTime(measured).TotalSeconds;
+        measureEnd?.Invoke();
+        Volatile.Write(ref stop, true);
+        await Task.WhenAll(workers);
+
+        var merged = new long[MaxMicros + 1];
+        foreach (var histogram in histograms)
+        {
+            for (var i = 0; i < merged.Length; i++) merged[i] += histogram[i];
+        }
+
+        var total = counts.Sum();
+        return new Load(total / elapsed, Percentile(merged, total, 0.50) / 1000.0, Percentile(merged, total, 0.95) / 1000.0, Percentile(merged, total, 0.99) / 1000.0,
+            errors.Sum(), elapsed);
     }
 
     private const int MaxMicros = 1_000_000;
@@ -252,7 +338,7 @@ internal static class Bench
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
-    private static double Median(List<Result> runs, Func<Result, double> value)
+    private static double Median<T>(List<T> runs, Func<T, double> value)
     {
         var sorted = runs.Select(value).Order().ToArray();
         return sorted.Length % 2 == 1 ? sorted[sorted.Length / 2] : (sorted[sorted.Length / 2 - 1] + sorted[sorted.Length / 2]) / 2;
