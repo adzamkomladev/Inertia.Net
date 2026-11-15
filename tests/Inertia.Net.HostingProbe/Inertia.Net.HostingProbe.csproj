@@ -5,15 +5,26 @@
     <RootNamespace>Inertia.Net.HostingProbe</RootNamespace>
     <!-- eng/hosting-probe.sh publishes it twice: framework-dependent (JIT) and, with -p:HostingProbeAot=true, Native AOT. -->
     <PublishAot Condition="'$(HostingProbeAot)' == 'true'">true</PublishAot>
-    <IsAotCompatible>true</IsAotCompatible>
+    <!-- Trim and AOT analysis only in the AOT build: the JIT build's todo app uses EF Core. -->
+    <IsAotCompatible Condition="'$(HostingProbeAot)' == 'true'">true</IsAotCompatible>
     <!-- Source-generated Minimal API delegates in both builds, so JIT and AOT run the same endpoint code. -->
     <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
     <InvariantGlobalization>true</InvariantGlobalization>
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(HostingProbeAot)' == 'true'">
+    <DefineConstants>$(DefineConstants);HOSTING_PROBE_AOT</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Inertia.Net\Inertia.Net.csproj" />
+  </ItemGroup>
+  <!-- The todo app: EF Core in the JIT build, Microsoft.Data.Sqlite (no EF Core) in the Native AOT build. -->
+  <ItemGroup Condition="'$(HostingProbeAot)' != 'true'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(HostingProbeAot)' == 'true'">
+    <PackageReference Include="Microsoft.Data.Sqlite" />
   </ItemGroup>
   <ItemGroup>
     <None Update="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
