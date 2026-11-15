@@ -2,7 +2,10 @@
 
 ## Todo app and SSR process memory — 2026-11-15
 
-Replaces the estimated todo and SSR rows of the performance page with measurements. Busy 8-vCPU AMD EPYC VM (load average 10–17 from
+Replaces the estimated todo and SSR rows of the performance page with measurements. The todo rows on the performance page come from the
+GitHub-runner run [43654446305](https://github.com/adzamkomladev/Inertia.Net/actions/runs/43654446305) (same setup as the hosting section
+below): JIT/EF Core 4,411 req/s, 446 µs CPU per request, 115 MB at rest, 144 MB peak; Native AOT/`Microsoft.Data.Sqlite` 9,387 req/s,
+206 µs, 37 MB, 50 MB (server GC). The tables below are from a busy 8-vCPU AMD EPYC VM (load average 10–17 from
 unrelated work), .NET 10, Bun 1.4.4, Node 26.13.1. RSS figures held within 1–3 MB of the GitHub-runner run of the same probe; CPU and
 request rates from this machine are not used.
 
