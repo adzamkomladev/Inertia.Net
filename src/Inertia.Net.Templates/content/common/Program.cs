@@ -34,10 +34,13 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.UseInertiaRedirects();
     });
 builder.Services.AddAuthorization();
-// At most 5 sign-in attempts a minute per client. Precognition requests (checking a field as you type) are not counted.
+// At most 5 sign-in attempts a minute per client. Precognition requests (checking a field as you type) are not counted; the metadata
+// check keeps that header from skipping the limit on an endpoint whose handler runs for it.
+// Behind a reverse proxy every client has the proxy's address: configure forwarded headers first (README, "Deploying behind a proxy").
 builder.Services.AddRateLimiter(o =>
 {
-    o.AddPolicy("login", http => InertiaPrecognition.IsPrecognitive(http.Request)
+    o.AddPolicy("login", http => http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
+        && InertiaPrecognition.IsPrecognitive(http.Request)
         ? RateLimitPartition.GetNoLimiter("validation")
         : RateLimitPartition.GetFixedWindowLimiter(http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));

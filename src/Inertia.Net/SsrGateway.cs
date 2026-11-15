@@ -792,7 +792,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             Truncate(attempt.Details?.BrowserApi?.ToString()), Truncate(attempt.Details?.SourceLocation?.ToString()));
 
     // SSR error text comes from the renderer and can be large (stack traces, serialized props): logs keep the first 2 KB.
-    private static string? Truncate(string? text) => text is { Length: > MaxLoggedChars } ? string.Concat(text.AsSpan(0, MaxLoggedChars), "…") : text;
+    internal static string? Truncate(string? text) => text is { Length: > MaxLoggedChars } ? string.Concat(text.AsSpan(0, MaxLoggedChars), "…") : text;
 
     // Repeating skip reasons (no process ready, open circuit, overload) are logged at most once per 30 seconds each, with a count.
     private bool ShouldLogSkip(SsrFailure failure, out int suppressed)

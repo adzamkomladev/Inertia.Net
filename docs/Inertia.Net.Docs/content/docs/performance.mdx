@@ -35,7 +35,7 @@ All runs were on a GitHub-hosted `ubuntu-24.04` runner (AMD EPYC 9V74, 4 vCPUs) 
 
 What this means for an app:
 
-- **Memory.** On JIT, Inertia.Net adds about 13 MB at rest and 14–19 MB at peak under load. On Native AOT it adds about 4 MB at rest and 6–13 MB at peak.
+- **Memory.** On JIT, the Inertia rows use about 13 MB more at rest and 14–19 MB more at peak under load. On Native AOT they use about 4 MB more at rest and 6–13 MB more at peak. Almost all of the difference at rest is ASP.NET Core Data Protection, which `AddInertia` registers for its state cookie: a plain app that only adds `AddDataProtection()` measured 12 MB more on JIT and 5 MB more on Native AOT. Inertia.Net itself is about 1 MB at rest. An app with cookie sign-in, antiforgery or sessions already loads Data Protection.
 - **CPU.** An Inertia response costs 5–8 µs more server CPU than a hand-written JSON or HTML endpoint on JIT, and 9–14 µs more on Native AOT. On these do-nothing handlers that is 12–31% fewer requests per second. A handler that spends 1 ms on a database query loses under 1.5%.
 - **A real handler.** The todo rows read the signed-in user's 25 todos from SQLite on every request. The database work, not Inertia, sets their cost: 206–446 µs of CPU per request, against Inertia's 34–44 µs in total. On JIT the EF Core build serves 4,411 requests per second; the Native AOT build, which uses `Microsoft.Data.Sqlite` directly, serves 9,387.
 - **Latency.** Under 64 concurrent connections, p99 stays below 3 ms in every build without a database.

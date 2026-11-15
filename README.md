@@ -2569,9 +2569,10 @@ unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies 
 unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk.
 
 Without an `Authorize` callback the read API answers in Development only, and only requests from this machine: a loopback connection
-to a loopback host name such as `localhost` (`404` otherwise). This keeps an app accidentally run as Development on a server, or a
-DNS-rebinding page in the developer's browser, from reading other users' entries; set `Authorize` to read from a container or another
-machine. Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize`
+to a loopback host name such as `localhost`, with no `X-Forwarded-For`, `Forwarded`, `X-Forwarded-Host`, `X-Real-IP` or `Via` header
+(`404` otherwise). This keeps an app accidentally run as Development on a server, or a DNS-rebinding page in the developer's browser,
+from reading other users' entries; set `Authorize` to read from a container or another machine. A reverse proxy on the same machine
+that adds none of those headers makes a remote request look local, so set `Authorize` there too. Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize`
 accepts (`404` otherwise). With `Pages.Directory` set, entries link the component to its file.
 
 ## Development checks

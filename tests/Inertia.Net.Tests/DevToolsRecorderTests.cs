@@ -48,4 +48,24 @@ public sealed class DevToolsRecorderTests
         await recorder.ListEntriesAsync(context);
         Assert.Equal(status, context.Response.StatusCode);
     }
+
+    [Theory]
+    [InlineData("X-Forwarded-For", "203.0.113.7")]
+    [InlineData("Forwarded", "for=203.0.113.7")]
+    [InlineData("X-Forwarded-Host", "app.example.com")]
+    [InlineData("X-Real-IP", "203.0.113.7")]
+    [InlineData("Via", "1.1 proxy")]
+    public async Task Without_a_reader_development_refuses_a_request_forwarded_by_a_local_proxy(string header, string value)
+    {
+        var harness = new Harness(environment: "Development", configureServices: services => services.AddInertiaDevTools());
+        var recorder = harness.Services.GetRequiredService<DevToolsRecorder>();
+        var context = new DefaultHttpContext { RequestServices = harness.Services };
+        context.Connection.RemoteIpAddress = IPAddress.Loopback;
+        context.Request.Host = HostString.FromUriComponent("127.0.0.1:5000");
+        context.Request.Headers[header] = value;
+        context.Response.Body = new MemoryStream();
+
+        await recorder.ListEntriesAsync(context);
+        Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+    }
 }

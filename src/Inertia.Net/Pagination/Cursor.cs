@@ -160,7 +160,8 @@ internal static class CursorCodec
         if (typeof(T) == typeof(DateTime)) { var value = reader.GetDateTime(); return Unsafe.As<DateTime, T>(ref value); }
         if (typeof(T) == typeof(DateTimeOffset)) { var value = reader.GetDateTimeOffset(); return Unsafe.As<DateTimeOffset, T>(ref value); }
         if (typeof(T) == typeof(decimal)) { var value = reader.GetDecimal(); return Unsafe.As<decimal, T>(ref value); }
-        if (typeof(T) == typeof(double)) { var value = reader.GetDouble(); return Unsafe.As<double, T>(ref value); }
+        // GetDouble reads 1e999 as Infinity; Encode cannot write one, so it is a hand-made cursor, and SQL Server rejects it as a parameter.
+        if (typeof(T) == typeof(double)) { var value = reader.GetDouble(); if (!double.IsFinite(value)) throw new FormatException(); return Unsafe.As<double, T>(ref value); }
         if (typeof(T) == typeof(bool)) { var value = reader.GetBoolean(); return Unsafe.As<bool, T>(ref value); }
         throw new NotSupportedException($"Cursor key type '{typeof(T)}' is not supported.");
     }

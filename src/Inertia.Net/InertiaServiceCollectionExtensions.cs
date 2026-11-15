@@ -62,7 +62,8 @@ public static class InertiaServiceCollectionExtensions
         // Ssr.Timeout bounds the render; Ssr.ConnectTimeout also bounds connection establishment. No redirects (a render POST must not be replayed elsewhere), no proxy (renderers are local or
         // on a private network), and pooled connections are recycled so a remote renderer's DNS changes are picked up. The default
         // primary handler is set first, so a handler the app configures for this client (before or after AddInertia) replaces it.
-        services.AddHttpClient(SsrGateway.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
+        // Without the factory's request logging: four Information lines per render and per liveness ping, which SSR outcomes already cover.
+        services.AddHttpClient(SsrGateway.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan).RemoveAllLoggers();
         services.Configure<HttpClientFactoryOptions>(SsrGateway.HttpClientName, o => o.HttpMessageHandlerBuilderActions.Insert(0, static builder =>
             builder.PrimaryHandler = new SocketsHttpHandler
             {
