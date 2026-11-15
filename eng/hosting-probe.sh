@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Hosting cost of Inertia.Net next to a plain Minimal API serving the same data: RSS, requests per second, latency, CPU and startup,
 # for JIT and Native AOT builds with server and workstation GC. Linux only; needs taskset (util-linux), clang and zlib for AOT.
-# Usage: eng/hosting-probe.sh [output.md] [--seconds 10] [--warmup 5] [--connections 64] [--repeat 3] [--server-cpus FIRST-LAST] [--only TEXT]
-# The server runs on --server-cpus and the load client on the remaining CPUs.
+# Usage: eng/hosting-probe.sh [output.md] [--seconds 10] [--warmup 5] [--connections 64] [--repeat 3] [--server-cpus FIRST-LAST] [--only TEXT] [--rates 1000,4000]
+# The server runs on --server-cpus and the load client on the remaining CPUs. --rates adds latency at those fixed request rates (server GC builds).
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)

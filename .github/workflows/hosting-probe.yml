@@ -28,7 +28,7 @@ jobs:
           dotnet-version: 10.0.x
       - run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
       - run: nproc && lscpu | grep -E 'Model name|^CPU\(s\)'
-      - run: set -o pipefail; mkdir -p artifacts; bash eng/hosting-probe.sh artifacts/hosting-probe.md --seconds 12 --warmup 8 --repeat 5 | tee artifacts/hosting-probe.log
+      - run: set -o pipefail; mkdir -p artifacts; bash eng/hosting-probe.sh artifacts/hosting-probe.md --seconds 12 --warmup 8 --repeat 5 --rates 1000,4000,20000 | tee artifacts/hosting-probe.log
       - run: cat artifacts/hosting-probe.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
