@@ -27,6 +27,13 @@
     <PackageReference Include="Microsoft.Data.Sqlite" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="app.html;ssr.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- PROBE_MODE=ssr: ClientApp's sources and node_modules stay out of the build; its outputs (wwwroot/build, ssr/ssr.mjs from
+       `npm run build` in ClientApp, which eng/hosting-probe.sh runs for the ssr suite) are published with the app. -->
+  <ItemGroup>
+    <Content Remove="ClientApp\**" />
+    <None Remove="ClientApp\**;ssr\**" />
+    <None Include="ssr\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

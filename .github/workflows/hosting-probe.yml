@@ -1,7 +1,8 @@
 name: hosting-probe
 
 # Process RSS, requests per second, latency and CPU per request of Inertia.Net next to a plain Minimal API serving the same data,
-# JIT and Native AOT. Runs when the probe changes, or on demand; the table is in the job summary and the hosting-probe artifact.
+# JIT and Native AOT. Runs when the probe changes, or on demand; the table is in the job summary and the hosting-probe artifact. The ssr-probe
+# job compares client-rendered and server-rendered first loads (ssr-probe artifact).
 on:
   workflow_dispatch:
   pull_request:
@@ -34,3 +35,24 @@ jobs:
         with:
           name: hosting-probe
           path: artifacts/hosting-probe*
+
+  # SPA-only vs SSR first loads of the probe's React pages (eng/hosting-probe.sh --suite ssr), JIT only; Node and Bun as managed SSR processes.
+  ssr-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - run: nproc && lscpu | grep -E 'Model name|^CPU\(s\)' && node --version && bun --version
+      - run: set -o pipefail; mkdir -p artifacts; bash eng/hosting-probe.sh artifacts/ssr-probe.md --suite ssr --builds jit --seconds 12 --warmup 8 --repeat 5 | tee artifacts/ssr-probe.log
+      - run: cat artifacts/ssr-probe.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ssr-probe
+          path: artifacts/ssr-probe*

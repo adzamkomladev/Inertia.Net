@@ -1,6 +1,10 @@
 // Hosting cost of Inertia.Net next to a plain Minimal API that serves the same data: process RSS, requests per second and latency.
 // `serve` runs one server (PROBE_MODE=plain, inertia, or todo: a small todo app with cookie sign-in and SQLite); `bench` drives published JIT and Native AOT builds of it from a separate
 // process over raw keep-alive sockets. eng/hosting-probe.sh publishes both builds and pins server and client to separate CPUs.
+// PROBE_MODE=ssr serves the React pages in ClientApp: PROBE_SSR=off|node|bun picks client rendering or a managed SSR process,
+// PROBE_SSR_CACHE=1 caches the anonymous home page's render, and /__metrics reports GC counters and SSR outcomes.
+using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -19,7 +23,8 @@ if (Environment.GetEnvironmentVariable("PROBE_LOG") != "1") builder.Logging.Clea
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, ProbeJsonContext.Default));
 var mode = Environment.GetEnvironmentVariable("PROBE_MODE");
 var todo = mode == "todo";
-var inertia = mode == "inertia" || todo;
+var ssrPages = mode == "ssr";
+var inertia = mode == "inertia" || todo || ssrPages;
 if (inertia)
 {
     builder.Services.AddInertia(o =>
@@ -29,6 +34,26 @@ if (inertia)
         if (todo)
         {
             o.Share("auth", ctx => new Auth(ctx.User.Identity?.Name ?? ""));
+        }
+        else if (ssrPages)
+        {
+            o.RootView = "ssr.html";
+            var runtime = Environment.GetEnvironmentVariable("PROBE_SSR") ?? "off";
+            if (runtime is "node" or "bun")
+            {
+                o.Ssr.UseNodeProcess(n =>
+                {
+                    n.Executable = runtime;
+                    n.BasePort = int.Parse(Environment.GetEnvironmentVariable("PROBE_SSR_PORT") ?? "13714", System.Globalization.CultureInfo.InvariantCulture);
+                });
+                // Required, not Preferred: a render that cannot SSR (e.g. a full render queue) fails the request instead of quietly
+                // serving a cheaper client-rendered shell that would flatter the numbers.
+                o.Ssr.Mode = SsrMode.Required;
+            }
+            else if (runtime != "off")
+            {
+                throw new InvalidOperationException($"PROBE_SSR must be off, node or bun, not '{runtime}'.");
+            }
         }
         else
         {
@@ -64,6 +89,25 @@ if (todo)
         Render("Todos/Index", new InertiaProps { ["todos"] = await TodoStore.ForUserAsync(http.RequestServices, int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!, System.Globalization.CultureInfo.InvariantCulture)) }))
         .RequireAuthorization();
 }
+else if (ssrPages)
+{
+    app.UseInertia();
+    var outcomes = SsrOutcomes.Listen();
+    var cache = Environment.GetEnvironmentVariable("PROBE_SSR_CACHE") == "1";
+    app.MapGet("/__metrics", () => new ProbeMetrics(GC.GetTotalAllocatedBytes(), GC.GetTotalPauseDuration().TotalMilliseconds,
+        GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2), new Dictionary<string, long>(outcomes)));
+    // The same JSON for every visitor, so it is the one page the SSR cache (keyed by the page JSON) can share between requests.
+    app.MapGet("/", () => cache
+        ? Render("Home", new InertiaProps { ["features"] = Data.Features() }).WithSsrCache(TimeSpan.FromHours(1))
+        : Render("Home", new InertiaProps { ["features"] = Data.Features() }));
+    app.MapGet("/todos", (int? perPage) => Render("Todos/Index", new InertiaProps
+    {
+        ["auth"] = new Auth("ada@example.com"),
+        ["todos"] = Data.Todos(Math.Clamp(perPage ?? 25, 1, 100)),
+        ["pagination"] = new PageInfo(1, Math.Clamp(perPage ?? 25, 1, 100), 1000),
+        ["filters"] = new Filters("all", ""),
+    }));
+}
 else if (inertia)
 {
     app.UseInertia();
@@ -89,11 +133,56 @@ namespace Inertia.Net.HostingProbe
 
     public sealed record UsersPage(string AppName, Auth Auth, User[] Users);
 
+    public sealed record TodoRow(int Id, string Title, string Note, bool Done, string[] Tags, string Assignee, DateTime DueAt, int Priority, int Progress);
+
+    public sealed record PageInfo(int Page, int PerPage, int Total);
+
+    public sealed record Filters(string Status, string Search);
+
+    public sealed record Feature(string Title, string Body);
+
+    /// <summary>The /__metrics answer: GC counters since startup, and inertia.ssr.outcomes counts by "outcome/reason".</summary>
+    public sealed record ProbeMetrics(long AllocatedBytes, double GcPauseMs, int Gen0, int Gen1, int Gen2, Dictionary<string, long> SsrOutcomes);
+
+    internal static class SsrOutcomes
+    {
+        // Counts every inertia.ssr.outcomes measurement, so the bench can tell a server-rendered response from a fallback.
+        public static ConcurrentDictionary<string, long> Listen()
+        {
+            var counts = new ConcurrentDictionary<string, long>();
+            var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, l) =>
+                {
+                    if (instrument.Meter.Name == InertiaDiagnostics.MeterName && instrument.Name == "inertia.ssr.outcomes") l.EnableMeasurementEvents(instrument);
+                },
+            };
+            listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
+            {
+                string? outcome = null, reason = null;
+                foreach (var tag in tags)
+                {
+                    if (tag.Key == "inertia.ssr.outcome") outcome = tag.Value as string;
+                    else if (tag.Key == "inertia.ssr.reason") reason = tag.Value as string;
+                }
+
+                counts.AddOrUpdate($"{outcome}/{reason}", value, (_, total) => total + value);
+            });
+            listener.Start(); // the listener stays registered (and alive) until the process exits
+            return counts;
+        }
+    }
+
     [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
     [JsonSerializable(typeof(User[]))]
     [JsonSerializable(typeof(Auth))]
     [JsonSerializable(typeof(UsersPage))]
     [JsonSerializable(typeof(Todo[]))]
+    [JsonSerializable(typeof(TodoRow[]))]
+    [JsonSerializable(typeof(PageInfo))]
+    [JsonSerializable(typeof(Filters))]
+    [JsonSerializable(typeof(Feature[]))]
+    [JsonSerializable(typeof(ProbeMetrics))]
     internal sealed partial class ProbeJsonContext : JsonSerializerContext;
 
     internal static class Data
@@ -116,5 +205,27 @@ namespace Inertia.Net.HostingProbe
         }
 
         public static UsersPage Page() => new("Probe", new Auth("ada@example.com"), Users());
+
+        private static readonly string[] TagNames = ["home", "work", "errand", "urgent", "later", "team"];
+        private static readonly string[] People = ["ada", "grace", "linus", "barbara", "dennis"];
+
+        public static TodoRow[] Todos(int count)
+        {
+            var todos = new TodoRow[count];
+            for (var i = 0; i < todos.Length; i++)
+            {
+                todos[i] = new TodoRow(i + 1, "Todo " + (i + 1), $"Notes for todo {i + 1}: check the details before the due date.", i % 3 == 0,
+                    [TagNames[i % 6], TagNames[(i + 1) % 6], TagNames[(i + 2) % 6]], People[i % 5], Created.AddDays(i), i % 3, i * 7 % 101);
+            }
+
+            return todos;
+        }
+
+        public static Feature[] Features() =>
+        [
+            new("Lists", "Group todos by project, tag and due date."),
+            new("Reports", "See what got done this week and what slipped."),
+            new("Teams", "Share lists and assign todos to people."),
+        ];
     }
 }
