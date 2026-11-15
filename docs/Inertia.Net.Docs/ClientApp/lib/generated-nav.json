@@ -905,6 +905,96 @@
       ]
     },
     {
+      "slug": "page-records",
+      "url": "/docs/page-records",
+      "title": "Page records",
+      "description": "Optional typed page props that name their component once, generate their TypeScript type, and can hold the handler that renders them.",
+      "section": "Type safety",
+      "order": 1,
+      "headings": [
+        {
+          "id": "declare-a-page-record",
+          "text": "Declare a page record",
+          "depth": 2
+        },
+        {
+          "id": "handle-the-request-in-the-page-record",
+          "text": "Handle the request in the page record",
+          "depth": 2
+        },
+        {
+          "id": "where-the-route-lives",
+          "text": "Where the route lives",
+          "depth": 2
+        },
+        {
+          "id": "compile-time-component-checks",
+          "text": "Compile-time component checks",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "typescript",
+      "url": "/docs/typescript",
+      "title": "TypeScript types",
+      "description": "Generate declarations for page props, shared props and flash data from your .NET contracts.",
+      "section": "Type safety",
+      "order": 2,
+      "headings": [
+        {
+          "id": "configure-generation",
+          "text": "Configure generation",
+          "depth": 2
+        },
+        {
+          "id": "generate-in-ci",
+          "text": "Generate in CI",
+          "depth": 2
+        },
+        {
+          "id": "shared-props",
+          "text": "Shared props",
+          "depth": 2
+        },
+        {
+          "id": "flash-data",
+          "text": "Flash data",
+          "depth": 2
+        },
+        {
+          "id": "prop-members",
+          "text": "Prop members",
+          "depth": 2
+        },
+        {
+          "id": "mapping",
+          "text": "Mapping",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "typed-routes",
+      "url": "/docs/typed-routes",
+      "title": "Typed routes",
+      "description": "Generate a typed routes.ts for named endpoints, with typed parameters and request bodies, and write it at build time.",
+      "section": "Type safety",
+      "order": 3,
+      "headings": [
+        {
+          "id": "generate-routests",
+          "text": "Generate routes.ts",
+          "depth": 2
+        },
+        {
+          "id": "generating-at-build-time",
+          "text": "Generating at build time",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "server-side-rendering",
       "url": "/docs/server-side-rendering",
       "title": "Server-side rendering",
@@ -1335,76 +1425,6 @@
         {
           "id": "name-collisions",
           "text": "Name collisions",
-          "depth": 2
-        }
-      ]
-    },
-    {
-      "slug": "typescript",
-      "url": "/docs/typescript",
-      "title": "TypeScript types",
-      "description": "Generate declarations for page props, shared props and flash data from your .NET contracts.",
-      "section": "Reference",
-      "order": 2,
-      "headings": [
-        {
-          "id": "configure-generation",
-          "text": "Configure generation",
-          "depth": 2
-        },
-        {
-          "id": "generate-in-ci",
-          "text": "Generate in CI",
-          "depth": 2
-        },
-        {
-          "id": "shared-props",
-          "text": "Shared props",
-          "depth": 2
-        },
-        {
-          "id": "flash-data",
-          "text": "Flash data",
-          "depth": 2
-        },
-        {
-          "id": "prop-members",
-          "text": "Prop members",
-          "depth": 2
-        },
-        {
-          "id": "mapping",
-          "text": "Mapping",
-          "depth": 2
-        }
-      ]
-    },
-    {
-      "slug": "typed-routes",
-      "url": "/docs/typed-routes",
-      "title": "Page records and typed routes",
-      "description": "Name a page's component once, generate a typed routes.ts for named endpoints, write the files at build time, and check component names at compile time.",
-      "section": "Reference",
-      "order": 3,
-      "headings": [
-        {
-          "id": "page-records",
-          "text": "Page records",
-          "depth": 2
-        },
-        {
-          "id": "typed-routes",
-          "text": "Typed routes",
-          "depth": 2
-        },
-        {
-          "id": "generating-at-build-time",
-          "text": "Generating at build time",
-          "depth": 2
-        },
-        {
-          "id": "compile-time-component-checks",
-          "text": "Compile-time component checks",
           "depth": 2
         }
       ]

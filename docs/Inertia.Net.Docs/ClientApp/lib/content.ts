@@ -28,6 +28,7 @@ const sectionOrder = [
   'Get started',
   'Essentials',
   'Loading data',
+  'Type safety',
   'Production',
   'Reference',
   'Tutorial',

@@ -1,31 +1,13 @@
 ---
-title: Page records and typed routes
-description: Name a page's component once, generate a typed routes.ts for named endpoints, write the files at build time, and check component names at compile time.
-section: Reference
+title: Typed routes
+description: Generate a typed routes.ts for named endpoints, with typed parameters and request bodies, and write it at build time.
+section: Type safety
 order: 3
 ---
 
-These build on [TypeScript types](/docs/typescript): the same `o.TypeScript` options write both files.
+This builds on [TypeScript types](/docs/typescript): the same `o.TypeScript` options write both files. Routes come from endpoint names, so they work the same whether an endpoint renders with `Render("Component", props)` or a [page record](/docs/page-records).
 
-## Page records
-
-A record that implements `IInertiaPage` names its component once, so neither `Render` nor the TypeScript registration repeats it:
-
-```csharp
-public sealed record UsersPage(List<User> Users) : IInertiaPage
-{
-    public static string Component => "Users/Index";
-}
-
-return Render(new UsersPage(users));                 // component "Users/Index"
-o.TypeScript.Page<UsersPage>();                      // or AddGeneratedPages(): every IInertiaPage in the project, listed at compile time
-```
-
-`AddGeneratedPages()` is written by a source generator, so it needs no reflection and works under [Native AOT](/docs/native-aot). `PagesFrom(assembly)` does the same with reflection, for page records in another assembly.
-
-FastEndpoints' `Send.InertiaAsync(page)` takes a page record too.
-
-## Typed routes
+## Generate routes.ts
 
 Set `RoutesOutputPath` and every named endpoint (`WithName`, a controller route name, or a FastEndpoints `Description(x => x.WithName(...))`) gets a typed function in `routes.ts`:
 
@@ -131,19 +113,4 @@ dotnet build -p:InertiaGenerateTypesOnBuild=true
 git diff --exit-code ClientApp/types
 ```
 
-## Compile-time component checks
-
-Inertia.Net ships an analyzer in the `Inertia.Net` package:
-
-| Rule | Reports |
-|---|---|
-| `INERTIA001` | Two page records that claim one component. |
-| `INERTIA002` | A component name, in `Render("...")`, `MapInertia` or a page record, that has no page file under `$(InertiaPagesDirectory)`. |
-
-`INERTIA002` runs when the project file sets the pages directory:
-
-```xml
-<PropertyGroup>
-  <InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>
-</PropertyGroup>
-```
+Component names are checked at compile time too. See [Page records](/docs/page-records#compile-time-component-checks).

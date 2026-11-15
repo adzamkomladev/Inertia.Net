@@ -1360,7 +1360,7 @@ public sealed record UsersPage(List<User> Users, string Title);
 app.MapGet("/users", () => Render("Users/Index", new UsersPage(users, "Users")));
 ```
 
-A record that implements `IInertiaPage` names its component, so `Render(new UsersPage(...))` needs no component string. See [Page records](/docs/typed-routes#page-records).
+This is the default style, and the rest of these docs use it. If you want typed props, a record that implements `IInertiaPage` names its component, so `Render(new UsersPage(...))` needs no component string, and the record can hold its own GET handler. See [Page records](/docs/page-records).
 
 Every page has an `errors` prop (an empty object when there are no errors). Key order is `errors`, shared props, then page props.
 
@@ -3881,6 +3881,367 @@ A validation failure returns `422`; a limiter may return `429`. `InertiaPrecogni
 
 ---
 
+# Page records
+
+URL: https://inertia-dotnet.temtem.dev/docs/page-records
+
+> Optional typed page props that name their component once, generate their TypeScript type, and can hold the handler that renders them.
+
+`Render("Users/Index", new InertiaProps { ... })` is the default way to render a page, and it stays fully supported. See [Pages and responses](/docs/pages-and-responses). A page record is an opt-in alternative for when you want the props typed end to end: the record lists the props, names its component once, and becomes the TypeScript type of the page. You can mix both styles in one app, page by page.
+
+## Declare a page record
+
+A record that implements `IInertiaPage` names its component once, so neither `Render` nor the TypeScript registration repeats it:
+
+```csharp
+public sealed record UsersPage(List<User> Users) : IInertiaPage
+{
+    public static string Component => "Users/Index";
+}
+
+return Render(new UsersPage(users));                 // component "Users/Index"
+o.TypeScript.Page<UsersPage>();                      // or AddGeneratedPages(): every IInertiaPage in the project, listed at compile time
+```
+
+`AddGeneratedPages()` is written by a source generator, so it needs no reflection and works under [Native AOT](/docs/native-aot). `PagesFrom(assembly)` does the same with reflection, for page records in another assembly. See [TypeScript types](/docs/typescript) for the generated file.
+
+A property can hold any prop factory. Give an `InertiaProp` its type with `InertiaPropType` so the TypeScript declaration is not `unknown`:
+
+```csharp
+public sealed record TodosPage(List<Todo> Todos, [property: InertiaPropType(typeof(TodoStats))] InertiaProp Stats) : IInertiaPage
+{
+    public static string Component => "Todos/Index";
+}
+
+return Render(new TodosPage(todos, Defer(() => store.Stats())));
+```
+
+Every host renders a page record the same way:
+
+```csharp
+// Minimal API
+app.MapGet("/users", (AppDb db) => Render(new UsersPage(db.Users.ToList())));
+
+// MVC
+[HttpGet("/users")]
+public IResult Index() => Render(new UsersPage(db.Users.ToList()));
+
+// FastEndpoints, inside HandleAsync
+await Send.InertiaAsync(new UsersPage(users));
+```
+
+## Handle the request in the page record
+
+`IInertiaPage` only names the component; the library never calls into the record. Because a record can have static methods, you can still keep the GET handler next to the props it fills, and map the method itself as the endpoint. Its parameters bind like any Minimal API handler: route values, query strings, services, `ClaimsPrincipal` and `CancellationToken`.
+
+```csharp
+public sealed record TodosPage(List<Todo> Todos, string Filter, [property: InertiaPropType(typeof(TodoStats))] InertiaProp Stats) : IInertiaPage
+{
+    public static string Component => "Todos/Index";
+
+    public static InertiaResult Handle(string? filter, TodoStore store) =>
+        Render(new TodosPage(store.All(filter), filter ?? "all", Defer(() => store.Stats())));
+}
+
+app.MapGet("/todos", TodosPage.Handle).WithName("todos.index");
+```
+
+A handler can be async and return another result when there is no page to show:
+
+```csharp
+public sealed record UserShowPage(User User, [property: InertiaPropType(typeof(List<Post>))] InertiaProp Posts) : IInertiaPage
+{
+    public static string Component => "Users/Show";
+
+    public static async Task<IResult> Handle(int id, AppDb db, CancellationToken ct) =>
+        await db.Users.FindAsync([id], ct) is { } user
+            ? Render(new UserShowPage(user, Defer(() => db.Posts.Where(p => p.UserId == id).ToListAsync(ct))))
+            : Results.NotFound();
+}
+
+app.MapGet("/users/{id:int}", UserShowPage.Handle).WithName("users.show");
+```
+
+Method groups go through the Request Delegate Generator like lambdas do, so this works under [Native AOT](/docs/native-aot).
+
+Keep `POST`, `PUT` and `DELETE` handlers with the rest of their feature rather than on the record: they validate input and [redirect](/docs/redirects-and-history), so they do not render this page.
+
+## Where the route lives
+
+The route pattern and its name stay on the endpoint (`MapGet(...).WithName(...)`), not on the record. One component is often rendered by more than one endpoint, such as a form page shown by `GET /users/create` and by `GET /users/{id}/edit`, and an endpoint can render different components. [Typed routes](/docs/typed-routes) are generated from endpoint names, so a named endpoint gets its `routes.ts` function whichever style renders it.
+
+## Compile-time component checks
+
+Inertia.Net ships an analyzer in the `Inertia.Net` package:
+
+| Rule | Reports |
+|---|---|
+| `INERTIA001` | Two page records that claim one component. |
+| `INERTIA002` | A component name, in `Render("...")`, `MapInertia` or a page record, that has no page file under `$(InertiaPagesDirectory)`. |
+
+`INERTIA002` runs when the project file sets the pages directory:
+
+```xml
+<PropertyGroup>
+  <InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>
+</PropertyGroup>
+```
+
+---
+
+# TypeScript types
+
+URL: https://inertia-dotnet.temtem.dev/docs/typescript
+
+> Generate declarations for page props, shared props and flash data from your .NET contracts.
+
+Inertia.Net can write TypeScript declarations for typed page props, shared props and flash data. They follow the app's JSON contracts (the HTTP JSON options and their source-generated contexts), so names, nullability and enum values match the page JSON.
+
+To name a page's component once, see [Page records](/docs/page-records). To generate a typed `routes.ts` for your named endpoints, see [Typed routes](/docs/typed-routes).
+
+## Configure generation
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";   // written in Development, only when it changed
+    o.TypeScript.Page<UsersPage>("Users/Index").Page<HomePage>("Home");
+    o.TypeScript.FlashData<Flash>();                             // optional: the whole page.flash object; SharedProps<T>() too
+});
+
+public sealed record UsersPage(
+    List<User> Users,
+    [property: InertiaPropType(typeof(UserStats))] InertiaProp Stats);
+```
+
+The file is written when the app starts in Development, and only when its content changed. Commit it so `tsc` passes in CI without running the app.
+
+## Generate in CI
+
+To write the file without starting the app for real (in CI, or outside Development), run it with `--inertia-types`: it writes the
+declarations in any environment, then stops, and exits with code 1 if they could not be written. The templates add it as a script:
+
+```sh
+dotnet run -- --inertia-types   # or: npm run types
+git diff --exit-code ClientApp/types/inertia.d.ts   # fail CI when the committed file is stale
+```
+
+Program.cs still runs up to `app.Run()`, so startup code such as migrations runs too; the server stops as soon as it has started.
+
+```ts
+// ClientApp/types/inertia.d.ts (excerpt)
+export interface InertiaPages {
+  'Users/Index': UsersPage
+  Home: HomePage
+}
+export interface UsersPage {
+  users: User[]
+  stats?: UserStats
+}
+declare module '@inertiajs/core' {
+  export interface InertiaConfig {
+    sharedPageProps: SharedProps
+    flashDataType: FlashData
+    errorValueType: string
+  }
+}
+```
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+import type { InertiaPages } from '../../types/inertia'
+
+export default function Index({ users, stats }: InertiaPages['Users/Index']) {
+  // ...
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import type { InertiaPages } from '../../types/inertia'
+
+const { users, stats } = defineProps<InertiaPages['Users/Index']>()
+</script>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import type { InertiaPages } from '../../types/inertia'
+
+  let { users, stats }: InertiaPages['Users/Index'] = $props()
+</script>
+```
+
+  </Tab>
+</Tabs>
+
+## Shared props
+
+Shared props are inferred from the values passed to `o.Share(...)`; dot keys nest. A factory is typed by what it returns: `o.Share("user", ctx => new UserDto(...))` gives `user: UserDto`, while a factory cast to `Func<HttpContext, object?>` is `unknown`. Shares added per request (middleware, `HttpContext.Inertia().Share(...)`) are not known at startup; type them with `o.TypeScript.SharedProps<T>()`, which replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+
+## Flash data
+
+`FlashData<T>()` types the whole flash object, not one entry: each property of `T` is a flash key. To type
+`Flash("toast", new Toast("success", "Saved"))`, wrap the entry:
+
+```csharp
+public sealed record Toast(string Type, string Message);
+public sealed record Flash(Toast? Toast);   // page.flash.toast is Toast | null
+o.TypeScript.FlashData<Flash>();
+```
+
+## Prop members
+
+An `InertiaProp` member is optional (it can be deferred, optional or rescued) and `unknown`, unless `[InertiaPropType(typeof(T))]` names its value type.
+
+## Mapping
+
+| .NET | TypeScript |
+|---|---|
+| `int`, `long`, `double`, `decimal`, `float` | `number` (`number \| bigint` for 64-bit and larger with `PreserveBigIntegers`) |
+| `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid`, `byte[]` | `string` |
+| enum | union of JSON values: numbers by default, with the member names in a doc comment; string names with `JsonStringEnumConverter` |
+| dictionary | `Record<string, T>` |
+| polymorphic type | union tagged with its discriminator |
+| C# 15 `union` (.NET 11) | union of its case types, `User \| Team` (plus `\| null` when a case is nullable) |
+| nullable member | `T \| null` |
+
+Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.
+
+Number handling follows member settings, then type settings, then the global JSON options. Custom converter output is typed as `unknown` with a warning when its shape cannot be inferred.
+
+<Callout type="info" title="Validation and JSON names">
+Props and MVC validation error keys use the HTTP `JsonOptions`. FastEndpoints error keys use its binding serializer policy. Keep client field names aligned with the applicable policy; custom resolvers without member metadata may require client JSON names for aliases.
+</Callout>
+
+---
+
+# Typed routes
+
+URL: https://inertia-dotnet.temtem.dev/docs/typed-routes
+
+> Generate a typed routes.ts for named endpoints, with typed parameters and request bodies, and write it at build time.
+
+This builds on [TypeScript types](/docs/typescript): the same `o.TypeScript` options write both files. Routes come from endpoint names, so they work the same whether an endpoint renders with `Render("Component", props)` or a [page record](/docs/page-records).
+
+## Generate routes.ts
+
+Set `RoutesOutputPath` and every named endpoint (`WithName`, a controller route name, or a FastEndpoints `Description(x => x.WithName(...))`) gets a typed function in `routes.ts`:
+
+```csharp
+o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+app.MapGet("/users/{id:int}", ...).WithName("users.show");
+app.MapPost("/users", (CreateUser input) => ...).WithName("users.store");
+```
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+import { Link, useForm } from '@inertiajs/react'
+import { routes, type RouteBodies } from '../../types/routes'
+
+export default function Create({ user }: { user: { id: number; name: string } }) {
+  const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+  const posts = routes.users.show.url(user.id, { query: { tab: 'posts' } })   // '/users/1?tab=posts'
+
+  return (
+    <>
+      {/* routes.users.show(1) is { url: '/users/1', method: 'get' } */}
+      <Link href={routes.users.show(user.id)}>{user.name}</Link> <a href={posts}>Posts</a>
+      <form onSubmit={(e) => { e.preventDefault(); form.submit(routes.users.store()) }}>
+        <input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
+        <button disabled={form.processing}>Create</button>
+      </form>
+    </>
+  )
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { Link, useForm } from '@inertiajs/vue3'
+import { computed } from 'vue'
+import { routes, type RouteBodies } from '../../types/routes'
+
+const props = defineProps<{ user: { id: number; name: string } }>()
+const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+const posts = computed(() => routes.users.show.url(props.user.id, { query: { tab: 'posts' } }))   // '/users/1?tab=posts'
+</script>
+
+<template>
+  <!-- routes.users.show(1) is { url: '/users/1', method: 'get' } -->
+  <Link :href="routes.users.show(user.id)">{{ user.name }}</Link> <a :href="posts">Posts</a>
+  <form @submit.prevent="form.submit(routes.users.store())">
+    <input v-model="form.name" />
+    <button :disabled="form.processing">Create</button>
+  </form>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { Link, useForm } from '@inertiajs/svelte'
+  import { routes, type RouteBodies } from '../../types/routes'
+
+  let { user }: { user: { id: number; name: string } } = $props()
+  const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
+  const posts = $derived(routes.users.show.url(user.id, { query: { tab: 'posts' } }))   // '/users/1?tab=posts'
+
+  function submit(e: SubmitEvent) {
+    e.preventDefault()
+    form.submit(routes.users.store())
+  }
+</script>
+
+<!-- routes.users.show(1) is { url: '/users/1', method: 'get' } -->
+<Link href={routes.users.show(user.id)}>{user.name}</Link> <a href={posts}>Posts</a>
+<form onsubmit={submit}>
+  <input bind:value={form.name} />
+  <button disabled={form.processing}>Create</button>
+</form>
+```
+
+  </Tab>
+</Tabs>
+
+- Route parameters are typed from their constraints; optional and catch-all parameters are optional.
+- Every HTTP method of an endpoint has a variant (`routes.users.update.put(1)`).
+- `routeConfig.base` prefixes every URL (an app under a path base).
+- `RouteBodies` holds the `[FromBody]` (or FastEndpoints request) type of each route that has one.
+- Unnamed endpoints are skipped.
+
+`o.TypeScript.LiveEvents(...)` also exports live event names and channels as `liveEvents`. See [Live props](/docs/live-props#reloading-scroll-and-merge-props).
+
+To assert a route sent as a prop in tests, use `WhereRoute(key, url, method)`. See [Testing](/docs/testing).
+
+## Generating at build time
+
+Set `<InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>` in the project file, and every build (including the one inside `dotnet publish`) runs the app once with `--inertia-types` to write both files. The app starts without listening on any port and exits; a failure to write fails the build. In CI, compare the result with the committed files:
+
+```sh
+dotnet build -p:InertiaGenerateTypesOnBuild=true
+git diff --exit-code ClientApp/types
+```
+
+Component names are checked at compile time too. See [Page records](/docs/page-records#compile-time-component-checks).
+
+---
+
 # Server-side rendering
 
 URL: https://inertia-dotnet.temtem.dev/docs/server-side-rendering
@@ -5138,292 +5499,6 @@ See [Error pages](/docs/error-pages) for setup, shared props and existing except
 The package imports `Inertia.Net` and static members of `Inertia.Net.Inertia` when implicit usings are enabled. If a name such as `Location` collides with a type, use `Inertia.Net.Inertia.Location(url)`. To manage imports yourself, set `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` in the project and add `using Inertia.Net;` and `using static Inertia.Net.Inertia;` where needed.
 
 `InertiaPropJsonConverter`, `InertiaSsrHealthCheck`, `InertiaCacheEntryKind`, `InertiaCacheEntryOptions`, `InertiaPagesOptions`, `InertiaPrecognition.IsPrecognitive(...)` and `InertiaPrecognitionMetadata` are public APIs for serialization, health checks, cache stores, page checks and precognitive request handling.
-
----
-
-# TypeScript types
-
-URL: https://inertia-dotnet.temtem.dev/docs/typescript
-
-> Generate declarations for page props, shared props and flash data from your .NET contracts.
-
-Inertia.Net can write TypeScript declarations for typed page props, shared props and flash data. They follow the app's JSON contracts (the HTTP JSON options and their source-generated contexts), so names, nullability and enum values match the page JSON.
-
-To name a page's component once with a page record, or to generate a typed `routes.ts` for your named endpoints, see [Page records and typed routes](/docs/typed-routes).
-
-## Configure generation
-
-```csharp
-builder.Services.AddInertia(o =>
-{
-    o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";   // written in Development, only when it changed
-    o.TypeScript.Page<UsersPage>("Users/Index").Page<HomePage>("Home");
-    o.TypeScript.FlashData<Flash>();                             // optional: the whole page.flash object; SharedProps<T>() too
-});
-
-public sealed record UsersPage(
-    List<User> Users,
-    [property: InertiaPropType(typeof(UserStats))] InertiaProp Stats);
-```
-
-The file is written when the app starts in Development, and only when its content changed. Commit it so `tsc` passes in CI without running the app.
-
-## Generate in CI
-
-To write the file without starting the app for real (in CI, or outside Development), run it with `--inertia-types`: it writes the
-declarations in any environment, then stops, and exits with code 1 if they could not be written. The templates add it as a script:
-
-```sh
-dotnet run -- --inertia-types   # or: npm run types
-git diff --exit-code ClientApp/types/inertia.d.ts   # fail CI when the committed file is stale
-```
-
-Program.cs still runs up to `app.Run()`, so startup code such as migrations runs too; the server stops as soon as it has started.
-
-```ts
-// ClientApp/types/inertia.d.ts (excerpt)
-export interface InertiaPages {
-  'Users/Index': UsersPage
-  Home: HomePage
-}
-export interface UsersPage {
-  users: User[]
-  stats?: UserStats
-}
-declare module '@inertiajs/core' {
-  export interface InertiaConfig {
-    sharedPageProps: SharedProps
-    flashDataType: FlashData
-    errorValueType: string
-  }
-}
-```
-
-<Tabs>
-  <Tab label="React">
-
-```tsx
-import type { InertiaPages } from '../../types/inertia'
-
-export default function Index({ users, stats }: InertiaPages['Users/Index']) {
-  // ...
-}
-```
-
-  </Tab>
-  <Tab label="Vue">
-
-```vue
-<script setup lang="ts">
-import type { InertiaPages } from '../../types/inertia'
-
-const { users, stats } = defineProps<InertiaPages['Users/Index']>()
-</script>
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```svelte
-<script lang="ts">
-  import type { InertiaPages } from '../../types/inertia'
-
-  let { users, stats }: InertiaPages['Users/Index'] = $props()
-</script>
-```
-
-  </Tab>
-</Tabs>
-
-## Shared props
-
-Shared props are inferred from the values passed to `o.Share(...)`; dot keys nest. A factory is typed by what it returns: `o.Share("user", ctx => new UserDto(...))` gives `user: UserDto`, while a factory cast to `Func<HttpContext, object?>` is `unknown`. Shares added per request (middleware, `HttpContext.Inertia().Share(...)`) are not known at startup; type them with `o.TypeScript.SharedProps<T>()`, which replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
-
-## Flash data
-
-`FlashData<T>()` types the whole flash object, not one entry: each property of `T` is a flash key. To type
-`Flash("toast", new Toast("success", "Saved"))`, wrap the entry:
-
-```csharp
-public sealed record Toast(string Type, string Message);
-public sealed record Flash(Toast? Toast);   // page.flash.toast is Toast | null
-o.TypeScript.FlashData<Flash>();
-```
-
-## Prop members
-
-An `InertiaProp` member is optional (it can be deferred, optional or rescued) and `unknown`, unless `[InertiaPropType(typeof(T))]` names its value type.
-
-## Mapping
-
-| .NET | TypeScript |
-|---|---|
-| `int`, `long`, `double`, `decimal`, `float` | `number` (`number \| bigint` for 64-bit and larger with `PreserveBigIntegers`) |
-| `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid`, `byte[]` | `string` |
-| enum | union of JSON values: numbers by default, with the member names in a doc comment; string names with `JsonStringEnumConverter` |
-| dictionary | `Record<string, T>` |
-| polymorphic type | union tagged with its discriminator |
-| C# 15 `union` (.NET 11) | union of its case types, `User \| Team` (plus `\| null` when a case is nullable) |
-| nullable member | `T \| null` |
-
-Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.
-
-Number handling follows member settings, then type settings, then the global JSON options. Custom converter output is typed as `unknown` with a warning when its shape cannot be inferred.
-
-<Callout type="info" title="Validation and JSON names">
-Props and MVC validation error keys use the HTTP `JsonOptions`. FastEndpoints error keys use its binding serializer policy. Keep client field names aligned with the applicable policy; custom resolvers without member metadata may require client JSON names for aliases.
-</Callout>
-
----
-
-# Page records and typed routes
-
-URL: https://inertia-dotnet.temtem.dev/docs/typed-routes
-
-> Name a page's component once, generate a typed routes.ts for named endpoints, write the files at build time, and check component names at compile time.
-
-These build on [TypeScript types](/docs/typescript): the same `o.TypeScript` options write both files.
-
-## Page records
-
-A record that implements `IInertiaPage` names its component once, so neither `Render` nor the TypeScript registration repeats it:
-
-```csharp
-public sealed record UsersPage(List<User> Users) : IInertiaPage
-{
-    public static string Component => "Users/Index";
-}
-
-return Render(new UsersPage(users));                 // component "Users/Index"
-o.TypeScript.Page<UsersPage>();                      // or AddGeneratedPages(): every IInertiaPage in the project, listed at compile time
-```
-
-`AddGeneratedPages()` is written by a source generator, so it needs no reflection and works under [Native AOT](/docs/native-aot). `PagesFrom(assembly)` does the same with reflection, for page records in another assembly.
-
-FastEndpoints' `Send.InertiaAsync(page)` takes a page record too.
-
-## Typed routes
-
-Set `RoutesOutputPath` and every named endpoint (`WithName`, a controller route name, or a FastEndpoints `Description(x => x.WithName(...))`) gets a typed function in `routes.ts`:
-
-```csharp
-o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
-app.MapGet("/users/{id:int}", ...).WithName("users.show");
-app.MapPost("/users", (CreateUser input) => ...).WithName("users.store");
-```
-
-<Tabs>
-  <Tab label="React">
-
-```tsx
-import { Link, useForm } from '@inertiajs/react'
-import { routes, type RouteBodies } from '../../types/routes'
-
-export default function Create({ user }: { user: { id: number; name: string } }) {
-  const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
-  const posts = routes.users.show.url(user.id, { query: { tab: 'posts' } })   // '/users/1?tab=posts'
-
-  return (
-    <>
-      {/* routes.users.show(1) is { url: '/users/1', method: 'get' } */}
-      <Link href={routes.users.show(user.id)}>{user.name}</Link> <a href={posts}>Posts</a>
-      <form onSubmit={(e) => { e.preventDefault(); form.submit(routes.users.store()) }}>
-        <input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
-        <button disabled={form.processing}>Create</button>
-      </form>
-    </>
-  )
-}
-```
-
-  </Tab>
-  <Tab label="Vue">
-
-```vue
-<script setup lang="ts">
-import { Link, useForm } from '@inertiajs/vue3'
-import { computed } from 'vue'
-import { routes, type RouteBodies } from '../../types/routes'
-
-const props = defineProps<{ user: { id: number; name: string } }>()
-const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
-const posts = computed(() => routes.users.show.url(props.user.id, { query: { tab: 'posts' } }))   // '/users/1?tab=posts'
-</script>
-
-<template>
-  <!-- routes.users.show(1) is { url: '/users/1', method: 'get' } -->
-  <Link :href="routes.users.show(user.id)">{{ user.name }}</Link> <a :href="posts">Posts</a>
-  <form @submit.prevent="form.submit(routes.users.store())">
-    <input v-model="form.name" />
-    <button :disabled="form.processing">Create</button>
-  </form>
-</template>
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```svelte
-<script lang="ts">
-  import { Link, useForm } from '@inertiajs/svelte'
-  import { routes, type RouteBodies } from '../../types/routes'
-
-  let { user }: { user: { id: number; name: string } } = $props()
-  const form = useForm<RouteBodies['users.store']>({ name: '' })   // the request body, typed from CreateUser
-  const posts = $derived(routes.users.show.url(user.id, { query: { tab: 'posts' } }))   // '/users/1?tab=posts'
-
-  function submit(e: SubmitEvent) {
-    e.preventDefault()
-    form.submit(routes.users.store())
-  }
-</script>
-
-<!-- routes.users.show(1) is { url: '/users/1', method: 'get' } -->
-<Link href={routes.users.show(user.id)}>{user.name}</Link> <a href={posts}>Posts</a>
-<form onsubmit={submit}>
-  <input bind:value={form.name} />
-  <button disabled={form.processing}>Create</button>
-</form>
-```
-
-  </Tab>
-</Tabs>
-
-- Route parameters are typed from their constraints; optional and catch-all parameters are optional.
-- Every HTTP method of an endpoint has a variant (`routes.users.update.put(1)`).
-- `routeConfig.base` prefixes every URL (an app under a path base).
-- `RouteBodies` holds the `[FromBody]` (or FastEndpoints request) type of each route that has one.
-- Unnamed endpoints are skipped.
-
-`o.TypeScript.LiveEvents(...)` also exports live event names and channels as `liveEvents`. See [Live props](/docs/live-props#reloading-scroll-and-merge-props).
-
-To assert a route sent as a prop in tests, use `WhereRoute(key, url, method)`. See [Testing](/docs/testing).
-
-## Generating at build time
-
-Set `<InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>` in the project file, and every build (including the one inside `dotnet publish`) runs the app once with `--inertia-types` to write both files. The app starts without listening on any port and exits; a failure to write fails the build. In CI, compare the result with the committed files:
-
-```sh
-dotnet build -p:InertiaGenerateTypesOnBuild=true
-git diff --exit-code ClientApp/types
-```
-
-## Compile-time component checks
-
-Inertia.Net ships an analyzer in the `Inertia.Net` package:
-
-| Rule | Reports |
-|---|---|
-| `INERTIA001` | Two page records that claim one component. |
-| `INERTIA002` | A component name, in `Render("...")`, `MapInertia` or a page record, that has no page file under `$(InertiaPagesDirectory)`. |
-
-`INERTIA002` runs when the project file sets the pages directory:
-
-```xml
-<PropertyGroup>
-  <InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>
-</PropertyGroup>
-```
 
 ---
 

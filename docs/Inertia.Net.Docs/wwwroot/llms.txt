@@ -37,6 +37,12 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [Live props](https://inertia-dotnet.temtem.dev/docs/live-props): Props that refresh themselves when the server broadcasts an event.
 - [Precognition](https://inertia-dotnet.temtem.dev/docs/precognition): Validate a form before submission without running its handler.
 
+## Type safety
+
+- [Page records](https://inertia-dotnet.temtem.dev/docs/page-records): Optional typed page props that name their component once, generate their TypeScript type, and can hold the handler that renders them.
+- [TypeScript types](https://inertia-dotnet.temtem.dev/docs/typescript): Generate declarations for page props, shared props and flash data from your .NET contracts.
+- [Typed routes](https://inertia-dotnet.temtem.dev/docs/typed-routes): Generate a typed routes.ts for named endpoints, with typed parameters and request bodies, and write it at build time.
+
 ## Production
 
 - [Server-side rendering](https://inertia-dotnet.temtem.dev/docs/server-side-rendering): Render the first visit on Bun or Node, supervise the process from .NET, and fall back safely.
@@ -52,8 +58,6 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 ## Reference
 
 - [Configuration](https://inertia-dotnet.temtem.dev/docs/configuration): InertiaOptions, Vite, SSR, props, state and the middleware and result API.
-- [TypeScript types](https://inertia-dotnet.temtem.dev/docs/typescript): Generate declarations for page props, shared props and flash data from your .NET contracts.
-- [Page records and typed routes](https://inertia-dotnet.temtem.dev/docs/typed-routes): Name a page's component once, generate a typed routes.ts for named endpoints, write the files at build time, and check component names at compile time.
 - [Testing](https://inertia-dotnet.temtem.dev/docs/testing): Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
 - [DevTools](https://inertia-dotnet.temtem.dev/docs/devtools): Record visits for the Inertia DevTools extension and catch missing page components during development.
 - [Troubleshooting](https://inertia-dotnet.temtem.dev/docs/troubleshooting): Common errors, their causes, and how to fix them.

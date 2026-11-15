@@ -26,7 +26,7 @@ public sealed record UsersPage(List<User> Users, string Title);
 app.MapGet("/users", () => Render("Users/Index", new UsersPage(users, "Users")));
 ```
 
-A record that implements `IInertiaPage` names its component, so `Render(new UsersPage(...))` needs no component string. See [Page records](/docs/typed-routes#page-records).
+This is the default style, and the rest of these docs use it. If you want typed props, a record that implements `IInertiaPage` names its component, so `Render(new UsersPage(...))` needs no component string, and the record can hold its own GET handler. See [Page records](/docs/page-records).
 
 Every page has an `errors` prop (an empty object when there are no errors). Key order is `errors`, shared props, then page props.
 
