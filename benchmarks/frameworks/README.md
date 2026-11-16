@@ -69,15 +69,45 @@ drop as CPUs are added; throughput is where the sequential route scales instead.
 
 **Dev-server cold start** (`--dev`): with dependencies installed and nothing built, the time from starting the dev command
 (`dotnet watch` + Vite, `next dev`, `vite dev`, `php artisan serve` + Vite) until `/` answers 200, in the same container limits.
-The Inertia.Net app references the library's source, so its first `dotnet watch` build also compiles Inertia.Net and its analyzers,
-which an app using the NuGet package would not. Hot-reload timing in a browser is not measured (it needs a scripted browser).
+The benchmark images reference the library's source, but the Inertia.Net dev image builds against the `Inertia.Net` 1.9.2 NuGet
+package (`-p:InertiaBenchPackage=true`), as a developer's app would, so its first `dotnet watch` build does not compile the library.
+Hot-reload timing in a browser is not measured (it needs a scripted browser).
+
+## Images
+
+Every app is built on the host (`dotnet publish`, `npm ci && npm run build`), and its Dockerfile only copies the output onto an
+Alpine runtime image, so each image holds a runtime and the built app, nothing else. Two steps run in Docker instead: the Native
+AOT publish (`inertianet/aot.Dockerfile`, in `mcr.microsoft.com/dotnet/sdk:11.0.100-alpine3.24-aot`, so the binary links against
+musl; run.sh exports the result to `inertianet/publish/aot`), and Laravel's `composer install` (a pinned build stage, as PHP is
+not needed on the host).
+
+| Image | Base | Node |
+|---|---|---|
+| Inertia.Net JIT, SSR / SPA | `mcr.microsoft.com/dotnet/aspnet:10.0.15-alpine3.24` | SSR only |
+| Inertia.Net Native AOT, SSR / SPA | `mcr.microsoft.com/dotnet/runtime-deps:10.0.15-alpine3.24` | SSR only |
+| Next.js, SSR / SPA | `node:24.22.3-alpine3.24` | Always (it is the server) |
+| TanStack Start, SSR / SPA | `node:24.22.3-alpine3.24` | Always (it is the server) |
+| Laravel, SSR / SPA | `dunglas/frankenphp:1.13.5-php8.5-alpine` | SSR only |
+
+**Every image is Alpine, so every app runs on musl libc.** musl's memory allocator can be slower than glibc's for some
+allocation-heavy workloads, so these numbers describe Alpine images; the same apps on Debian or Ubuntu images may measure
+differently.
+
+Node is in an image only when something runs JavaScript on the server: the Next.js and TanStack Start servers, and the SSR renderer
+of the two Inertia apps (Inertia.Net's managed Node process, inertia-laravel's SSR server). The SPA images of the Inertia apps have
+no Node at all. Where Node is added to a .NET or FrankenPHP image, it is Alpine's own musl build (`apk add nodejs=24.22.3-r0`, the
+same Node version as the `node` images).
+
+The dev-server images (`Dockerfile.dev`, used by `--dev`) are different: they install the full toolchain and dependencies
+themselves, on the Debian-based SDK, `node` and FrankenPHP images, because they measure a developer's machine, not a deployment.
 
 ## How to run it
 
-You need Docker, `jq`, `curl` and the .NET SDK from `global.json` (for the load client). From the repository root:
+You need Docker, `jq`, `curl`, the .NET SDK from `global.json`, and Node 24 with npm (the apps are built on the host). From the
+repository root:
 
 ```sh
-benchmarks/frameworks/run.sh --check        # parity check only: builds the images, starts each app, compares the answers
+benchmarks/frameworks/run.sh --check        # parity check only: builds the apps and images, starts each app, compares the answers
 benchmarks/frameworks/run.sh --smoke        # parity check + very short loads: proves everything works, the numbers mean nothing
 benchmarks/frameworks/run.sh                # parity check + the full benchmark, written to artifacts/framework-bench.md
 benchmarks/frameworks/run.sh --dev          # dev-server cold start
@@ -133,7 +163,9 @@ What each stack offers out of the box or through its official packages. "Unverif
 ## Versions
 
 Exact versions are pinned everywhere: npm `package.json` files with exact versions and lockfiles, `laravel/composer.lock`, and Docker
-image tags (`node:24.22.3-bookworm-slim`, `mcr.microsoft.com/dotnet/sdk:11.0.100`, `aspnet:10.0.15-noble`, `runtime-deps:10.0.15-noble`,
-`dunglas/frankenphp:1.13.5-php8.5-trixie`, `composer:2.11.2`, `postgres:18.7-bookworm`, `redis:8.8.4-alpine`). React is 19.3.1 and
+image tags (runtime: `node:24.22.3-alpine3.24`, `aspnet:10.0.15-alpine3.24`, `runtime-deps:10.0.15-alpine3.24`,
+`dunglas/frankenphp:1.13.5-php8.5-alpine` with Alpine's `nodejs=24.22.3-r0`; build: `sdk:11.0.100-alpine3.24-aot`, `composer:2.11.2`;
+dev: `node:24.22.3-bookworm-slim`, `sdk:11.0.100`, `aspnet:10.0.15-noble`, `dunglas/frankenphp:1.13.5-php8.5-trixie`; services:
+`postgres:18.7-bookworm`, `redis:8.8.4-alpine`). The workflow builds with Node 24.22.3 and the SDK from `global.json`. React is 19.3.1 and
 `@inertiajs/react` 3.11.0 everywhere. The Laravel image starts from the `laravel/laravel` v13.11.0 skeleton and overlays the files in
-`laravel/`; the PHP extensions are pdo_pgsql, phpredis 6.3.0, pcntl and zip.
+`laravel/`; the PHP extensions are pdo_pgsql, phpredis 6.3.0 and pcntl (plus zip in the Composer stage).
