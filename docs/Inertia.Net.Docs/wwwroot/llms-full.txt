@@ -1605,7 +1605,7 @@ A parallel loader must not use the request's `DbContext` or other non-thread-saf
 
 ```csharp
 ["orders"] = Prop<AppDbContext, int>((db, ct) => db.Orders.CountAsync(ct)),
-["inbox"] = Prop<InboxService, Inbox>((inbox, ct) => inbox.LoadAsync(ct)).Defer(), // and .Optional(), .Cache(...), .Live(...)
+["inbox"] = Prop<InboxService, Inbox>((inbox, ct) => inbox.LoadAsync(ct)).Defer(), // and .Once(), .Cache(...), .Live(...), .Rescue()
 ```
 
 - A loader that runs during the request gets the request's instance (the same `DbContext` the handler used).
@@ -2450,10 +2450,16 @@ See [Error pages](/docs/error-pages) for the 403 and 429 pages.
 ```csharp
 builder.Services.AddRateLimiter(o =>
 {
-    o.AddPolicy("login", http => InertiaPrecognition.IsPrecognitive(http.Request)
-        ? RateLimitPartition.GetNoLimiter("validation")
-        : RateLimitPartition.GetFixedWindowLimiter(http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("login", http =>
+    {
+        var client = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        // The metadata check keeps the Precognition header from skipping the limit on an endpoint whose handler runs for it.
+        return http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null && InertiaPrecognition.IsPrecognitive(http.Request)
+            ? RateLimitPartition.GetSlidingWindowLimiter("validation:" + client,
+                _ => new SlidingWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6 })
+            : RateLimitPartition.GetFixedWindowLimiter("login:" + client,
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) });
+    });
     o.OnRejected = InertiaRateLimiting.OnRejected("error", "Too many attempts. Try again later.");
 });
 
