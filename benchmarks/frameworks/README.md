@@ -38,59 +38,61 @@ a stable URL to post to; a route handler is a normal way to build a form API in 
 
 ## Results
 
-> These results are from the first version of the apps (plain SQL in every app, no form, no ORM). They will be replaced by a run
-> of the current version.
-
-From one run on a GitHub-hosted runner (4 CPUs, AMD EPYC) on 2026-11-16, each app limited to 2 CPUs and 2 GB. The full tables,
-with every route, latency percentile and fixed-rate run, are in [results/2026-11-16.md](results/2026-11-16.md). No run was marked
-overloaded: every request succeeded, and every SSR response was really server-rendered.
+From one run on a GitHub-hosted runner (4 CPUs, AMD EPYC 7763) on 2026-11-16, each app limited to 2 CPUs and 2 GB. The full
+tables, with every route, latency percentile and fixed-rate run, are in [results/2026-11-16-v2.md](results/2026-11-16-v2.md).
+No run was marked overloaded: every request succeeded, and every SSR response was really server-rendered. The first version of
+the apps (plain SQL, no form) is in [results/2026-11-16.md](results/2026-11-16.md); it ran on a faster runner CPU, so don't
+compare numbers across the two files.
 
 **Memory and startup**
 
 | App | Memory at rest, SPA / SSR | Cold start, SPA / SSR | Image, SPA / SSR |
 |---|---:|---:|---:|
-| Inertia.Net, Native AOT | **18** / 49 MB | **221** / 496 ms | **34** / 98 MB |
-| Inertia.Net, JIT | 34 / 66 MB | 433 / 1009 ms | 119 / 183 MB |
-| TanStack Start | 88 / 88 MB | 295 / 275 ms | 167 MB |
-| Next.js | 115 / 117 MB | 524 / 638 ms | 182 MB |
-| Laravel (Octane, FrankenPHP) | 101 / 156 MB | 775 / 888 ms | 252 / 311 MB |
+| Inertia.Net, Native AOT (Npgsql) | **20** / 50 MB | **239** / 704 ms | **34** / 98 MB |
+| Inertia.Net, JIT (EF Core) | 58 / 91 MB | 743 / 1297 ms | 125 / 189 MB |
+| TanStack Start | 86 / 93 MB | 473 / 475 ms | 167 MB |
+| Next.js | 132 / 138 MB | 1141 / 1237 ms | 185 MB |
+| Laravel (Octane, FrankenPHP) | 105 / 161 MB | 1212 / 1374 ms | 252 / 311 MB |
 
 Memory is the whole container: for SSR that includes the Node renderer, for Laravel all its PHP workers.
 
-**Requests per second** (16 connections; higher is better)
+**Requests per second** (16 connections, SSR mode; higher is better)
 
 | Route | Inertia.Net JIT | Inertia.Net AOT | TanStack Start | Next.js | Laravel |
 |---|---:|---:|---:|---:|---:|
-| `/todos?perPage=25`, first visit with SSR | **5,023** | 4,817 | 1,897 | 592 | 534 |
-| `/todos?perPage=25`, client-side navigation (JSON) | **12,603** | 11,901 | 6,261 | 2,624 | 1,102 |
-| `/dashboard` (Redis), client-side navigation | 26,383 | **26,670** | 13,009 | 3,297 | 1,410 |
-| `/compute?n=20000` (CPU-heavy, JSON) | **1,551** | 1,103 | 288 | 240 | 86 |
+| `/todos?perPage=25`, first visit | 1,836 | **2,449** | 934 | 254 | 192 |
+| `/todos?perPage=25`, client-side navigation (JSON) | 3,439 | **5,037** | 1,973 | 1,075 | 301 |
+| `/dashboard` (cached in Redis), client-side navigation | 6,935 | **8,708** | 5,874 | 1,447 | 739 |
+| New todo, valid post (validate and insert) | 3,482 | **4,887** | 2,419 | 1,117 | 447 |
+| New todo, invalid post (four errors) | 6,468 | **8,298** | 3,806 | 1,503 | 452 |
+| `/compute?n=20000` (CPU-heavy, JSON) | **986** | 711 | 164 | 145 | 50 |
 
 **Using more CPUs** (`/compute/parallel`, JSON, 16 connections)
 
 | App | 1 CPU | 2 CPUs | 4 CPUs |
 |---|---:|---:|---:|
-| Inertia.Net, JIT | 909 | 1,534 | 2,702 |
-| Inertia.Net, Native AOT | 714 | 1,069 | 1,824 |
-| TanStack Start | 215 | 398 | 514 |
-| Next.js | 182 | 350 | 444 |
-| Laravel (sequential in PHP) | 61 | 84 | 161 |
+| Inertia.Net, JIT | 626 | 1,010 | 1,591 |
+| Inertia.Net, Native AOT | 482 | 701 | 1,162 |
+| TanStack Start | 136 | 247 | 331 |
+| Next.js | 133 | 216 | 282 |
+| Laravel (sequential in PHP) | 37 | 50 | 99 |
 
 What stands out:
 
-- **Inertia.Net uses the least memory and serves the most requests in this test.** The Native AOT SPA build sits at 18 MB, about
-  a fifth of the smallest Node app. With SSR, Inertia.Net served about 2.6 times as many first visits as TanStack Start and about
-  8 to 9 times as many as Next.js and Laravel.
-- **Client-side navigation is cheap in every Inertia.Net mode**, because an Inertia visit returns only the page's JSON and the SSR
-  renderer is not involved.
-- **CPU-heavy work is mostly a language-speed test.** .NET runs the same algorithm several times faster than Node and much faster
-  than PHP. Node handles one request's JavaScript at a time per process, so the plain `/compute` route stays near 240 req/s at any
-  CPU count. Only the worker-thread route (`/compute/parallel`) uses extra cores. .NET spreads both routes over all cores with no
-  extra code.
-- **Native AOT is about 30% slower than JIT on the CPU-heavy routes.** The JIT build optimises hot code at run time using what
-  it observes (dynamic PGO), and AOT can't. AOT wins on memory, startup and image size, and is level with JIT on ordinary pages.
-- **Laravel can't keep up with 200 req/s on `/compute`** (it peaks near 90 on 2 CPUs), so those requests queue for 3 to 6 seconds.
-  It scales by running more PHP workers, which shows from 2 to 4 CPUs.
+- **Inertia.Net serves the most requests on every route and uses the least memory.** With SSR it served about 2 to 2.6 times as
+  many first visits as TanStack Start and about 7 to 13 times as many as Next.js and Laravel. Its form posts, with validation,
+  antiforgery and a database insert, beat the Node apps' plain JSON route handlers.
+- **On database routes the AOT build is faster than the JIT build, because of the data layer, not AOT.** The AOT build uses plain
+  Npgsql and the JIT build uses EF Core: about 45% more JSON navigations and 40% more valid posts. The JIT build also sits about 25 MB
+  higher at rest than in the first version. On the CPU-heavy route, where neither touches the database, JIT is about 40% faster.
+- **Every Inertia app now pays for forgery protection on every page:** an antiforgery token in Inertia.Net, a session in Laravel.
+  The Node apps' route handlers don't, which narrows Inertia.Net's lead compared with the first version.
+- **CPU-heavy work is mostly a language-speed test.** Node handles one request's JavaScript at a time per process, so plain
+  `/compute` stays near 150 req/s at any CPU count, and only the worker-thread route uses extra cores. .NET spreads both routes
+  over all cores with no extra code.
+- **Some apps can't keep up with 200 req/s on the heavy routes,** so requests queue for one to eight seconds (see the fixed-rate
+  columns in the full results): Laravel on `/compute` and `/todos?perPage=100`, Next.js on `/compute` and its `/todos?perPage=100`
+  first visit, and TanStack Start on `/compute`.
 - **Next.js "SPA (nearest)" pages are a static shell.** The page then fetches its data from an API route. Its `page` rows measure
   serving that shell, so compare its `json` rows instead.
 
