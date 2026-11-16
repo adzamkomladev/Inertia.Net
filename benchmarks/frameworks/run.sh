@@ -8,7 +8,7 @@
 #   run.sh [options]                      parity check, then the benchmark
 #   run.sh --dev                          dev-server cold start only
 #
-# Options: --frameworks inertianet,inertianet-aot,nextjs,tanstack,laravel  --modes ssr,spa
+# Options: --frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel  --modes ssr,spa
 #          --routes home,todos25,todos100,dashboard,new,create,invalid,compute,parallel
 #          --seconds 10 --warmup 5 --connections 16 --rates 50,200 --cpus 2 --memory 2g --scale-cpus 1,2,4 --port 18080
 #          --out artifacts/framework-bench.md --keep-services (leave Postgres and Redis running)
@@ -18,7 +18,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 DOTNET=${DOTNET:-dotnet}
 
-FRAMEWORKS=inertianet,inertianet-aot,nextjs,tanstack,laravel
+FRAMEWORKS=inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel
 MODES=ssr,spa
 ROUTES=home,todos25,todos100,dashboard,new,create,invalid,compute,parallel
 DURATION=10 WARMUP=5 CONNECTIONS=16 RATES=50,200 CPUS=2 MEMORY=2g SCALE=1,2,4 PORT=18080
@@ -108,11 +108,11 @@ prepare() { # framework -> the shared components copied in, npm packages install
   log "building $1 on the host"
   if [ -z "${PREPARED[$dir]:-}" ]; then # the JIT and AOT apps share one client build
     case $1 in
-      inertianet*) shared=ClientApp/shared ;; nextjs) shared=shared ;; tanstack) shared=src/shared ;; laravel) shared=resources/js/shared ;;
+      inertianet*) shared=ClientApp/shared ;; nextjs | nuxt) shared=shared ;; tanstack) shared=src/shared ;; laravel) shared=resources/js/shared ;;
     esac
     rm -rf "${dir:?}/$shared" && cp -r "$HERE/shared/ts" "$dir/$shared"
     (cd "$dir" && "$NPM" ci --no-audit --no-fund --loglevel=error >&2)
-    [[ $1 == nextjs || $1 == tanstack ]] || (cd "$dir" && "$NPM" run build >&2)
+    [[ $1 == nextjs || $1 == tanstack || $1 == nuxt ]] || (cd "$dir" && "$NPM" run build >&2)
     PREPARED[$dir]=1
   fi
   case $1 in
@@ -136,8 +136,8 @@ build() { # framework mode
       inertianet) target=(--target "jit-$2") ;;
       inertianet-aot) target=(--target "aot-$2") ;;
       laravel) target=(--target "$2") ;;
-      # Next.js and TanStack Start decide SSR or SPA at build time.
-      nextjs | tanstack) (cd "$dir" && BENCH_MODE=$2 "$NPM" run build >&2) ;;
+      # Next.js, TanStack Start and Nuxt decide SSR or SPA at build time.
+      nextjs | tanstack | nuxt) (cd "$dir" && BENCH_MODE=$2 "$NPM" run build >&2) ;;
     esac
   fi
   log "building $(tag "$1" "$2")"
@@ -150,7 +150,7 @@ app_env() { # framework mode cpus -> docker run -e arguments, one per line
   case $1 in
     inertianet*) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "DATABASE_URL=Host=$PG;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10" "REDIS_URL=$REDIS:6379" ;;
     # Node sizes its worker pool from the host's CPUs, not the container's quota, so the pool gets the CPU limit (rounded up).
-    nextjs | tanstack) printf -- '-e\n%s\n' "BENCH_WORKERS=$(awk "BEGIN{print int($3 + 0.999)}")" "DATABASE_URL=postgres://bench:bench@$PG/bench" "REDIS_URL=redis://$REDIS:6379" ;;
+    nextjs | tanstack | nuxt) printf -- '-e\n%s\n' "BENCH_WORKERS=$(awk "BEGIN{print int($3 + 0.999)}")" "DATABASE_URL=postgres://bench:bench@$PG/bench" "REDIS_URL=redis://$REDIS:6379" ;;
     # FrankenPHP workers block on I/O, so two per CPU; each keeps one Postgres connection.
     laravel) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "OCTANE_WORKERS=$(awk "BEGIN{print int($3 * 2 + 0.999)}")" "DB_HOST=$PG" "REDIS_HOST=$REDIS" ;;
   esac
@@ -331,7 +331,7 @@ load() { "$DOTNET" "$LOAD_DLL" load "$@"; } # prints {"rps","p50Ms","p95Ms","p99
 name() {
   case $1 in
     inertianet) echo "Inertia.Net (JIT)" ;; inertianet-aot) echo "Inertia.Net (Native AOT)" ;; nextjs) echo Next.js ;;
-    tanstack) echo "TanStack Start" ;; laravel) echo "Laravel (Octane, FrankenPHP)" ;;
+    tanstack) echo "TanStack Start" ;; nuxt) echo Nuxt ;; laravel) echo "Laravel (Octane, FrankenPHP)" ;;
   esac
 }
 
@@ -439,7 +439,7 @@ bench_dev() {
     [ "$fw" = inertianet-aot ] && continue
     local cmd ms
     case $fw in
-      inertianet) cmd="dotnet watch + vite" ;; nextjs) cmd="next dev" ;; tanstack) cmd="vite dev" ;; laravel) cmd="php artisan serve + vite" ;;
+      inertianet) cmd="dotnet watch + vite" ;; nextjs) cmd="next dev" ;; tanstack) cmd="vite dev" ;; nuxt) cmd="nuxt dev" ;; laravel) cmd="php artisan serve + vite" ;;
     esac
     ms=$(start_app "$fw" spa "$CPUS" dev)
     echo "| $(name "$fw") | $cmd | $ms |" >>"$WORK/dev.md"

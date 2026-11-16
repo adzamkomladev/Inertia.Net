@@ -17,7 +17,7 @@ header() { awk -v s="## $SECTION" '$0 == s {on = 1; next} /^## / {on = 0} on && 
 # Sort key: framework order, then mode, then part, then the row's place in its part.
 order() {
   awk -F'\t' 'BEGIN {
-      o["Inertia.Net (JIT)"] = 1; o["Inertia.Net (Native AOT)"] = 2; o["Next.js"] = 3; o["TanStack Start"] = 4; o["Laravel (Octane, FrankenPHP)"] = 5
+      o["Inertia.Net (JIT)"] = 1; o["Inertia.Net (Native AOT)"] = 2; o["Next.js"] = 3; o["TanStack Start"] = 4; o["Nuxt"] = 5; o["Laravel (Octane, FrankenPHP)"] = 6
       m["SSR"] = 1; m["SPA"] = 2; m["SPA (nearest)"] = 2 }
     { split($2, c, " \\| "); fw = substr(c[1], 3); mode = c[2]; if ('"$1"') mode = ""
       printf "%d\t%d\t%04d\t%06d\t%s\n", (fw in o ? o[fw] : 9), (mode in m ? m[mode] : 0), $1, NR, $2 }' |

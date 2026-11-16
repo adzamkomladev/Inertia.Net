@@ -1,15 +1,16 @@
 # Framework comparison
 
-The same small app, built four ways, measured the same way:
+The same small app, built five ways, measured the same way:
 
 | App | Stack | Folder |
 |---|---|---|
 | Inertia.Net | ASP.NET Core Minimal API on .NET 10 + Inertia.Net (this repository, by project reference) + React. Run as a normal (JIT) build and as a Native AOT build. | `inertianet/` |
 | Next.js | Next.js 16.4.6, App Router, `output: 'standalone'` | `nextjs/` |
 | TanStack Start | TanStack Start 1.169.5 on Vite 8 with the `nitro/vite` plugin (Node server) | `tanstack/` |
+| Nuxt | Nuxt 4.6.4 (Vue 3.5.45) on Nitro 2.13.6, `node-server` preset | `nuxt/` |
 | Laravel | Laravel 13 (framework 13.42.0) + inertia-laravel 3.7.0 + React, served by Laravel Octane 2.24.0 on FrankenPHP 1.13.5 (worker mode) | `laravel/` |
 
-Every app shows the same React pages, written in TypeScript (`shared/ts/*Page.tsx`, copied into each app at build time). Each app
+Every app shows the same React pages, written in TypeScript (`shared/ts/*Page.tsx`, copied into each app at build time), except Nuxt, which renders Vue ports of those pages (`nuxt/app/components`) with the same markup. Each app
 reads the same Postgres tables (`shared/schema.sql`) through the ORM its community normally uses, caches the dashboard in Redis
 for 60 seconds the framework's usual way, validates the same form with its usual validation library, and runs the same
 CPU-heavy algorithm. A parity check proves they all return the same rows, checksums and validation messages before anything is
@@ -19,13 +20,13 @@ measured.
 
 The aim is that each app looks like what a team would write in that framework, not the fastest code each one could run.
 
-| | Inertia.Net | Laravel | Next.js | TanStack Start |
-|---|---|---|---|---|
-| Data access | EF Core 10 (Npgsql provider), paging with `Inertia.Net.EntityFrameworkCore`'s `ToPageAsync` | Eloquent models | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres |
-| Dashboard cache (60 s, Redis) | Inertia.Net's prop cache, `InertiaProp.Cache("dashboard", ...)`, on the `Inertia.Net.Redis` store | `Cache::remember` on the Redis store | A `'use cache: remote'` function with a Redis cache handler (Cache Components) | Nitro's `defineCachedFunction`, with Nitro's storage mounted on Redis (unstorage's Redis driver) by a Nitro plugin |
-| Form validation | .NET 10 validation (`AddValidation()`, `IValidatableObject`) with `WithInertiaValidation()` | A Form Request | zod | zod |
-| Form endpoint | `POST /todos`, Inertia redirect back with errors | `POST /todos`, Inertia redirect back with errors | `POST /api/todos` route handler: 201, or 422 with errors | `POST /api/todos` server route: 201, or 422 with errors |
-| Request forgery protection | Antiforgery with the `XSRF-TOKEN` cookie (as in the Inertia.Net template) | CSRF with the `XSRF-TOKEN` cookie, cookie sessions | None by default for route handlers | None by default for server routes |
+| | Inertia.Net | Laravel | Next.js | TanStack Start | Nuxt |
+|---|---|---|---|---|---|
+| Data access | EF Core 10 (Npgsql provider), paging with `Inertia.Net.EntityFrameworkCore`'s `ToPageAsync` | Eloquent models | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres |
+| Dashboard cache (60 s, Redis) | Inertia.Net's prop cache, `InertiaProp.Cache("dashboard", ...)`, on the `Inertia.Net.Redis` store | `Cache::remember` on the Redis store | A `'use cache: remote'` function with a Redis cache handler (Cache Components) | Nitro's `defineCachedFunction`, with Nitro's storage mounted on Redis (unstorage's Redis driver) by a Nitro plugin | Nitro's `defineCachedFunction`, with Nitro's storage mounted on Redis (unstorage's Redis driver) by a Nitro plugin |
+| Form validation | .NET 10 validation (`AddValidation()`, `IValidatableObject`) with `WithInertiaValidation()` | A Form Request | zod | zod | zod |
+| Form endpoint | `POST /todos`, Inertia redirect back with errors | `POST /todos`, Inertia redirect back with errors | `POST /api/todos` route handler: 201, or 422 with errors | `POST /api/todos` server route: 201, or 422 with errors | `POST /api/todos` Nitro server route: 201, or 422 with errors |
+| Request forgery protection | Antiforgery with the `XSRF-TOKEN` cookie (as in the Inertia.Net template) | CSRF with the `XSRF-TOKEN` cookie, cookie sessions | None by default for route handlers | None by default for server routes | None by default for server routes |
 
 **The Native AOT build uses plain Npgsql, not EF Core.** EF Core 10's `DbContext` is not trim- or AOT-safe (its constructor warns
 IL2026/IL3050), `ToPageAsync` builds its query inside the library where EF's query precompiler cannot see it, and the
@@ -33,7 +34,7 @@ precompiler's interceptors do not compile with the .NET 11 SDK this repository b
 layer (`BenchData.Npgsql.cs`, same routes and results) whenever `PublishAot=true`. This is what the Inertia.Net docs recommend for
 Native AOT apps today.
 
-The Next.js and TanStack Start forms post to a JSON route rather than a server action or server function, because a load test needs
+The Next.js, TanStack Start and Nuxt forms post to a JSON route rather than a server action or server function, because a load test needs
 a stable URL to post to; a route handler is a normal way to build a form API in both.
 
 ## Results
@@ -124,6 +125,7 @@ Each route is measured twice:
 |---|---|---|
 | Inertia.Net | `BENCH_SSR=1`: the library starts and supervises one Node process (`UseNodeProcess`) that renders first visits. SSR is `Required`, so a render that fails is an error rather than a silent client-rendered page. | SSR off: the HTML holds the page JSON and React renders it in the browser. |
 | Laravel | `BENCH_SSR=1`: inertia-laravel's SSR server (`php artisan inertia:start-ssr`, one Node process). | SSR off (`INERTIA_SSR_ENABLED=0`). |
+| Nuxt | The default: pages load their data with `useFetch`, which calls the `/api` routes in-process on the server. | `ssr: false` at build time: the server answers page requests with the SPA shell and the browser fetches the `/api` routes. |
 | TanStack Start | The default: loaders and components run on the server. | Start's SPA mode (`spa: { enabled: true }`) plus `defaultSsr: false`. SPA mode prerenders a shell for static hosts; on the Node server it still rendered every route until SSR was turned off, so the server now answers page requests with the shell and the browser loads the data through server functions. |
 | Next.js | Server components that query the database on every request. | **Next.js has no true SPA mode.** The nearest equivalent is used and labelled "SPA (nearest)": each page is a static shell (prerendered at build time) whose client component fetches its props from the `/api` route handler. |
 
@@ -175,6 +177,7 @@ not needed on the host).
 | Inertia.Net Native AOT, SSR / SPA | `mcr.microsoft.com/dotnet/runtime-deps:10.0.15-alpine3.24` | SSR only |
 | Next.js, SSR / SPA | `node:24.22.3-alpine3.24` | Always (it is the server) |
 | TanStack Start, SSR / SPA | `node:24.22.3-alpine3.24` | Always (it is the server) |
+| Nuxt, SSR / SPA | `node:24.22.3-alpine3.24` | Always (it is the server) |
 | Laravel, SSR / SPA | `dunglas/frankenphp:1.13.5-php8.5-alpine` | SSR only |
 
 **Every image is Alpine, so every app runs on musl libc.** musl's memory allocator can be slower than glibc's for some
@@ -201,7 +204,7 @@ benchmarks/frameworks/run.sh                # parity check + the full benchmark,
 benchmarks/frameworks/run.sh --dev          # dev-server cold start
 ```
 
-Options: `--frameworks inertianet,inertianet-aot,nextjs,tanstack,laravel`, `--modes ssr,spa`,
+Options: `--frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel`, `--modes ssr,spa`,
 `--routes home,todos25,todos100,dashboard,compute,parallel`, `--seconds 10`, `--warmup 5`, `--connections 16`, `--rates 50,200`,
 `--cpus 2`, `--memory 2g`, `--scale-cpus 1,2,4`, `--port 18080`, `--out <file>`, and `--keep-services` to leave Postgres and Redis
 running for the next run. Everything run.sh creates is named `inertia-bench-fw-*` and removed when it exits.
@@ -264,5 +267,5 @@ image tags (runtime: `node:24.22.3-alpine3.24`, `aspnet:10.0.15-alpine3.24`, `ru
 `dunglas/frankenphp:1.13.5-php8.5-alpine` with Alpine's `nodejs=24.22.3-r0`; build: `sdk:11.0.100-alpine3.24-aot`, `composer:2.11.2`;
 dev: `node:24.22.3-bookworm-slim`, `sdk:11.0.100`, `aspnet:10.0.15-noble`, `dunglas/frankenphp:1.13.5-php8.5-trixie`; services:
 `postgres:18.7-bookworm`, `redis:8.8.4-alpine`). The workflow builds with Node 24.22.3 and the SDK from `global.json`. React is 19.3.1 and
-`@inertiajs/react` 3.11.0 everywhere. The Laravel image starts from the `laravel/laravel` v13.11.0 skeleton and overlays the files in
+`@inertiajs/react` 3.11.0 everywhere except Nuxt, which is Vue 3.5.45 with Nuxt 4.6.4 (Nitro 2.13.6, unstorage 1.17.6, ioredis 5.11.1). The Laravel image starts from the `laravel/laravel` v13.11.0 skeleton and overlays the files in
 `laravel/`; the PHP extensions are pdo_pgsql, phpredis 6.3.0 and pcntl (plus zip in the Composer stage).

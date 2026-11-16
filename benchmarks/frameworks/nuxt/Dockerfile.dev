@@ -1,0 +1,12 @@
+# syntax=docker/dockerfile:1
+# Dev-server cold start (run.sh --dev), with dependencies installed and nothing built. Build from benchmarks/frameworks:
+#   docker build -f nuxt/Dockerfile.dev .
+FROM node:24.22.3-bookworm-slim
+WORKDIR /app
+ENV NUXT_TELEMETRY_DISABLED=1
+COPY nuxt/package.json nuxt/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY nuxt/ ./
+COPY shared/ts shared
+EXPOSE 8080
+CMD ["npx", "nuxt", "dev"]

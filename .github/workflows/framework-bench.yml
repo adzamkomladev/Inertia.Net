@@ -1,6 +1,6 @@
 name: framework-bench
 
-# The framework comparison in benchmarks/frameworks (Inertia.Net, Next.js, TanStack Start, Laravel): the parity check, then the
+# The framework comparison in benchmarks/frameworks (Inertia.Net, Next.js, TanStack Start, Nuxt, Laravel): the parity check, then the
 # benchmark. Heavy (it builds every app and its Docker images), so it only runs on demand. By default each route runs on its own
 # runner in parallel, every app side by side on the same machine, and a last job merges the parts. The table is in the job summary
 # and the framework-bench artifact.
@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: ${{ fromJSON('{"routes":["--routes home","--routes todos25","--routes todos100","--routes dashboard","--routes new","--routes create","--routes invalid","--routes compute","--routes parallel"],"frameworks":["--frameworks inertianet","--frameworks inertianet-aot","--frameworks nextjs","--frameworks tanstack","--frameworks laravel"],"none":[""]}')[inputs.split] }}
+        part: ${{ fromJSON('{"routes":["--routes home","--routes todos25","--routes todos100","--routes dashboard","--routes new","--routes create","--routes invalid","--routes compute","--routes parallel"],"frameworks":["--frameworks inertianet","--frameworks inertianet-aot","--frameworks nextjs","--frameworks tanstack","--frameworks nuxt","--frameworks laravel"],"none":[""]}')[inputs.split] }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
