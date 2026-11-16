@@ -103,7 +103,7 @@ A parallel loader must not use the request's `DbContext` or other non-thread-saf
 
 ```csharp
 ["orders"] = Prop<AppDbContext, int>((db, ct) => db.Orders.CountAsync(ct)),
-["inbox"] = Prop<InboxService, Inbox>((inbox, ct) => inbox.LoadAsync(ct)).Defer(), // and .Optional(), .Cache(...), .Live(...)
+["inbox"] = Prop<InboxService, Inbox>((inbox, ct) => inbox.LoadAsync(ct)).Defer(), // and .Once(), .Cache(...), .Live(...), .Rescue()
 ```
 
 - A loader that runs during the request gets the request's instance (the same `DbContext` the handler used).
