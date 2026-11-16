@@ -55,6 +55,8 @@ COPY --from=node /usr/local/bin/node /usr/local/bin/node
 WORKDIR /src/benchmarks/frameworks/inertianet
 COPY --from=client /app/node_modules node_modules
 COPY benchmarks/frameworks/shared/js ClientApp/shared
+# Packages restored, nothing built: the same starting point as node_modules or vendor/ in the other dev images.
+RUN dotnet restore
 ENV ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_HTTP_PORTS=8080 DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
 EXPOSE 8080
 CMD ["sh", "-c", "node node_modules/vite/bin/vite.js & exec dotnet watch run --non-interactive"]
