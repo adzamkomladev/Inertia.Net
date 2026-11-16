@@ -1,0 +1,11 @@
+# syntax=docker/dockerfile:1
+# Dev-server cold start (run.sh --dev), with dependencies installed and nothing built. Build from benchmarks/frameworks:
+#   docker build -f tanstack/Dockerfile.dev .
+FROM node:24.22.3-bookworm-slim
+WORKDIR /app
+COPY tanstack/package.json tanstack/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY tanstack/ ./
+COPY shared/js src/shared
+EXPOSE 8080
+CMD ["npx", "vite", "dev"]

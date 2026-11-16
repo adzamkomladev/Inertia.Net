@@ -1,0 +1,12 @@
+# syntax=docker/dockerfile:1
+# Dev-server cold start (run.sh --dev), with dependencies installed and nothing built. Build from benchmarks/frameworks:
+#   docker build -f nextjs/Dockerfile.dev .
+FROM node:24.22.3-bookworm-slim
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY nextjs/package.json nextjs/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY nextjs/ ./
+COPY shared/js shared
+EXPOSE 8080
+CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "8080"]

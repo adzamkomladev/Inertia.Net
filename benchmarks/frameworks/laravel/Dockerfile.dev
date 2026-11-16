@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1
+# Dev-server cold start (run.sh --dev): php artisan serve and Vite side by side, with dependencies installed and nothing built.
+# Build from benchmarks/frameworks: docker build -f laravel/Dockerfile.dev .
+FROM node:24.22.3-bookworm-slim AS node
+
+FROM dunglas/frankenphp:1.13.5-php8.5-trixie
+RUN install-php-extensions pdo_pgsql redis-6.3.0 pcntl zip
+COPY --from=composer:2.11.2 /usr/bin/composer /usr/bin/composer
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+WORKDIR /app
+RUN rm -rf /app/* && composer create-project laravel/laravel=v13.11.0 /tmp/skeleton --no-install --no-scripts --quiet && cp -a /tmp/skeleton/. /app/ && rm -rf /tmp/skeleton
+COPY laravel/composer.json laravel/composer.lock laravel/package.json laravel/package-lock.json ./
+RUN composer install --no-scripts --no-autoloader --quiet && node /usr/local/lib/node_modules/npm/bin/npm-cli.js ci --no-audit --no-fund
+COPY laravel/ ./
+COPY shared/js resources/js/shared
+RUN cp .env.bench .env && sed -i 's/^APP_ENV=.*/APP_ENV=local/; s/^APP_DEBUG=.*/APP_DEBUG=true/' .env && composer dump-autoload --quiet && php artisan package:discover --quiet && php artisan key:generate --force --quiet
+EXPOSE 8080
+CMD ["sh", "-c", "node node_modules/vite/bin/vite.js & exec php artisan serve --host=0.0.0.0 --port=8080"]

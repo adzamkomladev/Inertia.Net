@@ -1,0 +1,7 @@
+**/node_modules
+**/vendor
+**/public/build
+**/bootstrap/ssr
+**/.next
+**/.output
+**/publish
