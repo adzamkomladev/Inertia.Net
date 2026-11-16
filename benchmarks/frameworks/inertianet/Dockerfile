@@ -52,6 +52,8 @@ ENTRYPOINT ["./InertiaNetBench"]
 # Dev-server cold start (run.sh --dev): Vite and dotnet watch side by side, as a developer runs them.
 FROM source AS dev
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
+# The app targets net10.0 and the SDK 11 image only carries the .NET 11 runtimes.
+COPY --from=mcr.microsoft.com/dotnet/aspnet:10.0.15-noble /usr/share/dotnet/shared /usr/share/dotnet/shared
 WORKDIR /src/benchmarks/frameworks/inertianet
 COPY --from=client /app/node_modules node_modules
 COPY benchmarks/frameworks/shared/js ClientApp/shared
