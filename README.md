@@ -1793,11 +1793,16 @@ Call `UseRateLimiter()` after `UseInertia()`, so the flash message is saved.
 ```csharp
 builder.Services.AddRateLimiter(o =>
 {
-    o.AddPolicy("login", http => http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
-        && InertiaPrecognition.IsPrecognitive(http.Request) // the header alone proves nothing: only a Precognition endpoint skips its handler
-        ? RateLimitPartition.GetNoLimiter("validation")
-        : RateLimitPartition.GetFixedWindowLimiter(http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("login", http =>
+    {
+        var client = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        // The metadata check keeps the Precognition header from skipping the limit on an endpoint whose handler runs for it.
+        return http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null && InertiaPrecognition.IsPrecognitive(http.Request)
+            ? RateLimitPartition.GetSlidingWindowLimiter("validation:" + client,
+                _ => new SlidingWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6 })
+            : RateLimitPartition.GetFixedWindowLimiter("login:" + client,
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) });
+    });
     o.OnRejected = InertiaRateLimiting.OnRejected("error", "Too many attempts. Try again later.");
 });
 app.MapPost("/login", ...).WithInertiaPrecognition().RequireRateLimiting("login");

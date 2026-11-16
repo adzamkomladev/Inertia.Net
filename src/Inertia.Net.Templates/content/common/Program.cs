@@ -34,16 +34,21 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.UseInertiaRedirects();
     });
 builder.Services.AddAuthorization();
-// At most 5 sign-in attempts a minute per client. Precognition requests (checking a field as you type) are not counted; the metadata
-// check keeps that header from skipping the limit on an endpoint whose handler runs for it.
+// At most 5 sign-in attempts a minute per client. Precognition requests (checking a field as you type) get their own allowance of 30 a
+// minute, so typing doesn't use up sign-in attempts and validation can't be called without limit.
 // Behind a reverse proxy every client has the proxy's address: configure forwarded headers first (README, "Deploying behind a proxy").
 builder.Services.AddRateLimiter(o =>
 {
-    o.AddPolicy("login", http => http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null
-        && InertiaPrecognition.IsPrecognitive(http.Request)
-        ? RateLimitPartition.GetNoLimiter("validation")
-        : RateLimitPartition.GetFixedWindowLimiter(http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("login", http =>
+    {
+        var client = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        // The metadata check keeps the Precognition header from skipping the limit on an endpoint whose handler runs for it.
+        return http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null && InertiaPrecognition.IsPrecognitive(http.Request)
+            ? RateLimitPartition.GetSlidingWindowLimiter("validation:" + client,
+                _ => new SlidingWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6 })
+            : RateLimitPartition.GetFixedWindowLimiter("login:" + client,
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) });
+    });
     o.OnRejected = InertiaRateLimiting.OnRejected(); // back to the form, with flash.error
 });
 #endif

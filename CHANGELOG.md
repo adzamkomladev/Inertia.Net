@@ -7,6 +7,11 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+### Security
+
+- `dotnet new inertia --auth`: Precognition validation requests to the login endpoint now have their own limit of 30 a minute per
+  client instead of none, so validation can't be called without limit. Sign-in attempts keep their limit of 5 a minute.
+
 ## [1.9.2] - 2026-11-15
 
 ### Security
