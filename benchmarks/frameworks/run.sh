@@ -9,6 +9,7 @@
 #   run.sh --dev                          dev-server cold start only
 #
 # Options: --frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel  --modes ssr,spa
+#          (also inertianet-tuned and inertianet-aot-tuned: the same images with BENCH_TUNED=1, Inertia.Net's caches and Node instances on)
 #          --routes home,todos25,todos100,dashboard,new,create,invalid,compute,parallel
 #          --seconds 10 --warmup 5 --connections 16 --rates 50,200 --cpus 2 --memory 2g --scale-cpus 1,2,4 --port 18080
 #          --out artifacts/framework-bench.md --keep-services (leave Postgres and Redis running)
@@ -92,6 +93,7 @@ NPM=${NPM:-npm}
 declare -A PREPARED=()
 
 tag() { # framework mode -> image tag (mode dev: the dev-server image)
+  set -- "${1%-tuned}" "$2" # a tuned app is its plain app's image, started with BENCH_TUNED=1
   case $1 in
     inertianet) [ "$2" = dev ] && echo inertia-bench-fw-inertianet:dev || echo "inertia-bench-fw-inertianet:jit-$2" ;;
     inertianet-aot) echo "inertia-bench-fw-inertianet:aot-$2" ;;
@@ -125,6 +127,7 @@ prepare() { # framework -> the shared components copied in, npm packages install
 }
 
 build() { # framework mode
+  set -- "${1%-tuned}" "$2"
   local dir target=() file=Dockerfile context
   dir=$(app_dir "$1") context=$dir
   if [ "$2" = dev ]; then
@@ -148,7 +151,7 @@ app_env() { # framework mode cpus -> docker run -e arguments, one per line
   local ssr=0
   [ "$2" = ssr ] && ssr=1
   case $1 in
-    inertianet*) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "DATABASE_URL=Host=$PG;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10" "REDIS_URL=$REDIS:6379" ;;
+    inertianet*) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "BENCH_TUNED=$([[ $1 == *-tuned ]] && echo 1 || echo 0)" "DATABASE_URL=Host=$PG;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10" "REDIS_URL=$REDIS:6379" ;;
     # Node sizes its worker pool from the host's CPUs, not the container's quota, so the pool gets the CPU limit (rounded up).
     nextjs | tanstack | nuxt) printf -- '-e\n%s\n' "BENCH_WORKERS=$(awk "BEGIN{print int($3 + 0.999)}")" "DATABASE_URL=postgres://bench:bench@$PG/bench" "REDIS_URL=redis://$REDIS:6379" ;;
     # FrankenPHP workers block on I/O, so two per CPU; each keeps one Postgres connection.
@@ -331,6 +334,7 @@ load() { "$DOTNET" "$LOAD_DLL" load "$@"; } # prints {"rps","p50Ms","p95Ms","p99
 name() {
   case $1 in
     inertianet) echo "Inertia.Net (JIT)" ;; inertianet-aot) echo "Inertia.Net (Native AOT)" ;; nextjs) echo Next.js ;;
+    inertianet-tuned) echo "Inertia.Net (JIT, tuned)" ;; inertianet-aot-tuned) echo "Inertia.Net (Native AOT, tuned)" ;;
     tanstack) echo "TanStack Start" ;; nuxt) echo Nuxt ;; laravel) echo "Laravel (Octane, FrankenPHP)" ;;
   esac
 }
