@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+# Dev-server cold start (run.sh --dev): Vite and dotnet watch side by side, with dependencies installed and nothing built.
+# The app uses the published Inertia.Net package here (InertiaBenchPackage), as an app outside this repository would.
+# Build from the repository root: docker build -f benchmarks/frameworks/inertianet/Dockerfile.dev .
+FROM node:24.22.3-bookworm-slim AS node
+
+FROM mcr.microsoft.com/dotnet/sdk:11.0.100
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+# The app targets net10.0 and the SDK 11 image only carries the .NET 11 runtimes.
+COPY --from=mcr.microsoft.com/dotnet/aspnet:10.0.15-noble /usr/share/dotnet/shared /usr/share/dotnet/shared
+WORKDIR /src
+COPY Directory.Build.props Directory.Packages.props ./
+COPY benchmarks/frameworks/inertianet benchmarks/frameworks/inertianet
+COPY benchmarks/frameworks/shared/js benchmarks/frameworks/inertianet/ClientApp/shared
+WORKDIR /src/benchmarks/frameworks/inertianet
+ENV InertiaBenchPackage=true ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_HTTP_PORTS=8080 DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN node /usr/local/lib/node_modules/npm/bin/npm-cli.js ci --no-audit --no-fund && dotnet restore
+EXPOSE 8080
+CMD ["sh", "-c", "node node_modules/vite/bin/vite.js & exec dotnet watch run --non-interactive"]
