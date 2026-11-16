@@ -7,6 +7,12 @@ Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes an
 
 Inertia.Net **1.9.2** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
+**Fast.** In a benchmark where the same todo app was built in Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel, Inertia.Net
+served the most requests in every test: a server-rendered first visit to the todo list ran at 3,905 requests per second on Native
+AOT, against 1,294 for TanStack Start, 745 for Nuxt, 364 for Next.js and 337 for Laravel. With every framework's own caching on, it
+served 34,020, more than twice the next best. See [Performance](#performance) and the
+[framework comparison](https://inertia-dotnet.temtem.dev/docs/framework-comparison).
+
 ## Contents
 
 - [How it works](#how-it-works)
