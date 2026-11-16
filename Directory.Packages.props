@@ -11,7 +11,7 @@
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="MemoryPack" Version="1.21.4" />
-    <PackageVersion Include="StackExchange.Redis" Version="2.9.17" />
+    <PackageVersion Include="StackExchange.Redis" Version="3.4.35" />
     <PackageVersion Include="MongoDB.Driver" Version="3.13.0" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
