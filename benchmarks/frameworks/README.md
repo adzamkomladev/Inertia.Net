@@ -106,6 +106,40 @@ Read these numbers as one run on shared cloud machines, using Alpine images (see
 the same machine as the apps. Image sizes are what that runner's Docker reported, and can differ from `docker images` on another
 machine.
 
+## Inertia.Net with its caching features on
+
+The comparison above runs every app without page caching. Inertia.Net has caching features an app can turn on, and the
+`inertianet-tuned` and `inertianet-aot-tuned` builds (the same images started with `BENCH_TUNED=1`) use them:
+
+- **SSR render cache** (`o.Ssr.Cache`): a page whose data hasn't changed reuses its rendered HTML for 60 s, then is served stale
+  for up to 5 minutes while it renders again in the background.
+- **Two Node SSR instances** (`UseNodeProcess(n => n.Instances = 2)`), one per CPU, instead of one.
+- **The in-memory cache store**, Inertia.Net's default, instead of Redis: right for a single instance.
+- **Stale-while-revalidate prop caches**: the dashboard, and each todo list page for 10 s.
+
+From one GitHub Actions run on 2026-11-16 ([results/2026-11-16-inertianet-tuned.md](results/2026-11-16-inertianet-tuned.md)),
+split by route, with all four builds on each route's runner (requests per second, SSR mode):
+
+| Route | JIT | JIT, tuned | Native AOT | Native AOT, tuned |
+|---|---:|---:|---:|---:|
+| `/`, first visit | 3,528 | **20,800** | 4,378 | 17,952 |
+| `/todos?perPage=25`, first visit | 1,561 | **25,756** | 3,293 | 23,443 |
+| `/todos?perPage=100`, first visit | 562 | **15,119** | 1,033 | 13,745 |
+| `/dashboard`, first visit | 2,819 | **20,903** | 3,586 | 18,054 |
+| `/todos/new`, first visit | 7,068 | **56,746** | 7,773 | 49,923 |
+| `/todos?perPage=25`, client-side navigation | 4,248 | **17,565** | 7,276 | 16,047 |
+| `/dashboard`, client-side navigation | 9,140 | **13,102** | 8,910 | 11,353 |
+
+- **Cached first visits are 4 to 27 times faster**, and their median response fell from 2 to 25 ms to about 1 ms or less: a
+  cached render skips the Node renderer entirely.
+- **Form posts and the CPU-heavy routes didn't change**, as expected: nothing there is cached.
+- **The second Node process costs memory**: at rest with SSR, 84 MB instead of 60 (JIT) and 75 instead of 46 (Native AOT).
+
+These numbers show what Inertia.Net can do with its features on. They don't belong in the main table: the other frameworks have
+caching of their own (Next.js full-route caching, Nuxt's route rules, response-cache packages for Laravel) that this comparison didn't turn
+on. Cache only pages that are the same for everyone, or whose cache key covers the user; see the
+[response cache docs](../../README.md#6-response-cache).
+
 ## What the app does
 
 | Route | What the server does |
