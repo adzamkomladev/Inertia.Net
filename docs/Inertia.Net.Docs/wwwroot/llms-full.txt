@@ -5071,7 +5071,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/performance
 
 Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
 
-To compare a whole app with Next.js, TanStack Start and Laravel, see [Framework comparison](/docs/framework-comparison).
+To compare a whole app with Next.js, TanStack Start, Nuxt and Laravel, see [Framework comparison](/docs/framework-comparison).
 
 ## With and without Inertia
 
@@ -5392,67 +5392,71 @@ See the [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/
 
 URL: https://inertia-dotnet.temtem.dev/docs/framework-comparison
 
-> The same todo app built with Inertia.Net, Next.js, TanStack Start and Laravel, measured for requests per second, latency, memory, startup and image size.
+> The same todo app built with Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel, measured for requests per second, latency, memory, startup and image size.
 
-How does an Inertia.Net app compare with the same app built in other full-stack frameworks? `benchmarks/frameworks` builds one small todo app five ways, runs each in Docker and loads it with the same client. Each app is written the way a team in that framework usually writes it.
+How does an Inertia.Net app compare with the same app built in other full-stack frameworks? `benchmarks/frameworks` builds one small todo app six ways, runs each in Docker and loads it with the same client. Each app is written the way a team in that framework usually writes it.
 
 | App | Data access | Dashboard cache | Form validation |
 |---|---|---|---|
 | Inertia.Net, JIT | EF Core | `InertiaProp.Cache` on Redis | `AddValidation()` and `WithInertiaValidation()` |
 | Inertia.Net, Native AOT | Npgsql | `InertiaProp.Cache` on Redis | `AddValidation()` and `WithInertiaValidation()` |
 | Next.js | Drizzle | `'use cache: remote'` with a Redis handler | zod |
-| TanStack Start | Drizzle | Redis | zod |
+| TanStack Start | Drizzle | Nitro's `defineCachedFunction` on Redis | zod |
+| Nuxt | Drizzle | Nitro's `defineCachedFunction` on Redis | zod |
 | Laravel (Octane, FrankenPHP) | Eloquent | `Cache::remember` on Redis | Form Request |
 
 The Native AOT build uses Npgsql because EF Core is not yet trim- or AOT-safe. The [Native AOT](/docs/native-aot) page explains the options.
 
-Every app serves the same routes: a home page, a paged todo list, a cached dashboard, a CPU-heavy route and a new-todo form. Each runs in SSR and SPA mode, with React and TypeScript on the client. The app code, the run script and every setting are in [benchmarks/frameworks](https://github.com/adzamkomladev/Inertia.Net/tree/main/benchmarks/frameworks).
+Every app serves the same routes: a home page, a paged todo list, a cached dashboard, a CPU-heavy route and a new-todo form. Each runs in SSR and SPA mode with TypeScript. Nuxt renders Vue pages; the others render the same React pages. The app code, the run script and every setting are in [benchmarks/frameworks](https://github.com/adzamkomladev/Inertia.Net/tree/main/benchmarks/frameworks).
 
 ## Results
 
-From one run on a GitHub-hosted runner (4 vCPUs, AMD EPYC 7763) on 2026-11-16. Each app was limited to 2 CPUs and 2 GB, under 16 keep-alive connections. Every request succeeded, and every SSR response was really server-rendered.
+From one run on GitHub-hosted runners on 2026-11-16. Each route ran on its own 4-vCPU runner with all six apps on it, so every row compares apps on the same machine. Each app was limited to 2 CPUs and 2 GB, under 16 keep-alive connections. Every request succeeded, and every SSR response was really server-rendered.
 
 **Memory and startup**
 
 | App | Memory at rest, SPA / SSR | Cold start, SPA / SSR | Image, SPA / SSR |
 |---|---:|---:|---:|
-| Inertia.Net, Native AOT | **20** / 50 MB | **239** / 704 ms | **34** / 98 MB |
-| Inertia.Net, JIT | 58 / 91 MB | 743 / 1,297 ms | 125 / 189 MB |
-| TanStack Start | 86 / 93 MB | 473 / 475 ms | 167 MB |
-| Next.js | 132 / 138 MB | 1,141 / 1,237 ms | 185 MB |
-| Laravel | 105 / 161 MB | 1,212 / 1,374 ms | 252 / 311 MB |
+| Inertia.Net, Native AOT | **17** / 46 MB | **216** / 514 ms | **34** / 98 MB |
+| Inertia.Net, JIT | 27 / 60 MB | 522 / 1,108 ms | 125 / 189 MB |
+| TanStack Start | 28 / 29 MB | 263 / **258** ms | 166 MB |
+| Next.js | 72 / 76 MB | 715 / 775 ms | 185 MB |
+| Nuxt | 138 / 139 MB | 340 / 739 ms | 169 MB |
+| Laravel | 98 / 154 MB | 785 / 951 ms | 252 / 311 MB |
 
 Memory is the whole container: for SSR it includes the Node renderer, and for Laravel all its PHP workers.
 
 **Requests per second** (SSR mode; higher is better)
 
-| Route | Inertia.Net JIT | Inertia.Net AOT | TanStack Start | Next.js | Laravel |
-|---|---:|---:|---:|---:|---:|
-| `/todos?perPage=25`, first visit | 1,836 | **2,449** | 934 | 254 | 192 |
-| `/todos?perPage=25`, client-side navigation | 3,439 | **5,037** | 1,973 | 1,075 | 301 |
-| `/dashboard`, client-side navigation | 6,935 | **8,708** | 5,874 | 1,447 | 739 |
-| New todo, valid post | 3,482 | **4,887** | 2,419 | 1,117 | 447 |
-| New todo, invalid post | 6,468 | **8,298** | 3,806 | 1,503 | 452 |
-| `/compute?n=20000`, CPU-heavy | **986** | 711 | 164 | 145 | 50 |
+| Route | Inertia.Net JIT | Inertia.Net AOT | TanStack Start | Nuxt | Next.js | Laravel |
+|---|---:|---:|---:|---:|---:|---:|
+| `/todos?perPage=25`, first visit | 1,764 | **3,905** | 1,294 | 745 | 364 | 337 |
+| `/todos?perPage=25`, client-side navigation | 6,155 | **9,789** | 3,962 | 5,498 | 1,512 | 550 |
+| `/dashboard`, client-side navigation | **13,465** | 12,842 | 7,153 | 10,262 | 2,283 | 1,056 |
+| New todo, valid post | 2,810 | **2,956** | 2,464 | 1,996 | 957 | 517 |
+| New todo, invalid post | 16,314 | **18,299** | 12,559 | 11,417 | 1,841 | 854 |
+| `/compute?n=20000`, CPU-heavy | **1,212** | 1,033 | 227 | 240 | 207 | 81 |
 
 **Using more CPUs** (`/compute/parallel`, requests per second)
 
 | App | 1 CPU | 2 CPUs | 4 CPUs |
 |---|---:|---:|---:|
-| Inertia.Net, JIT | 626 | 1,010 | 1,591 |
-| Inertia.Net, Native AOT | 482 | 701 | 1,162 |
-| TanStack Start | 136 | 247 | 331 |
-| Next.js | 133 | 216 | 282 |
-| Laravel | 37 | 50 | 99 |
+| Inertia.Net, JIT | 648 | 1,260 | 1,938 |
+| Inertia.Net, Native AOT | 614 | 1,062 | 1,576 |
+| Nuxt | 204 | 367 | 499 |
+| TanStack Start | 197 | 361 | 493 |
+| Next.js | 173 | 341 | 431 |
+| Laravel | 56 | 79 | 157 |
 
 ## What the numbers say
 
-- **Inertia.Net served the most requests on every route and used the least memory.** With SSR it served 2 to 2.6 times as many first visits as TanStack Start, and 7 to 13 times as many as Next.js and Laravel.
-- **The data layer matters more than JIT or AOT.** On database routes the Native AOT build, using Npgsql, served about 45% more navigations and 40% more form posts than the JIT build using EF Core. On the CPU-heavy route, which doesn't touch the database, the JIT build was about 40% faster.
-- **The Inertia apps check for forged requests on every page.** Inertia.Net checks an antiforgery token and Laravel checks a session. The Node apps' route handlers do neither by default.
-- **CPU-heavy work is mostly a language-speed test.** A Node process runs one request's JavaScript at a time, so the plain `/compute` route stays near 150 requests per second however many CPUs it has. .NET spreads work over every core without extra code.
+- **Inertia.Net served the most requests on every route.** The Native AOT build served 3 times as many SSR first visits as TanStack Start, 5 times as many as Nuxt, and 11 to 12 times as many as Next.js and Laravel.
+- **The data layer matters more than JIT or AOT.** On database routes the Native AOT build, using Npgsql, served 59% more navigations and twice the SSR first visits of the JIT build using EF Core. On the CPU-heavy route, which doesn't touch the database, the JIT build was about 17% faster.
+- **Saving a row is limited by the database for every app.** Valid posts are close across the fastest apps. Invalid posts, which write nothing, show the framework's own cost: Inertia.Net handled 16,000 to 18,000 per second, including validation, the antiforgery check and the redirect.
+- **The Inertia apps check for forged requests on every page.** Inertia.Net checks an antiforgery token and Laravel checks a session. The Node apps' API routes do neither by default.
+- **CPU-heavy work is mostly a language-speed test.** A Node process runs one request's JavaScript at a time, so the plain `/compute` route stays near 200 to 240 requests per second however many CPUs it has. .NET spreads work over every core without extra code.
 
-These numbers come from one run on a shared cloud machine, with the load client on the same machine. Measure your own app before you rely on them. Every route, the latency percentiles and the fixed-rate runs are in the [full results](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-16-v2.md). The [README](https://github.com/adzamkomladev/Inertia.Net/tree/main/benchmarks/frameworks) lists the caveats and how to run the comparison yourself.
+These numbers come from one run on shared cloud machines, with the load client on the same machine as the apps. Measure your own app before you rely on them. Every route in both modes, the latency percentiles and the fixed-rate runs are in the [full results](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-16-v3.md). The [README](https://github.com/adzamkomladev/Inertia.Net/tree/main/benchmarks/frameworks) lists the caveats and how to run the comparison yourself.
 
 For the cost of Inertia.Net next to a plain Minimal API, see [Performance](/docs/performance).
 

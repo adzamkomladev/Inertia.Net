@@ -39,66 +39,72 @@ a stable URL to post to; a route handler is a normal way to build a form API in 
 
 ## Results
 
-From one run on a GitHub-hosted runner (4 CPUs, AMD EPYC 7763) on 2026-11-16, each app limited to 2 CPUs and 2 GB. The full
-tables, with every route, latency percentile and fixed-rate run, are in [results/2026-11-16-v2.md](results/2026-11-16-v2.md).
-No run was marked overloaded: every request succeeded, and every SSR response was really server-rendered. The first version of
-the apps (plain SQL, no form) is in [results/2026-11-16.md](results/2026-11-16.md); it ran on a faster runner CPU, so don't
-compare numbers across the two files.
+From one GitHub Actions run on 2026-11-16 with `split=routes`: each route ran on its own 4-CPU runner with all six apps on
+it, each app limited to 2 CPUs and 2 GB. The runners had different CPUs (AMD EPYC and Intel Xeon), so compare apps along a
+row, not one row with another. The full tables, with every route in both modes, latency percentiles and fixed-rate runs, are in
+[results/2026-11-16-v3.md](results/2026-11-16-v3.md). No run was marked overloaded: every request succeeded, and every SSR
+response was really server-rendered. Earlier runs, of earlier versions of the apps, are in [results/](results/).
 
-**Memory and startup**
+**Memory and startup** (measured on one runner, AMD EPYC 9V45)
 
 | App | Memory at rest, SPA / SSR | Cold start, SPA / SSR | Image, SPA / SSR |
 |---|---:|---:|---:|
-| Inertia.Net, Native AOT (Npgsql) | **20** / 50 MB | **239** / 704 ms | **34** / 98 MB |
-| Inertia.Net, JIT (EF Core) | 58 / 91 MB | 743 / 1297 ms | 125 / 189 MB |
-| TanStack Start | 86 / 93 MB | 473 / 475 ms | 167 MB |
-| Next.js | 132 / 138 MB | 1141 / 1237 ms | 185 MB |
-| Laravel (Octane, FrankenPHP) | 105 / 161 MB | 1212 / 1374 ms | 252 / 311 MB |
+| Inertia.Net, Native AOT (Npgsql) | **17** / 46 MB | **216** / 514 ms | **34** / 98 MB |
+| Inertia.Net, JIT (EF Core) | 27 / 60 MB | 522 / 1108 ms | 125 / 189 MB |
+| TanStack Start | 28 / 29 MB | 263 / **258** ms | 166 MB |
+| Next.js | 72 / 76 MB | 715 / 775 ms | 185 MB |
+| Nuxt | 138 / 139 MB | 340 / 739 ms | 169 MB |
+| Laravel (Octane, FrankenPHP) | 98 / 154 MB | 785 / 951 ms | 252 / 311 MB |
 
 Memory is the whole container: for SSR that includes the Node renderer, for Laravel all its PHP workers.
 
 **Requests per second** (16 connections, SSR mode; higher is better)
 
-| Route | Inertia.Net JIT | Inertia.Net AOT | TanStack Start | Next.js | Laravel |
-|---|---:|---:|---:|---:|---:|
-| `/todos?perPage=25`, first visit | 1,836 | **2,449** | 934 | 254 | 192 |
-| `/todos?perPage=25`, client-side navigation (JSON) | 3,439 | **5,037** | 1,973 | 1,075 | 301 |
-| `/dashboard` (cached in Redis), client-side navigation | 6,935 | **8,708** | 5,874 | 1,447 | 739 |
-| New todo, valid post (validate and insert) | 3,482 | **4,887** | 2,419 | 1,117 | 447 |
-| New todo, invalid post (four errors) | 6,468 | **8,298** | 3,806 | 1,503 | 452 |
-| `/compute?n=20000` (CPU-heavy, JSON) | **986** | 711 | 164 | 145 | 50 |
+| Route | Inertia.Net JIT | Inertia.Net AOT | TanStack Start | Nuxt | Next.js | Laravel |
+|---|---:|---:|---:|---:|---:|---:|
+| `/todos?perPage=25`, first visit | 1,764 | **3,905** | 1,294 | 745 | 364 | 337 |
+| `/todos?perPage=25`, client-side navigation (JSON) | 6,155 | **9,789** | 3,962 | 5,498 | 1,512 | 550 |
+| `/dashboard` (cached in Redis), client-side navigation | **13,465** | 12,842 | 7,153 | 10,262 | 2,283 | 1,056 |
+| New todo, valid post (validate and insert) | 2,810 | **2,956** | 2,464 | 1,996 | 957 | 517 |
+| New todo, invalid post (four errors) | 16,314 | **18,299** | 12,559 | 11,417 | 1,841 | 854 |
+| `/compute?n=20000` (CPU-heavy, JSON) | **1,212** | 1,033 | 227 | 240 | 207 | 81 |
 
 **Using more CPUs** (`/compute/parallel`, JSON, 16 connections)
 
 | App | 1 CPU | 2 CPUs | 4 CPUs |
 |---|---:|---:|---:|
-| Inertia.Net, JIT | 626 | 1,010 | 1,591 |
-| Inertia.Net, Native AOT | 482 | 701 | 1,162 |
-| TanStack Start | 136 | 247 | 331 |
-| Next.js | 133 | 216 | 282 |
-| Laravel (sequential in PHP) | 37 | 50 | 99 |
+| Inertia.Net, JIT | 648 | 1,260 | 1,938 |
+| Inertia.Net, Native AOT | 614 | 1,062 | 1,576 |
+| Nuxt | 204 | 367 | 499 |
+| TanStack Start | 197 | 361 | 493 |
+| Next.js | 173 | 341 | 431 |
+| Laravel (sequential in PHP) | 56 | 79 | 157 |
 
 What stands out:
 
-- **Inertia.Net serves the most requests on every route and uses the least memory.** With SSR it served about 2 to 2.6 times as
-  many first visits as TanStack Start and about 7 to 13 times as many as Next.js and Laravel. Its form posts, with validation,
-  antiforgery and a database insert, beat the Node apps' plain JSON route handlers.
-- **On database routes the AOT build is faster than the JIT build, because of the data layer, not AOT.** The AOT build uses plain
-  Npgsql and the JIT build uses EF Core: about 45% more JSON navigations and 40% more valid posts. The JIT build also sits about 25 MB
-  higher at rest than in the first version. On the CPU-heavy route, where neither touches the database, JIT is about 40% faster.
-- **Every Inertia app now pays for forgery protection on every page:** an antiforgery token in Inertia.Net, a session in Laravel.
-  The Node apps' route handlers don't, which narrows Inertia.Net's lead compared with the first version.
-- **CPU-heavy work is mostly a language-speed test.** Node handles one request's JavaScript at a time per process, so plain
-  `/compute` stays near 150 req/s at any CPU count, and only the worker-thread route uses extra cores. .NET spreads both routes
-  over all cores with no extra code.
-- **Some apps can't keep up with 200 req/s on the heavy routes,** so requests queue for one to eight seconds (see the fixed-rate
-  columns in the full results): Laravel on `/compute` and `/todos?perPage=100`, Next.js on `/compute` and its `/todos?perPage=100`
-  first visit, and TanStack Start on `/compute`.
+- **Inertia.Net served the most requests on every route.** The Native AOT build served 3 times as many SSR first visits as
+  TanStack Start, 5 times as many as Nuxt and 11 to 12 times as many as Next.js and Laravel.
+- **The data layer matters more than JIT or AOT.** On database routes the AOT build, on plain Npgsql, beat the JIT build on EF
+  Core: 59% more JSON navigations and twice the SSR first visits. On the CPU-heavy route, where neither touches the database,
+  JIT was about 17% faster.
+- **Saving a todo is limited by the database for every app.** Valid posts are close across the fast apps, and their p99 rises to
+  48 to 290 ms in every app, so the insert, not the framework, sets the pace. Invalid posts, which write nothing, show the
+  framework cost: Inertia.Net served 16,000 to 18,000 per second with validation, antiforgery and a redirect.
+- **Nuxt's JSON routes are fast, its SSR pages are not.** Its `/api` routes kept up with Inertia.Net on small payloads
+  (27,698 req/s for `/` JSON against 27,584), but its server-rendered pages came behind TanStack Start's. Nuxt renders Vue
+  pages, not the shared React ones, so part of that gap is Vue's SSR, not Nuxt itself.
+- **TanStack Start is the leanest Node app**: 28 MB at rest and a 258 ms cold start, the fastest SSR cold start of all six.
+- **CPU-heavy work is mostly a language-speed test.** Node runs one request's JavaScript at a time per process, so plain
+  `/compute` stays near 200 to 240 req/s at any CPU count in all three Node apps. .NET spreads both routes over every core with
+  no extra code.
+- **Laravel and Next.js can't keep up with 200 req/s on `/compute`,** so requests queue for one to seven seconds (see the
+  fixed-rate columns in the full results).
 - **Next.js "SPA (nearest)" pages are a static shell.** The page then fetches its data from an API route. Its `page` rows measure
   serving that shell, so compare its `json` rows instead.
 
-Read these numbers as one run on one shared cloud machine, using Alpine images (see [Caveats](#caveats)). The load client ran on
-the same machine. Image sizes are what that runner's Docker reported, and can differ from `docker images` on another machine.
+Read these numbers as one run on shared cloud machines, using Alpine images (see [Caveats](#caveats)). The load client ran on
+the same machine as the apps. Image sizes are what that runner's Docker reported, and can differ from `docker images` on another
+machine.
 
 ## What the app does
 
