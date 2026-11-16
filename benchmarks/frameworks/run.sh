@@ -120,8 +120,11 @@ app_env() { # framework mode cpus -> docker run -e arguments, one per line
 now_ms() { echo $(($(date +%s%N) / 1000000)); }
 
 # Starts the app (replacing any previous one) and prints the cold start in ms: docker run until / answers 200.
-start_app() { # framework mode cpus [image]
-  local image=${4:-$(tag "$1" "$2")} start env
+start_app() { # framework mode cpus [dev]
+  local image start env
+  image=$(tag "$1" "${4:-$2}")
+  # Rebuilt if it disappeared since the build step (a shared host may prune images that no container uses).
+  docker image inspect "$image" >/dev/null 2>&1 || build "$1" "${4:-$2}"
   mapfile -t env < <(app_env "$1" "$2" "$3")
   docker rm -f "$APP" >/dev/null 2>&1 || true
   docker exec "$REDIS" redis-cli FLUSHALL >/dev/null
@@ -249,7 +252,7 @@ mb() { awk "BEGIN{printf \"%.0f\", $1 / 1048576}"; }
 OVERLOADED="overloaded"
 
 bench_app() { # framework mode
-  local fw=$1 mode=$2 cold cg rest size path url expect result rates line
+  local fw=$1 mode=$2 cold cg rest size path url result rates line
   cold=$(start_app "$fw" "$mode" "$CPUS")
   cg=$(cgroup)
   # Every route once in both forms, so all code paths are loaded before memory at rest is read.
@@ -312,11 +315,12 @@ bench_dev() {
   echo "|---|---|---:|" >>"$WORK/dev.md"
   for fw in ${FRAMEWORKS//,/ }; do
     [ "$fw" = inertianet-aot ] && continue
-    local cmd
+    local cmd ms
     case $fw in
       inertianet) cmd="dotnet watch + vite" ;; nextjs) cmd="next dev" ;; tanstack) cmd="vite dev" ;; laravel) cmd="php artisan serve + vite" ;;
     esac
-    echo "| $(name "$fw") | $cmd | $(start_app "$fw" spa "$CPUS" "$(tag "$fw" dev)") |" >>"$WORK/dev.md"
+    ms=$(start_app "$fw" spa "$CPUS" dev)
+    echo "| $(name "$fw") | $cmd | $ms |" >>"$WORK/dev.md"
     log "$fw dev server up"
   done
 }
