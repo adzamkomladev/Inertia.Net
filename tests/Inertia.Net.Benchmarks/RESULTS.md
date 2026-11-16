@@ -1,5 +1,53 @@
 # Inertia.Net benchmark results
 
+## 1.9.2: rendering through the app's JSON context, and the SPA vs SSR suite — 2026-11-16
+
+Measured by the `hosting-probe` workflow on GitHub's `ubuntu-latest` runner (12 s measured, 8 s warmup, best of 5 rounds).
+"Before" is `main` at `2079a3e` (run 43766967699) and "after" is the 1.9.2 branch at `dfae514` (run 43770377286).
+
+The two runs landed on different runner hardware: the plain ASP.NET Core rows, which this release does not touch, were about 33%
+faster in the second run. So the raw numbers cannot be compared across runs. The fair comparison is how close the Inertia rows
+come to the plain app on the same machine in the same run.
+
+| Build | Inertia visit (JSON) as a share of the plain JSON API's req/s | Extra CPU per request over the plain JSON API |
+|---|---:|---:|
+| JIT, server GC, before | 77.6% (57,500 of 74,060) | +7 µs (34 vs 27) |
+| JIT, server GC, after | **88.2%** (86,565 of 98,183) | **+3 µs** (23 vs 20) |
+| Native AOT, server GC, before | 69.6% (45,953 of 66,003) | +13 µs (43 vs 30) |
+| Native AOT, server GC, after | **84.4%** (77,134 of 91,409) | **+4 µs** (26 vs 22) |
+
+The CPU column is rounded to whole microseconds, so treat it as a direction rather than an exact figure. Instruction counts on the
+local hosting probe (`perf stat -e instructions:u`, less sensitive to machine speed) agree: about 16% fewer instructions per Inertia
+request on JIT and about 20% on Native AOT. The output is byte-identical before and after. Memory at rest and at peak is unchanged
+for these small pages; the 32 KB write slices and the 1 MB pool rule only matter for large pages (a 2.2 MB page with 32 clients
+went from 288 MB to 209 MB peak RSS locally).
+
+### SPA vs SSR suite (first run)
+
+`bash eng/hosting-probe.sh --suite ssr --builds jit`, from the `ssr-probe` job of the same run. 8 connections, which matches the
+SSR gateway's default `MaxActive`. "Server + SSR CPU" and the RSS columns add up the .NET server and its managed SSR process; the
+SSR process shares the server's pinned CPUs. The A/A repeat of the first row came within 2%, so the runner was quiet.
+
+| Scenario | Response | Req/s | p50 ms | p99 ms | p99.9 ms | Server + SSR CPU per request | .NET RSS rest / peak | SSR RSS rest / peak | Allocated per request |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Inertia visit (JSON), SSR on, 25 rows | 5,679 B | 65,674 | 0.11 | 0.39 | 1.24 | 30 µs | 82 / 102 MB | 81 / 81 MB | 9,144 B |
+| SPA first load (HTML, SSR off), 25 rows | 5,962 B | 64,640 | 0.12 | 0.37 | 1.03 | 30 µs | 77 / 95 MB | none | 9,000 B |
+| SSR first load, Node, 10 rows | 10,075 B | 6,097 | 1.10 | 2.84 | 4.30 | 312 µs | 82 / 102 MB | 81 / 133 MB | 9,577 B |
+| SSR first load, Node, 25 rows | 22,864 B | 3,176 | 2.15 | 4.94 | 6.52 | 562 µs | 83 / 102 MB | 81 / 163 MB | 14,141 B |
+| SSR first load, Node, 100 rows | 86,875 B | 877 | 7.79 | 16.86 | 20.56 | 1,679 µs | 83 / 122 MB | 82 / 243 MB | 37,947 B |
+| SSR first load, Bun, 25 rows | 22,864 B | 2,794 | 2.62 | 6.39 | 7.95 | 612 µs | 83 / 103 MB | 49 / 108 MB | 14,147 B |
+| Anonymous home, Node SSR + render cache | 1,542 B | 97,035 | 0.08 | 0.20 | 0.99 | 19 µs | 83 / 99 MB | 80 / 80 MB | 1,192 B |
+| Node `/render` called directly, 25 rows | 24,281 B | 3,457 | 2.03 | 4.47 | 5.04 | 291 µs | 82 / 84 MB | 81 / 170 MB | n/a |
+
+What this shows, in plain words:
+- Server rendering is where the time goes. A 25-row page renders about 20 times slower with SSR than without it (3,176 vs 64,640
+  req/s), and almost all of that is React rendering in Node: calling Node's `/render` directly is only about 9% faster than going
+  through Inertia.Net.
+- Inertia (JSON) visits are unaffected by SSR being on: only the first page load is server-rendered.
+- The SSR render cache turns an anonymous page back into a fast page (97,035 req/s) when the page JSON repeats.
+- Node used about twice the memory of Bun at rest (81 vs 49 MB) and grows with page size under load (243 MB peak at 100 rows);
+  Bun was a little slower per render here.
+
 ## Todo app and SSR process memory — 2026-11-15
 
 Replaces the estimated todo and SSR rows of the performance page with measurements. The todo rows on the performance page come from the

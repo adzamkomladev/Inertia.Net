@@ -444,16 +444,17 @@ internal sealed partial class SsrNodeProcess(
         var process = new Process { StartInfo = startInfo };
         process.OutputDataReceived += (_, e) =>
         {
-            if (e.Data is { } line)
+            if (e.Data is { } line && _logger.IsEnabled(LogLevel.Information))
             {
-                LogOutput(_logger, line);
+                var text = SsrGateway.Truncate(line)!;
+                LogOutput(_logger, text);
             }
         };
         process.ErrorDataReceived += (_, e) =>
         {
             if (e.Data is { } line)
             {
-                LogErrorOutput(_logger, line);
+                LogErrorOutput(_logger, SsrGateway.Truncate(line)!);
             }
         };
 

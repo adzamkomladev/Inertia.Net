@@ -10,15 +10,13 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 permissions:
-  contents: write # create the GitHub Release
-  id-token: write # NuGet trusted publishing: exchange the GitHub OIDC token for a short-lived API key
+  contents: read
 
 jobs:
-  release:
+  # Build, test and pack without write access or an OIDC token: the tests run Node and npm packages, which must not be able to
+  # mint a NuGet API key or write to the repository.
+  build:
     runs-on: ubuntu-latest
-    # Publishing needs approval: add required reviewers to the "release" environment (Settings > Environments), so a pushed
-    # tag alone cannot publish. NuGet trusts this repository, workflow and environment (trusted publishing); no stored API key.
-    environment: release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -61,6 +59,27 @@ jobs:
             test -f "artifacts/$id.$VERSION.nupkg" || { echo "Missing artifacts/$id.$VERSION.nupkg"; exit 1; }
           done
 
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages
+          path: artifacts/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Publishing needs approval: add required reviewers to the "release" environment (Settings > Environments), so a pushed
+    # tag alone cannot publish. NuGet trusts this repository, workflow and environment (trusted publishing); no stored API key.
+    environment: release
+    permissions:
+      contents: write # create the GitHub Release
+      id-token: write # NuGet trusted publishing: exchange the GitHub OIDC token for a short-lived API key
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages
+          path: artifacts
+
       # A .snupkg next to a .nupkg is pushed to the symbol server automatically.
       - name: Log in to NuGet
         id: nuget-login
@@ -68,10 +87,13 @@ jobs:
         with:
           user: adzamkomladev
 
+      # The key goes through env rather than ${{ }} inside run, so it is never part of the script text.
       - name: Push to NuGet
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: >
           dotnet nuget push "artifacts/*.nupkg"
-          --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          --api-key "$NUGET_API_KEY"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 

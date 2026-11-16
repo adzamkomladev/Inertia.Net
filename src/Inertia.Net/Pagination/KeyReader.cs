@@ -22,7 +22,7 @@ internal static class KeyReader
 
         if (members.Count == 0 || node != selector.Parameters[0])
         {
-            return selector.Compile();
+            return selector.Compile(preferInterpretation: true); // called at most twice per page: compiling per request costs more than it saves
         }
 
         members.Reverse();

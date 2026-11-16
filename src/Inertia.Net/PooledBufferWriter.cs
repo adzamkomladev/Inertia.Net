@@ -8,7 +8,24 @@ internal sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
     private byte[] _buffer;
     private int _written;
 
-    public PooledBufferWriter(int initialCapacity = 4096) => _buffer = ArrayPool<byte>.Shared.Rent(initialCapacity);
+    // ArrayPool.Shared keeps arrays up to 1 GiB per core, so one very large page would pin its buffers for the life of the process.
+    // Above this size buffers are allocated exactly and left to the GC: memory goes back after a large page, at the cost of more gen2 GCs.
+    internal const int MaxPooledLength = 1024 * 1024;
+
+    public PooledBufferWriter(int initialCapacity = 4096) => _buffer = Rent(initialCapacity);
+
+    /// <summary>A pooled array of at least <paramref name="length"/> bytes, or an unpooled one above <see cref="MaxPooledLength"/>.</summary>
+    internal static byte[] Rent(int length) =>
+        length <= MaxPooledLength ? ArrayPool<byte>.Shared.Rent(length) : GC.AllocateUninitializedArray<byte>(length);
+
+    /// <summary>Returns an array from <see cref="Rent"/> to the pool; a large one is left to the GC.</summary>
+    internal static void Return(byte[] buffer)
+    {
+        if (buffer.Length is > 0 and <= MaxPooledLength)
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
 
     public ReadOnlyMemory<byte> WrittenMemory => _buffer.AsMemory(0, _written);
 
@@ -33,10 +50,7 @@ internal sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
         var buffer = _buffer;
         _buffer = [];
         _written = 0;
-        if (buffer.Length > 0)
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+        Return(buffer);
     }
 
     private void EnsureCapacity(int sizeHint)
@@ -47,9 +61,9 @@ internal sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
             return;
         }
 
-        var bigger = ArrayPool<byte>.Shared.Rent(Math.Max(_buffer.Length * 2, _written + sizeHint));
+        var bigger = Rent((int)Math.Min(Math.Max(_buffer.Length * 2L, (long)_written + sizeHint), Array.MaxLength));
         _buffer.AsSpan(0, _written).CopyTo(bigger);
-        ArrayPool<byte>.Shared.Return(_buffer);
+        Return(_buffer);
         _buffer = bigger;
     }
 }

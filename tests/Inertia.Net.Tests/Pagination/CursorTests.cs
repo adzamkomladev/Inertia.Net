@@ -67,6 +67,15 @@ public class CursorTests
         Assert.Null(CursorCodec.Decode<int>(encoded));
     }
 
+    [Theory]
+    [InlineData("[\"a\",1e999]")]
+    [InlineData("[\"a\",-1e999]")]
+    public void Non_finite_double_is_ignored(string json)
+    {
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        Assert.Null(CursorCodec.Decode<double>(encoded));
+    }
+
     [Fact]
     public void Unsupported_type_errors_name_the_type()
     {

@@ -614,7 +614,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     /// </summary>
     internal static SsrRender? ParseRender(ReadOnlySpan<byte> json)
     {
-        var output = ArrayPool<byte>.Shared.Rent(Math.Max(json.Length, 1));
+        var output = PooledBufferWriter.Rent(Math.Max(json.Length, 1));
         try
         {
             var reader = new Utf8JsonReader(json);
@@ -663,7 +663,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         {
             if (output is not null)
             {
-                ArrayPool<byte>.Shared.Return(output);
+                PooledBufferWriter.Return(output);
             }
         }
     }
@@ -792,7 +792,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             Truncate(attempt.Details?.BrowserApi?.ToString()), Truncate(attempt.Details?.SourceLocation?.ToString()));
 
     // SSR error text comes from the renderer and can be large (stack traces, serialized props): logs keep the first 2 KB.
-    private static string? Truncate(string? text) => text is { Length: > MaxLoggedChars } ? string.Concat(text.AsSpan(0, MaxLoggedChars), "…") : text;
+    internal static string? Truncate(string? text) => text is { Length: > MaxLoggedChars } ? string.Concat(text.AsSpan(0, MaxLoggedChars), "…") : text;
 
     // Repeating skip reasons (no process ready, open circuit, overload) are logged at most once per 30 seconds each, with a count.
     private bool ShouldLogSkip(SsrFailure failure, out int suppressed)

@@ -327,7 +327,7 @@ public class ParallelPropsTests
     }
 
     // Stands in for an EF Core DbContext: its concurrency detector throws when a second operation starts before the first ends.
-    private sealed class NotThreadSafeContext
+    private sealed class NotThreadSafeContext(int holdMilliseconds = 20)
     {
         private int _busy;
 
@@ -340,7 +340,7 @@ public class ParallelPropsTests
 
             try
             {
-                await Task.Delay(20);
+                await Task.Delay(holdMilliseconds);
                 return value;
             }
             finally
@@ -361,11 +361,13 @@ public class ParallelPropsTests
         });
         JsonAssert.Equal("""{"errors":{},"a":1,"b":2}""", sequential["props"]);
 
-        // A new app: here the component's first render without parallel props would delay planning by one render.
+        // A new app: here the component's first render without parallel props would delay planning by one render. The context stays
+        // busy long enough that a descheduled render thread cannot let the first loader finish before the second starts.
+        var slow = new NotThreadSafeContext(holdMilliseconds: 1000);
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => new Harness().PageAsync(new InertiaProps
         {
-            ["a"] = Inertia.Prop(() => context.QueryAsync(1)).Parallel(),
-            ["b"] = Inertia.Prop(() => context.QueryAsync(2)).Parallel(),
+            ["a"] = Inertia.Prop(() => slow.QueryAsync(1)).Parallel(),
+            ["b"] = Inertia.Prop(() => slow.QueryAsync(2)).Parallel(),
         }));
         Assert.StartsWith("A second operation", ex.Message, StringComparison.Ordinal);
 

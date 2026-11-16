@@ -279,10 +279,15 @@ internal sealed partial class DevToolsRecorder
 
     // The default reader: this machine only. The entries hold every user's props and bodies, so an app mistakenly run as Development on a
     // server must not serve them, and the Host check keeps a DNS-rebinding page from reading them through the developer's browser.
+    // A reverse proxy on the same machine also connects from loopback, often with a loopback Host (nginx's default proxy_pass), so a
+    // request carrying a forwarding header came from somewhere else. A proxy that adds none of them is not caught; Authorize is the boundary.
     private static bool IsLocal(HttpContext httpContext)
     {
         var remote = httpContext.Connection.RemoteIpAddress;
         if (remote is not null && !IPAddress.IsLoopback(remote)) return false;
+        var headers = httpContext.Request.Headers;
+        if (headers.ContainsKey("X-Forwarded-For") || headers.ContainsKey("Forwarded") || headers.ContainsKey("X-Forwarded-Host")
+            || headers.ContainsKey("X-Real-IP") || headers.ContainsKey("Via")) return false;
         var host = httpContext.Request.Host.Host;
         return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
             || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)

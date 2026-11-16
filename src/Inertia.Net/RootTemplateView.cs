@@ -44,7 +44,7 @@ internal sealed class SsrRender : IDisposable
         if (Interlocked.Exchange(ref _rented, null) is { } rented)
         {
             Head = Body = default;
-            ArrayPool<byte>.Shared.Return(rented);
+            PooledBufferWriter.Return(rented);
         }
     }
 }

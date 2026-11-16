@@ -7,6 +7,47 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-11-15
+
+### Security
+
+- DevTools: without an `Authorize` callback, the read API also refuses a request that carries `X-Forwarded-For`, `Forwarded`,
+  `X-Forwarded-Host`, `X-Real-IP` or `Via`. An app run as Development behind a reverse proxy on the same machine (nginx's default
+  `proxy_pass` sends a loopback `Host`) served every user's recorded entries to remote clients. A proxy that adds none of those
+  headers still looks local; set `Authorize` there.
+- `dotnet new inertia --auth`: the login rate limit skips Precognition requests only on an endpoint with
+  `WithInertiaPrecognition()`, as the React sample does, so copying the policy elsewhere does not let the header bypass it. A comment
+  points at forwarded headers, without which every client behind a proxy shares one bucket.
+- `SECURITY.md` describes private vulnerability reporting. The release workflow builds and runs the tests in a job with read-only
+  permissions; only the publish job can mint the NuGet key or write the GitHub Release.
+
+### Fixed
+
+- A hand-made cursor with a non-finite `double` key (`1e999`) is treated as invalid (first page) instead of being sent to the
+  database, where SQL Server rejects it.
+
+### Changed
+
+- The SSR `HttpClient` no longer logs four `Information` lines per render and per liveness ping (`RemoveAllLoggers()`). SSR outcomes
+  are still logged and counted. An app that wants them back calls
+  `services.AddHttpClient(InertiaSsr.HttpClientName).AddDefaultLogger()` after `AddInertia`.
+- Lines the managed SSR process writes to stdout and stderr are logged truncated to 2 KB, as SSR errors already are.
+- Faster page rendering, with byte-identical output:
+  - Values that cannot hold props (strings, numbers, records, lists of records) are serialized through the app's source-generated
+    `JsonSerializerContext` when it is first in `TypeInfoResolverChain` and its settings match the app's JSON options, as in
+    `dotnet new inertia`. System.Text.Json then runs the generated code instead of its general-purpose converters. Apps without a
+    context, or whose context's settings differ, are unchanged.
+  - One cached lookup per value type instead of two, and plain values are written without going through the async prop walk.
+- Inertia (JSON) responses larger than 32 KB are written to the client in 32 KB pieces instead of in one call, so a large page no
+  longer has a second full copy in the server's response buffers while it is being sent.
+- Page and SSR buffers larger than 1 MB are no longer kept in the shared array pool after the request. Before, one very large page
+  kept that much memory reserved for the life of the process; now the memory is freed once the page is sent. Pages under 1 MB
+  are unchanged.
+- Cursor pagination with a key selector that is not a plain member chain (`x => x.CreatedAt.Date`) interprets the selector instead
+  of compiling it on every request.
+- The performance page attributes the memory difference at rest to ASP.NET Core Data Protection, which `AddInertia` registers;
+  Inertia.Net itself is about 1 MB.
+
 ## [1.9.1] - 2026-11-14
 
 ### Fixed

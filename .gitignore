@@ -497,3 +497,5 @@ artifacts/
 samples/*/ssr/
 samples/*/wwwroot/hot
 samples/*/wwwroot/build/
+tests/Inertia.Net.HostingProbe/ssr/
+tests/Inertia.Net.HostingProbe/wwwroot/build/

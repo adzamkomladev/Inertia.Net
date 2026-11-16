@@ -40,6 +40,8 @@ internal sealed class InertiaPageWriter
     }
 
     private readonly ConcurrentDictionary<Type, bool> _containsProps = new();
+    private readonly ConcurrentDictionary<Type, (JsonTypeInfo Info, bool ContainsProps)> _types = new();
+    private readonly JsonSerializerContext? _generated;
     private readonly ConcurrentDictionary<(JsonPropertyInfo Property, JsonNumberHandling? Handling), JsonTypeInfo> _propertySerializers = new();
     private readonly ConcurrentDictionary<(JsonConverter? Converter, JsonNumberHandling? Handling), JsonSerializerOptions> _memberOptions = new();
     private readonly ConcurrentDictionary<Type, object> _defaultValues = new();
@@ -94,6 +96,7 @@ internal sealed class InertiaPageWriter
 
         serializerOptions.MakeReadOnly();
         SerializerOptions = serializerOptions;
+        _generated = Options.PreserveBigIntegers ? null : GeneratedContext(source);
         _jsonWriterOptions = new JsonWriterOptions { Encoder = source.Encoder, Indented = serializerOptions.WriteIndented };
         _htmlWriterOptions = new JsonWriterOptions { Encoder = HtmlSafeEncoder };
         _propsWriters = new DefaultObjectPool<PropsWriter>(new PropsWriterPolicy(this));
@@ -293,6 +296,69 @@ internal sealed class InertiaPageWriter
     /// <summary>Whether values of <paramref name="type"/> can hold props and must be walked instead of serialized in one call.</summary>
     public bool ContainsProps(Type type) =>
         _containsProps.GetOrAdd(type, static (t, self) => self.ComputeContainsProps(t, []), this);
+
+    /// <summary>
+    /// The type's metadata and <see cref="ContainsProps"/> in one cached lookup, for the render path: the public
+    /// <see cref="JsonSerializerOptions.GetTypeInfo"/> validates the type on every call before reaching its own cache.
+    /// </summary>
+    public (JsonTypeInfo Info, bool ContainsProps) TypeEntry(Type type) =>
+        _types.GetOrAdd(type, static (t, self) =>
+        {
+            var info = self.SerializerOptions.GetTypeInfo(t);
+            var containsProps = self.ContainsProps(t);
+            // A value that cannot hold props is serialized whole: through the app's generated context when the output is the same, so
+            // System.Text.Json can use the generated serialization code instead of its metadata converters.
+            if (!containsProps && self._generated?.GetTypeInfo(t) is { } generated && self.HasPlainNames(info, []))
+            {
+                info = generated;
+            }
+
+            return (info, containsProps);
+        }, this);
+
+    // The app's source-generated context, when Inertia's options would write exactly what the context's own options write: it is the
+    // first resolver (so it supplies every type it knows), and the settings that change the output are the same. The encoders differ,
+    // but values go through the writer's encoder either way; names are checked per type by HasPlainNames.
+    private static JsonSerializerContext? GeneratedContext(JsonSerializerOptions source)
+    {
+        if (source.TypeInfoResolverChain is not [JsonSerializerContext context, ..]) return null;
+        var generated = context.Options;
+#pragma warning disable SYSLIB0020 // IgnoreNullValues is obsolete but still changes the output.
+        return source.Converters.Count == 0 && generated.Converters.Count == 0
+            && source.IgnoreNullValues == generated.IgnoreNullValues
+#pragma warning restore SYSLIB0020
+            && source.NumberHandling == generated.NumberHandling
+            && source.ReferenceHandler is null && generated.ReferenceHandler is null
+            && source.DefaultIgnoreCondition == generated.DefaultIgnoreCondition
+            && source.RespectNullableAnnotations == generated.RespectNullableAnnotations
+            && source.IgnoreReadOnlyFields == generated.IgnoreReadOnlyFields
+            && source.IgnoreReadOnlyProperties == generated.IgnoreReadOnlyProperties
+            && source.IncludeFields == generated.IncludeFields
+            && source.PropertyNamingPolicy == generated.PropertyNamingPolicy
+            && source.DictionaryKeyPolicy == generated.DictionaryKeyPolicy
+            && source.MaxDepth == generated.MaxDepth
+            ? context
+            : null;
+    }
+
+    // Generated code writes property names pre-encoded with the default encoder; Inertia's encoder writes them differently only for
+    // characters outside letters, digits, '_', '-', '.' and '$'. Polymorphic types carry a discriminator encoded the same way.
+    private bool HasPlainNames(JsonTypeInfo info, HashSet<Type> visiting)
+    {
+        if (!visiting.Add(info.Type) || info.Kind == JsonTypeInfoKind.None) return true;
+        if (info.PolymorphismOptions is not null) return false;
+        foreach (var property in info.Properties)
+        {
+            foreach (var c in property.Name)
+            {
+                if (!char.IsAsciiLetterOrDigit(c) && c is not ('_' or '-' or '.' or '$')) return false;
+            }
+
+            if (!HasPlainNames(SerializerOptions.GetTypeInfo(property.PropertyType), visiting)) return false;
+        }
+
+        return info.ElementType is not { } element || HasPlainNames(SerializerOptions.GetTypeInfo(element), visiting);
+    }
 
     /// <summary>Reads a POCO property the way System.Text.Json would write it.</summary>
     public bool TryGetPropertyValue(JsonPropertyInfo property, object target, out object? value)
@@ -721,7 +787,7 @@ internal sealed class InertiaPageWriter
             }
             else
             {
-                JsonSerializer.Serialize(writer, value, SerializerOptions.GetTypeInfo(valueType));
+                JsonSerializer.Serialize(writer, value, TypeEntry(valueType).Info);
             }
         }
 
@@ -792,7 +858,7 @@ internal sealed class InertiaPageWriter
                 WriteNode(writer, node);
                 break;
             default:
-                JsonSerializer.Serialize(writer, value, SerializerOptions.GetTypeInfo(value.GetType()));
+                JsonSerializer.Serialize(writer, value, TypeEntry(value.GetType()).Info);
                 break;
         }
     }

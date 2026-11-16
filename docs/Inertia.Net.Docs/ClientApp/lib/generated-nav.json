@@ -1288,6 +1288,11 @@
           "depth": 2
         },
         {
+          "id": "make-rendering-faster-register-your-json-context-first",
+          "text": "Make rendering faster: register your JSON context first",
+          "depth": 2
+        },
+        {
           "id": "payload-size",
           "text": "Payload size",
           "depth": 2

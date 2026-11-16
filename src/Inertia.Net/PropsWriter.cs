@@ -458,8 +458,39 @@ internal sealed partial class PropsWriter
         }
     }
 
+    // Plain values (strings, numbers, POCOs that cannot hold props) are written here without the two async state machines below; this is
+    // what WriteEntryCoreAsync and WriteValueAsync do for them. Anything that can resolve, hold props or needs its own writer goes there.
+    private ValueTask WriteEntryAsync(string? key, int index, object? prop, Type declaredType, bool parentWasResolved)
+    {
+        if (prop is null or InertiaProp or JsonElement or JsonNode or InertiaPageWriter.LazyDotObject or InertiaPageWriter.PropertyValue)
+        {
+            return WriteEntryCoreAsync(key, index, prop, declaredType, parentWasResolved);
+        }
+
+        var (info, containsProps) = _owner.TypeEntry(declaredType == typeof(object) ? prop.GetType() : declaredType);
+        if (containsProps)
+        {
+            return WriteEntryCoreAsync(key, index, prop, declaredType, parentWasResolved);
+        }
+
+        var mark = key is null ? Push(index) : Push(key);
+        try
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfPlanFailed();
+            if (Decide(null, prop, declaredType, parentWasResolved) == Inclusion.Filtered) return default;
+            if (key is not null) _writer.WritePropertyName(key);
+            JsonSerializer.Serialize(_writer, prop, info);
+            return default;
+        }
+        finally
+        {
+            _pathLength = mark;
+        }
+    }
+
     // resolveProps loop body for one key (or array index).
-    private async ValueTask WriteEntryAsync(string? key, int index, object? prop, Type declaredType, bool parentWasResolved)
+    private async ValueTask WriteEntryCoreAsync(string? key, int index, object? prop, Type declaredType, bool parentWasResolved)
     {
         var mark = key is null ? Push(index) : Push(key);
         var arrayMark = _arrayPathLength;
@@ -657,8 +688,8 @@ internal sealed partial class PropsWriter
         }
 
         var type = declaredType == typeof(object) ? value.GetType() : declaredType;
-        var info = _owner.SerializerOptions.GetTypeInfo(type);
-        if (_owner.ContainsProps(type))
+        var (info, containsProps) = _owner.TypeEntry(type);
+        if (containsProps)
         {
             if (info.Kind == JsonTypeInfoKind.Object)
             {
@@ -1041,10 +1072,10 @@ internal sealed partial class PropsWriter
         if (value is null or string) return false;
         if (value is JsonElement element) return element.ValueKind == JsonValueKind.Array;
         if (value is JsonNode node) return node is JsonArray;
-        if (value is InertiaProp prop) return prop.ValueType != typeof(object) && _owner.SerializerOptions.GetTypeInfo(prop.ValueType).Kind == JsonTypeInfoKind.Enumerable;
+        if (value is InertiaProp prop) return prop.ValueType != typeof(object) && _owner.TypeEntry(prop.ValueType).Info.Kind == JsonTypeInfoKind.Enumerable;
         if (value is InertiaPageWriter.PropertyValue member)
             return member.TypeInfo.Kind == JsonTypeInfoKind.Enumerable;
-        return value is IEnumerable && _owner.SerializerOptions.GetTypeInfo(declaredType == typeof(object) ? value.GetType() : declaredType).Kind == JsonTypeInfoKind.Enumerable;
+        return value is IEnumerable && _owner.TypeEntry(declaredType == typeof(object) ? value.GetType() : declaredType).Info.Kind == JsonTypeInfoKind.Enumerable;
     }
 
     // path == filter, or path is a descendant of filter.
