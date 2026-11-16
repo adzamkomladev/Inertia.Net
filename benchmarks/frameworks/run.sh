@@ -9,7 +9,7 @@
 #   run.sh --dev                          dev-server cold start only
 #
 # Options: --frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel  --modes ssr,spa
-#          (also inertianet-tuned and inertianet-aot-tuned: the same images with BENCH_TUNED=1, Inertia.Net's caches and Node instances on)
+#          Any framework id + "-tuned" (e.g. nextjs-tuned) is that app with its own caching on (BENCH_TUNED=1, see the README).
 #          --routes home,todos25,todos100,dashboard,new,create,invalid,compute,parallel
 #          --seconds 10 --warmup 5 --connections 16 --rates 50,200 --cpus 2 --memory 2g --scale-cpus 1,2,4 --port 18080
 #          --out artifacts/framework-bench.md --keep-services (leave Postgres and Redis running)
@@ -48,7 +48,8 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-NET=inertia-bench-fw-net PG=inertia-bench-fw-postgres REDIS=inertia-bench-fw-redis APP=inertia-bench-fw-app
+# Named after the port, so runs on different --port values can share a host.
+NET=inertia-bench-fw-net-$PORT PG=inertia-bench-fw-postgres-$PORT REDIS=inertia-bench-fw-redis-$PORT APP=inertia-bench-fw-app-$PORT
 BASE=http://127.0.0.1:$PORT
 WORK=$(mktemp -d)
 log() { echo "[$(date +%T)] $*" >&2; }
@@ -93,7 +94,9 @@ NPM=${NPM:-npm}
 declare -A PREPARED=()
 
 tag() { # framework mode -> image tag (mode dev: the dev-server image)
-  set -- "${1%-tuned}" "$2" # a tuned app is its plain app's image, started with BENCH_TUNED=1
+  # Next.js, TanStack Start and Nuxt choose their caching at build time; the other tuned apps are their plain app's image.
+  case $1 in nextjs-tuned | tanstack-tuned | nuxt-tuned) echo "inertia-bench-fw-${1%-tuned}:tuned-$2"; return ;; esac
+  set -- "${1%-tuned}" "$2"
   case $1 in
     inertianet) [ "$2" = dev ] && echo inertia-bench-fw-inertianet:dev || echo "inertia-bench-fw-inertianet:jit-$2" ;;
     inertianet-aot) echo "inertia-bench-fw-inertianet:aot-$2" ;;
@@ -127,6 +130,9 @@ prepare() { # framework -> the shared components copied in, npm packages install
 }
 
 build() { # framework mode
+  local tuned=0 image
+  [[ $1 == *-tuned ]] && tuned=1
+  image=$(tag "$1" "$2")
   set -- "${1%-tuned}" "$2"
   local dir target=() file=Dockerfile context
   dir=$(app_dir "$1") context=$dir
@@ -140,18 +146,19 @@ build() { # framework mode
       inertianet-aot) target=(--target "aot-$2") ;;
       laravel) target=(--target "$2") ;;
       # Next.js, TanStack Start and Nuxt decide SSR or SPA at build time.
-      nextjs | tanstack | nuxt) (cd "$dir" && BENCH_MODE=$2 "$NPM" run build >&2) ;;
+      nextjs | tanstack | nuxt) (cd "$dir" && BENCH_MODE=$2 BENCH_TUNED=$tuned "$NPM" run build >&2) ;;
     esac
   fi
-  log "building $(tag "$1" "$2")"
-  docker build -q -f "$dir/$file" "${target[@]}" -t "$(tag "$1" "$2")" "$context" >/dev/null
+  log "building $image"
+  docker build -q -f "$dir/$file" "${target[@]}" -t "$image" "$context" >/dev/null
 }
 
 app_env() { # framework mode cpus -> docker run -e arguments, one per line
   local ssr=0
   [ "$2" = ssr ] && ssr=1
-  case $1 in
-    inertianet*) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "BENCH_TUNED=$([[ $1 == *-tuned ]] && echo 1 || echo 0)" "DATABASE_URL=Host=$PG;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10" "REDIS_URL=$REDIS:6379" ;;
+  printf -- '-e\n%s\n' "BENCH_TUNED=$([[ $1 == *-tuned ]] && echo 1 || echo 0)"
+  case ${1%-tuned} in
+    inertianet*) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "DATABASE_URL=Host=$PG;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10" "REDIS_URL=$REDIS:6379" ;;
     # Node sizes its worker pool from the host's CPUs, not the container's quota, so the pool gets the CPU limit (rounded up).
     nextjs | tanstack | nuxt) printf -- '-e\n%s\n' "BENCH_WORKERS=$(awk "BEGIN{print int($3 + 0.999)}")" "DATABASE_URL=postgres://bench:bench@$PG/bench" "REDIS_URL=redis://$REDIS:6379" ;;
     # FrankenPHP workers block on I/O, so two per CPU; each keeps one Postgres connection.
@@ -210,7 +217,7 @@ route_path() {
 
 route_page() { case $1 in todos*) echo todos ;; parallel) echo compute ;; *) echo "$1" ;; esac; }
 
-is_inertia() { [[ $1 == inertianet* || $1 == laravel ]]; }
+is_inertia() { [[ $1 == inertianet* || ${1%-tuned} == laravel ]]; }
 
 # --- The new-todo form: POST /todos (Inertia apps: 303 back to the form) or POST /api/todos (Node apps: 201, or 422 with errors) ---
 VALID='{"title":"Buy milk","priority":2,"assignee":"ada","due":"2026-06-01"}'
@@ -218,7 +225,7 @@ INVALID='{"title":"x","priority":9,"assignee":"bob","due":"2027-02-30"}' # fails
 post_path() { is_inertia "$1" && echo /todos || echo /api/todos; }
 post_status() { # framework valid|invalid -> the status that counts as success
   # Inertia only needs a 303 after PUT, PATCH and DELETE, so Inertia.Net (both posts) and Laravel (its validation redirect) answer a POST with 302.
-  if [[ $1 == inertianet* ]] || { [ "$1" = laravel ] && [ "$2" = invalid ]; }; then echo 302; elif is_inertia "$1"; then echo 303; elif [ "$2" = valid ]; then echo 201; else echo 422; fi
+  if [[ $1 == inertianet* ]] || { [ "${1%-tuned}" = laravel ] && [ "$2" = invalid ]; }; then echo 302; elif is_inertia "$1"; then echo 303; elif [ "$2" = valid ]; then echo 201; else echo 422; fi
 }
 # A session as a browser has it after opening the form: the cookies GET /todos/new set, and the headers an Inertia form post
 # sends (with X-XSRF-TOKEN when the app set an XSRF-TOKEN cookie). The load client reuses them for every post of a run.
@@ -332,16 +339,17 @@ LOAD_DLL=$ROOT/tests/Inertia.Net.HostingProbe/bin/Release/net10.0/Inertia.Net.Ho
 load() { "$DOTNET" "$LOAD_DLL" load "$@"; } # prints {"rps","p50Ms","p95Ms","p99Ms","p999Ms","errors","cpuMicrosPerRequest","peakMb"}
 
 name() {
-  case $1 in
-    inertianet) echo "Inertia.Net (JIT)" ;; inertianet-aot) echo "Inertia.Net (Native AOT)" ;; nextjs) echo Next.js ;;
-    inertianet-tuned) echo "Inertia.Net (JIT, tuned)" ;; inertianet-aot-tuned) echo "Inertia.Net (Native AOT, tuned)" ;;
-    tanstack) echo "TanStack Start" ;; nuxt) echo Nuxt ;; laravel) echo "Laravel (Octane, FrankenPHP)" ;;
+  local n
+  case ${1%-tuned} in
+    inertianet) n="Inertia.Net (JIT)" ;; inertianet-aot) n="Inertia.Net (Native AOT)" ;; nextjs) n=Next.js ;;
+    tanstack) n="TanStack Start" ;; nuxt) n=Nuxt ;; laravel) n="Laravel (Octane, FrankenPHP)" ;;
   esac
+  if [[ $1 != *-tuned ]]; then echo "$n"; elif [[ $n == *')' ]]; then echo "${n%)}, tuned)"; else echo "$n (tuned)"; fi
 }
 
 mode_name() {
   if [ "$2" = ssr ]; then echo SSR
-  elif [ "$1" = nextjs ]; then echo "SPA (nearest)"
+  elif [ "${1%-tuned}" = nextjs ]; then echo "SPA (nearest)"
   else echo SPA
   fi
 }
@@ -428,7 +436,7 @@ bench_scaling() { # framework
       mapfile -t args < <(json_headers "$fw")
       single=$(load "$url" --connections 1 --warmup "$WARMUP" --seconds "$DURATION" "${args[@]}")
       multi=$(load "$url" --connections "$CONNECTIONS" --warmup "$WARMUP" --seconds "$DURATION" "${args[@]}")
-      echo "| $(name "$fw") | \`$(route_path "$route")\`$([ "$fw" = laravel ] && [ "$route" = parallel ] && echo ' (sequential in PHP)') | $cpus |" \
+      echo "| $(name "$fw") | \`$(route_path "$route")\`$([ "${fw%-tuned}" = laravel ] && [ "$route" = parallel ] && echo ' (sequential in PHP)') | $cpus |" \
         "$(jq -r --arg o "$OVERLOADED" 'if .errors > 0 then $o else "\(.rps | round)" end' <<<"$multi") |" \
         "$(jq -r --arg o "$OVERLOADED" 'if .errors > 0 then $o else "\(.p50Ms)" end' <<<"$single") |" >>"$WORK/scaling.md"
     done
@@ -479,7 +487,7 @@ for fw in ${FRAMEWORKS//,/ }; do
   for mode in ${MODES//,/ }; do bench_app "$fw" "$mode"; done
 done
 if [[ ,$ROUTES, == *,compute,* ]]; then # the scaling runs both compute routes, so a split run does it once, in the compute part
-  for fw in ${FRAMEWORKS//,/ }; do bench_scaling "$fw"; done
+  for fw in ${FRAMEWORKS//,/ }; do [[ $fw == *-tuned ]] || bench_scaling "$fw"; done # caching doesn't change CPU-bound work
 fi
 
 mkdir -p "$(dirname "$OUT")"
