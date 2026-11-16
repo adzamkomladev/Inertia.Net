@@ -1458,6 +1458,16 @@
           "depth": 2
         },
         {
+          "id": "every-framework-with-its-caching-turned-on",
+          "text": "Every framework with its caching turned on",
+          "depth": 2
+        },
+        {
+          "id": "what-inertianet-caches-and-what-it-doesnt",
+          "text": "What Inertia.Net caches, and what it doesn't",
+          "depth": 2
+        },
+        {
           "id": "what-this-means-for-you",
           "text": "What this means for you",
           "depth": 2

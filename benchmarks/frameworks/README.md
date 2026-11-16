@@ -135,10 +135,43 @@ split by route, with all four builds on each route's runner (requests per second
 - **Form posts and the CPU-heavy routes didn't change**, as expected: nothing there is cached.
 - **The second Node process costs memory**: at rest with SSR, 84 MB instead of 60 (JIT) and 75 instead of 46 (Native AOT).
 
-These numbers show what Inertia.Net can do with its features on. They don't belong in the main table: the other frameworks have
-caching of their own (Next.js full-route caching, Nuxt's route rules, response-cache packages for Laravel) that this comparison didn't turn
-on. Cache only pages that are the same for everyone, or whose cache key covers the user; see the
-[response cache docs](../../README.md#6-response-cache).
+These numbers show what Inertia.Net can do with its features on. They aren't in the main table because the other apps had no
+caching on in that run; the next section turns it on for all of them. Cache only pages that are the same for everyone, or whose cache
+key covers the user; see the [response cache docs](../../README.md#6-response-cache).
+
+## Every framework with its caching on
+
+Every app also has a tuned build (`<id>-tuned`, `BENCH_TUNED=1`) with its own framework's caching on, set like Inertia.Net tuned:
+pages for 60 s and todo lists for 10 s, each served stale while it refreshes, kept in the app's memory. Compute and the form post
+are never cached, so tuned apps skip those routes.
+
+| App | What its tuned build caches |
+|---|---|
+| Inertia.Net | The SSR render (by a hash of the page's data) and the todo and dashboard props (`.Cache(...)`); two Node renderers. The handler still runs on every request. |
+| Next.js | `'use cache'` on the todo and dashboard page components and the JSON route data ([lib/tuned.tsx](nextjs/lib/tuned.tsx)). |
+| TanStack Start, Nuxt | Nitro `routeRules` caching the whole GET response of the pages and `/api` routes. |
+| Laravel | The whole response, through [spatie/laravel-responsecache](https://github.com/spatie/laravel-responsecache) with a profile that also caches Inertia visits ([BenchCacheProfile.php](laravel/app/Support/BenchCacheProfile.php)). |
+
+From one GitHub Actions run on 2026-11-16 ([results/2026-11-16-all-tuned.md](results/2026-11-16-all-tuned.md)), split by route
+with all twelve builds on each route's runner. Requests per second for first visits (SSR), plain → tuned:
+
+| Route | Inertia.Net (JIT) | Inertia.Net (Native AOT) | Next.js | TanStack Start | Nuxt | Laravel |
+|---|---:|---:|---:|---:|---:|---:|
+| `/` | 9,548 → **55,711** | 10,812 → 50,970 | 555 → 558 | 2,567 → 12,997 | 1,196 → 18,471 | 572 → 1,177 |
+| `/todos?perPage=25` | 2,201 → **34,020** | 4,567 → 32,889 | 380 → 439 | 1,827 → 9,543 | 908 → 15,481 | 396 → 1,201 |
+| `/todos?perPage=100` | 787 → **22,834** | 1,442 → 20,007 | 203 → 201 | 767 → 3,882 | 568 → 6,835 | 168 → 868 |
+| `/dashboard` | 6,847 → **55,439** | 8,002 → 50,105 | 472 → 424 | 3,642 → 11,680 | 1,016 → 18,151 | 527 → 1,206 |
+| `/todos/new` | 7,464 → **57,611** | 8,100 → 51,266 | 501 → 504 | 2,607 → 12,129 | 1,446 → 18,603 | 513 → 1,180 |
+
+- **Inertia.Net tuned is the fastest on every cached first visit**: 2 to 3 times Nuxt tuned, 3 to 6 times TanStack Start tuned, and
+  far ahead of Laravel and Next.js, although it still runs the handler and builds the page data on every request while the Nitro and
+  Laravel caches answer with a stored response.
+- **Next.js didn't get faster.** `'use cache'` caches the components' output, but a page that reads the query string (or calls
+  `connection()`) still renders its HTML on every request. Next.js only serves stored HTML for static and ISR routes, which can't read
+  the query string; the todo list needs it.
+- **Laravel gained 2 to 5 times** but stops near 1,200 requests per second: a cache hit still runs the session, cookie and CSRF middleware.
+- **Already-cheap routes don't gain**: the home page's JSON (a fixed list) was a little slower in some tuned builds, within the noise of
+  one run.
 
 ## What the app does
 

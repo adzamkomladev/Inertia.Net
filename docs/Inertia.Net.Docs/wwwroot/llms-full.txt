@@ -5404,6 +5404,7 @@ This page explains what was built, introduces each framework and what it is good
 - **TanStack Start is the leanest JavaScript option.** It used as little memory as Inertia.Net's normal build and started the fastest of all the server-rendered apps.
 - **Nuxt's API is very quick**, but its server-rendered pages were slower than the other JavaScript frameworks except Next.js.
 - **Next.js and Laravel served the fewest requests** in this setup. Both still answered in a few milliseconds at everyday traffic levels.
+- **With every framework's own caching turned on, Inertia.Net was still the fastest**, by 2 to 6 times over the next best on cached first visits.
 - **At normal traffic every framework is fast enough.** The differences matter when traffic spikes, when you pay per server, or when a page does heavy work.
 
 ## What we built
@@ -5565,8 +5566,45 @@ Plain and tuned builds ran side by side on the same machines:
 With caching on, server-rendered pages were served 4 to 27 times faster, in about a millisecond, because a cached page skips rendering entirely. Form posts and the heavy calculation didn't change, since nothing there is cached. The second Node renderer adds about 25 MB of memory.
 
 <Callout type="warning" title="Cache what everyone sees the same way">
-The render cache is keyed by the page's data, so pages with per-user data make one entry per user. Turn it on for pages that are the same for every visitor, such as landing, catalog and article pages. The other frameworks have caching of their own, such as Next.js full-route caching and Nuxt route rules, which this comparison didn't turn on. That's why these numbers aren't in the tables above.
+The render cache is keyed by the page's data, so pages with per-user data make one entry per user. Turn it on for pages that are the same for every visitor, such as landing, catalog and article pages. The other frameworks have caching of their own, so these numbers aren't in the tables above; the next section turns caching on for all of them.
 </Callout>
+
+## Every framework with its caching turned on
+
+Comparing a cached Inertia.Net with uncached rivals wouldn't be fair, so we gave every app its own framework's caching, set the same way: pages kept for 60 seconds and todo lists for 10, each served stale while a fresh copy is made in the background, all kept in the app's memory.
+
+- **Next.js:** `'use cache'` on the page components and their data.
+- **TanStack Start and Nuxt:** Nitro route rules, which store the whole response.
+- **Laravel:** the popular [spatie/laravel-responsecache](https://github.com/spatie/laravel-responsecache) package, which also stores the whole response.
+
+Requests per second for a first visit, every app with caching on:
+
+| Page, first visit | Inertia.Net | Inertia.Net (AOT) | Nuxt | TanStack Start | Laravel | Next.js |
+|---|---:|---:|---:|---:|---:|---:|
+| Home | **55,711** | 50,970 | 18,471 | 12,997 | 1,177 | 558 |
+| Todo list, 25 rows | **34,020** | 32,889 | 15,481 | 9,543 | 1,201 | 439 |
+| Todo list, 100 rows | **22,834** | 20,007 | 6,835 | 3,882 | 868 | 201 |
+| Dashboard | **55,439** | 50,105 | 18,151 | 11,680 | 1,206 | 424 |
+| New todo form | **57,611** | 51,266 | 18,603 | 12,129 | 1,180 | 504 |
+
+- **Inertia.Net served 2 to 3 times more than Nuxt and 3 to 6 times more than TanStack Start**, the next fastest. It did so while still running your code and loading fresh page data on every request, which the Nuxt, TanStack Start and Laravel caches skip.
+- **Nuxt and TanStack Start gained the most from caching** among the JavaScript frameworks, up to 15 times for Nuxt.
+- **Laravel got 2 to 5 times faster** but stopped near 1,200 requests per second, because every request still goes through its session and security layers.
+- **Next.js didn't get faster.** Its cache stores the output of components, but a page that reads the address bar, like the todo list, is still turned into HTML on every request. Next.js only serves ready-made HTML for pages that never change per request.
+
+## What Inertia.Net caches, and what it doesn't
+
+Inertia.Net has two caches that work together, and you choose what goes in each.
+
+**The SSR render cache stores HTML, not data.** On a first visit Inertia.Net still runs your endpoint and builds the page's data as usual. It then looks up that exact data: if the same page with the same data was rendered recently, it sends the stored HTML and Node isn't called at all. Rendering with Node is the most expensive step of a server-rendered page, so this is where most of the speed comes from. Because the lookup uses the data itself, the cache can never show an out-of-date page: when one todo changes, the data changes, and the page is rendered fresh.
+
+**Cached props store data.** Add `.Cache(key, duration)` to a prop and its value is kept, in memory or in Redis, so the database isn't asked again until it expires. With `staleFor`, an expired value is still served while a fresh one loads in the background. This is the only place Inertia.Net will show data that is a little old, and only for the props you mark.
+
+In the benchmark's tuned app, a todo list visit therefore reads the rows from the prop cache, finds the HTML in the render cache, and sends it, all in well under a millisecond on the server. Moving between pages in the browser fetches only data and never involves Node, so there the prop cache does the work.
+
+This is different from the other frameworks' caches, which store the whole response under its address. Those skip your code entirely on a hit, but they show the same response, possibly out of date, until it expires, and they need care so that one user's page isn't served to another. Inertia.Net always runs your code, so permissions and per-user data are checked on every request, and you decide which data may be a little old.
+
+See [Server-side rendering](/docs/server-side-rendering) for the render cache and [Props](/docs/props) for cached props.
 
 ## What this means for you
 
