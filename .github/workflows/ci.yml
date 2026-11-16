@@ -3,7 +3,15 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore:
+      # Benchmark apps (built by benchmarks/frameworks/run.sh and their own workflow) and plain notes; docs pages are .mdx.
+      - 'benchmarks/**'
+      - '**/*.md'
   pull_request:
+    paths-ignore:
+      # Benchmark apps (built by benchmarks/frameworks/run.sh and their own workflow) and plain notes; docs pages are .mdx.
+      - 'benchmarks/**'
+      - '**/*.md'
 
 # Read-only token: CI never writes to the repository.
 permissions:
