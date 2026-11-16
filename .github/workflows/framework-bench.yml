@@ -1,0 +1,47 @@
+name: framework-bench
+
+# The framework comparison in benchmarks/frameworks (Inertia.Net, Next.js, TanStack Start, Laravel): the parity check, then the
+# benchmark. Heavy (it builds every app and its Docker images), so it only runs on demand. The table is in the job summary and the
+# framework-bench artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      args:
+        description: Extra run.sh options, e.g. --frameworks inertianet,laravel --seconds 20
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  framework-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      # run.sh builds the apps on the host and copies the output into Alpine runtime images.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.3
+      - run: nproc && lscpu | grep -E 'Model name|^CPU\(s\)' && docker version --format '{{.Server.Version}}'
+      - run: benchmarks/frameworks/run.sh --check
+      - env:
+          ARGS: ${{ inputs.args }}
+        # ARGS is split into words on purpose: it holds run.sh options.
+        run: set -o pipefail; mkdir -p artifacts; benchmarks/frameworks/run.sh $ARGS --out artifacts/framework-bench.md 2>&1 | tee artifacts/framework-bench.log
+      - if: always()
+        run: if [ -f artifacts/framework-bench.md ]; then cat artifacts/framework-bench.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: framework-bench
+          path: artifacts/framework-bench*

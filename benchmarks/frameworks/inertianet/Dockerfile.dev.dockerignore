@@ -1,0 +1,8 @@
+**/bin
+**/obj
+**/node_modules
+**/publish
+**/wwwroot
+**/ssr
+artifacts
+.git

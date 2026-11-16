@@ -1,0 +1,6 @@
+*
+!.next/standalone
+!.next/static
+# sharp only serves next/image, which the app does not use, and the host install is the glibc build, which would not load on Alpine.
+.next/standalone/node_modules/sharp
+.next/standalone/node_modules/@img

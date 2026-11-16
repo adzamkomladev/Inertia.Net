@@ -13,6 +13,7 @@
     <PackageVersion Include="MemoryPack" Version="1.21.4" />
     <PackageVersion Include="StackExchange.Redis" Version="2.9.17" />
     <PackageVersion Include="MongoDB.Driver" Version="3.13.0" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
   <!-- Per-framework versions: EF Core 11 and the ASP.NET Core 11 packages target net11.0 only. "!= net11.0" also covers the outer, framework-less evaluation. -->
   <ItemGroup Condition="'$(TargetFramework)' != 'net11.0'">

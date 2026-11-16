@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- What a package consumer gets from buildTransitive/: global usings for Inertia.Net and its static Inertia class.
+       InertiaBenchPackage=true (the dev image) uses the published package instead of src/, so a dev cold start does not compile the library. -->
+  <Import Project="..\..\..\src\Inertia.Net\buildTransitive\Inertia.Net.props" Condition="'$(InertiaBenchPackage)' != 'true'" />
+  <PropertyGroup>
+    <RootNamespace>InertiaNetBench</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+    <!-- aot.Dockerfile publishes it with -p:PublishAot=true for linux-musl-x64; the trim and AOT analyzers run in every build. -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Inertia.Net\Inertia.Net.csproj" Condition="'$(InertiaBenchPackage)' != 'true'" />
+    <PackageReference Include="Inertia.Net" VersionOverride="1.9.2" Condition="'$(InertiaBenchPackage)' == 'true'" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="StackExchange.Redis" />
+  </ItemGroup>
+  <!-- The frontend is built separately (npm run build, by run.sh); dotnet build never needs Node. -->
+  <ItemGroup>
+    <Content Remove="node_modules\**;ClientApp\**;ssr\**;wwwroot\**;publish\**;package*.json" />
+    <None Remove="node_modules\**;ClientApp\**;ssr\**;publish\**;app.html" />
+    <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
