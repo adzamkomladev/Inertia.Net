@@ -39,6 +39,10 @@ Each route is measured twice:
 | TanStack Start | The default: loaders and components run on the server. | Start's SPA mode (`spa: { enabled: true }`) plus `defaultSsr: false`. SPA mode prerenders a shell for static hosts; on the Node server it still rendered every route until SSR was turned off, so the server now answers page requests with the shell and the browser loads the data through server functions. |
 | Next.js | Server components that query the database on every request. | **Next.js has no true SPA mode.** The nearest equivalent is used and labelled "SPA (nearest)": each page is a static shell (prerendered at build time) whose client component fetches its props from the `/api` route handler. |
 
+One difference to keep in mind when reading SPA rows: an Inertia SPA first visit still runs the route's server work, because the
+page's props are embedded in the HTML; a Next.js or TanStack Start SPA shell carries no data, and the browser makes a second request
+(the `json` row) for it.
+
 Both Inertia SSR bundles inline their dependencies (Vite `ssr.noExternal`), so they run without `node_modules`.
 
 ## What is measured
@@ -64,8 +68,9 @@ connections and as the median latency of one request at a time. The single-reque
 drop as CPUs are added; throughput is where the sequential route scales instead.
 
 **Dev-server cold start** (`--dev`): with dependencies installed and nothing built, the time from starting the dev command
-(`dotnet watch` + Vite, `next dev`, `vite dev`, `php artisan serve` + Vite) until `/` answers 200. Hot-reload timing in a browser is
-not measured.
+(`dotnet watch` + Vite, `next dev`, `vite dev`, `php artisan serve` + Vite) until `/` answers 200, in the same container limits.
+The Inertia.Net app references the library's source, so its first `dotnet watch` build also compiles Inertia.Net and its analyzers,
+which an app using the NuGet package would not. Hot-reload timing in a browser is not measured (it needs a scripted browser).
 
 ## How to run it
 
