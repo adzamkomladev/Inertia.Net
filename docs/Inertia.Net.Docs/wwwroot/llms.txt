@@ -54,6 +54,7 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [Performance](https://inertia-dotnet.temtem.dev/docs/performance): Memory, requests per second and CPU with and without Inertia, hosting guidance, payload limits and the design choices behind the adapter.
 - [Multiple apps and libraries](https://inertia-dotnet.temtem.dev/docs/mounts): Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
 - [Redis cache](https://inertia-dotnet.temtem.dev/docs/redis): Share cached props and SSR renders between app instances with the Inertia.Net.Redis cache store.
+- [Framework comparison](https://inertia-dotnet.temtem.dev/docs/framework-comparison): The same todo app built with Inertia.Net, Next.js, TanStack Start and Laravel, measured for requests per second, latency, memory, startup and image size.
 
 ## Reference
 

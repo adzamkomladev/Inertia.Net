@@ -1375,6 +1375,26 @@
       ]
     },
     {
+      "slug": "framework-comparison",
+      "url": "/docs/framework-comparison",
+      "title": "Framework comparison",
+      "description": "The same todo app built with Inertia.Net, Next.js, TanStack Start and Laravel, measured for requests per second, latency, memory, startup and image size.",
+      "section": "Production",
+      "order": 10,
+      "headings": [
+        {
+          "id": "results",
+          "text": "Results",
+          "depth": 2
+        },
+        {
+          "id": "what-the-numbers-say",
+          "text": "What the numbers say",
+          "depth": 2
+        }
+      ]
+    },
+    {
       "slug": "configuration",
       "url": "/docs/configuration",
       "title": "Configuration",
