@@ -13,6 +13,64 @@ Every app shows the same React pages (`shared/js/*Page.jsx`, copied into each ap
 table with the same SQL (`shared/schema.sql`, `shared/queries.sql`), caches the dashboard in Redis for 60 seconds, and runs the
 same CPU-heavy algorithm. A parity check proves they all return the same rows and checksums before anything is measured.
 
+## Results
+
+From one run on a GitHub-hosted runner (4 CPUs, AMD EPYC) on 2026-11-16, each app limited to 2 CPUs and 2 GB. The full tables,
+with every route, latency percentile and fixed-rate run, are in [results/2026-11-16.md](results/2026-11-16.md). No run was marked
+overloaded: every request succeeded, and every SSR response was really server-rendered.
+
+**Memory and startup**
+
+| App | Memory at rest, SPA / SSR | Cold start, SPA / SSR | Image, SPA / SSR |
+|---|---:|---:|---:|
+| Inertia.Net, Native AOT | **18** / 49 MB | **221** / 496 ms | **34** / 98 MB |
+| Inertia.Net, JIT | 34 / 66 MB | 433 / 1009 ms | 119 / 183 MB |
+| TanStack Start | 88 / 88 MB | 295 / 275 ms | 167 MB |
+| Next.js | 115 / 117 MB | 524 / 638 ms | 182 MB |
+| Laravel (Octane, FrankenPHP) | 101 / 156 MB | 775 / 888 ms | 252 / 311 MB |
+
+Memory is the whole container: for SSR that includes the Node renderer, for Laravel all its PHP workers.
+
+**Requests per second** (16 connections; higher is better)
+
+| Route | Inertia.Net JIT | Inertia.Net AOT | TanStack Start | Next.js | Laravel |
+|---|---:|---:|---:|---:|---:|
+| `/todos?perPage=25`, first visit with SSR | **5,023** | 4,817 | 1,897 | 592 | 534 |
+| `/todos?perPage=25`, client-side navigation (JSON) | **12,603** | 11,901 | 6,261 | 2,624 | 1,102 |
+| `/dashboard` (Redis), client-side navigation | 26,383 | **26,670** | 13,009 | 3,297 | 1,410 |
+| `/compute?n=20000` (CPU-heavy, JSON) | **1,551** | 1,103 | 288 | 240 | 86 |
+
+**Using more CPUs** (`/compute/parallel`, JSON, 16 connections)
+
+| App | 1 CPU | 2 CPUs | 4 CPUs |
+|---|---:|---:|---:|
+| Inertia.Net, JIT | 909 | 1,534 | 2,702 |
+| Inertia.Net, Native AOT | 714 | 1,069 | 1,824 |
+| TanStack Start | 215 | 398 | 514 |
+| Next.js | 182 | 350 | 444 |
+| Laravel (sequential in PHP) | 61 | 84 | 161 |
+
+What stands out:
+
+- **Inertia.Net uses the least memory and serves the most requests in this test.** The Native AOT SPA build sits at 18 MB, about
+  a fifth of the smallest Node app. With SSR, Inertia.Net served about 2.6 times as many first visits as TanStack Start and about
+  8 to 9 times as many as Next.js and Laravel.
+- **Client-side navigation is cheap in every Inertia.Net mode**, because an Inertia visit returns only the page's JSON and the SSR
+  renderer is not involved.
+- **CPU-heavy work is mostly a language-speed test.** .NET runs the same algorithm several times faster than Node and much faster
+  than PHP. Node handles one request's JavaScript at a time per process, so the plain `/compute` route stays near 240 req/s at any
+  CPU count. Only the worker-thread route (`/compute/parallel`) uses extra cores. .NET spreads both routes over all cores with no
+  extra code.
+- **Native AOT is about 30% slower than JIT on the CPU-heavy routes.** The JIT build optimises hot code at run time using what
+  it observes (dynamic PGO), and AOT can't. AOT wins on memory, startup and image size, and is level with JIT on ordinary pages.
+- **Laravel can't keep up with 200 req/s on `/compute`** (it peaks near 90 on 2 CPUs), so those requests queue for 3 to 6 seconds.
+  It scales by running more PHP workers, which shows from 2 to 4 CPUs.
+- **Next.js "SPA (nearest)" pages are a static shell.** The page then fetches its data from an API route. Its `page` rows measure
+  serving that shell, so compare its `json` rows instead.
+
+Read these numbers as one run on one shared cloud machine, using Alpine images (see [Caveats](#caveats)). The load client ran on
+the same machine. Image sizes are what that runner's Docker reported, and can differ from `docker images` on another machine.
+
 ## What the app does
 
 | Route | What the server does |
