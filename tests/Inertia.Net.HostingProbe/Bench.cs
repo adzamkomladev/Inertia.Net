@@ -204,7 +204,8 @@ internal static class Bench
     /// <summary>
     /// <c>load &lt;url&gt;</c>: drives one URL of any HTTP/1.1 server (benchmarks/frameworks/run.sh uses it for every framework) and prints
     /// one JSON line. Options: --connections, --rate (0: closed loop), --warmup, --seconds, --header "Name: value" (repeatable),
-    /// --expect &lt;text&gt; (a 200 without it counts as an error) and --cgroup &lt;dir&gt; (the server container's cgroup v2 directory:
+    /// --expect &lt;text&gt; (a 200 without it counts as an error), --method and --body (e.g. POST with a JSON body; send the
+    /// Content-Type with --header), --status &lt;code&gt; (the status that counts as success, 200 by default; 303 for a form redirect) and --cgroup &lt;dir&gt; (the server container's cgroup v2 directory:
     /// CPU time per request from cpu.stat and peak memory.current sampled every 100 ms while measuring).
     /// </summary>
     public static async Task LoadUrlAsync(string[] options)
@@ -212,7 +213,9 @@ internal static class Bench
         var uri = new Uri(options[0]);
         string? Value(string name) => options.SkipWhile(o => o != name).Skip(1).FirstOrDefault();
         var headers = string.Concat(options.Select((o, i) => o == "--header" && i + 1 < options.Length ? options[i + 1] + "\r\n" : ""));
-        var request = Encoding.ASCII.GetBytes($"GET {uri.PathAndQuery} HTTP/1.1\r\nHost: {uri.Authority}\r\n{headers}\r\n");
+        var body = Encoding.UTF8.GetBytes(Value("--body") ?? "");
+        var length = body.Length > 0 ? $"Content-Length: {body.Length}\r\n" : "";
+        byte[] request = [.. Encoding.ASCII.GetBytes($"{Value("--method") ?? "GET"} {uri.PathAndQuery} HTTP/1.1\r\nHost: {uri.Authority}\r\n{headers}{length}\r\n"), .. body];
         var expect = Value("--expect") is { } text ? Encoding.UTF8.GetBytes(text) : null;
         var cgroup = Value("--cgroup");
         long cpuStart = 0, cpuEnd = 0, peak = 0;
@@ -239,7 +242,7 @@ internal static class Bench
                 cpuEnd = CgroupCpuMicros(cgroup);
                 sampling.Cancel();
             },
-            expect);
+            expect, Option(options, "--status", 200));
         await sampler;
         var requests = load.Rps * load.Seconds;
         Console.WriteLine(JsonSerializer.Serialize(new LoadReport(Math.Round(load.Rps, 1), Math.Round(load.P50Ms, 3), Math.Round(load.P95Ms, 3), Math.Round(load.P99Ms, 3),
@@ -449,7 +452,7 @@ internal static class Bench
     /// arrives (saturation). Otherwise the connections together send <paramref name="rate"/> requests per second on a schedule, and a request
     /// sent late because the previous response had not arrived counts its latency from when it was due.
     /// </summary>
-    private static async Task<Load> LoadAsync(IPEndPoint endpoint, byte[] request, int connections, int rate, int warmup, int seconds, Action? measureStart, Action? measureEnd, byte[]? expect = null)
+    private static async Task<Load> LoadAsync(IPEndPoint endpoint, byte[] request, int connections, int rate, int warmup, int seconds, Action? measureStart, Action? measureEnd, byte[]? expect = null, int expectStatus = 200)
     {
         var measuring = false;
         var stop = false;
@@ -494,7 +497,7 @@ internal static class Bench
                     var status = await connection.SendAsync(request);
                     if (!record || Volatile.Read(ref stop)) continue;
                     // With expect: a 200 whose body lacks the marker (e.g. a page that was not server-rendered) counts as an error too.
-                    if (status != 200 || (expect is not null && connection.LastBody.AsSpan().IndexOf(expect) < 0)) { errors[c]++; continue; }
+                    if (status != expectStatus || (expect is not null && connection.LastBody.AsSpan().IndexOf(expect) < 0)) { errors[c]++; continue; }
                     histogram[Math.Min(Bucket(Stopwatch.GetElapsedTime(begin).TotalMicroseconds), Buckets - 1)]++;
                     counts[c]++;
                 }

@@ -11,7 +11,7 @@ COPY --from=mcr.microsoft.com/dotnet/aspnet:10.0.15-noble /usr/share/dotnet/shar
 WORKDIR /src
 COPY Directory.Build.props Directory.Packages.props ./
 COPY benchmarks/frameworks/inertianet benchmarks/frameworks/inertianet
-COPY benchmarks/frameworks/shared/js benchmarks/frameworks/inertianet/ClientApp/shared
+COPY benchmarks/frameworks/shared/ts benchmarks/frameworks/inertianet/ClientApp/shared
 WORKDIR /src/benchmarks/frameworks/inertianet
 ENV InertiaBenchPackage=true ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_HTTP_PORTS=8080 DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
 COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm

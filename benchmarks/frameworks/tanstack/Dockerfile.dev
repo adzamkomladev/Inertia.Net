@@ -6,6 +6,6 @@ WORKDIR /app
 COPY tanstack/package.json tanstack/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY tanstack/ ./
-COPY shared/js src/shared
+COPY shared/ts src/shared
 EXPOSE 8080
 CMD ["npx", "vite", "dev"]
