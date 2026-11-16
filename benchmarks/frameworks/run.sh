@@ -375,6 +375,8 @@ bench_app() { # framework mode
   size=$(mb "$(docker image inspect -f '{{.Size}}' "$(tag "$fw" "$mode")")")
   echo "| $(name "$fw") | $(mode_name "$fw" "$mode") | $size | $cold | $rest |" >>"$WORK/apps.md"
   for route in ${ROUTES//,/ }; do
+    # Caching never touches compute or the form post, so a tuned app would only repeat its plain app's numbers there.
+    [[ $fw == *-tuned && $route =~ ^(compute|parallel|create|invalid)$ ]] && continue
     if [[ $route == create || $route == invalid ]]; then
       bench_post "$fw" "$mode" "$route" "$cg"
       continue
