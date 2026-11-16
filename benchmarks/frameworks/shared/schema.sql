@@ -23,3 +23,14 @@ FROM generate_series(1, 10000) AS i;
 CREATE INDEX todos_created_at_id ON todos (created_at DESC, id DESC);
 
 ANALYZE todos;
+
+-- Where POST /todos (POST /api/todos in the Node apps) writes. Separate from todos so the write runs never change what the read
+-- routes return; run.sh empties it before each app starts.
+CREATE TABLE submissions (
+  id serial PRIMARY KEY,
+  title text NOT NULL,
+  priority integer NOT NULL,
+  assignee text NOT NULL,
+  due_at date NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);

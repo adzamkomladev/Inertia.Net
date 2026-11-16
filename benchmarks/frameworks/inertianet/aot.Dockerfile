@@ -8,6 +8,7 @@ COPY Directory.Build.props Directory.Packages.props ./
 COPY src/Directory.Build.props src/
 COPY src/Inertia.Net src/Inertia.Net
 COPY src/Inertia.Net.Analyzers src/Inertia.Net.Analyzers
+COPY src/Inertia.Net.Redis src/Inertia.Net.Redis
 COPY benchmarks/frameworks/inertianet benchmarks/frameworks/inertianet
 RUN dotnet publish benchmarks/frameworks/inertianet -c Release -r linux-musl-x64 -p:PublishAot=true -o /out && rm -f /out/*.dbg
 

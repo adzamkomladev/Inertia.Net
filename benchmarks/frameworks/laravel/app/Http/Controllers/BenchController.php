@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreTodoRequest;
+use App\Models\Submission;
+use App\Models\Todo;
 use App\Support\Compute;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,20 +30,23 @@ class BenchController
     {
         $perPage = self::int($request->query('perPage'), 25, 1, 100);
         $page = self::int($request->query('page'), 1, 1, 400);
-        $todos = DB::select(
-            "SELECT id, title, done, priority, assignee, to_char(due_at, 'YYYY-MM-DD') AS due FROM todos ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
-            [$perPage, ($page - 1) * $perPage],
-        );
+        $todos = Todo::query()
+            ->select(['id', 'title', 'done', 'priority', 'assignee', 'due_at'])
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->offset(($page - 1) * $perPage)->limit($perPage)
+            ->get();
 
         return Inertia::render('Todos', ['todos' => $todos, 'page' => $page, 'perPage' => $perPage]);
     }
 
+    // Inertia::once() only lets the client skip a prop it already holds; the 60 s server-side cache stays with Laravel's cache.
     public function dashboard(): Response
     {
         $stats = Cache::remember('bench:dashboard', 60, function () {
-            $byAssignee = array_map(fn ($r) => [
-                'assignee' => $r->assignee, 'total' => $r->total, 'done' => $r->done, 'prioritySum' => $r->priority_sum,
-            ], DB::select('SELECT assignee, count(*)::int AS total, (count(*) FILTER (WHERE done))::int AS done, sum(priority)::int AS priority_sum FROM todos GROUP BY assignee ORDER BY assignee'));
+            $byAssignee = Todo::query()
+                ->selectRaw('assignee, count(*)::int AS total, (count(*) FILTER (WHERE done))::int AS done, sum(priority)::int AS "prioritySum"')
+                ->groupBy('assignee')->orderBy('assignee')
+                ->toBase()->get()->map(fn ($row) => (array) $row)->all();
 
             return [
                 'total' => array_sum(array_column($byAssignee, 'total')),
@@ -50,6 +56,19 @@ class BenchController
         });
 
         return Inertia::render('Dashboard', ['stats' => $stats]);
+    }
+
+    public function create(): Response
+    {
+        return Inertia::render('Todos/New');
+    }
+
+    public function store(StoreTodoRequest $request): RedirectResponse
+    {
+        $todo = $request->validated();
+        Submission::create(['title' => $todo['title'], 'priority' => $todo['priority'], 'assignee' => $todo['assignee'], 'due_at' => $todo['due']]);
+
+        return redirect('/todos/new', 303);
     }
 
     public function compute(Request $request): Response

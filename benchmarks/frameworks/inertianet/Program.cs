@@ -1,11 +1,10 @@
-// The benchmark app on Inertia.Net (benchmarks/frameworks/README.md): the same routes, queries and React pages as the Next.js,
-// TanStack Start and Laravel apps. BENCH_SSR=1 renders first visits on the managed Node process; otherwise the client renders them.
+// The benchmark app on Inertia.Net (benchmarks/frameworks/README.md): the same routes, data and React pages as the other apps, written
+// the way the Inertia.Net template writes an app. BENCH_SSR=1 renders first visits on the managed Node process; otherwise the client renders them.
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using InertiaNetBench;
-using Npgsql;
-using StackExchange.Redis;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, BenchJsonContext.Default));
@@ -21,57 +20,34 @@ builder.Services.AddInertia(o =>
         o.Ssr.Mode = SsrMode.Required;
     }
 });
-builder.Services.AddSingleton(new NpgsqlSlimDataSourceBuilder(Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? "Host=localhost;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10").Build());
-builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(Environment.GetEnvironmentVariable("REDIS_URL") ?? "localhost:6379"));
+builder.Services.AddInertiaRedisCache(o =>
+{
+    o.Configuration = Environment.GetEnvironmentVariable("REDIS_URL") ?? "localhost:6379";
+    o.KeyPrefix = "bench:";
+});
+builder.Services.AddValidation();
+// CSRF: the Inertia client sends the XSRF-TOKEN cookie back as X-XSRF-TOKEN; UseInertiaAntiforgery() issues and validates it.
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+builder.Services.AddBenchData(Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? "Host=localhost;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10");
 
 var app = builder.Build();
 app.UseStaticFiles();
 app.UseInertia();
+app.UseInertiaAntiforgery();
 
 app.MapGet("/", () => Render("Home", new InertiaProps { ["features"] = Data.Features }));
 
-app.MapGet("/todos", async (int? perPage, int? page, NpgsqlDataSource db) =>
+app.MapGet("/todos", async (int? perPage, int? page, BenchData data, CancellationToken ct) =>
 {
-    var size = Math.Clamp(perPage ?? 25, 1, 100);
-    var number = Math.Clamp(page ?? 1, 1, 400);
-    await using var command = db.CreateCommand(
-        "SELECT id, title, done, priority, assignee, to_char(due_at, 'YYYY-MM-DD') AS due FROM todos ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2");
-    command.Parameters.Add(new NpgsqlParameter { Value = size });
-    command.Parameters.Add(new NpgsqlParameter { Value = (number - 1) * size });
-    var todos = new List<Todo>(size);
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync())
-    {
-        todos.Add(new Todo(reader.GetInt32(0), reader.GetString(1), reader.GetBoolean(2), reader.GetInt32(3), reader.GetString(4), reader.GetString(5)));
-    }
-
-    return Render("Todos", new InertiaProps { ["todos"] = todos, ["page"] = number, ["perPage"] = size });
+    var todos = await data.TodosAsync(new PageRequest(Math.Clamp(page ?? 1, 1, 400), Math.Clamp(perPage ?? 25, 1, 100)), ct);
+    return Render("Todos", new InertiaProps { ["todos"] = todos.Data, ["page"] = todos.CurrentPage, ["perPage"] = todos.PerPage });
 });
 
-app.MapGet("/dashboard", async (NpgsqlDataSource db, IConnectionMultiplexer redis) =>
+app.MapGet("/dashboard", () => Render("Dashboard", new InertiaProps
 {
-    var cache = redis.GetDatabase();
-    if (await cache.StringGetAsync("bench:dashboard") is { HasValue: true } cached)
-    {
-        return Render("Dashboard", new InertiaProps { ["stats"] = JsonSerializer.Deserialize((string)cached!, BenchJsonContext.Default.Stats)! });
-    }
-
-    await using var command = db.CreateCommand(
-        "SELECT assignee, count(*)::int AS total, (count(*) FILTER (WHERE done))::int AS done, sum(priority)::int AS priority_sum FROM todos GROUP BY assignee ORDER BY assignee");
-    var rows = new List<AssigneeStats>();
-    await using (var reader = await command.ExecuteReaderAsync())
-    {
-        while (await reader.ReadAsync())
-        {
-            rows.Add(new AssigneeStats(reader.GetString(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3)));
-        }
-    }
-
-    var stats = new Stats(rows.Sum(r => r.Total), rows.Sum(r => r.Done), rows);
-    await cache.StringSetAsync("bench:dashboard", JsonSerializer.Serialize(stats, BenchJsonContext.Default.Stats), TimeSpan.FromSeconds(60));
-    return Render("Dashboard", new InertiaProps { ["stats"] = stats });
-});
+    ["stats"] = Prop<BenchData, Stats>((data, ct) => data.StatsAsync(ct)).Cache("dashboard", TimeSpan.FromSeconds(60)),
+}));
 
 app.MapGet("/compute", (int? n) =>
 {
@@ -85,17 +61,43 @@ app.MapGet("/compute/parallel", (int? n) =>
     return Render("Compute", new InertiaProps { ["n"] = count, ["checksum"] = Compute.Run(count, parallel: true), ["parallel"] = true });
 });
 
+app.MapGet("/todos/new", () => Render("Todos/New"));
+
+app.MapPost("/todos", async (NewTodoInput input, BenchData data, CancellationToken ct) =>
+{
+    await data.AddSubmissionAsync(input.Title!.Trim(), input.Priority!.Value, input.Assignee!, input.DueDate, ct);
+    return Results.Redirect("/todos/new");
+}).WithInertiaValidation();
+
 app.Run();
 
 namespace InertiaNetBench
 {
     public sealed record Feature(string Title, string Body);
 
-    public sealed record Todo(int Id, string Title, bool Done, int Priority, string Assignee, string Due);
+    public sealed record TodoItem(int Id, string Title, bool Done, int Priority, string Assignee, DateOnly Due);
 
     public sealed record AssigneeStats(string Assignee, int Total, int Done, int PrioritySum);
 
     public sealed record Stats(int Total, int Done, List<AssigneeStats> ByAssignee);
+
+    /// <summary>The body of POST /todos. Must be public: the AddValidation() source generator skips internal types.</summary>
+    public sealed record NewTodoInput(string? Title, int? Priority, string? Assignee, string? Due) : IValidatableObject
+    {
+        private static readonly string[] Assignees = ["ada", "barbara", "dennis", "grace", "linus"];
+
+        internal DateOnly DueDate => DateOnly.ParseExact(Due!, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        // One rule method rather than attributes: attribute failures would stop IValidatableObject, and every failing field must be reported.
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (Title?.Trim().Length is not (>= 3 and <= 120)) yield return new("Enter a title between 3 and 120 characters.", [nameof(Title)]);
+            if (Priority is not (>= 0 and <= 4)) yield return new("Choose a priority from 0 to 4.", [nameof(Priority)]);
+            if (Assignee is null || Array.IndexOf(Assignees, Assignee) < 0) yield return new("Choose someone from the team.", [nameof(Assignee)]);
+            if (!DateOnly.TryParseExact(Due, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var due) || due.Year != 2026)
+                yield return new("Enter a due date in 2026.", [nameof(Due)]);
+        }
+    }
 
     internal static class Data
     {
@@ -109,8 +111,10 @@ namespace InertiaNetBench
 
     [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
     [JsonSerializable(typeof(Feature[]))]
-    [JsonSerializable(typeof(List<Todo>))]
+    [JsonSerializable(typeof(TodoItem[]))]
+    [JsonSerializable(typeof(List<TodoItem>))]
     [JsonSerializable(typeof(Stats))]
+    [JsonSerializable(typeof(NewTodoInput))]
     [JsonSerializable(typeof(int))]
     [JsonSerializable(typeof(bool))]
     [JsonSerializable(typeof(string))]

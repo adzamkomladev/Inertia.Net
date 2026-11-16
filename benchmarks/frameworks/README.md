@@ -9,11 +9,37 @@ The same small app, built four ways, measured the same way:
 | TanStack Start | TanStack Start 1.169.5 on Vite 8 with the `nitro/vite` plugin (Node server) | `tanstack/` |
 | Laravel | Laravel 13 (framework 13.42.0) + inertia-laravel 3.7.0 + React, served by Laravel Octane 2.24.0 on FrankenPHP 1.13.5 (worker mode) | `laravel/` |
 
-Every app shows the same React pages (`shared/js/*Page.jsx`, copied into each app at build time), reads the same Postgres
-table with the same SQL (`shared/schema.sql`, `shared/queries.sql`), caches the dashboard in Redis for 60 seconds, and runs the
-same CPU-heavy algorithm. A parity check proves they all return the same rows and checksums before anything is measured.
+Every app shows the same React pages, written in TypeScript (`shared/ts/*Page.tsx`, copied into each app at build time). Each app
+reads the same Postgres tables (`shared/schema.sql`) through the ORM its community normally uses, caches the dashboard in Redis
+for 60 seconds the framework's usual way, validates the same form with its usual validation library, and runs the same
+CPU-heavy algorithm. A parity check proves they all return the same rows, checksums and validation messages before anything is
+measured.
+
+## How each app is written
+
+The aim is that each app looks like what a team would write in that framework, not the fastest code each one could run.
+
+| | Inertia.Net | Laravel | Next.js | TanStack Start |
+|---|---|---|---|---|
+| Data access | EF Core 10 (Npgsql provider), paging with `Inertia.Net.EntityFrameworkCore`'s `ToPageAsync` | Eloquent models | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres |
+| Dashboard cache (60 s, Redis) | Inertia.Net's prop cache, `InertiaProp.Cache("dashboard", ...)`, on the `Inertia.Net.Redis` store | `Cache::remember` on the Redis store | A `'use cache: remote'` function with a Redis cache handler (Cache Components) | A small cache-aside helper on node-redis (Start has no server data cache of its own) |
+| Form validation | .NET 10 validation (`AddValidation()`, `IValidatableObject`) with `WithInertiaValidation()` | A Form Request | zod | zod |
+| Form endpoint | `POST /todos`, Inertia redirect back with errors | `POST /todos`, Inertia redirect back with errors | `POST /api/todos` route handler: 201, or 422 with errors | `POST /api/todos` server route: 201, or 422 with errors |
+| Request forgery protection | Antiforgery with the `XSRF-TOKEN` cookie (as in the Inertia.Net template) | CSRF with the `XSRF-TOKEN` cookie, cookie sessions | None by default for route handlers | None by default for server routes |
+
+**The Native AOT build uses plain Npgsql, not EF Core.** EF Core 10's `DbContext` is not trim- or AOT-safe (its constructor warns
+IL2026/IL3050), `ToPageAsync` builds its query inside the library where EF's query precompiler cannot see it, and the
+precompiler's interceptors do not compile with the .NET 11 SDK this repository builds with. The csproj switches to an Npgsql data
+layer (`BenchData.Npgsql.cs`, same routes and results) whenever `PublishAot=true`. This is what the Inertia.Net docs recommend for
+Native AOT apps today.
+
+The Next.js and TanStack Start forms post to a JSON route rather than a server action or server function, because a load test needs
+a stable URL to post to; a route handler is a normal way to build a form API in both.
 
 ## Results
+
+> These results are from the first version of the apps (plain SQL in every app, no form, no ORM). They will be replaced by a run
+> of the current version.
 
 From one run on a GitHub-hosted runner (4 CPUs, AMD EPYC) on 2026-11-16, each app limited to 2 CPUs and 2 GB. The full tables,
 with every route, latency percentile and fixed-rate run, are in [results/2026-11-16.md](results/2026-11-16.md). No run was marked
@@ -78,7 +104,9 @@ the same machine. Image sizes are what that runner's Docker reported, and can di
 | `/` | A small home page with three static items. |
 | `/todos?perPage=25`, `/todos?perPage=100` | One Postgres query: a page of todos, newest first, through an index on `(created_at DESC, id DESC)`. |
 | `/dashboard` | Per-assignee totals from a `GROUP BY` query, cached in Redis for 60 seconds. Under load this is the cache-hit path. |
-| `/compute?n=20000` | CPU work: 16 batches of n/16 generated records, each sorted, grouped into 64 buckets and hashed with SHA-256; the page shows the final checksum. Same algorithm in C# (`inertianet/Compute.cs`), JavaScript (`shared/js/compute.js`) and PHP (`laravel/app/Support/Compute.php`). |
+| `/todos/new` | The new-todo form page. |
+| `POST /todos` (`POST /api/todos` in the Node apps) | The form post: validate title, priority, assignee and due date (rules and messages in `shared/ts/rules.ts`), then insert a row into `submissions`. Measured twice: **valid** (validates and inserts) and **invalid** (fails all four rules, writes nothing). Each run reuses one session, as a user submitting the form repeatedly would. |
+| `/compute?n=20000` | CPU work: 16 batches of n/16 generated records, each sorted, grouped into 64 buckets and hashed with SHA-256; the page shows the final checksum. Same algorithm in C# (`inertianet/Compute.cs`), TypeScript (`shared/ts/compute.ts`) and PHP (`laravel/app/Support/Compute.php`). |
 | `/compute/parallel?n=20000` | The same work split across CPU cores inside one request: `Parallel.For` in C#, a `worker_threads` pool in Node. **PHP has no standard way to run threads inside a request**, so Laravel runs this route sequentially (same result, one core). PHP spreads work across cores by running several requests at once in separate workers instead. |
 
 Each route is measured twice:
@@ -200,7 +228,13 @@ the benchmark on `ubuntu-latest` and attaches the report to the run.
 - **TanStack Start's Node deployment uses Nitro 3, which is still a release candidate** (3.0.261103-rc); it is what the TanStack Start
   hosting docs use for Node.
 - **Octane restarts each worker after 500 requests** (its default, to contain memory leaks); that cost is part of Laravel's numbers.
-- Postgres and Redis are shared by all apps, run one app at a time, and Redis is flushed before each app starts.
+- Postgres and Redis are shared by all apps, run one app at a time; Redis is flushed and the `submissions` table emptied before each
+  app starts.
+- **Sessions and forgery protection cost something on every page in the Inertia apps.** Inertia.Net issues antiforgery tokens and
+  Laravel writes its encrypted session cookies on each page response, as a real app with forms does. The Node apps' route handlers
+  have no equivalent by default.
+- **Next.js runs with Cache Components on** (needed for `'use cache'`). Each page sets `instant = false`, so pages are still fully
+  rendered per request, as in the other apps, instead of streaming a prerendered shell first.
 
 ## Feature comparison
 
@@ -208,7 +242,7 @@ What each stack offers out of the box or through its official packages. "Unverif
 
 | Feature | Inertia.Net | Laravel + Inertia | Next.js | TanStack Start |
 |---|---|---|---|---|
-| Server language | C# | PHP | JavaScript / TypeScript | JavaScript / TypeScript |
+| Server language | C# | PHP | TypeScript | TypeScript |
 | SSR | Yes, Node or Bun process managed by the app | Yes, separate Node SSR server | Yes (React Server Components, streaming) | Yes (streaming, per-route selective SSR) |
 | Client-only (SPA) mode | Yes (SSR off) | Yes (SSR off) | No; static export or client components are the nearest | Yes (SPA mode) |
 | Typed routes in the client | Yes (generated `routes.ts`) | Yes, with Laravel Wayfinder | Yes (`typedRoutes`), unverified here | Yes (core feature) |

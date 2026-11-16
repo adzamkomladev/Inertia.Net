@@ -7,18 +7,33 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
     <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
-    <!-- aot.Dockerfile publishes it with -p:PublishAot=true for linux-musl-x64; the trim and AOT analyzers run in every build. -->
-    <IsAotCompatible>true</IsAotCompatible>
+    <!-- The data layer: EF Core (BenchDb.cs), or plain Npgsql (BenchData.Npgsql.cs) for Native AOT (aot.Dockerfile, -p:PublishAot=true).
+         EF Core 10 needs precompiled queries there, which cannot cover ToPageAsync (it composes the query inside the library) and whose
+         generated interceptors use an InterceptsLocation form the SDK 11 compiler rejects (CS9270). -->
+    <BenchDataLayer Condition="'$(BenchDataLayer)' == '' and '$(PublishAot)' == 'true'">Npgsql</BenchDataLayer>
+    <BenchDataLayer Condition="'$(BenchDataLayer)' == ''">EfCore</BenchDataLayer>
+    <!-- The trim and AOT analyzers run in every Npgsql build; EF Core's DbContext is annotated as needing unreferenced and dynamic code. -->
+    <IsAotCompatible Condition="'$(BenchDataLayer)' == 'Npgsql'">true</IsAotCompatible>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Inertia.Net\Inertia.Net.csproj" Condition="'$(InertiaBenchPackage)' != 'true'" />
+    <ProjectReference Include="..\..\..\src\Inertia.Net.Redis\Inertia.Net.Redis.csproj" Condition="'$(InertiaBenchPackage)' != 'true'" />
     <PackageReference Include="Inertia.Net" VersionOverride="1.9.2" Condition="'$(InertiaBenchPackage)' == 'true'" />
+    <PackageReference Include="Inertia.Net.Redis" VersionOverride="1.9.2" Condition="'$(InertiaBenchPackage)' == 'true'" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(BenchDataLayer)' == 'EfCore'">
+    <ProjectReference Include="..\..\..\src\Inertia.Net.EntityFrameworkCore\Inertia.Net.EntityFrameworkCore.csproj" Condition="'$(InertiaBenchPackage)' != 'true'" />
+    <PackageReference Include="Inertia.Net.EntityFrameworkCore" VersionOverride="1.9.2" Condition="'$(InertiaBenchPackage)' == 'true'" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <Compile Remove="BenchData.Npgsql.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(BenchDataLayer)' == 'Npgsql'">
     <PackageReference Include="Npgsql" />
-    <PackageReference Include="StackExchange.Redis" />
+    <Compile Remove="BenchDb.cs" />
   </ItemGroup>
   <!-- The frontend is built separately (npm run build, by run.sh); dotnet build never needs Node. -->
   <ItemGroup>
-    <Content Remove="node_modules\**;ClientApp\**;ssr\**;wwwroot\**;publish\**;package*.json" />
+    <Content Remove="node_modules\**;ClientApp\**;ssr\**;wwwroot\**;publish\**;package*.json;tsconfig.json" />
     <None Remove="node_modules\**;ClientApp\**;ssr\**;publish\**;app.html" />
     <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

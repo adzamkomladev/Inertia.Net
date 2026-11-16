@@ -7,6 +7,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY nextjs/package.json nextjs/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY nextjs/ ./
-COPY shared/js shared
+COPY shared/ts shared
 EXPOSE 8080
 CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "8080"]
