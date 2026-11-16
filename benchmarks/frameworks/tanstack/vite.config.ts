@@ -9,5 +9,5 @@ const spa = process.env.BENCH_MODE === 'spa'
 export default defineConfig({
   define: { __BENCH_SPA__: JSON.stringify(spa) },
   server: { host: '0.0.0.0', port: 8080 },
-  plugins: [tanstackStart({ spa: { enabled: spa } }), viteReact(), nitro()],
+  plugins: [tanstackStart({ spa: { enabled: spa } }), viteReact(), nitro({ cache: { driver: 'kv' }, plugins: ['./server/redis.ts'] })],
 })

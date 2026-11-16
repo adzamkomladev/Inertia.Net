@@ -22,7 +22,7 @@ The aim is that each app looks like what a team would write in that framework, n
 | | Inertia.Net | Laravel | Next.js | TanStack Start |
 |---|---|---|---|---|
 | Data access | EF Core 10 (Npgsql provider), paging with `Inertia.Net.EntityFrameworkCore`'s `ToPageAsync` | Eloquent models | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres |
-| Dashboard cache (60 s, Redis) | Inertia.Net's prop cache, `InertiaProp.Cache("dashboard", ...)`, on the `Inertia.Net.Redis` store | `Cache::remember` on the Redis store | A `'use cache: remote'` function with a Redis cache handler (Cache Components) | A small cache-aside helper on node-redis (Start has no server data cache of its own) |
+| Dashboard cache (60 s, Redis) | Inertia.Net's prop cache, `InertiaProp.Cache("dashboard", ...)`, on the `Inertia.Net.Redis` store | `Cache::remember` on the Redis store | A `'use cache: remote'` function with a Redis cache handler (Cache Components) | Nitro's `defineCachedFunction`, with Nitro's storage mounted on Redis (unstorage's Redis driver) by a Nitro plugin |
 | Form validation | .NET 10 validation (`AddValidation()`, `IValidatableObject`) with `WithInertiaValidation()` | A Form Request | zod | zod |
 | Form endpoint | `POST /todos`, Inertia redirect back with errors | `POST /todos`, Inertia redirect back with errors | `POST /api/todos` route handler: 201, or 422 with errors | `POST /api/todos` server route: 201, or 422 with errors |
 | Request forgery protection | Antiforgery with the `XSRF-TOKEN` cookie (as in the Inertia.Net template) | CSRF with the `XSRF-TOKEN` cookie, cookie sessions | None by default for route handlers | None by default for server routes |
@@ -211,7 +211,10 @@ that SSR pages contain the server-rendered rows (25 and 100 `data-todo` items) a
 every app returns byte-for-byte the same todos, dashboard totals and compute checksums.
 
 The GitHub Actions workflow `.github/workflows/framework-bench.yml` (run it by hand from the Actions tab) runs the parity check and
-the benchmark on `ubuntu-latest` and attaches the report to the run.
+the benchmark on `ubuntu-latest` and attaches the report to the run. Its `split` input runs the work in parallel: `routes` (the
+default) gives each route its own runner with every app on it, so each route's numbers compare apps on one machine; `frameworks`
+gives each app its own runner; `none` runs everything on one runner. `merge.sh` joins the parts into one report, which names the
+CPU each part ran on.
 
 ## Caveats
 

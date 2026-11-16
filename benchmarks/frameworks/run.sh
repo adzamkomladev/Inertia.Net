@@ -474,7 +474,7 @@ echo "|---|---|---:|---:|---:|" >>"$WORK/scaling.md"
 for fw in ${FRAMEWORKS//,/ }; do
   for mode in ${MODES//,/ }; do bench_app "$fw" "$mode"; done
 done
-if [[ $ROUTES == *compute* || $ROUTES == *parallel* ]]; then
+if [[ ,$ROUTES, == *,compute,* ]]; then # the scaling runs both compute routes, so a split run does it once, in the compute part
   for fw in ${FRAMEWORKS//,/ }; do bench_scaling "$fw"; done
 fi
 

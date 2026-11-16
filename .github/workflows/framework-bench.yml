@@ -1,13 +1,19 @@
 name: framework-bench
 
 # The framework comparison in benchmarks/frameworks (Inertia.Net, Next.js, TanStack Start, Laravel): the parity check, then the
-# benchmark. Heavy (it builds every app and its Docker images), so it only runs on demand. The table is in the job summary and the
-# framework-bench artifact.
+# benchmark. Heavy (it builds every app and its Docker images), so it only runs on demand. By default each route runs on its own
+# runner in parallel, every app side by side on the same machine, and a last job merges the parts. The table is in the job summary
+# and the framework-bench artifact.
 on:
   workflow_dispatch:
     inputs:
+      split:
+        description: "routes: one runner per route, all apps on each (fair per route). frameworks: one runner per app (apps on different machines). none: one runner for everything (slowest)."
+        type: choice
+        options: [routes, frameworks, none]
+        default: routes
       args:
-        description: Extra run.sh options, e.g. --frameworks inertianet,laravel --seconds 20
+        description: Extra run.sh options, e.g. --seconds 20
         required: false
         default: ""
 
@@ -19,9 +25,13 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
-  framework-bench:
+  bench:
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON('{"routes":["--routes home","--routes todos25","--routes todos100","--routes dashboard","--routes new","--routes create","--routes invalid","--routes compute","--routes parallel"],"frameworks":["--frameworks inertianet","--frameworks inertianet-aot","--frameworks nextjs","--frameworks tanstack","--frameworks laravel"],"none":[""]}')[inputs.split] }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -33,15 +43,39 @@ jobs:
         with:
           node-version: 24.22.3
       - run: nproc && lscpu | grep -E 'Model name|^CPU\(s\)' && docker version --format '{{.Server.Version}}'
-      - run: benchmarks/frameworks/run.sh --check
       - env:
+          PART: ${{ matrix.part }}
           ARGS: ${{ inputs.args }}
-        # ARGS is split into words on purpose: it holds run.sh options.
-        run: set -o pipefail; mkdir -p artifacts; benchmarks/frameworks/run.sh $ARGS --out artifacts/framework-bench.md 2>&1 | tee artifacts/framework-bench.log
-      - if: always()
-        run: if [ -f artifacts/framework-bench.md ]; then cat artifacts/framework-bench.md >> "$GITHUB_STEP_SUMMARY"; fi
+        # PART and ARGS are split into words on purpose: they hold run.sh options. run.sh runs the parity check first.
+        run: |
+          set -o pipefail; mkdir -p artifacts
+          benchmarks/frameworks/run.sh $PART $ARGS --out artifacts/part.md 2>&1 | tee artifacts/part.log
+          echo "<!-- part: ${PART:-everything} -->" >> artifacts/part.md
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          name: framework-bench-part-${{ strategy.job-index }}
+          path: artifacts/part.*
+
+  merge:
+    needs: bench
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: benchmarks/frameworks/merge.sh
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: framework-bench-part-*
+          path: parts
+      - run: |
+          mkdir -p artifacts
+          mapfile -t parts < <(ls parts/framework-bench-part-*/part.md 2>/dev/null | sort -V) # a failed part has no report; the merged one lists the parts it has
+          benchmarks/frameworks/merge.sh "${parts[@]}" > artifacts/framework-bench.md
+          cat artifacts/framework-bench.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
           name: framework-bench
-          path: artifacts/framework-bench*
+          path: artifacts/framework-bench.md
