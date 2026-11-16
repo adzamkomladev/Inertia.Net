@@ -1,5 +1,4 @@
-**/node_modules
-**/.next
-**/.output
-**/dist
-**/vendor
+node_modules
+vendor
+resources/js/shared
+Dockerfile*

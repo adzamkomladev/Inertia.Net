@@ -2,3 +2,4 @@ ClientApp/shared/
 node_modules/
 wwwroot/
 ssr/
+publish/

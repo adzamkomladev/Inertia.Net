@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The framework comparison (README.md next to this file): builds each app's Docker image, runs it next to Postgres and Redis with the
-# same CPU and memory limits, checks that every app answers the same thing (--check), then measures throughput, latency, CPU per request,
+# The framework comparison (README.md next to this file): builds each app on the host and into an Alpine Docker image, runs it next to
+# Postgres and Redis with the same CPU and memory limits, checks that every app answers the same thing (--check), then measures throughput, latency, CPU per request,
 # memory, cold start and image size, and writes a markdown report.
 #
 #   run.sh --check                        parity check only
@@ -84,25 +84,63 @@ services_up() {
 }
 
 # --- Images ---
+# Apps are built on the host (dotnet publish, npm ci && npm run build); the Dockerfiles only copy the output onto Alpine runtime images.
+# Exceptions: Native AOT is published in the pinned Alpine AOT SDK image (aot.Dockerfile) so it links against musl, and Laravel's
+# composer install runs in a pinned build stage, as the host has no PHP. Dev images (Dockerfile.dev) install everything themselves.
+NPM=${NPM:-npm}
+declare -A PREPARED=()
+
 tag() { # framework mode -> image tag (mode dev: the dev-server image)
   case $1 in
-    inertianet) [ "$2" = dev ] && echo inertia-bench-fw-inertianet:dev || echo inertia-bench-fw-inertianet:jit ;;
-    inertianet-aot) echo inertia-bench-fw-inertianet:aot ;;
-    laravel) [ "$2" = dev ] && echo inertia-bench-fw-laravel:dev || echo inertia-bench-fw-laravel:latest ;;
-    nextjs | tanstack) echo "inertia-bench-fw-$1:$2" ;;
+    inertianet) [ "$2" = dev ] && echo inertia-bench-fw-inertianet:dev || echo "inertia-bench-fw-inertianet:jit-$2" ;;
+    inertianet-aot) echo "inertia-bench-fw-inertianet:aot-$2" ;;
+    *) echo "inertia-bench-fw-$1:$2" ;;
   esac
 }
 
-build() { # framework mode (Docker's layer cache makes a rebuild of an unchanged app cheap)
-  local file=$1/Dockerfile target=runtime context=$HERE args=()
+app_dir() { case $1 in inertianet*) echo "$HERE/inertianet" ;; *) echo "$HERE/$1" ;; esac; }
+
+prepare() { # framework -> the shared components copied in, npm packages installed, and the mode-independent host builds
+  local dir shared
+  dir=$(app_dir "$1")
+  [ -n "${PREPARED[$1]:-}" ] && return
+  log "building $1 on the host"
+  if [ -z "${PREPARED[$dir]:-}" ]; then # the JIT and AOT apps share one client build
+    case $1 in
+      inertianet*) shared=ClientApp/shared ;; nextjs) shared=shared ;; tanstack) shared=src/shared ;; laravel) shared=resources/js/shared ;;
+    esac
+    rm -rf "${dir:?}/$shared" && cp -r "$HERE/shared/js" "$dir/$shared"
+    (cd "$dir" && "$NPM" ci --no-audit --no-fund --loglevel=error >&2)
+    [[ $1 == nextjs || $1 == tanstack ]] || (cd "$dir" && "$NPM" run build >&2)
+    PREPARED[$dir]=1
+  fi
   case $1 in
-    inertianet*) file=inertianet/Dockerfile context=$ROOT target=jit ;;
-    nextjs | tanstack) [ "$2" = dev ] || args=(--build-arg "BENCH_MODE=$2") ;;
+    inertianet) "$DOTNET" publish "$dir" -c Release -p:UseAppHost=false -o "$dir/publish/jit" -v quiet -nologo >&2 ;;
+    inertianet-aot)
+      rm -rf "$dir/publish/aot"
+      docker build -q -f "$dir/aot.Dockerfile" --output "type=local,dest=$dir/publish/aot" "$ROOT" >/dev/null ;;
   esac
-  [ "$1" = inertianet-aot ] && target=aot
-  [ "$2" = dev ] && target=dev
+  PREPARED[$1]=1
+}
+
+build() { # framework mode
+  local dir target=() file=Dockerfile context
+  dir=$(app_dir "$1") context=$dir
+  if [ "$2" = dev ]; then
+    file=Dockerfile.dev context=$HERE
+    [[ $1 == inertianet* ]] && context=$ROOT
+  else
+    prepare "$1"
+    case $1 in
+      inertianet) target=(--target "jit-$2") ;;
+      inertianet-aot) target=(--target "aot-$2") ;;
+      laravel) target=(--target "$2") ;;
+      # Next.js and TanStack Start decide SSR or SPA at build time.
+      nextjs | tanstack) (cd "$dir" && BENCH_MODE=$2 "$NPM" run build >&2) ;;
+    esac
+  fi
   log "building $(tag "$1" "$2")"
-  docker build -q -f "$HERE/$file" --target "$target" "${args[@]}" -t "$(tag "$1" "$2")" "$context" >/dev/null
+  docker build -q -f "$dir/$file" "${target[@]}" -t "$(tag "$1" "$2")" "$context" >/dev/null
 }
 
 app_env() { # framework mode cpus -> docker run -e arguments, one per line
@@ -335,10 +373,7 @@ if [ "$DEV" = 1 ]; then
 fi
 
 for fw in ${FRAMEWORKS//,/ }; do
-  case $fw in
-    nextjs | tanstack) for mode in ${MODES//,/ }; do build "$fw" "$mode"; done ;;
-    *) build "$fw" ssr ;;
-  esac
+  for mode in ${MODES//,/ }; do build "$fw" "$mode"; done
 done
 run_check
 [ "$CHECK_ONLY" = 1 ] && exit 0

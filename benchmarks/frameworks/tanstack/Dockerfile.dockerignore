@@ -1,5 +1,2 @@
-**/node_modules
-**/.next
-**/.output
-**/dist
-**/vendor
+*
+!.output
