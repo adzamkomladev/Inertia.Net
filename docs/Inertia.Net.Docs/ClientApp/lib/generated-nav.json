@@ -1378,18 +1378,88 @@
       "slug": "framework-comparison",
       "url": "/docs/framework-comparison",
       "title": "Framework comparison",
-      "description": "The same todo app built with Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel, measured for requests per second, latency, memory, startup and image size.",
+      "description": "How Inertia.Net compares with Next.js, TanStack Start, Nuxt and Laravel when they all build the same app, what each framework is good at, and how fast, lean and quick to start each one is.",
       "section": "Production",
       "order": 10,
       "headings": [
         {
-          "id": "results",
-          "text": "Results",
+          "id": "the-short-version",
+          "text": "The short version",
           "depth": 2
         },
         {
-          "id": "what-the-numbers-say",
-          "text": "What the numbers say",
+          "id": "what-we-built",
+          "text": "What we built",
+          "depth": 2
+        },
+        {
+          "id": "the-frameworks",
+          "text": "The frameworks",
+          "depth": 2
+        },
+        {
+          "id": "inertianet",
+          "text": "Inertia.Net",
+          "depth": 3
+        },
+        {
+          "id": "nextjs",
+          "text": "Next.js",
+          "depth": 3
+        },
+        {
+          "id": "tanstack-start",
+          "text": "TanStack Start",
+          "depth": 3
+        },
+        {
+          "id": "nuxt",
+          "text": "Nuxt",
+          "depth": 3
+        },
+        {
+          "id": "laravel",
+          "text": "Laravel",
+          "depth": 3
+        },
+        {
+          "id": "the-results",
+          "text": "The results",
+          "depth": 2
+        },
+        {
+          "id": "memory-startup-and-image-size",
+          "text": "Memory, startup and image size",
+          "depth": 3
+        },
+        {
+          "id": "first-visits",
+          "text": "First visits",
+          "depth": 3
+        },
+        {
+          "id": "moving-between-pages",
+          "text": "Moving between pages",
+          "depth": 3
+        },
+        {
+          "id": "saving-a-form",
+          "text": "Saving a form",
+          "depth": 3
+        },
+        {
+          "id": "heavy-work",
+          "text": "Heavy work",
+          "depth": 3
+        },
+        {
+          "id": "what-this-means-for-you",
+          "text": "What this means for you",
+          "depth": 2
+        },
+        {
+          "id": "run-it-yourself",
+          "text": "Run it yourself",
           "depth": 2
         }
       ]
