@@ -65,4 +65,4 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 
 ## Tutorial
 
-- [Build a todo app](https://inertia-dotnet.temtem.dev/docs/forget-me-not): Build ForgetMeNot step by step, a todo app with sign-in, shared lists, infinite scroll, live reminders and server-side rendering, using named routes, typed routes and caching.
+- [Build a todo app](https://inertia-dotnet.temtem.dev/docs/forget-me-not): Build ForgetMeNot step by step with shadcn/ui, covering sign-in, shared lists, infinite scroll, live reminders and server-side rendering, using named routes, typed routes and caching.

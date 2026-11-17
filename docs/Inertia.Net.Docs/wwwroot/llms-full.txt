@@ -6343,7 +6343,7 @@ Check that the key and duration are stable and the cache store works. Dot-key pr
 
 URL: https://inertia-dotnet.temtem.dev/docs/forget-me-not
 
-> Build ForgetMeNot step by step, a todo app with sign-in, shared lists, infinite scroll, live reminders and server-side rendering, using named routes, typed routes and caching.
+> Build ForgetMeNot step by step with shadcn/ui, covering sign-in, shared lists, infinite scroll, live reminders and server-side rendering, using named routes, typed routes and caching.
 
 ForgetMeNot is a small todo app. It is small, but it uses the same pieces as a real product: sign-in, private data, a public page, a long list that loads as you scroll, and a reminder that appears on your screen without a refresh.
 
@@ -6363,6 +6363,7 @@ Every feature below is here because it shows one idea from Inertia.Net. The righ
 
 | You build | You learn |
 |---|---|
+| A polished interface | shadcn/ui cards, lists, switches and a theme you can change in one place |
 | Sign in with a cookie | The `--auth` starter, redirects to the login page, and a sign-in rate limit |
 | A page of lists | Page records, named routes and the typed `routes.ts` file |
 | A form that checks itself | Precognition: the server validates a field as you type |
@@ -6412,25 +6413,35 @@ The template is not empty. It already uses the features we want, and it is worth
 
 Both generated files are rewritten when the app starts in Development. You never edit them by hand.
 
-## 2. Add Tailwind CSS
+## 2. Make it look good with shadcn/ui
 
-The template has almost no styling. Tailwind lets us style a page with short class names inside the markup, so there are no extra style files to keep in sync.
+The template's pages have almost no styling. We will use **shadcn/ui**, a set of well-made components: cards, inputs, checkboxes, switches, lists and more. They are built on Tailwind CSS, and they are *copied into your project*, so you own the code and can change any of it.
+
+First, Tailwind CSS and an `@` shortcut for imports (so you write `@/components/ui/button` instead of `../../components/ui/button`):
 
 ```sh
 bun add -d tailwindcss @tailwindcss/vite
 ```
 
-Add the plugin to `vite.config.ts`. This is the only change in this step:
+In `vite.config.ts`, add the Tailwind plugin and the alias. Everything else stays as it is:
 
 ```ts
+import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 // ...your other imports
 
 export default defineConfig(({ command }) => ({
   // react(), vue() or svelte() stays where it is; just add tailwindcss() to the list
   plugins: [react(), tailwindcss(), inertia(), hotFile()],
+  resolve: { alias: { '@': path.resolve(import.meta.dirname, 'ClientApp') } },
   // ...the rest stays the same
 }))
+```
+
+In `tsconfig.json`, add this inside `compilerOptions`, so TypeScript understands the same shortcut:
+
+```json
+"paths": { "@/*": ["./ClientApp/*"] }
 ```
 
 Create `ClientApp/app.css` with one line, and import it at the top of the client entry (`ClientApp/app.tsx` for React, `ClientApp/app.ts` for Vue and Svelte):
@@ -6442,6 +6453,250 @@ Create `ClientApp/app.css` with one line, and import it at the top of the client
 ```ts
 import './app.css'
 ```
+
+Now let shadcn set itself up and add the components we need. The flags answer its questions in advance (the `nova` preset is a clean neutral look); if you leave them out, it asks you instead.
+
+<Tabs>
+  <Tab label="React">
+
+```sh
+bunx --bun shadcn@latest init -t vite -b radix -p nova -y --no-monorepo --no-reinstall
+bunx --bun shadcn@latest add button card input label badge checkbox alert skeleton switch progress empty item field separator
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```sh
+bunx --bun shadcn-vue@latest init -t vite -p nova -y
+bunx --bun shadcn-vue@latest add button card input label badge checkbox alert skeleton switch progress empty item field separator
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```sh
+bunx --bun shadcn-svelte@latest init --preset nova --base-color neutral --css ClientApp/app.css \
+  --components-alias @/components --lib-alias @/lib --utils-alias @/lib/utils \
+  --hooks-alias @/hooks --ui-alias @/components/ui
+bunx --bun shadcn-svelte@latest add button card input label badge checkbox alert skeleton switch progress empty item field separator
+```
+
+The Svelte tool asks before it changes `app.css`. Answer yes.
+
+  </Tab>
+</Tabs>
+
+Look in `ClientApp/components/ui`. Those files are yours now: open `button` and you will see ordinary code, not a library.
+
+<Callout type="info" title="Why copy components instead of installing a package?">
+When a library does almost what you want, you fight it. These are plain files in your repo. Want a rounder button? Edit the file. There is no version to upgrade and nothing hidden. Still, you rarely need to: **theming** (next) changes the look of every component at once.
+</Callout>
+
+### Make the theme yours
+
+Every shadcn component reads a few CSS variables, such as `--primary` for the main color. Add this to the end of `ClientApp/app.css`, and every button, switch and progress bar turns violet with rounder corners:
+
+```css
+/* Our theme: a violet primary and rounder corners. Every shadcn component reads these variables. */
+:root {
+    --primary: oklch(0.51 0.23 277);
+    --primary-foreground: oklch(0.98 0 0);
+    --ring: oklch(0.62 0.18 277);
+    --radius: 0.75rem;
+}
+
+.dark {
+    --primary: oklch(0.68 0.19 277);
+    --primary-foreground: oklch(0.2 0.02 277);
+}
+```
+
+Try other values to see how far one line goes. The `.dark` block is used when the page has the `dark` class on its root element; we do not add a switch here, but the theme is ready for one.
+
+### The login page
+
+The template's login page is plain HTML, and Tailwind resets plain HTML to nothing. Replace it with a card. A `Field` groups a label, an input and its error message, so the error appears in the right place and is announced to screen readers.
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+// ClientApp/pages/Auth/Login.tsx
+import { useForm } from '@inertiajs/react'
+import type { FormEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import Layout from '../../Layout'
+import type { InertiaPages } from '../../types/inertia'
+import { routes } from '../../types/routes'
+
+export default function Login({ returnUrl }: InertiaPages['Auth/Login']) {
+  // Precognition: each field is checked on the server when you leave it, with the same rules as the submit.
+  const form = useForm({ email: '', password: '', returnUrl }).withPrecognition(routes.login.store())
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    form.submit(routes.login.store(), { onFinish: () => form.reset('password') })
+  }
+
+  return (
+    <Layout>
+      <Card className="mx-auto max-w-sm">
+        <CardHeader>
+          <CardTitle>Welcome back</CardTitle>
+          <CardDescription>Use demo@example.com and the password "password".</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submit}>
+            <FieldGroup>
+              <Field data-invalid={Boolean(form.errors.email)}>
+                <FieldLabel htmlFor="email">Email</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  name="email"
+                  autoComplete="username"
+                  value={form.data.email}
+                  onChange={(e) => form.setData('email', e.target.value)}
+                  onBlur={() => form.validate('email')}
+                  aria-invalid={Boolean(form.errors.email)}
+                />
+                <FieldError>{form.errors.email}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(form.errors.password)}>
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <Input
+                  id="password"
+                  type="password"
+                  name="password"
+                  autoComplete="current-password"
+                  value={form.data.password}
+                  onChange={(e) => form.setData('password', e.target.value)}
+                  onBlur={() => form.validate('password')}
+                  aria-invalid={Boolean(form.errors.password)}
+                />
+                <FieldError>{form.errors.password}</FieldError>
+              </Field>
+              <Button type="submit" disabled={form.processing}>Log in</Button>
+            </FieldGroup>
+          </form>
+        </CardContent>
+      </Card>
+    </Layout>
+  )
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Auth/Login.vue -->
+<script setup lang="ts">
+import { useForm } from '@inertiajs/vue3'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import Layout from '../../Layout.vue'
+import type { InertiaPages } from '../../types/inertia'
+import { routes } from '../../types/routes'
+
+const props = defineProps<InertiaPages['Auth/Login']>()
+
+// Precognition: each field is checked on the server when you leave it, with the same rules as the submit.
+const form = useForm({ email: '', password: '', returnUrl: props.returnUrl }).withPrecognition(routes.login.store())
+const submit = () => form.submit(routes.login.store(), { onFinish: () => form.reset('password') })
+</script>
+
+<template>
+  <Layout>
+    <Card class="mx-auto max-w-sm">
+      <CardHeader>
+        <CardTitle>Welcome back</CardTitle>
+        <CardDescription>Use demo@example.com and the password "password".</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form @submit.prevent="submit">
+          <FieldGroup>
+            <Field :data-invalid="Boolean(form.errors.email)">
+              <FieldLabel for="email">Email</FieldLabel>
+              <Input id="email" v-model="form.email" type="email" name="email" autocomplete="username" :aria-invalid="Boolean(form.errors.email)" @blur="form.validate('email')" />
+              <FieldError v-if="form.errors.email">{{ form.errors.email }}</FieldError>
+            </Field>
+            <Field :data-invalid="Boolean(form.errors.password)">
+              <FieldLabel for="password">Password</FieldLabel>
+              <Input id="password" v-model="form.password" type="password" name="password" autocomplete="current-password" :aria-invalid="Boolean(form.errors.password)" @blur="form.validate('password')" />
+              <FieldError v-if="form.errors.password">{{ form.errors.password }}</FieldError>
+            </Field>
+            <Button type="submit" :disabled="form.processing">Log in</Button>
+          </FieldGroup>
+        </form>
+      </CardContent>
+    </Card>
+  </Layout>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Auth/Login.svelte -->
+<script lang="ts">
+  import { useForm } from '@inertiajs/svelte'
+  import { Button } from '@/components/ui/button'
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+  import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+  import { Input } from '@/components/ui/input'
+  import Layout from '../../Layout.svelte'
+  import type { InertiaPages } from '../../types/inertia'
+  import { routes } from '../../types/routes'
+
+  let { returnUrl }: InertiaPages['Auth/Login'] = $props()
+
+  // Precognition: each field is checked on the server when you leave it, with the same rules as the submit.
+  const form = useForm({ email: '', password: '', returnUrl }).withPrecognition(routes.login.store())
+  const submit = (e: SubmitEvent) => {
+    e.preventDefault()
+    form.submit(routes.login.store(), { onFinish: () => form.reset('password') })
+  }
+</script>
+
+<Layout>
+  <Card class="mx-auto max-w-sm">
+    <CardHeader>
+      <CardTitle>Welcome back</CardTitle>
+      <CardDescription>Use demo@example.com and the password "password".</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <form onsubmit={submit}>
+        <FieldGroup>
+          <Field data-invalid={Boolean(form.errors.email)}>
+            <FieldLabel for="email">Email</FieldLabel>
+            <Input id="email" type="email" name="email" autocomplete="username" bind:value={form.email} onblur={() => form.validate('email')} aria-invalid={Boolean(form.errors.email)} />
+            {#if form.errors.email}<FieldError>{form.errors.email}</FieldError>{/if}
+          </Field>
+          <Field data-invalid={Boolean(form.errors.password)}>
+            <FieldLabel for="password">Password</FieldLabel>
+            <Input id="password" type="password" name="password" autocomplete="current-password" bind:value={form.password} onblur={() => form.validate('password')} aria-invalid={Boolean(form.errors.password)} />
+            {#if form.errors.password}<FieldError>{form.errors.password}</FieldError>{/if}
+          </Field>
+          <Button type="submit" disabled={form.processing}>Log in</Button>
+        </FieldGroup>
+      </form>
+    </CardContent>
+  </Card>
+</Layout>
+```
+
+  </Tab>
+</Tabs>
+
+The form still uses `withPrecognition`: when you leave a field, the server checks it with the same rules as the real submit. Open `http://localhost:5180/login` to see the new look.
 
 ## 3. Add a database
 
@@ -6752,7 +7007,7 @@ bun run build
 
 Because we deleted the `todos` and `dashboard` routes, TypeScript lists every place that still uses them: the layout and the home page. A string URL would have failed silently, in front of a visitor. A typed route fails at your desk.
 
-Fix them one by one. First the layout, which is used by every page. It shows the **My lists** link and the messages the server sends after an action (the **flash** messages):
+Fix them one by one. First the layout, which is used by every page. It has the top bar with the **My lists** link and the **Log out** button, and an `Alert` for the messages the server sends after an action (the **flash** messages):
 
 <Tabs>
   <Tab label="React">
@@ -6760,7 +7015,10 @@ Fix them one by one. First the layout, which is used by every page. It shows the
 ```tsx
 // ClientApp/Layout.tsx
 import { Link, router, usePage } from '@inertiajs/react'
+import { CircleAlert, CircleCheck, ListChecks, LogOut } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { routes } from './types/routes'
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -6769,24 +7027,46 @@ export default function Layout({ children }: { children: ReactNode }) {
   const user = props.auth.user
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 font-sans text-slate-900">
-      <header className="flex items-center gap-4 border-b border-slate-200 pb-4">
-        <Link href={routes.home()} className="font-semibold">{props.appName}</Link>
-        <nav className="flex flex-1 items-center gap-4 text-sm">
+    <div className="min-h-screen bg-muted/30">
+      <header className="border-b bg-background">
+        <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4">
+          <Link href={routes.home()} className="mr-2 flex items-center gap-2 font-semibold">
+            <ListChecks className="size-5 text-primary" />
+            {props.appName}
+          </Link>
           {user ? (
             <>
-              <Link href={routes.lists.index()}>My lists</Link>
-              <span className="ml-auto text-slate-500">{user.name}</span>
-              <button className="underline" onClick={() => router.visit(routes.logout())}>Log out</button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href={routes.lists.index()}>My lists</Link>
+              </Button>
+              <span className="ml-auto hidden text-sm text-muted-foreground sm:inline">{user.name}</span>
+              <Button variant="outline" size="sm" className="ml-auto sm:ml-0" onClick={() => router.visit(routes.logout())}>
+                <LogOut /> Log out
+              </Button>
             </>
           ) : (
-            <Link href={routes.login()} className="ml-auto">Log in</Link>
+            <Button asChild size="sm" className="ml-auto">
+              <Link href={routes.login()}>Log in</Link>
+            </Button>
           )}
-        </nav>
+        </div>
       </header>
-      {flash.success && <p className="mt-4 rounded bg-green-50 px-3 py-2 text-sm text-green-800">{flash.success}</p>}
-      {flash.error && <p role="alert" className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-800">{flash.error}</p>}
-      <main className="py-6">{children}</main>
+
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
+        {flash.success && (
+          <Alert>
+            <CircleCheck />
+            <AlertDescription>{flash.success}</AlertDescription>
+          </Alert>
+        )}
+        {flash.error && (
+          <Alert variant="destructive">
+            <CircleAlert />
+            <AlertDescription>{flash.error}</AlertDescription>
+          </Alert>
+        )}
+        {children}
+      </main>
     </div>
   )
 }
@@ -6799,7 +7079,10 @@ export default function Layout({ children }: { children: ReactNode }) {
 <!-- ClientApp/Layout.vue -->
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3'
+import { CircleAlert, CircleCheck, ListChecks, LogOut } from '@lucide/vue'
 import { computed } from 'vue'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { routes } from './types/routes'
 
 // page.props.appName, page.props.auth and page.flash are typed by types/inertia.d.ts.
@@ -6808,21 +7091,39 @@ const user = computed(() => page.props.auth.user)
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl px-4 py-6 font-sans text-slate-900">
-    <header class="flex items-center gap-4 border-b border-slate-200 pb-4">
-      <Link :href="routes.home()" class="font-semibold">{{ page.props.appName }}</Link>
-      <nav class="flex flex-1 items-center gap-4 text-sm">
+  <div class="min-h-screen bg-muted/30">
+    <header class="border-b bg-background">
+      <div class="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4">
+        <Link :href="routes.home()" class="mr-2 flex items-center gap-2 font-semibold">
+          <ListChecks class="size-5 text-primary" />
+          {{ page.props.appName }}
+        </Link>
         <template v-if="user">
-          <Link :href="routes.lists.index()">My lists</Link>
-          <span class="ml-auto text-slate-500">{{ user.name }}</span>
-          <button class="underline" @click="router.visit(routes.logout())">Log out</button>
+          <Button as-child variant="ghost" size="sm">
+            <Link :href="routes.lists.index()">My lists</Link>
+          </Button>
+          <span class="ml-auto hidden text-sm text-muted-foreground sm:inline">{{ user.name }}</span>
+          <Button variant="outline" size="sm" class="ml-auto sm:ml-0" @click="router.visit(routes.logout())">
+            <LogOut /> Log out
+          </Button>
         </template>
-        <Link v-else :href="routes.login()" class="ml-auto">Log in</Link>
-      </nav>
+        <Button v-else as-child size="sm" class="ml-auto">
+          <Link :href="routes.login()">Log in</Link>
+        </Button>
+      </div>
     </header>
-    <p v-if="page.flash.success" class="mt-4 rounded bg-green-50 px-3 py-2 text-sm text-green-800">{{ page.flash.success }}</p>
-    <p v-if="page.flash.error" role="alert" class="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-800">{{ page.flash.error }}</p>
-    <main class="py-6"><slot /></main>
+
+    <main class="mx-auto max-w-3xl space-y-6 px-4 py-8">
+      <Alert v-if="page.flash.success">
+        <CircleCheck />
+        <AlertDescription>{{ page.flash.success }}</AlertDescription>
+      </Alert>
+      <Alert v-if="page.flash.error" variant="destructive">
+        <CircleAlert />
+        <AlertDescription>{{ page.flash.error }}</AlertDescription>
+      </Alert>
+      <slot />
+    </main>
   </div>
 </template>
 ```
@@ -6833,8 +7134,11 @@ const user = computed(() => page.props.auth.user)
 ```svelte
 <!-- ClientApp/Layout.svelte -->
 <script lang="ts">
+  import { CircleAlert, CircleCheck, ListChecks, LogOut } from '@lucide/svelte'
   import { Link, page, router } from '@inertiajs/svelte'
   import type { Snippet } from 'svelte'
+  import { Alert, AlertDescription } from '@/components/ui/alert'
+  import { Button, buttonVariants } from '@/components/ui/button'
   import { routes } from './types/routes'
 
   let { children }: { children: Snippet } = $props()
@@ -6842,33 +7146,189 @@ const user = computed(() => page.props.auth.user)
 </script>
 
 <!-- page.props.appName, page.props.auth and page.flash are typed by types/inertia.d.ts. -->
-<div class="mx-auto max-w-2xl px-4 py-6 font-sans text-slate-900">
-  <header class="flex items-center gap-4 border-b border-slate-200 pb-4">
-    <Link href={routes.home()} class="font-semibold">{page.props.appName}</Link>
-    <nav class="flex flex-1 items-center gap-4 text-sm">
+<div class="min-h-screen bg-muted/30">
+  <header class="border-b bg-background">
+    <div class="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4">
+      <Link href={routes.home()} class="mr-2 flex items-center gap-2 font-semibold">
+        <ListChecks class="size-5 text-primary" />
+        {page.props.appName}
+      </Link>
       {#if user}
-        <Link href={routes.lists.index()}>My lists</Link>
-        <span class="ml-auto text-slate-500">{user.name}</span>
-        <button class="underline" onclick={() => router.visit(routes.logout())}>Log out</button>
+        <Link href={routes.lists.index()} class={buttonVariants({ variant: 'ghost', size: 'sm' })}>My lists</Link>
+        <span class="ml-auto hidden text-sm text-muted-foreground sm:inline">{user.name}</span>
+        <Button variant="outline" size="sm" class="ml-auto sm:ml-0" onclick={() => router.visit(routes.logout())}>
+          <LogOut /> Log out
+        </Button>
       {:else}
-        <Link href={routes.login()} class="ml-auto">Log in</Link>
+        <Link href={routes.login()} class={buttonVariants({ size: 'sm', class: 'ml-auto' })}>Log in</Link>
       {/if}
-    </nav>
+    </div>
   </header>
-  {#if page.flash.success}
-    <p class="mt-4 rounded bg-green-50 px-3 py-2 text-sm text-green-800">{page.flash.success}</p>
-  {/if}
-  {#if page.flash.error}
-    <p role="alert" class="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-800">{page.flash.error}</p>
-  {/if}
-  <main class="py-6">{@render children()}</main>
+
+  <main class="mx-auto max-w-3xl space-y-6 px-4 py-8">
+    {#if page.flash.success}
+      <Alert>
+        <CircleCheck />
+        <AlertDescription>{page.flash.success}</AlertDescription>
+      </Alert>
+    {/if}
+    {#if page.flash.error}
+      <Alert variant="destructive">
+        <CircleAlert />
+        <AlertDescription>{page.flash.error}</AlertDescription>
+      </Alert>
+    {/if}
+    {@render children()}
+  </main>
 </div>
 ```
 
   </Tab>
 </Tabs>
 
-In the home page, change the link from the todos page to `routes.lists.index()`. Then delete `ClientApp/pages/Todos` and the Dashboard page (`Dashboard.tsx`, `Dashboard.vue` or `Dashboard.svelte`). Run `bun run build` again. It passes.
+Then the home page, whose link pointed at the deleted todos route:
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+// ClientApp/pages/Home.tsx
+import { Link } from '@inertiajs/react'
+import { ArrowRight, BellRing, Globe, Infinity as Scroll } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import Layout from '../Layout'
+import type { InertiaPages } from '../types/inertia'
+import { routes } from '../types/routes'
+
+const features = [
+  { icon: Scroll, title: 'Lists that scale', text: 'Thousands of items load as you scroll.' },
+  { icon: Globe, title: 'Share with a link', text: 'A public page anyone can open, rendered on the server.' },
+  { icon: BellRing, title: 'Live reminders', text: 'They appear on your screen the moment they are due.' },
+]
+
+export default function Home({ message }: InertiaPages['Home']) {
+  return (
+    <Layout>
+      <section className="py-8 text-center">
+        <h1 className="text-4xl font-semibold tracking-tight">Remember everything.</h1>
+        <p className="mx-auto mt-3 max-w-md text-muted-foreground">{message}</p>
+        <Button asChild size="lg" className="mt-6">
+          <Link href={routes.lists.index()}>
+            Open my lists <ArrowRight />
+          </Link>
+        </Button>
+      </section>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {features.map(({ icon: Icon, title, text }) => (
+          <Card key={title}>
+            <CardHeader>
+              <Icon className="mb-2 size-5 text-primary" />
+              <CardTitle>{title}</CardTitle>
+              <CardDescription>{text}</CardDescription>
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
+    </Layout>
+  )
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Home.vue -->
+<script setup lang="ts">
+import { Link } from '@inertiajs/vue3'
+import { ArrowRight, BellRing, Globe, Infinity as Scroll } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import Layout from '../Layout.vue'
+import type { InertiaPages } from '../types/inertia'
+import { routes } from '../types/routes'
+
+defineProps<InertiaPages['Home']>()
+
+const features = [
+  { icon: Scroll, title: 'Lists that scale', text: 'Thousands of items load as you scroll.' },
+  { icon: Globe, title: 'Share with a link', text: 'A public page anyone can open, rendered on the server.' },
+  { icon: BellRing, title: 'Live reminders', text: 'They appear on your screen the moment they are due.' },
+]
+</script>
+
+<template>
+  <Layout>
+    <section class="py-8 text-center">
+      <h1 class="text-4xl font-semibold tracking-tight">Remember everything.</h1>
+      <p class="mx-auto mt-3 max-w-md text-muted-foreground">{{ message }}</p>
+      <Button as-child size="lg" class="mt-6">
+        <Link :href="routes.lists.index()">Open my lists <ArrowRight /></Link>
+      </Button>
+    </section>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <Card v-for="f in features" :key="f.title">
+        <CardHeader>
+          <component :is="f.icon" class="mb-2 size-5 text-primary" />
+          <CardTitle>{{ f.title }}</CardTitle>
+          <CardDescription>{{ f.text }}</CardDescription>
+        </CardHeader>
+      </Card>
+    </div>
+  </Layout>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Home.svelte -->
+<script lang="ts">
+  import { ArrowRight, BellRing, Globe, Infinity as Scroll } from '@lucide/svelte'
+  import { Link } from '@inertiajs/svelte'
+  import { buttonVariants } from '@/components/ui/button'
+  import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+  import Layout from '../Layout.svelte'
+  import type { InertiaPages } from '../types/inertia'
+  import { routes } from '../types/routes'
+
+  let { message }: InertiaPages['Home'] = $props()
+
+  const features = [
+    { icon: Scroll, title: 'Lists that scale', text: 'Thousands of items load as you scroll.' },
+    { icon: Globe, title: 'Share with a link', text: 'A public page anyone can open, rendered on the server.' },
+    { icon: BellRing, title: 'Live reminders', text: 'They appear on your screen the moment they are due.' },
+  ]
+</script>
+
+<Layout>
+  <section class="py-8 text-center">
+    <h1 class="text-4xl font-semibold tracking-tight">Remember everything.</h1>
+    <p class="mx-auto mt-3 max-w-md text-muted-foreground">{message}</p>
+    <Link href={routes.lists.index()} class={buttonVariants({ size: 'lg', class: 'mt-6' })}>
+      Open my lists <ArrowRight />
+    </Link>
+  </section>
+  <div class="grid gap-4 sm:grid-cols-3">
+    {#each features as { icon: Icon, title, text } (title)}
+      <Card>
+        <CardHeader>
+          <Icon class="mb-2 size-5 text-primary" />
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{text}</CardDescription>
+        </CardHeader>
+      </Card>
+    {/each}
+  </div>
+</Layout>
+```
+
+  </Tab>
+</Tabs>
+
+Finally delete `ClientApp/pages/Todos` and the Dashboard page (`Dashboard.tsx`, `Dashboard.vue` or `Dashboard.svelte`). Run `bun run build` again. It passes.
 
 <Callout type="info" title="Why a warning appears when you build the C#">
 `dotnet build` prints `INERTIA002` for `ListsPage`: "this component has no file under `ClientApp/pages`". That is a helper catching a typo, or a page you forgot to write. It goes away in the next step, when we add the page.
@@ -6998,7 +7458,17 @@ The lists page. `useForm` holds the form's values, and `withPrecognition` gives 
 ```tsx
 // ClientApp/pages/Lists/Index.tsx
 import { Deferred, Link, useForm } from '@inertiajs/react'
+import { BellRing, ChevronRight, CircleCheck, ListTodo, Plus } from 'lucide-react'
 import type { FormEvent } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Field, FieldError } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import Layout from '../../Layout'
 import type { InertiaPages } from '../../types/inertia'
 import { routes, type RouteBodies } from '../../types/routes'
@@ -7014,48 +7484,110 @@ export default function Index({ lists, stats, reminders }: InertiaPages['Lists/I
 
   return (
     <Layout>
-      <h1 className="text-2xl font-semibold">My lists</h1>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">My lists</h1>
+        <p className="text-sm text-muted-foreground">Private by default. Share a list when you want to.</p>
+      </div>
 
-      <form onSubmit={submit} className="mt-4 flex gap-2">
-        <input
-          value={form.data.title ?? ''}
-          onChange={(e) => form.setData('title', e.target.value)}
-          onBlur={() => form.validate('title')}
-          placeholder="A new list"
-          className="flex-1 rounded border border-slate-300 px-3 py-2"
-        />
-        <button disabled={form.processing} className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
-      </form>
-      {form.errors.title && <p role="alert" className="mt-1 text-sm text-red-700">{form.errors.title}</p>}
-
-      <ul className="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-        {lists.map((list) => (
-          <li key={list.id}>
-            <Link href={routes.lists.show(list.id)} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
-              <span>{list.title}{list.isShared && <span className="ml-2 rounded bg-blue-100 px-2 text-xs text-blue-800">shared</span>}</span>
-              <span className="text-sm text-slate-500">{list.open} open of {list.total}</span>
-            </Link>
-          </li>
-        ))}
-        {lists.length === 0 && <li className="px-4 py-3 text-slate-500">No lists yet. Add your first one above.</li>}
-      </ul>
-
-      <Deferred data="stats" fallback={<p className="mt-6 text-sm text-slate-400">Counting...</p>}>
-        <p className="mt-6 text-sm text-slate-600">{stats?.open} open, {stats?.done} done</p>
+      {/* Deferred needs a fallback to show while the data loads. */}
+      <Deferred
+        data="stats"
+        fallback={
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+        }
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardDescription className="flex items-center gap-2"><ListTodo className="size-4" /> Open</CardDescription>
+              <CardTitle className="text-3xl tabular-nums">{stats?.open}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardDescription className="flex items-center gap-2"><CircleCheck className="size-4" /> Done</CardDescription>
+              <CardTitle className="text-3xl tabular-nums">{stats?.done}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
       </Deferred>
 
-      <Deferred data="reminders" fallback={null}>
+      <Deferred data="reminders" fallback={<></>}>
         {reminders && reminders.length > 0 && (
-          <section className="mt-6 rounded bg-amber-50 p-4">
-            <h2 className="font-medium">Reminders</h2>
-            <ul className="mt-2 space-y-1 text-sm">
-              {reminders.map((r) => (
-                <li key={r.id}><Link href={routes.lists.show(r.listId)} className="underline">{r.title}</Link></li>
-              ))}
-            </ul>
-          </section>
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><BellRing className="size-4 text-primary" /> Reminders</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ItemGroup>
+                {reminders.map((r) => (
+                  <Item key={r.id} asChild size="sm">
+                    <Link href={routes.lists.show(r.listId)}>
+                      <ItemContent><ItemTitle>{r.title}</ItemTitle></ItemContent>
+                      <ItemActions><Badge>due</Badge></ItemActions>
+                    </Link>
+                  </Item>
+                ))}
+              </ItemGroup>
+            </CardContent>
+          </Card>
         )}
       </Deferred>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>New list</CardTitle>
+          <CardDescription>Give it a short name, like Groceries.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submit} className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                value={form.data.title ?? ''}
+                onChange={(e) => form.setData('title', e.target.value)}
+                onBlur={() => form.validate('title')}
+                placeholder="A new list"
+                aria-invalid={Boolean(form.errors.title)}
+              />
+              <Button disabled={form.processing}><Plus /> Add</Button>
+            </div>
+            <Field data-invalid={Boolean(form.errors.title)}>
+              <FieldError>{form.errors.title}</FieldError>
+            </Field>
+          </form>
+        </CardContent>
+      </Card>
+
+      {lists.length === 0 ? (
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
+            <EmptyTitle>No lists yet</EmptyTitle>
+            <EmptyDescription>Add your first one above.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <ItemGroup className="gap-3">
+          {lists.map((list) => (
+            <Item key={list.id} variant="outline" asChild className="bg-card hover:bg-accent/50">
+              <Link href={routes.lists.show(list.id)}>
+                <ItemContent>
+                  <ItemTitle>
+                    {list.title}
+                    {list.isShared && <Badge variant="secondary">shared</Badge>}
+                  </ItemTitle>
+                  <ItemDescription>{list.open} open of {list.total}</ItemDescription>
+                  <Progress value={list.total === 0 ? 0 : ((list.total - list.open) / list.total) * 100} className="mt-2 h-1.5" />
+                </ItemContent>
+                <ItemActions><ChevronRight className="size-4 text-muted-foreground" /></ItemActions>
+              </Link>
+            </Item>
+          ))}
+        </ItemGroup>
+      )}
     </Layout>
   )
 }
@@ -7068,6 +7600,16 @@ export default function Index({ lists, stats, reminders }: InertiaPages['Lists/I
 <!-- ClientApp/pages/Lists/Index.vue -->
 <script setup lang="ts">
 import { Deferred, Link, useForm } from '@inertiajs/vue3'
+import { BellRing, ChevronRight, CircleCheck, ListTodo, Plus } from '@lucide/vue'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { FieldError } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@/components/ui/item'
+import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import Layout from '../../Layout.vue'
 import type { InertiaPages } from '../../types/inertia'
 import { routes, type RouteBodies } from '../../types/routes'
@@ -7081,40 +7623,92 @@ const submit = () => form.submit(routes.lists.store())
 
 <template>
   <Layout>
-    <h1 class="text-2xl font-semibold">My lists</h1>
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">My lists</h1>
+      <p class="text-sm text-muted-foreground">Private by default. Share a list when you want to.</p>
+    </div>
 
-    <form class="mt-4 flex gap-2" @submit.prevent="submit">
-      <input v-model="form.title" placeholder="A new list" class="flex-1 rounded border border-slate-300 px-3 py-2" @blur="form.validate('title')" />
-      <button :disabled="form.processing" class="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
-    </form>
-    <p v-if="form.errors.title" role="alert" class="mt-1 text-sm text-red-700">{{ form.errors.title }}</p>
-
-    <ul class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-      <li v-for="list in lists" :key="list.id">
-        <Link :href="routes.lists.show(list.id)" class="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
-          <span>
-            {{ list.title }}
-            <span v-if="list.isShared" class="ml-2 rounded bg-blue-100 px-2 text-xs text-blue-800">shared</span>
-          </span>
-          <span class="text-sm text-slate-500">{{ list.open }} open of {{ list.total }}</span>
-        </Link>
-      </li>
-      <li v-if="lists.length === 0" class="px-4 py-3 text-slate-500">No lists yet. Add your first one above.</li>
-    </ul>
-
+    <!-- Deferred needs a fallback to show while the data loads. -->
     <Deferred data="stats">
-      <template #fallback><p class="mt-6 text-sm text-slate-400">Counting...</p></template>
-      <p class="mt-6 text-sm text-slate-600">{{ stats?.open }} open, {{ stats?.done }} done</p>
+      <template #fallback>
+        <div class="grid grid-cols-2 gap-4">
+          <Skeleton class="h-24" />
+          <Skeleton class="h-24" />
+        </div>
+      </template>
+      <div class="grid grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardDescription class="flex items-center gap-2"><ListTodo class="size-4" /> Open</CardDescription>
+            <CardTitle class="text-3xl tabular-nums">{{ stats?.open }}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription class="flex items-center gap-2"><CircleCheck class="size-4" /> Done</CardDescription>
+            <CardTitle class="text-3xl tabular-nums">{{ stats?.done }}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
     </Deferred>
 
     <Deferred data="reminders">
-      <section v-if="reminders && reminders.length > 0" class="mt-6 rounded bg-amber-50 p-4">
-        <h2 class="font-medium">Reminders</h2>
-        <ul class="mt-2 space-y-1 text-sm">
-          <li v-for="r in reminders" :key="r.id"><Link :href="routes.lists.show(r.listId)" class="underline">{{ r.title }}</Link></li>
-        </ul>
-      </section>
+      <template #fallback />
+      <Card v-if="reminders && reminders.length > 0" class="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2"><BellRing class="size-4 text-primary" /> Reminders</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ItemGroup>
+            <Item v-for="r in reminders" :key="r.id" as-child size="sm">
+              <Link :href="routes.lists.show(r.listId)">
+                <ItemContent><ItemTitle>{{ r.title }}</ItemTitle></ItemContent>
+                <ItemActions><Badge>due</Badge></ItemActions>
+              </Link>
+            </Item>
+          </ItemGroup>
+        </CardContent>
+      </Card>
     </Deferred>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>New list</CardTitle>
+        <CardDescription>Give it a short name, like Groceries.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form class="space-y-2" @submit.prevent="submit">
+          <div class="flex gap-2">
+            <Input :model-value="form.title ?? ''" @update:model-value="form.title = String($event)" placeholder="A new list" :aria-invalid="Boolean(form.errors.title)" @blur="form.validate('title')" />
+            <Button :disabled="form.processing"><Plus /> Add</Button>
+          </div>
+          <FieldError v-if="form.errors.title">{{ form.errors.title }}</FieldError>
+        </form>
+      </CardContent>
+    </Card>
+
+    <Empty v-if="lists.length === 0" class="border border-dashed">
+      <EmptyHeader>
+        <EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
+        <EmptyTitle>No lists yet</EmptyTitle>
+        <EmptyDescription>Add your first one above.</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+    <ItemGroup v-else class="gap-3">
+      <Item v-for="list in lists" :key="list.id" variant="outline" as-child class="bg-card hover:bg-accent/50">
+        <Link :href="routes.lists.show(list.id)">
+          <ItemContent>
+            <ItemTitle>
+              {{ list.title }}
+              <Badge v-if="list.isShared" variant="secondary">shared</Badge>
+            </ItemTitle>
+            <ItemDescription>{{ list.open }} open of {{ list.total }}</ItemDescription>
+            <Progress :model-value="list.total === 0 ? 0 : ((list.total - list.open) / list.total) * 100" class="mt-2 h-1.5" />
+          </ItemContent>
+          <ItemActions><ChevronRight class="size-4 text-muted-foreground" /></ItemActions>
+        </Link>
+      </Item>
+    </ItemGroup>
   </Layout>
 </template>
 ```
@@ -7125,7 +7719,17 @@ const submit = () => form.submit(routes.lists.store())
 ```svelte
 <!-- ClientApp/pages/Lists/Index.svelte -->
 <script lang="ts">
+  import { BellRing, ChevronRight, CircleCheck, ListTodo, Plus } from '@lucide/svelte'
   import { Deferred, Link, useForm } from '@inertiajs/svelte'
+  import { Badge } from '@/components/ui/badge'
+  import { Button } from '@/components/ui/button'
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+  import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+  import { FieldError } from '@/components/ui/field'
+  import { Input } from '@/components/ui/input'
+  import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@/components/ui/item'
+  import { Progress } from '@/components/ui/progress'
+  import { Skeleton } from '@/components/ui/skeleton'
   import Layout from '../../Layout.svelte'
   import type { InertiaPages } from '../../types/inertia'
   import { routes, type RouteBodies } from '../../types/routes'
@@ -7141,51 +7745,105 @@ const submit = () => form.submit(routes.lists.store())
 </script>
 
 <Layout>
-  <h1 class="text-2xl font-semibold">My lists</h1>
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight">My lists</h1>
+    <p class="text-sm text-muted-foreground">Private by default. Share a list when you want to.</p>
+  </div>
 
-  <form onsubmit={submit} class="mt-4 flex gap-2">
-    <input bind:value={form.title} onblur={() => form.validate('title')} placeholder="A new list" class="flex-1 rounded border border-slate-300 px-3 py-2" />
-    <button disabled={form.processing} class="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
-  </form>
-  {#if form.errors.title}
-    <p role="alert" class="mt-1 text-sm text-red-700">{form.errors.title}</p>
-  {/if}
-
-  <ul class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-    {#each lists as list (list.id)}
-      <li>
-        <Link href={routes.lists.show(list.id)} class="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
-          <span>
-            {list.title}
-            {#if list.isShared}<span class="ml-2 rounded bg-blue-100 px-2 text-xs text-blue-800">shared</span>{/if}
-          </span>
-          <span class="text-sm text-slate-500">{list.open} open of {list.total}</span>
-        </Link>
-      </li>
-    {:else}
-      <li class="px-4 py-3 text-slate-500">No lists yet. Add your first one above.</li>
-    {/each}
-  </ul>
-
+  <!-- Deferred needs a fallback to show while the data loads. -->
   <Deferred data="stats">
     {#snippet fallback()}
-      <p class="mt-6 text-sm text-slate-400">Counting...</p>
+      <div class="grid grid-cols-2 gap-4">
+        <Skeleton class="h-24" />
+        <Skeleton class="h-24" />
+      </div>
     {/snippet}
-    <p class="mt-6 text-sm text-slate-600">{stats?.open} open, {stats?.done} done</p>
+    <div class="grid grid-cols-2 gap-4">
+      <Card>
+        <CardHeader>
+          <CardDescription class="flex items-center gap-2"><ListTodo class="size-4" /> Open</CardDescription>
+          <CardTitle class="text-3xl tabular-nums">{stats?.open}</CardTitle>
+        </CardHeader>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardDescription class="flex items-center gap-2"><CircleCheck class="size-4" /> Done</CardDescription>
+          <CardTitle class="text-3xl tabular-nums">{stats?.done}</CardTitle>
+        </CardHeader>
+      </Card>
+    </div>
   </Deferred>
 
   <Deferred data="reminders">
+    {#snippet fallback()}{/snippet}
     {#if reminders && reminders.length > 0}
-      <section class="mt-6 rounded bg-amber-50 p-4">
-        <h2 class="font-medium">Reminders</h2>
-        <ul class="mt-2 space-y-1 text-sm">
-          {#each reminders as r (r.id)}
-            <li><Link href={routes.lists.show(r.listId)} class="underline">{r.title}</Link></li>
-          {/each}
-        </ul>
-      </section>
+      <Card class="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2"><BellRing class="size-4 text-primary" /> Reminders</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ItemGroup>
+            {#each reminders as r (r.id)}
+              <Item size="sm">
+                {#snippet child({ props })}
+                  <Link {...props} href={routes.lists.show(r.listId)}>
+                    <ItemContent><ItemTitle>{r.title}</ItemTitle></ItemContent>
+                    <ItemActions><Badge>due</Badge></ItemActions>
+                  </Link>
+                {/snippet}
+              </Item>
+            {/each}
+          </ItemGroup>
+        </CardContent>
+      </Card>
     {/if}
   </Deferred>
+
+  <Card>
+    <CardHeader>
+      <CardTitle>New list</CardTitle>
+      <CardDescription>Give it a short name, like Groceries.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <form onsubmit={submit} class="space-y-2">
+        <div class="flex gap-2">
+          <Input bind:value={form.title} onblur={() => form.validate('title')} placeholder="A new list" aria-invalid={Boolean(form.errors.title)} />
+          <Button type="submit" disabled={form.processing}><Plus /> Add</Button>
+        </div>
+        {#if form.errors.title}<FieldError>{form.errors.title}</FieldError>{/if}
+      </form>
+    </CardContent>
+  </Card>
+
+  {#if lists.length === 0}
+    <Empty class="border border-dashed">
+      <EmptyHeader>
+        <EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
+        <EmptyTitle>No lists yet</EmptyTitle>
+        <EmptyDescription>Add your first one above.</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  {:else}
+    <ItemGroup class="gap-3">
+      {#each lists as list (list.id)}
+        <Item variant="outline" class="bg-card hover:bg-accent/50">
+          {#snippet child({ props })}
+            <Link {...props} href={routes.lists.show(list.id)}>
+              <ItemContent>
+                <ItemTitle>
+                  {list.title}
+                  {#if list.isShared}<Badge variant="secondary">shared</Badge>{/if}
+                </ItemTitle>
+                <ItemDescription>{list.open} open of {list.total}</ItemDescription>
+                <Progress value={list.total === 0 ? 0 : ((list.total - list.open) / list.total) * 100} class="mt-2 h-1.5" />
+              </ItemContent>
+              <ItemActions><ChevronRight class="size-4 text-muted-foreground" /></ItemActions>
+            </Link>
+          {/snippet}
+        </Item>
+      {/each}
+    </ItemGroup>
+  {/if}
 </Layout>
 ```
 
@@ -7200,7 +7858,19 @@ And the page for one list. Pay attention to `InfiniteScroll`: it wraps your rows
 ```tsx
 // ClientApp/pages/Lists/Show.tsx
 import { InfiniteScroll, Link, router, useForm } from '@inertiajs/react'
+import { ArrowLeft, BellRing, Copy, ListTodo, Plus, Trash2 } from 'lucide-react'
 import type { FormEvent } from 'react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { FieldError } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import Layout from '../../Layout'
 import type { InertiaPages } from '../../types/inertia'
 import { routes, type RouteBodies } from '../../types/routes'
@@ -7215,50 +7885,107 @@ export default function Show({ list, items }: InertiaPages['Lists/Show']) {
 
   return (
     <Layout>
-      <Link href={routes.lists.index()} className="text-sm text-slate-500 underline">All lists</Link>
-      <div className="mt-2 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{list.title}</h1>
-        <button onClick={() => router.visit(routes.lists.share(list.id))} className="text-sm underline">
-          {list.isShared ? 'Stop sharing' : 'Share'}
-        </button>
+      <div>
+        <Button asChild variant="ghost" size="sm" className="-ml-2">
+          <Link href={routes.lists.index()}><ArrowLeft /> All lists</Link>
+        </Button>
+        <div className="mt-1 flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">{list.title}</h1>
+          <div className="flex items-center gap-2">
+            <Switch id="shared" checked={list.isShared} onCheckedChange={() => router.visit(routes.lists.share(list.id))} />
+            <Label htmlFor="shared">Shared</Label>
+          </div>
+        </div>
       </div>
+
       {list.shareUrl && (
-        <p className="mt-2 text-sm text-slate-600">
-          Anyone with this link can read the list: <a className="underline" href={list.shareUrl}>{list.shareUrl}</a>
-        </p>
+        <Alert>
+          <AlertDescription className="flex items-center justify-between gap-2">
+            <span>Anyone with this link can read the list: <a className="underline" href={list.shareUrl}>{list.shareUrl}</a></span>
+            <Button variant="outline" size="xs" onClick={() => navigator.clipboard.writeText(location.origin + list.shareUrl)}>
+              <Copy /> Copy
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
-      <form onSubmit={submit} className="mt-6 flex flex-wrap gap-2">
-        <input
-          value={form.data.title ?? ''}
-          onChange={(e) => form.setData('title', e.target.value)}
-          placeholder="What needs doing?"
-          className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2"
-        />
-        <input
-          type="datetime-local"
-          title="Remind me at"
-          onChange={(e) => form.setData('remindAt', e.target.value ? new Date(e.target.value).toISOString() : null)}
-          className="rounded border border-slate-300 px-2 py-2"
-        />
-        <button disabled={form.processing} className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
-      </form>
-      {form.errors.title && <p role="alert" className="mt-1 text-sm text-red-700">{form.errors.title}</p>}
+      <Card>
+        <CardHeader>
+          <CardTitle>Add an item</CardTitle>
+          <CardDescription>Pick a time if you want a reminder.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submit} className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                className="min-w-0 flex-1"
+                value={form.data.title ?? ''}
+                onChange={(e) => form.setData('title', e.target.value)}
+                placeholder="What needs doing?"
+                aria-invalid={Boolean(form.errors.title)}
+              />
+              <Input
+                type="datetime-local"
+                title="Remind me at"
+                className="w-auto"
+                onChange={(e) => form.setData('remindAt', e.target.value ? new Date(e.target.value).toISOString() : null)}
+              />
+              <Button disabled={form.processing}><Plus /> Add</Button>
+            </div>
+            <FieldError>{form.errors.title}</FieldError>
+          </form>
+        </CardContent>
+      </Card>
 
-      {/* InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there because a prop made with Scroll() can be left out by a partial reload, so its generated type is optional. */}
-      <InfiniteScroll data="items" className="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-        {items?.data.map((item) => (
-          <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-            <input
-              type="checkbox"
-              checked={item.isDone}
-              onChange={() => router.visit(routes.items.toggle(item.id), { preserveScroll: true })}
-            />
-            <span className={item.isDone ? 'flex-1 text-slate-400 line-through' : 'flex-1'}>{item.title}</span>
-            <button onClick={() => router.visit(routes.items.destroy(item.id), { preserveScroll: true })} className="text-sm text-slate-400 hover:text-red-700">Delete</button>
-          </div>
-        ))}
-      </InfiniteScroll>
+      <Card className="py-0">
+        <CardContent className="px-0">
+          {/* InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there
+              because a prop made with Scroll() can be left out by a partial reload, so its generated type is optional. */}
+          <InfiniteScroll data="items">
+            {items?.data.length === 0 && (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
+                  <EmptyTitle>Nothing here yet</EmptyTitle>
+                  <EmptyDescription>Add the first item above.</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+            <ItemGroup className="gap-0">
+              {items?.data.map((item, i) => (
+                <div key={item.id}>
+                  {i > 0 && <ItemSeparator className="my-0" />}
+                  <Item size="sm">
+                    <ItemMedia>
+                      <Checkbox
+                        checked={item.isDone}
+                        onCheckedChange={() => router.visit(routes.items.toggle(item.id), { preserveScroll: true })}
+                        aria-label={`Mark ${item.title} as done`}
+                      />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle className={item.isDone ? 'text-muted-foreground line-through' : undefined}>
+                        {item.title}
+                        {item.remindAt && !item.isDone && <Badge variant="secondary"><BellRing /> reminder</Badge>}
+                      </ItemTitle>
+                    </ItemContent>
+                    <ItemActions>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Delete ${item.title}`}
+                        onClick={() => router.visit(routes.items.destroy(item.id), { preserveScroll: true })}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </ItemActions>
+                  </Item>
+                </div>
+              ))}
+            </ItemGroup>
+          </InfiniteScroll>
+        </CardContent>
+      </Card>
     </Layout>
   )
 }
@@ -7271,6 +7998,18 @@ export default function Show({ list, items }: InertiaPages['Lists/Show']) {
 <!-- ClientApp/pages/Lists/Show.vue -->
 <script setup lang="ts">
 import { InfiniteScroll, Link, router, useForm } from '@inertiajs/vue3'
+import { ArrowLeft, BellRing, Copy, ListTodo, Plus, Trash2 } from '@lucide/vue'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { FieldError } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import Layout from '../../Layout.vue'
 import type { InertiaPages } from '../../types/inertia'
 import { routes, type RouteBodies } from '../../types/routes'
@@ -7283,38 +8022,93 @@ const setReminder = (e: Event) => {
   const value = (e.target as HTMLInputElement).value
   form.remindAt = value ? new Date(value).toISOString() : null
 }
+const copy = () => navigator.clipboard.writeText(location.origin + props.list.shareUrl)
 </script>
 
 <template>
   <Layout>
-    <Link :href="routes.lists.index()" class="text-sm text-slate-500 underline">All lists</Link>
-    <div class="mt-2 flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">{{ list.title }}</h1>
-      <button class="text-sm underline" @click="router.visit(routes.lists.share(list.id))">
-        {{ list.isShared ? 'Stop sharing' : 'Share' }}
-      </button>
-    </div>
-    <p v-if="list.shareUrl" class="mt-2 text-sm text-slate-600">
-      Anyone with this link can read the list:
-      <a class="underline" :href="list.shareUrl">{{ list.shareUrl }}</a>
-    </p>
-
-    <form class="mt-6 flex flex-wrap gap-2" @submit.prevent="submit">
-      <input v-model="form.title" placeholder="What needs doing?" class="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
-      <input type="datetime-local" title="Remind me at" class="rounded border border-slate-300 px-2 py-2" @change="setReminder" />
-      <button :disabled="form.processing" class="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
-    </form>
-    <p v-if="form.errors.title" role="alert" class="mt-1 text-sm text-red-700">{{ form.errors.title }}</p>
-
-    <!-- InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there because a
-         prop made with Scroll() can be left out by a partial reload, so its generated type is optional. -->
-    <InfiniteScroll data="items" class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-      <div v-for="item in items?.data" :key="item.id" class="flex items-center gap-3 px-4 py-3">
-        <input type="checkbox" :checked="item.isDone" @change="router.visit(routes.items.toggle(item.id), { preserveScroll: true })" />
-        <span :class="item.isDone ? 'flex-1 text-slate-400 line-through' : 'flex-1'">{{ item.title }}</span>
-        <button class="text-sm text-slate-400 hover:text-red-700" @click="router.visit(routes.items.destroy(item.id), { preserveScroll: true })">Delete</button>
+    <div>
+      <Button as-child variant="ghost" size="sm" class="-ml-2">
+        <Link :href="routes.lists.index()"><ArrowLeft /> All lists</Link>
+      </Button>
+      <div class="mt-1 flex items-center justify-between gap-4">
+        <h1 class="text-2xl font-semibold tracking-tight">{{ list.title }}</h1>
+        <div class="flex items-center gap-2">
+          <Switch id="shared" :model-value="list.isShared" @update:model-value="router.visit(routes.lists.share(list.id))" />
+          <Label for="shared">Shared</Label>
+        </div>
       </div>
-    </InfiniteScroll>
+    </div>
+
+    <Alert v-if="list.shareUrl">
+      <AlertDescription class="flex items-center justify-between gap-2">
+        <span>Anyone with this link can read the list: <a class="underline" :href="list.shareUrl">{{ list.shareUrl }}</a></span>
+        <Button variant="outline" size="xs" @click="copy"><Copy /> Copy</Button>
+      </AlertDescription>
+    </Alert>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Add an item</CardTitle>
+        <CardDescription>Pick a time if you want a reminder.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form class="space-y-2" @submit.prevent="submit">
+          <div class="flex flex-wrap gap-2">
+            <Input :model-value="form.title ?? ''" @update:model-value="form.title = String($event)" class="min-w-0 flex-1" placeholder="What needs doing?" :aria-invalid="Boolean(form.errors.title)" />
+            <Input type="datetime-local" title="Remind me at" class="w-auto" @change="setReminder" />
+            <Button :disabled="form.processing"><Plus /> Add</Button>
+          </div>
+          <FieldError v-if="form.errors.title">{{ form.errors.title }}</FieldError>
+        </form>
+      </CardContent>
+    </Card>
+
+    <Card class="py-0">
+      <CardContent class="px-0">
+        <!-- InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there
+             because a prop made with Scroll() can be left out by a partial reload, so its generated type is optional. -->
+        <InfiniteScroll data="items">
+          <Empty v-if="items?.data.length === 0">
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
+              <EmptyTitle>Nothing here yet</EmptyTitle>
+              <EmptyDescription>Add the first item above.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+          <ItemGroup class="gap-0">
+            <div v-for="(item, i) in items?.data" :key="item.id">
+              <ItemSeparator v-if="i > 0" class="my-0" />
+              <Item size="sm">
+                <ItemMedia>
+                  <Checkbox
+                    :model-value="item.isDone"
+                    :aria-label="`Mark ${item.title} as done`"
+                    @update:model-value="router.visit(routes.items.toggle(item.id), { preserveScroll: true })"
+                  />
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle :class="item.isDone ? 'text-muted-foreground line-through' : undefined">
+                    {{ item.title }}
+                    <Badge v-if="item.remindAt && !item.isDone" variant="secondary"><BellRing /> reminder</Badge>
+                  </ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    :aria-label="`Delete ${item.title}`"
+                    @click="router.visit(routes.items.destroy(item.id), { preserveScroll: true })"
+                  >
+                    <Trash2 />
+                  </Button>
+                </ItemActions>
+              </Item>
+            </div>
+          </ItemGroup>
+        </InfiniteScroll>
+      </CardContent>
+    </Card>
   </Layout>
 </template>
 ```
@@ -7325,7 +8119,19 @@ const setReminder = (e: Event) => {
 ```svelte
 <!-- ClientApp/pages/Lists/Show.svelte -->
 <script lang="ts">
+  import { ArrowLeft, BellRing, Copy, ListTodo, Plus, Trash2 } from '@lucide/svelte'
   import { InfiniteScroll, Link, router, useForm } from '@inertiajs/svelte'
+  import { Alert, AlertDescription } from '@/components/ui/alert'
+  import { Badge } from '@/components/ui/badge'
+  import { Button, buttonVariants } from '@/components/ui/button'
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+  import { Checkbox } from '@/components/ui/checkbox'
+  import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+  import { FieldError } from '@/components/ui/field'
+  import { Input } from '@/components/ui/input'
+  import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
+  import { Label } from '@/components/ui/label'
+  import { Switch } from '@/components/ui/switch'
   import Layout from '../../Layout.svelte'
   import type { InertiaPages } from '../../types/inertia'
   import { routes, type RouteBodies } from '../../types/routes'
@@ -7341,50 +8147,118 @@ const setReminder = (e: Event) => {
     const value = (e.target as HTMLInputElement).value
     form.remindAt = value ? new Date(value).toISOString() : null
   }
+  const copy = () => navigator.clipboard.writeText(location.origin + list.shareUrl)
 </script>
 
 <Layout>
-  <Link href={routes.lists.index()} class="text-sm text-slate-500 underline">All lists</Link>
-  <div class="mt-2 flex items-center justify-between">
-    <h1 class="text-2xl font-semibold">{list.title}</h1>
-    <button class="text-sm underline" onclick={() => router.visit(routes.lists.share(list.id))}>
-      {list.isShared ? 'Stop sharing' : 'Share'}
-    </button>
-  </div>
-  {#if list.shareUrl}
-    <p class="mt-2 text-sm text-slate-600">
-      Anyone with this link can read the list:
-      <a class="underline" href={list.shareUrl}>{list.shareUrl}</a>
-    </p>
-  {/if}
-
-  <form onsubmit={submit} class="mt-6 flex flex-wrap gap-2">
-    <input bind:value={form.title} placeholder="What needs doing?" class="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
-    <input type="datetime-local" title="Remind me at" onchange={setReminder} class="rounded border border-slate-300 px-2 py-2" />
-    <button disabled={form.processing} class="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
-  </form>
-  {#if form.errors.title}
-    <p role="alert" class="mt-1 text-sm text-red-700">{form.errors.title}</p>
-  {/if}
-
-  <!-- InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there because a
-       prop made with Scroll() can be left out by a partial reload, so its generated type is optional. -->
-  <InfiniteScroll data="items" class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-    {#each items?.data ?? [] as item (item.id)}
-      <div class="flex items-center gap-3 px-4 py-3">
-        <input type="checkbox" checked={item.isDone} onchange={() => router.visit(routes.items.toggle(item.id), { preserveScroll: true })} />
-        <span class={item.isDone ? 'flex-1 text-slate-400 line-through' : 'flex-1'}>{item.title}</span>
-        <button class="text-sm text-slate-400 hover:text-red-700" onclick={() => router.visit(routes.items.destroy(item.id), { preserveScroll: true })}>Delete</button>
+  <div>
+    <Link href={routes.lists.index()} class={buttonVariants({ variant: 'ghost', size: 'sm', class: '-ml-2' })}>
+      <ArrowLeft /> All lists
+    </Link>
+    <div class="mt-1 flex items-center justify-between gap-4">
+      <h1 class="text-2xl font-semibold tracking-tight">{list.title}</h1>
+      <div class="flex items-center gap-2">
+        <Switch id="shared" checked={list.isShared} onCheckedChange={() => router.visit(routes.lists.share(list.id))} />
+        <Label for="shared">Shared</Label>
       </div>
-    {/each}
-  </InfiniteScroll>
+    </div>
+  </div>
+
+  {#if list.shareUrl}
+    <Alert>
+      <AlertDescription class="flex items-center justify-between gap-2">
+        <span>Anyone with this link can read the list: <a class="underline" href={list.shareUrl}>{list.shareUrl}</a></span>
+        <Button variant="outline" size="xs" onclick={copy}><Copy /> Copy</Button>
+      </AlertDescription>
+    </Alert>
+  {/if}
+
+  <Card>
+    <CardHeader>
+      <CardTitle>Add an item</CardTitle>
+      <CardDescription>Pick a time if you want a reminder.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <form onsubmit={submit} class="space-y-2">
+        <div class="flex flex-wrap gap-2">
+          <Input bind:value={form.title} class="min-w-0 flex-1" placeholder="What needs doing?" aria-invalid={Boolean(form.errors.title)} />
+          <Input type="datetime-local" title="Remind me at" class="w-auto" onchange={setReminder} />
+          <Button type="submit" disabled={form.processing}><Plus /> Add</Button>
+        </div>
+        {#if form.errors.title}<FieldError>{form.errors.title}</FieldError>{/if}
+      </form>
+    </CardContent>
+  </Card>
+
+  <Card class="py-0">
+    <CardContent class="px-0">
+      <!-- InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there
+           because a prop made with Scroll() can be left out by a partial reload, so its generated type is optional. -->
+      <InfiniteScroll data="items">
+        {#if items?.data.length === 0}
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
+              <EmptyTitle>Nothing here yet</EmptyTitle>
+              <EmptyDescription>Add the first item above.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        {/if}
+        <ItemGroup class="gap-0">
+          {#each items?.data ?? [] as item, i (item.id)}
+            <div>
+              {#if i > 0}<ItemSeparator class="my-0" />{/if}
+              <Item size="sm">
+                <ItemMedia>
+                  <Checkbox
+                    checked={item.isDone}
+                    aria-label={`Mark ${item.title} as done`}
+                    onCheckedChange={() => router.visit(routes.items.toggle(item.id), { preserveScroll: true })}
+                  />
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle class={item.isDone ? 'text-muted-foreground line-through' : undefined}>
+                    {item.title}
+                    {#if item.remindAt && !item.isDone}<Badge variant="secondary"><BellRing /> reminder</Badge>{/if}
+                  </ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Delete ${item.title}`}
+                    onclick={() => router.visit(routes.items.destroy(item.id), { preserveScroll: true })}
+                  >
+                    <Trash2 />
+                  </Button>
+                </ItemActions>
+              </Item>
+            </div>
+          {/each}
+        </ItemGroup>
+      </InfiniteScroll>
+    </CardContent>
+  </Card>
 </Layout>
 ```
 
   </Tab>
 </Tabs>
 
-Try it. Open **My lists**, leave the box empty and click out of it: the error appears without a submit, and it is the same message the server would send. Then add a list, add a few items and tick one off. After you add an item the number of open items on the lists page changes, because every write cleared the cached stats.
+Try it:
+
+1. Open **My lists** and click **Add** with the box empty. The server answers with "The Title field is required".
+2. Paste a title longer than 80 characters and click outside the box. The error appears **before** you submit. That is Precognition, and it is the same message the server would send.
+3. Add a list, add a few items, tick one off and add a reminder. The numbers at the top change, because every write cleared the cached stats.
+
+<Callout type="info" title="Two small things you will notice">
+- **`<Deferred>` needs a `fallback`**, even an empty one, or the page will not render. For the stats we show skeleton cards. For the reminders we show nothing until they arrive.
+- **A change reloads the list from the first page.** When you tick an item, the server sends the list again, so the extra pages you scrolled in are dropped. That is the price of the simple `Back()` redirect. If it matters for your app, reload only what changed with a [partial reload](/docs/partial-reloads).
+</Callout>
+
+<Callout type="warning" title="Svelte: submit buttons need type=submit">
+shadcn-svelte's `Button` is `type="button"` by default, so inside a form it does nothing. That is why the Svelte pages write `type="submit"` on their Add buttons. The React and Vue buttons submit by default.
+</Callout>
 
 ## 7. Share a list, and render it on the server
 
@@ -7498,19 +8372,38 @@ And the public page:
 ```tsx
 // ClientApp/pages/Public/Show.tsx
 import { InfiniteScroll } from '@inertiajs/react'
+import { Circle } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Item, ItemContent, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
 import Layout from '../../Layout'
 import type { InertiaPages } from '../../types/inertia'
 
 export default function Show({ list, items }: InertiaPages['Public/Show']) {
   return (
     <Layout>
-      <h1 className="text-2xl font-semibold">{list.title}</h1>
-      <p className="mt-1 text-sm text-slate-500">{list.open} open items</p>
-      <InfiniteScroll data="items" className="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-        {items?.data.map((item) => (
-          <div key={item.id} className="px-4 py-3">{item.title}</div>
-        ))}
-      </InfiniteScroll>
+      <div>
+        <Badge variant="secondary">Shared list</Badge>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">{list.title}</h1>
+        <p className="text-sm text-muted-foreground">{list.open} open items</p>
+      </div>
+      <Card className="py-0">
+        <CardContent className="px-0">
+          <InfiniteScroll data="items">
+            <ItemGroup className="gap-0">
+              {items?.data.map((item, i) => (
+                <div key={item.id}>
+                  {i > 0 && <ItemSeparator className="my-0" />}
+                  <Item size="sm">
+                    <ItemMedia><Circle className="size-4 text-muted-foreground" /></ItemMedia>
+                    <ItemContent><ItemTitle>{item.title}</ItemTitle></ItemContent>
+                  </Item>
+                </div>
+              ))}
+            </ItemGroup>
+          </InfiniteScroll>
+        </CardContent>
+      </Card>
     </Layout>
   )
 }
@@ -7523,6 +8416,10 @@ export default function Show({ list, items }: InertiaPages['Public/Show']) {
 <!-- ClientApp/pages/Public/Show.vue -->
 <script setup lang="ts">
 import { InfiniteScroll } from '@inertiajs/vue3'
+import { Circle } from '@lucide/vue'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Item, ItemContent, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
 import Layout from '../../Layout.vue'
 import type { InertiaPages } from '../../types/inertia'
 
@@ -7531,11 +8428,26 @@ defineProps<InertiaPages['Public/Show']>()
 
 <template>
   <Layout>
-    <h1 class="text-2xl font-semibold">{{ list.title }}</h1>
-    <p class="mt-1 text-sm text-slate-500">{{ list.open }} open items</p>
-    <InfiniteScroll data="items" class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-      <div v-for="item in items?.data" :key="item.id" class="px-4 py-3">{{ item.title }}</div>
-    </InfiniteScroll>
+    <div>
+      <Badge variant="secondary">Shared list</Badge>
+      <h1 class="mt-3 text-2xl font-semibold tracking-tight">{{ list.title }}</h1>
+      <p class="text-sm text-muted-foreground">{{ list.open }} open items</p>
+    </div>
+    <Card class="py-0">
+      <CardContent class="px-0">
+        <InfiniteScroll data="items">
+          <ItemGroup class="gap-0">
+            <div v-for="(item, i) in items?.data" :key="item.id">
+              <ItemSeparator v-if="i > 0" class="my-0" />
+              <Item size="sm">
+                <ItemMedia><Circle class="size-4 text-muted-foreground" /></ItemMedia>
+                <ItemContent><ItemTitle>{{ item.title }}</ItemTitle></ItemContent>
+              </Item>
+            </div>
+          </ItemGroup>
+        </InfiniteScroll>
+      </CardContent>
+    </Card>
   </Layout>
 </template>
 ```
@@ -7546,7 +8458,11 @@ defineProps<InertiaPages['Public/Show']>()
 ```svelte
 <!-- ClientApp/pages/Public/Show.svelte -->
 <script lang="ts">
+  import { Circle } from '@lucide/svelte'
   import { InfiniteScroll } from '@inertiajs/svelte'
+  import { Badge } from '@/components/ui/badge'
+  import { Card, CardContent } from '@/components/ui/card'
+  import { Item, ItemContent, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
   import Layout from '../../Layout.svelte'
   import type { InertiaPages } from '../../types/inertia'
 
@@ -7554,13 +8470,28 @@ defineProps<InertiaPages['Public/Show']>()
 </script>
 
 <Layout>
-  <h1 class="text-2xl font-semibold">{list.title}</h1>
-  <p class="mt-1 text-sm text-slate-500">{list.open} open items</p>
-  <InfiniteScroll data="items" class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
-    {#each items?.data ?? [] as item (item.id)}
-      <div class="px-4 py-3">{item.title}</div>
-    {/each}
-  </InfiniteScroll>
+  <div>
+    <Badge variant="secondary">Shared list</Badge>
+    <h1 class="mt-3 text-2xl font-semibold tracking-tight">{list.title}</h1>
+    <p class="text-sm text-muted-foreground">{list.open} open items</p>
+  </div>
+  <Card class="py-0">
+    <CardContent class="px-0">
+      <InfiniteScroll data="items">
+        <ItemGroup class="gap-0">
+          {#each items?.data ?? [] as item, i (item.id)}
+            <div>
+              {#if i > 0}<ItemSeparator class="my-0" />{/if}
+              <Item size="sm">
+                <ItemMedia><Circle class="size-4 text-muted-foreground" /></ItemMedia>
+                <ItemContent><ItemTitle>{item.title}</ItemTitle></ItemContent>
+              </Item>
+            </div>
+          {/each}
+        </ItemGroup>
+      </InfiniteScroll>
+    </CardContent>
+  </Card>
 </Layout>
 ```
 

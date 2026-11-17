@@ -1773,7 +1773,7 @@
       "slug": "forget-me-not",
       "url": "/docs/forget-me-not",
       "title": "Build a todo app",
-      "description": "Build ForgetMeNot step by step, a todo app with sign-in, shared lists, infinite scroll, live reminders and server-side rendering, using named routes, typed routes and caching.",
+      "description": "Build ForgetMeNot step by step with shadcn/ui, covering sign-in, shared lists, infinite scroll, live reminders and server-side rendering, using named routes, typed routes and caching.",
       "section": "Tutorial",
       "order": 1,
       "headings": [
@@ -1788,9 +1788,19 @@
           "depth": 2
         },
         {
-          "id": "2-add-tailwind-css",
-          "text": "2. Add Tailwind CSS",
+          "id": "2-make-it-look-good-with-shadcnui",
+          "text": "2. Make it look good with shadcn/ui",
           "depth": 2
+        },
+        {
+          "id": "make-the-theme-yours",
+          "text": "Make the theme yours",
+          "depth": 3
+        },
+        {
+          "id": "the-login-page",
+          "text": "The login page",
+          "depth": 3
         },
         {
           "id": "3-add-a-database",
