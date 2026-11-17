@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react'
 import { ArrowRight } from 'lucide-react'
 import { useState, type ComponentProps, type ComponentType, type SVGProps } from 'react'
+import { ArchitectureDiagram } from '../components/ArchitectureDiagram'
 import { ReactLogo, SvelteLogo, VueLogo } from '../components/icons/FrameworkLogos'
 import { GithubIcon } from '../components/icons/GithubIcon'
 import { InstallCommand } from '../components/InstallCommand'
@@ -147,6 +148,18 @@ export default function Home() {
               </div>
             </div>
             <CodePreview />
+          </div>
+        </section>
+
+        <section className="border-b border-border bg-muted/40">
+          <div className="mx-auto max-w-[1100px] px-6 py-16 lg:py-20">
+            <h2 className="max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl">One app, one request flow</h2>
+            <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">
+              Your .NET endpoints, the Inertia.Net adapter and a frontend of your choice, joined by one small protocol. Pick a scenario and watch a request move through every part.
+            </p>
+            <div className="mt-8">
+              <ArchitectureDiagram />
+            </div>
           </div>
         </section>
 

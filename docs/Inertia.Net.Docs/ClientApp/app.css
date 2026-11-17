@@ -26,8 +26,11 @@
   --input: oklch(0.912 0.006 286);
   --ring: oklch(0.55 0.2 285);
   --code-bg: oklch(0.982 0.003 286);
+  --glue-fill: color-mix(in oklab, var(--primary) 11%, var(--card));
+  --glue-stroke: color-mix(in oklab, var(--primary) 45%, var(--border));
   --header-bg: oklch(0.993 0.002 286 / 0.78);
   --success: oklch(0.55 0.16 155);
+  --success-foreground: oklch(0.99 0 0);
   --warning: oklch(0.6 0.15 70);
   --danger: oklch(0.56 0.21 27);
   --info: oklch(0.55 0.15 245);
@@ -58,6 +61,9 @@
   --input: oklch(0.29 0.012 286);
   --ring: oklch(0.7 0.14 285);
   --code-bg: oklch(0.175 0.009 286);
+  --glue-fill: color-mix(in oklab, var(--primary) 26%, var(--card));
+  --glue-stroke: color-mix(in oklab, var(--primary) 70%, var(--card));
+  --success-foreground: oklch(0.16 0.01 286);
   --header-bg: oklch(0.155 0.008 286 / 0.72);
   --success: oklch(0.72 0.15 155);
   --warning: oklch(0.8 0.14 78);
@@ -484,4 +490,93 @@ html.dark .shiki span {
 
 .prose :where(img) {
   border-radius: var(--radius-xl);
+}
+
+/* Diagram motion: once a diagram scrolls into view each packet crosses its arrow in turn, then everything rests. */
+@keyframes seq-travel {
+  0% { transform: translateX(0); opacity: 0; }
+  12%, 88% { opacity: 1; }
+  100% { transform: translateX(var(--dx)); opacity: 0; }
+}
+
+.seq-dot {
+  opacity: 0;
+}
+
+[data-play] .seq-dot {
+  animation: seq-travel 1.2s cubic-bezier(0.45, 0, 0.25, 1) 1 both;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes edge-flow {
+  to { stroke-dashoffset: -20; }
+}
+
+[data-play] .edge-flow {
+  animation: edge-flow 1.2s linear 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-play] .seq-dot { animation: none; opacity: 0; }
+  [data-play] .edge-flow { animation: none; }
+}
+
+/* Landing-page architecture diagram: packets ride the lanes, active parts glow, loading placeholders shimmer. */
+.arch-packet {
+  offset-path: var(--path);
+  offset-rotate: 0deg;
+  animation: arch-travel 1.1s cubic-bezier(0.45, 0, 0.25, 1) var(--delay, 0s) both;
+}
+
+@keyframes arch-travel {
+  0% { offset-distance: 0%; opacity: 0; }
+  12%, 88% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.arch-chip,
+.arch-frame {
+  transition: opacity 300ms var(--ease-out), filter 300ms var(--ease-out);
+}
+
+.arch-chip rect {
+  transition: stroke 250ms, stroke-width 250ms;
+}
+
+.arch-on {
+  filter: drop-shadow(0 0 9px color-mix(in oklab, var(--primary) 42%, transparent));
+}
+
+.arch-off {
+  opacity: 0.38;
+}
+
+@keyframes arch-fade {
+  from { opacity: 0; transform: translateY(3px); }
+}
+
+.arch-fade {
+  animation: arch-fade 350ms var(--ease-out) both;
+}
+
+@keyframes arch-shimmer {
+  50% { opacity: 0.45; }
+}
+
+.arch-shimmer {
+  animation: arch-shimmer 1.4s ease-in-out infinite;
+}
+
+/* The phone layout scales the artwork down, so its text is set larger to land near 11px on screen. */
+.arch-tall .text-\[11px\],
+.arch-tall .text-\[11\.5px\] { font-size: 13px; }
+.arch-tall .text-\[12px\] { font-size: 14px; }
+.arch-tall .text-\[13px\] { font-size: 15px; }
+.arch-tall .text-\[14px\],
+.arch-tall .text-\[15px\] { font-size: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Without motion the packet rests mid-lane, so its label still tells the story. */
+  .arch-packet { animation: none; offset-distance: 50%; opacity: 1; }
+  .arch-fade, .arch-shimmer { animation: none; }
 }

@@ -30,6 +30,28 @@ This is the default style, and the rest of these docs use it. If you want typed 
 
 Every page has an `errors` prop (an empty object when there are no errors). Key order is `errors`, shared props, then page props.
 
+Every response is one of three things, depending on how the request arrived:
+
+<Flow
+  caption="Figure: how the adapter chooses between JSON, HTML and a forced reload."
+  height={340}
+  nodes={[
+    { id: 'req', label: 'Request arrives', sub: 'Render() runs in your handler', x: 95, y: 170, tone: 'muted' },
+    { id: 'hdr', label: 'X-Inertia header?', x: 300, y: 170, tone: 'primary', shape: 'decision' },
+    { id: 'ver', label: 'Asset version matches?', x: 515, y: 170, tone: 'primary', shape: 'decision' },
+    { id: 'json', label: 'JSON page object', sub: 'client swaps the component', x: 650, y: 55, tone: 'success' },
+    { id: 'conflict', label: '409 + X-Inertia-Location', sub: 'client does a full reload', x: 650, y: 285, tone: 'warning' },
+    { id: 'html', label: 'HTML document', sub: 'root template + data-page', x: 300, y: 290, tone: 'primary' },
+  ]}
+  edges={[
+    { from: 'req', to: 'hdr' },
+    { from: 'hdr', to: 'ver', label: 'yes' },
+    { from: 'ver', to: 'json', label: 'yes' },
+    { from: 'ver', to: 'conflict', label: 'no', dashed: true },
+    { from: 'hdr', to: 'html', label: 'no: first visit' },
+  ]}
+/>
+
 ## Per-response options
 
 `InertiaResult` builds on the response without changing the component:

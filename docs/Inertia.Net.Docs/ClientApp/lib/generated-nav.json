@@ -54,6 +54,11 @@
           "depth": 2
         },
         {
+          "id": "how-a-request-works",
+          "text": "How a request works",
+          "depth": 2
+        },
+        {
           "id": "in-more-detail",
           "text": "In more detail",
           "depth": 2

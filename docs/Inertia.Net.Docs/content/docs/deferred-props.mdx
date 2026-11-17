@@ -27,6 +27,20 @@ return Render("Dashboard", new InertiaProps
 }
 ```
 
+<Sequence
+  caption="Figure: the page paints first, then each deferred group arrives in its own partial reload."
+  actors={[{ name: 'Browser', sub: 'Inertia client' }, { name: 'ASP.NET Core', sub: 'Dashboard route' }]}
+  messages={[
+    { from: 0, to: 1, text: 'GET /dashboard', phase: 'First paint' },
+    { from: 1, to: 0, text: 'user now; stats, chart and activity left out', reply: true, code: '"deferredProps": { "default": ["stats"], "charts": [...] }' },
+    { from: 0, to: 0, text: 'Page is interactive with skeletons showing' },
+    { from: 0, to: 1, text: 'Group "default" in one partial reload', code: 'X-Inertia-Partial-Data: stats', phase: 'Deferred groups' },
+    { from: 0, to: 1, text: 'Group "charts" in parallel', code: 'X-Inertia-Partial-Data: chart,activity' },
+    { from: 1, to: 0, text: 'stats arrive, skeleton replaced', reply: true },
+    { from: 1, to: 0, text: 'chart and activity arrive', reply: true },
+  ]}
+/>
+
 Props in the same group load in one request. Different groups load in parallel requests. `deferredProps` is only produced on non-partial renders.
 
 ## The client

@@ -34,6 +34,8 @@ Before any measuring, a parity check confirms that every app returns exactly the
 
 ## The frameworks
 
+<Contenders names={['Inertia.Net', 'Next.js', 'TanStack Start', 'Nuxt', 'Laravel']} />
+
 ### Inertia.Net
 
 Inertia.Net lets you write the server in ASP.NET Core and the pages in React, Vue or Svelte, without building a separate API. Controllers or Minimal API handlers return a page name and its data; Inertia's client does the routing in the browser.
@@ -100,6 +102,19 @@ In SSR mode the Inertia apps also run a small Node.js process to render pages, w
 
 A first visit is what a visitor gets when they open a link or reload the page. In SSR mode the server renders the whole page. This is the todo list with 25 rows:
 
+<Bars
+  title="First visits, todo list with 25 rows"
+  unit="pages per second"
+  data={[
+    { label: 'Inertia.Net, Native AOT', value: 3905 },
+    { label: 'Inertia.Net, JIT', value: 1764 },
+    { label: 'TanStack Start', value: 1294 },
+    { label: 'Nuxt', value: 745 },
+    { label: 'Next.js', value: 364 },
+    { label: 'Laravel', value: 337 },
+  ]}
+/>
+
 | App | Pages per second | Typical response under full load | Typical response at 50 visits per second |
 |---|---:|---:|---:|
 | Inertia.Net, Native AOT | **3,905** | **3.9 ms** | **1.1 ms** |
@@ -144,6 +159,19 @@ Saving is limited by the database for every framework, so the fast apps end up c
 ### Heavy work
 
 The heavy page runs a CPU-intensive calculation. This is mostly a test of the programming language.
+
+<Bars
+  title="Heavy work"
+  unit="requests per second"
+  data={[
+    { label: 'Inertia.Net, JIT', value: 1212 },
+    { label: 'Inertia.Net, Native AOT', value: 1033 },
+    { label: 'Nuxt', value: 240 },
+    { label: 'TanStack Start', value: 227 },
+    { label: 'Next.js', value: 207 },
+    { label: 'Laravel', value: 81 },
+  ]}
+/>
 
 | App | Requests per second | With 1 / 2 / 4 CPU cores (split across cores) |
 |---|---:|---:|

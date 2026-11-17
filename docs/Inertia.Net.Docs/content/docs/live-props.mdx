@@ -17,6 +17,22 @@ Three pieces make it work:
 Live props need `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte` 3.11.0 or later. Older clients ignore `liveProps`.
 </Callout>
 
+<Sequence
+  caption="Figure: an event published on the server refreshes only the props that listen to it."
+  actors={[
+    { name: 'Your code', sub: 'IInertiaLive.Publish' },
+    { name: 'Live transport', sub: 'SignalR or your own' },
+    { name: 'Browser', sub: 'Inertia client' },
+  ]}
+  messages={[
+    { from: 2, to: 1, text: 'Page loads, then subscribes to the channels in liveProps', code: '"liveProps": { "stats": ["orders.changed"] }', phase: 'Subscribe' },
+    { from: 0, to: 1, text: 'Publish an event', code: 'live.PublishAsync(new OrderChanged(id))', phase: 'Event' },
+    { from: 1, to: 2, text: 'Deliver it to every subscriber', reply: true },
+    { from: 2, to: 1, text: 'Partial reload of only the affected props', code: 'X-Inertia-Partial-Data: stats', phase: 'Refresh' },
+    { from: 2, to: 2, text: 'Component re-renders with fresh data' },
+  ]}
+/>
+
 ## Define each event once
 
 A `LiveEvent` is an event name on a `LiveChannel`. The same value declares the prop and publishes the event, so the two sides cannot drift apart.

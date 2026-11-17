@@ -194,6 +194,31 @@ The first visit is a normal HTML response. After that, links and form submission
 
 Want to see it run? Try [First 10 minutes](/docs/first-10-minutes). Want the details? Keep reading.
 
+## How a request works
+
+The first visit returns HTML. Every later click is an `X-Inertia` request that returns only JSON, so the page never reloads.
+
+<Sequence
+  caption="Figure: the first visit returns HTML; every later click returns only JSON."
+  actors={[
+    { name: 'Browser', sub: 'Inertia client' },
+    { name: 'ASP.NET Core', sub: 'Inertia.Net' },
+    { name: 'Your handler', sub: 'route or controller' },
+  ]}
+  messages={[
+    { from: 0, to: 1, text: 'GET /users', code: 'Accept: text/html', phase: 'First visit' },
+    { from: 1, to: 2, text: 'Run the route' },
+    { from: 2, to: 1, text: 'Return the page name and props', reply: true, code: 'Render("Users/Index", props)' },
+    { from: 1, to: 0, text: 'HTML shell with the page object', reply: true, code: '<div id="app" data-page="{...}">' },
+    { from: 0, to: 0, text: 'Client app boots and renders the page' },
+    { from: 0, to: 1, text: 'Click a link: GET /users/1', code: 'X-Inertia: true', phase: 'Every click after' },
+    { from: 1, to: 2, text: 'Run the route' },
+    { from: 2, to: 1, text: 'Same Render call', reply: true },
+    { from: 1, to: 0, text: 'Only the page object, as JSON', reply: true, code: '{ "component": "Users/Show", "props": {...} }' },
+    { from: 0, to: 0, text: 'Swap the page component, no reload' },
+  ]}
+/>
+
 ## In more detail
 
 ### Inertia vs a SPA plus a Web API
@@ -1363,6 +1388,28 @@ app.MapGet("/users", () => Render("Users/Index", new UsersPage(users, "Users")))
 This is the default style, and the rest of these docs use it. If you want typed props, a record that implements `IInertiaPage` names its component, so `Render(new UsersPage(...))` needs no component string, and the record can hold its own GET handler. See [Page records](/docs/page-records).
 
 Every page has an `errors` prop (an empty object when there are no errors). Key order is `errors`, shared props, then page props.
+
+Every response is one of three things, depending on how the request arrived:
+
+<Flow
+  caption="Figure: how the adapter chooses between JSON, HTML and a forced reload."
+  height={340}
+  nodes={[
+    { id: 'req', label: 'Request arrives', sub: 'Render() runs in your handler', x: 95, y: 170, tone: 'muted' },
+    { id: 'hdr', label: 'X-Inertia header?', x: 300, y: 170, tone: 'primary', shape: 'decision' },
+    { id: 'ver', label: 'Asset version matches?', x: 515, y: 170, tone: 'primary', shape: 'decision' },
+    { id: 'json', label: 'JSON page object', sub: 'client swaps the component', x: 650, y: 55, tone: 'success' },
+    { id: 'conflict', label: '409 + X-Inertia-Location', sub: 'client does a full reload', x: 650, y: 285, tone: 'warning' },
+    { id: 'html', label: 'HTML document', sub: 'root template + data-page', x: 300, y: 290, tone: 'primary' },
+  ]}
+  edges={[
+    { from: 'req', to: 'hdr' },
+    { from: 'hdr', to: 'ver', label: 'yes' },
+    { from: 'ver', to: 'json', label: 'yes' },
+    { from: 'ver', to: 'conflict', label: 'no', dashed: true },
+    { from: 'hdr', to: 'html', label: 'no: first visit' },
+  ]}
+/>
 
 ## Per-response options
 
@@ -2659,6 +2706,20 @@ return Render("Dashboard", new InertiaProps
 }
 ```
 
+<Sequence
+  caption="Figure: the page paints first, then each deferred group arrives in its own partial reload."
+  actors={[{ name: 'Browser', sub: 'Inertia client' }, { name: 'ASP.NET Core', sub: 'Dashboard route' }]}
+  messages={[
+    { from: 0, to: 1, text: 'GET /dashboard', phase: 'First paint' },
+    { from: 1, to: 0, text: 'user now; stats, chart and activity left out', reply: true, code: '"deferredProps": { "default": ["stats"], "charts": [...] }' },
+    { from: 0, to: 0, text: 'Page is interactive with skeletons showing' },
+    { from: 0, to: 1, text: 'Group "default" in one partial reload', code: 'X-Inertia-Partial-Data: stats', phase: 'Deferred groups' },
+    { from: 0, to: 1, text: 'Group "charts" in parallel', code: 'X-Inertia-Partial-Data: chart,activity' },
+    { from: 1, to: 0, text: 'stats arrive, skeleton replaced', reply: true },
+    { from: 1, to: 0, text: 'chart and activity arrive', reply: true },
+  ]}
+/>
+
 Props in the same group load in one request. Different groups load in parallel requests. `deferredProps` is only produced on non-partial renders.
 
 ## The client
@@ -3239,6 +3300,22 @@ Three pieces make it work:
 <Callout type="info" title="Client version">
 Live props need `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte` 3.11.0 or later. Older clients ignore `liveProps`.
 </Callout>
+
+<Sequence
+  caption="Figure: an event published on the server refreshes only the props that listen to it."
+  actors={[
+    { name: 'Your code', sub: 'IInertiaLive.Publish' },
+    { name: 'Live transport', sub: 'SignalR or your own' },
+    { name: 'Browser', sub: 'Inertia client' },
+  ]}
+  messages={[
+    { from: 2, to: 1, text: 'Page loads, then subscribes to the channels in liveProps', code: '"liveProps": { "stats": ["orders.changed"] }', phase: 'Subscribe' },
+    { from: 0, to: 1, text: 'Publish an event', code: 'live.PublishAsync(new OrderChanged(id))', phase: 'Event' },
+    { from: 1, to: 2, text: 'Deliver it to every subscriber', reply: true },
+    { from: 2, to: 1, text: 'Partial reload of only the affected props', code: 'X-Inertia-Partial-Data: stats', phase: 'Refresh' },
+    { from: 2, to: 2, text: 'Component re-renders with fresh data' },
+  ]}
+/>
 
 ## Define each event once
 
@@ -4256,6 +4333,25 @@ URL: https://inertia-dotnet.temtem.dev/docs/server-side-rendering
 
 SSR renders the first visit on a JavaScript server using your client bundle, so crawlers and slow devices get HTML. Inertia XHR requests are never rendered on the server.
 
+<Sequence
+  caption="Figure: the first visit is rendered by the SSR server; later clicks are JSON only."
+  actors={[
+    { name: 'Browser', sub: 'Inertia client' },
+    { name: 'ASP.NET Core', sub: 'Inertia.Net' },
+    { name: 'SSR server', sub: 'Bun or Node' },
+  ]}
+  messages={[
+    { from: 0, to: 1, text: 'First visit: GET /users', phase: 'First visit' },
+    { from: 1, to: 2, text: 'Send the page object to render', code: 'POST /render' },
+    { from: 2, to: 1, text: 'Head tags and rendered HTML', reply: true },
+    { from: 1, to: 0, text: 'Complete HTML, real content included', reply: true },
+    { from: 0, to: 0, text: 'Client hydrates the markup' },
+    { from: 0, to: 1, text: 'Later click: GET /users/1', code: 'X-Inertia: true', phase: 'After that' },
+    { from: 1, to: 0, text: 'JSON only, never rendered on the server', reply: true },
+  ]}
+/>
+
+
 ## 1. Build the SSR bundle
 
 ### With @inertiajs/vite
@@ -4564,6 +4660,24 @@ Use `ssr.ts` as the entry for Vue and Svelte.
 ## 5. Failures and fallbacks
 
 In `Preferred` mode every failure logs a warning and the page renders on the client. In `Required` mode it throws `InertiaSsrException` before the first byte is written, so the app's exception handler can still answer.
+
+After enough failures in a row the app stops calling the server for a while, then probes it before trusting it again:
+
+<Flow
+  caption="Figure: how the circuit breaker moves between closed, open and half open."
+  height={290}
+  nodes={[
+    { id: 'closed', label: 'Closed', sub: 'renders go to the server', x: 130, y: 80, tone: 'success' },
+    { id: 'open', label: 'Open', sub: 'server skipped, client renders', x: 630, y: 80, tone: 'danger' },
+    { id: 'half', label: 'Half open', sub: 'one probe render allowed', x: 380, y: 225, tone: 'warning' },
+  ]}
+  edges={[
+    { from: 'closed', to: 'open', label: '5 failures in a row', dashed: true },
+    { from: 'open', to: 'half', label: 'after 10 s', bend: 45 },
+    { from: 'half', to: 'closed', label: 'probe succeeds', bend: 30 },
+    { from: 'half', to: 'open', label: 'probe fails', bend: 45 },
+  ]}
+/>
 
 | Type | Cause | Opens the circuit |
 |---|---|---|
@@ -5105,6 +5219,29 @@ All runs were on a GitHub-hosted `ubuntu-24.04` runner (AMD EPYC 9V74, 4 vCPUs) 
 | JIT | Todo app visit: EF Core + SQLite + cookie auth | 4,411 | 38.88 ms | 446 µs | 115 MB | 144 MB | 786 ms |
 | Native AOT | Todo app visit: `Microsoft.Data.Sqlite` + cookie auth | 9,387 | 11.92 ms | 206 µs | 37 MB | 50 MB | 46 ms |
 
+<Bars
+  title="Requests per second, JIT"
+  unit="req/s"
+  data={[
+    { label: 'Plain JSON API', value: 73148 },
+    { label: 'Plain HTML shell', value: 64129 },
+    { label: 'Inertia visit (JSON)', value: 57241 },
+    { label: 'Inertia first load (HTML)', value: 56117 },
+  ]}
+/>
+
+<Bars
+  title="RSS at rest"
+  unit="MB"
+  lowerIsBetter
+  data={[
+    { label: 'Native AOT, plain JSON', value: 29 },
+    { label: 'Native AOT, Inertia visit', value: 33 },
+    { label: 'JIT, plain JSON', value: 61 },
+    { label: 'JIT, Inertia visit', value: 74 },
+  ]}
+/>
+
 What this means for an app:
 
 - **Memory.** Compared with the plain apps, the Inertia rows use about 13 MB more at rest and 14–19 MB more at peak under load on JIT. On Native AOT they use about 4 MB more at rest and 6–13 MB more at peak. Almost all of the difference at rest comes from ASP.NET Core Data Protection. `AddInertia` registers it for its state cookie. Adding only `AddDataProtection()` to a plain app increased memory use by 12 MB on JIT and 5 MB on Native AOT. Inertia.Net itself uses about 1 MB at rest. An app with cookie sign-in, antiforgery or sessions already loads Data Protection.
@@ -5429,6 +5566,8 @@ Before any measuring, a parity check confirms that every app returns exactly the
 
 ## The frameworks
 
+<Contenders names={['Inertia.Net', 'Next.js', 'TanStack Start', 'Nuxt', 'Laravel']} />
+
 ### Inertia.Net
 
 Inertia.Net lets you write the server in ASP.NET Core and the pages in React, Vue or Svelte, without building a separate API. Controllers or Minimal API handlers return a page name and its data; Inertia's client does the routing in the browser.
@@ -5495,6 +5634,19 @@ In SSR mode the Inertia apps also run a small Node.js process to render pages, w
 
 A first visit is what a visitor gets when they open a link or reload the page. In SSR mode the server renders the whole page. This is the todo list with 25 rows:
 
+<Bars
+  title="First visits, todo list with 25 rows"
+  unit="pages per second"
+  data={[
+    { label: 'Inertia.Net, Native AOT', value: 3905 },
+    { label: 'Inertia.Net, JIT', value: 1764 },
+    { label: 'TanStack Start', value: 1294 },
+    { label: 'Nuxt', value: 745 },
+    { label: 'Next.js', value: 364 },
+    { label: 'Laravel', value: 337 },
+  ]}
+/>
+
 | App | Pages per second | Typical response under full load | Typical response at 50 visits per second |
 |---|---:|---:|---:|
 | Inertia.Net, Native AOT | **3,905** | **3.9 ms** | **1.1 ms** |
@@ -5539,6 +5691,19 @@ Saving is limited by the database for every framework, so the fast apps end up c
 ### Heavy work
 
 The heavy page runs a CPU-intensive calculation. This is mostly a test of the programming language.
+
+<Bars
+  title="Heavy work"
+  unit="requests per second"
+  data={[
+    { label: 'Inertia.Net, JIT', value: 1212 },
+    { label: 'Inertia.Net, Native AOT', value: 1033 },
+    { label: 'Nuxt', value: 240 },
+    { label: 'TanStack Start', value: 227 },
+    { label: 'Next.js', value: 207 },
+    { label: 'Laravel', value: 81 },
+  ]}
+/>
 
 | App | Requests per second | With 1 / 2 / 4 CPU cores (split across cores) |
 |---|---:|---:|

@@ -7,6 +7,25 @@ order: 1
 
 SSR renders the first visit on a JavaScript server using your client bundle, so crawlers and slow devices get HTML. Inertia XHR requests are never rendered on the server.
 
+<Sequence
+  caption="Figure: the first visit is rendered by the SSR server; later clicks are JSON only."
+  actors={[
+    { name: 'Browser', sub: 'Inertia client' },
+    { name: 'ASP.NET Core', sub: 'Inertia.Net' },
+    { name: 'SSR server', sub: 'Bun or Node' },
+  ]}
+  messages={[
+    { from: 0, to: 1, text: 'First visit: GET /users', phase: 'First visit' },
+    { from: 1, to: 2, text: 'Send the page object to render', code: 'POST /render' },
+    { from: 2, to: 1, text: 'Head tags and rendered HTML', reply: true },
+    { from: 1, to: 0, text: 'Complete HTML, real content included', reply: true },
+    { from: 0, to: 0, text: 'Client hydrates the markup' },
+    { from: 0, to: 1, text: 'Later click: GET /users/1', code: 'X-Inertia: true', phase: 'After that' },
+    { from: 1, to: 0, text: 'JSON only, never rendered on the server', reply: true },
+  ]}
+/>
+
+
 ## 1. Build the SSR bundle
 
 ### With @inertiajs/vite
@@ -315,6 +334,24 @@ Use `ssr.ts` as the entry for Vue and Svelte.
 ## 5. Failures and fallbacks
 
 In `Preferred` mode every failure logs a warning and the page renders on the client. In `Required` mode it throws `InertiaSsrException` before the first byte is written, so the app's exception handler can still answer.
+
+After enough failures in a row the app stops calling the server for a while, then probes it before trusting it again:
+
+<Flow
+  caption="Figure: how the circuit breaker moves between closed, open and half open."
+  height={290}
+  nodes={[
+    { id: 'closed', label: 'Closed', sub: 'renders go to the server', x: 130, y: 80, tone: 'success' },
+    { id: 'open', label: 'Open', sub: 'server skipped, client renders', x: 630, y: 80, tone: 'danger' },
+    { id: 'half', label: 'Half open', sub: 'one probe render allowed', x: 380, y: 225, tone: 'warning' },
+  ]}
+  edges={[
+    { from: 'closed', to: 'open', label: '5 failures in a row', dashed: true },
+    { from: 'open', to: 'half', label: 'after 10 s', bend: 45 },
+    { from: 'half', to: 'closed', label: 'probe succeeds', bend: 30 },
+    { from: 'half', to: 'open', label: 'probe fails', bend: 45 },
+  ]}
+/>
 
 | Type | Cause | Opens the circuit |
 |---|---|---|

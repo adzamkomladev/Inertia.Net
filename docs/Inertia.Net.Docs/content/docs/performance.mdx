@@ -35,6 +35,29 @@ All runs were on a GitHub-hosted `ubuntu-24.04` runner (AMD EPYC 9V74, 4 vCPUs) 
 | JIT | Todo app visit: EF Core + SQLite + cookie auth | 4,411 | 38.88 ms | 446 µs | 115 MB | 144 MB | 786 ms |
 | Native AOT | Todo app visit: `Microsoft.Data.Sqlite` + cookie auth | 9,387 | 11.92 ms | 206 µs | 37 MB | 50 MB | 46 ms |
 
+<Bars
+  title="Requests per second, JIT"
+  unit="req/s"
+  data={[
+    { label: 'Plain JSON API', value: 73148 },
+    { label: 'Plain HTML shell', value: 64129 },
+    { label: 'Inertia visit (JSON)', value: 57241 },
+    { label: 'Inertia first load (HTML)', value: 56117 },
+  ]}
+/>
+
+<Bars
+  title="RSS at rest"
+  unit="MB"
+  lowerIsBetter
+  data={[
+    { label: 'Native AOT, plain JSON', value: 29 },
+    { label: 'Native AOT, Inertia visit', value: 33 },
+    { label: 'JIT, plain JSON', value: 61 },
+    { label: 'JIT, Inertia visit', value: 74 },
+  ]}
+/>
+
 What this means for an app:
 
 - **Memory.** Compared with the plain apps, the Inertia rows use about 13 MB more at rest and 14–19 MB more at peak under load on JIT. On Native AOT they use about 4 MB more at rest and 6–13 MB more at peak. Almost all of the difference at rest comes from ASP.NET Core Data Protection. `AddInertia` registers it for its state cookie. Adding only `AddDataProtection()` to a plain app increased memory use by 12 MB on JIT and 5 MB on Native AOT. Inertia.Net itself uses about 1 MB at rest. An app with cookie sign-in, antiforgery or sessions already loads Data Protection.
