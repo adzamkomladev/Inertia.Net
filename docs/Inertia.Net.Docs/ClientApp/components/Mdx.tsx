@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react'
 import { Link2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import type { AnchorHTMLAttributes, ComponentPropsWithoutRef, ReactNode } from 'react'
 import { Accordion, AccordionItem } from './Accordion'
 import { Badge } from './ui/badge'
@@ -44,10 +45,22 @@ function MdxHeading({ as: Tag, id, children }: { as: 'h2' | 'h3' | 'h4'; id?: st
 }
 
 function MdxTable({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLTableElement>(null)
+  const [stack, setStack] = useState(false)
+  // Wide tables turn into one card per row on phones, with each cell labelled by its column header.
+  useEffect(() => {
+    const t = ref.current
+    if (!t) return
+    const heads = [...t.querySelectorAll('thead th')].map((th) => th.textContent?.trim() ?? '')
+    t.querySelectorAll('tbody tr').forEach((tr) => [...tr.children].forEach((td, i) => td.setAttribute('data-label', heads[i] ?? '')))
+    const overflows = t.scrollWidth > (t.parentElement?.clientWidth ?? 0) + 1
+    setStack(heads.length >= 4 || (window.innerWidth < 640 && overflows))
+  }, [children])
+
   return (
-    <div className="not-prose my-7 overflow-hidden rounded-xl border border-border bg-card">
-      <ScrollArea className="scrollbar-thin overflow-x-auto">
-      <table className="w-full border-collapse text-left text-sm leading-6 tabular-nums [&_code]:rounded [&_code]:border [&_code]:border-border [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:[overflow-wrap:anywhere] [&_code]:[box-decoration-break:clone] [&_code]:[-webkit-box-decoration-break:clone] sm:[&_code]:whitespace-nowrap [&_td:first-child]:min-w-36 [&_code]:text-[0.8em] [&_code]:font-medium [&_code]:[font-variant-ligatures:none] [&_a]:font-medium [&_a]:text-primary [&_a]:underline [&_a]:decoration-primary/35 [&_a]:underline-offset-4 [&_thead]:bg-[var(--primary-soft)] [&_td:first-child]:font-medium [&_td:first-child]:text-foreground [&_th]:text-primary [&_th]:border-b [&_th]:border-border [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-xs [&_th]:font-semibold [&_td]:border-b [&_td]:border-border/70 [&_td]:px-4 [&_td]:py-3 [&_td]:align-top [&_td]:text-[color-mix(in_oklab,var(--foreground)_88%,var(--background))] [&_td[align=right]]:whitespace-nowrap [&_td[style*=right]]:whitespace-nowrap [&_th[align=right]]:min-w-24 [&_th[style*=right]]:min-w-24 [&_tbody_tr]:transition-colors [&_tbody_tr]:duration-150 [&_tbody_tr:hover]:bg-muted/40 [&_tr:last-child_td]:border-0">
+    <div data-stack={stack || undefined} className="not-prose my-7 overflow-hidden rounded-xl border border-border bg-card">
+      <ScrollArea className="no-scrollbar overflow-x-auto">
+      <table ref={ref} className="w-full border-collapse text-left text-[13px] leading-6 sm:text-sm tabular-nums [&_code]:rounded [&_code]:border [&_code]:border-border [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:[overflow-wrap:anywhere] [&_code]:[box-decoration-break:clone] [&_code]:[-webkit-box-decoration-break:clone] sm:[&_code]:whitespace-nowrap sm:[&_td:first-child]:min-w-36 [&_code]:text-[0.8em] [&_code]:font-medium [&_code]:[font-variant-ligatures:none] [&_a]:font-medium [&_a]:text-primary [&_a]:underline [&_a]:decoration-primary/35 [&_a]:underline-offset-4 [&_thead]:bg-[var(--primary-soft)] [&_td:first-child]:font-medium [&_td:first-child]:text-foreground [&_th]:text-primary [&_th]:border-b [&_th]:border-border [&_th]:px-3 [&_th]:py-2.5 sm:[&_th]:px-4 [&_th]:text-xs [&_th]:font-semibold [&_td]:border-b [&_td]:border-border/70 [&_td]:px-3 [&_td]:py-3 sm:[&_td]:px-4 [&_td]:align-top [&_td]:text-[color-mix(in_oklab,var(--foreground)_88%,var(--background))] [&_td[align=right]]:whitespace-nowrap [&_td[style*=right]]:whitespace-nowrap [&_th[align=right]]:min-w-24 [&_th[style*=right]]:min-w-24 [&_tbody_tr]:transition-colors [&_tbody_tr]:duration-150 [&_tbody_tr:hover]:bg-muted/40 [&_tr:last-child_td]:border-0">
         {children}
       </table>
       </ScrollArea>

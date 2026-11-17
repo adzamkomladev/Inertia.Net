@@ -351,6 +351,20 @@ After enough failures in a row the app stops calling the server for a while, the
     { from: 'half', to: 'closed', label: 'probe succeeds', bend: 30 },
     { from: 'half', to: 'open', label: 'probe fails', bend: 45 },
   ]}
+  narrow={{
+    height: 440,
+    nodes: [
+      { id: 'closed', label: 'Closed', sub: 'renders go to the server', x: 120, y: 50, tone: 'success', w: 190 },
+      { id: 'open', label: 'Open', sub: 'server skipped', x: 240, y: 200, tone: 'danger', w: 190 },
+      { id: 'half', label: 'Half open', sub: 'one probe render', x: 120, y: 360, tone: 'warning', w: 190 },
+    ],
+    edges: [
+      { from: 'closed', to: 'open', label: '5 failures in a row', dashed: true },
+      { from: 'open', to: 'half', label: 'after 10 s', bend: -34 },
+      { from: 'half', to: 'open', label: 'probe fails', bend: -34 },
+      { from: 'half', to: 'closed', label: 'probe succeeds', bend: -62 },
+    ],
+  }}
 />
 
 | Type | Cause | Opens the circuit |

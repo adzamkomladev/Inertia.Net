@@ -1409,6 +1409,24 @@ Every response is one of three things, depending on how the request arrived:
     { from: 'ver', to: 'conflict', label: 'no', dashed: true },
     { from: 'hdr', to: 'html', label: 'no: first visit' },
   ]}
+  narrow={{
+    height: 500,
+    nodes: [
+      { id: 'req', label: 'Request arrives', sub: 'Render() in your handler', x: 180, y: 40, tone: 'muted', w: 200 },
+      { id: 'hdr', label: 'X-Inertia header?', x: 180, y: 140, tone: 'primary', shape: 'decision', w: 200 },
+      { id: 'html', label: 'HTML document', sub: 'template + data-page', x: 85, y: 270, w: 160 },
+      { id: 'ver', label: 'Version matches?', x: 270, y: 270, tone: 'primary', shape: 'decision', w: 170 },
+      { id: 'json', label: 'JSON page object', sub: 'client swaps it in', x: 95, y: 420, tone: 'success', w: 170 },
+      { id: 'conflict', label: '409 + reload', sub: 'X-Inertia-Location', x: 275, y: 420, tone: 'warning', w: 160 },
+    ],
+    edges: [
+      { from: 'req', to: 'hdr' },
+      { from: 'hdr', to: 'html', label: 'no: first visit' },
+      { from: 'hdr', to: 'ver', label: 'yes' },
+      { from: 'ver', to: 'json', label: 'yes' },
+      { from: 'ver', to: 'conflict', label: 'no', dashed: true },
+    ],
+  }}
 />
 
 ## Per-response options
@@ -4677,6 +4695,20 @@ After enough failures in a row the app stops calling the server for a while, the
     { from: 'half', to: 'closed', label: 'probe succeeds', bend: 30 },
     { from: 'half', to: 'open', label: 'probe fails', bend: 45 },
   ]}
+  narrow={{
+    height: 440,
+    nodes: [
+      { id: 'closed', label: 'Closed', sub: 'renders go to the server', x: 120, y: 50, tone: 'success', w: 190 },
+      { id: 'open', label: 'Open', sub: 'server skipped', x: 240, y: 200, tone: 'danger', w: 190 },
+      { id: 'half', label: 'Half open', sub: 'one probe render', x: 120, y: 360, tone: 'warning', w: 190 },
+    ],
+    edges: [
+      { from: 'closed', to: 'open', label: '5 failures in a row', dashed: true },
+      { from: 'open', to: 'half', label: 'after 10 s', bend: -34 },
+      { from: 'half', to: 'open', label: 'probe fails', bend: -34 },
+      { from: 'half', to: 'closed', label: 'probe succeeds', bend: -62 },
+    ],
+  }}
 />
 
 | Type | Cause | Opens the circuit |

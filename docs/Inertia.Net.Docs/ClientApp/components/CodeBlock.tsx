@@ -87,7 +87,7 @@ export function CodeBlock({ className, children, ...props }: ComponentProps<'pre
           <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </figcaption>
-      <div ref={scrollRef} onScroll={measure} data-overflow={overflow} className="code-scroll scrollbar-thin overflow-x-auto">
+      <div ref={scrollRef} onScroll={measure} data-overflow={overflow} className="code-scroll no-scrollbar overflow-x-auto">
         <pre ref={ref} className={cn(className, 'm-0 rounded-none bg-transparent py-4')} {...props}>
           {children}
         </pre>

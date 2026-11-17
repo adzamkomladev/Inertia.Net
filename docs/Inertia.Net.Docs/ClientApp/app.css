@@ -521,7 +521,7 @@ html.dark .shiki span {
   [data-play] .edge-flow { animation: none; }
 }
 
-/* Landing-page architecture diagram: packets ride the lanes, active parts glow, loading placeholders shimmer. */
+/* Landing-page architecture diagram: packets ride the lanes with a comet tail, parts ping when they wake, pages fill in. */
 .arch-packet {
   offset-path: var(--path);
   offset-rotate: 0deg;
@@ -536,15 +536,37 @@ html.dark .shiki span {
 
 .arch-chip,
 .arch-frame {
-  transition: opacity 300ms var(--ease-out), filter 300ms var(--ease-out);
+  transition: opacity 300ms var(--ease-out), filter 300ms var(--ease-out), transform 200ms var(--ease-out);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.arch-chip {
+  cursor: pointer;
 }
 
 .arch-chip rect {
   transition: stroke 250ms, stroke-width 250ms;
 }
 
+@media (hover: hover) {
+  .arch-chip:hover {
+    transform: translateY(-2px);
+  }
+
+  .arch-chip:hover > rect:first-child {
+    stroke: var(--primary);
+  }
+}
+
 .arch-on {
   filter: drop-shadow(0 0 9px color-mix(in oklab, var(--primary) 42%, transparent));
+  animation: arch-ping 650ms var(--ease-out);
+}
+
+@keyframes arch-ping {
+  0% { filter: drop-shadow(0 0 0 color-mix(in oklab, var(--primary) 0%, transparent)); transform: scale(0.985); }
+  45% { filter: drop-shadow(0 0 20px color-mix(in oklab, var(--primary) 70%, transparent)); transform: scale(1.012); }
 }
 
 .arch-off {
@@ -567,13 +589,91 @@ html.dark .shiki span {
   animation: arch-shimmer 1.4s ease-in-out infinite;
 }
 
-/* The phone layout scales the artwork down, so its text is set larger to land near 11px on screen. */
-.arch-tall .text-\[11px\],
-.arch-tall .text-\[11\.5px\] { font-size: 13px; }
-.arch-tall .text-\[12px\] { font-size: 14px; }
-.arch-tall .text-\[13px\] { font-size: 15px; }
-.arch-tall .text-\[14px\],
-.arch-tall .text-\[15px\] { font-size: 16px; }
+@keyframes arch-rise {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+}
+
+.arch-rise {
+  animation: arch-rise 450ms var(--ease-out) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Idle lanes drift only while the diagram is playing; a hot lane draws itself in. */
+.arch-ambient .arch-lane {
+  animation: arch-flow 1.6s linear infinite;
+}
+
+@keyframes arch-flow {
+  to { stroke-dashoffset: -22; }
+}
+
+.arch-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: arch-draw 0.7s cubic-bezier(0.45, 0, 0.25, 1) var(--delay, 0s) forwards;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+@keyframes arch-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.arch-ripple {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: arch-ripple 700ms var(--ease-out) var(--delay, 0s) both;
+}
+
+@keyframes arch-ripple {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+
+.arch-load {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: arch-load 1.1s cubic-bezier(0.45, 0, 0.25, 1) both;
+}
+
+@keyframes arch-load {
+  from { transform: scaleX(0); opacity: 1; }
+  85% { opacity: 1; }
+  to { transform: scaleX(1); opacity: 0; }
+}
+
+.arch-cursor {
+  animation: arch-cursor 1.2s cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+
+@keyframes arch-cursor {
+  0% { transform: translate(var(--x0), var(--y0)); opacity: 0; }
+  15% { opacity: 1; }
+  70% { transform: translate(var(--x1), var(--y1)) scale(1); }
+  80% { transform: translate(var(--x1), var(--y1)) scale(0.88); }
+  100% { transform: translate(var(--x1), var(--y1)) scale(1); opacity: 1; }
+}
+
+.arch-hl {
+  opacity: 0;
+  animation: arch-hl 700ms ease-out 0.85s both;
+}
+
+@keyframes arch-hl {
+  0% { opacity: 0.28; }
+  100% { opacity: 0.1; }
+}
+
+.arch-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: arch-spin 1.6s linear 1;
+}
+
+@keyframes arch-spin {
+  to { transform: rotate(360deg); }
+}
 
 @keyframes arch-progress {
   from { transform: scaleX(0); }
@@ -586,7 +686,100 @@ html.dark .shiki span {
 
 @media (prefers-reduced-motion: reduce) {
   .arch-progress { animation: none; display: none; }
+  .arch-on, .arch-rise, .arch-ripple, .arch-load, .arch-cursor, .arch-hl, .arch-spin, .arch-ambient .arch-lane { animation: none; }
+  .arch-ripple, .arch-load, .arch-cursor { display: none; }
+  .arch-draw { animation: none; stroke-dashoffset: 0; }
+  .arch-chip:hover { transform: none; }
   /* Without motion the packet rests mid-lane, so its label still tells the story. */
   .arch-packet { animation: none; offset-distance: 50%; opacity: 1; }
   .arch-fade, .arch-shimmer { animation: none; }
+}
+
+/* Bars grow in when first seen and again on replay. They stay full if scripts or motion are off. */
+.bar-grow {
+  transform-origin: left center;
+}
+
+[data-armed]:not([data-play]) .bar-grow {
+  transform: scaleX(0);
+}
+
+[data-play] .bar-grow {
+  animation: bar-grow 800ms var(--ease-out) both;
+}
+
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+}
+
+.flow-node {
+  animation: arch-rise 450ms var(--ease-out) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-armed]:not([data-play]) .bar-grow { transform: none; }
+  [data-play] .bar-grow, .flow-node { animation: none; }
+}
+
+/* Below sm, tables with four or more columns become one labelled card per row instead of scrolling sideways. */
+@media (max-width: 639px) {
+  [data-stack] table,
+  [data-stack] tbody,
+  [data-stack] tr,
+  [data-stack] td {
+    display: block;
+    width: 100%;
+  }
+
+  [data-stack] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  [data-stack] tr {
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  [data-stack] tr:last-child {
+    border-bottom: 0;
+  }
+
+  [data-stack] td {
+    display: flex !important;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 0 !important;
+    padding: 0.2rem 0.875rem !important;
+    text-align: right !important;
+    white-space: normal !important;
+    min-width: 0 !important;
+  }
+
+  [data-stack] td::before {
+    content: attr(data-label);
+    flex: none;
+    max-width: 45%;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+
+  [data-stack] td:first-child {
+    justify-content: flex-start;
+    text-align: left !important;
+    font-size: 14px;
+    font-weight: 600;
+    padding-bottom: 0.35rem !important;
+  }
+
+  [data-stack] td:first-child::before {
+    display: none;
+  }
 }

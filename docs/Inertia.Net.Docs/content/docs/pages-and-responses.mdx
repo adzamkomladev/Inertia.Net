@@ -50,6 +50,24 @@ Every response is one of three things, depending on how the request arrived:
     { from: 'ver', to: 'conflict', label: 'no', dashed: true },
     { from: 'hdr', to: 'html', label: 'no: first visit' },
   ]}
+  narrow={{
+    height: 500,
+    nodes: [
+      { id: 'req', label: 'Request arrives', sub: 'Render() in your handler', x: 180, y: 40, tone: 'muted', w: 200 },
+      { id: 'hdr', label: 'X-Inertia header?', x: 180, y: 140, tone: 'primary', shape: 'decision', w: 200 },
+      { id: 'html', label: 'HTML document', sub: 'template + data-page', x: 85, y: 270, w: 160 },
+      { id: 'ver', label: 'Version matches?', x: 270, y: 270, tone: 'primary', shape: 'decision', w: 170 },
+      { id: 'json', label: 'JSON page object', sub: 'client swaps it in', x: 95, y: 420, tone: 'success', w: 170 },
+      { id: 'conflict', label: '409 + reload', sub: 'X-Inertia-Location', x: 275, y: 420, tone: 'warning', w: 160 },
+    ],
+    edges: [
+      { from: 'req', to: 'hdr' },
+      { from: 'hdr', to: 'html', label: 'no: first visit' },
+      { from: 'hdr', to: 'ver', label: 'yes' },
+      { from: 'ver', to: 'json', label: 'yes' },
+      { from: 'ver', to: 'conflict', label: 'no', dashed: true },
+    ],
+  }}
 />
 
 ## Per-response options
