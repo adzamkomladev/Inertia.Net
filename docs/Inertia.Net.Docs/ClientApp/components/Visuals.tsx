@@ -125,7 +125,7 @@ export function Sequence({ actors, messages, caption }: { actors: Actor[]; messa
   return (
     <figure ref={figRef} data-play={seen || undefined} className="not-prose my-8 rounded-2xl border border-border bg-card">
       <ScrollArea className="overflow-x-auto rounded-t-2xl">
-      <svg viewBox={`0 0 ${W} ${H}`} className="block min-w-[40rem] w-full" role="img" aria-label={messages.map((m, i) => `${i + 1}. ${m.text}${m.code ? ` (${m.code})` : ''}`).join(' ')}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="block min-w-[46rem] w-full" role="img" aria-label={messages.map((m, i) => `${i + 1}. ${m.text}${m.code ? ` (${m.code})` : ''}`).join(' ')}>
         <defs>
           <marker id={`${uid}-req`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
             <path d="M1 1.5 9 5 1 8.5" fill="none" stroke="var(--primary)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -284,7 +284,7 @@ export function Flow({ nodes, edges, height = 300, caption }: { nodes: FlowNode[
   return (
     <figure ref={figRef} data-play={seen || undefined} className="not-prose my-8 rounded-2xl border border-border bg-card">
       <ScrollArea className="overflow-x-auto rounded-t-2xl">
-      <svg viewBox={`0 0 ${W} ${height}`} className="block min-w-[40rem] w-full" role="img" aria-label={edges.map((e) => `${by[e.from].label} to ${by[e.to].label}${e.label ? `: ${e.label}` : ''}`).join('. ')}>
+      <svg viewBox={`0 0 ${W} ${height}`} className="block min-w-[46rem] w-full" role="img" aria-label={edges.map((e) => `${by[e.from].label} to ${by[e.to].label}${e.label ? `: ${e.label}` : ''}`).join('. ')}>
         <defs>
           <pattern id={`${uid}-grid`} width="22" height="22" patternUnits="userSpaceOnUse">
             <circle cx="1" cy="1" r="1" fill="var(--border)" />

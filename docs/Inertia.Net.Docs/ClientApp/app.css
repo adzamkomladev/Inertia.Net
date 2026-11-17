@@ -575,7 +575,17 @@ html.dark .shiki span {
 .arch-tall .text-\[14px\],
 .arch-tall .text-\[15px\] { font-size: 16px; }
 
+@keyframes arch-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.arch-progress {
+  animation: arch-progress linear both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .arch-progress { animation: none; display: none; }
   /* Without motion the packet rests mid-lane, so its label still tells the story. */
   .arch-packet { animation: none; offset-distance: 50%; opacity: 1; }
   .arch-fade, .arch-shimmer { animation: none; }

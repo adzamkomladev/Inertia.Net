@@ -174,6 +174,14 @@ function Chip({ r, title, sub, glue, on, off, children, compact }: { r: R; title
           {sub}
         </text>
       )}
+      {glue && !compact && (
+        <g>
+          <rect x={r.x + r.w - 54} y={r.y + 10} width="40" height="18" rx="9" fill="var(--primary)" opacity="0.14" />
+          <text x={r.x + r.w - 34} y={r.y + 23} textAnchor="middle" className="fill-primary font-sans text-[11px] font-semibold">
+            glue
+          </text>
+        </g>
+      )}
       {children}
     </g>
   )
@@ -213,7 +221,7 @@ function Skeleton({ r, state }: { r: R; state: PageState }) {
   )
 }
 
-function Scene({ L, step, uid, runKey }: { L: Layout; step: Step; uid: string; runKey: string }) {
+function Scene({ L, step, uid, runKey, desc }: { L: Layout; step: Step; uid: string; runKey: string; desc: string }) {
   const on = (p: Part) => step.on.includes(p)
   const off = (p: Part) => !!step.off?.includes(p)
   const { chips } = L
@@ -221,7 +229,7 @@ function Scene({ L, step, uid, runKey }: { L: Layout; step: Step; uid: string; r
   const c = L.compact
 
   return (
-    <svg viewBox={`0 0 ${L.w} ${L.h}`} className={cn('block h-auto w-full', c && 'arch-tall')} role="img" aria-label="Architecture of an Inertia.Net app: a browser running React, Vue or Svelte with the Inertia client, an ASP.NET Core app with your endpoints and the Inertia.Net adapter, a Bun or Node server-side rendering server, and a database. Requests and responses travel between them over the Inertia protocol.">
+    <svg viewBox={`0 0 ${L.w} ${L.h}`} className={cn('block h-auto w-full', c && 'arch-tall')} role="img" aria-label={`Architecture of an Inertia.Net app: a browser running React, Vue or Svelte with the Inertia client, an ASP.NET Core app with your endpoints and the Inertia.Net adapter, a Bun or Node SSR server and a database, joined by the Inertia protocol. ${desc}`}>
       <defs>
         {(['req', 'res', 'live'] as Tone[]).map((t) => (
           <marker key={t} id={`${uid}-${t}`} viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
@@ -387,10 +395,12 @@ export function ArchitectureDiagram() {
   const [stepIndex, setStep] = useState(0)
   const [playing, setPlaying] = useState(true)
   const [inView, setInView] = useState(false)
+  const [hold, setHold] = useState(false)
 
   const current = scenes[scene]
   const step = current.steps[stepIndex]
   const runKey = `${scene}-${stepIndex}`
+  const desc = `${current.label}, step ${stepIndex + 1} of ${current.steps.length}: ${step.title}. ${step.text}`
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setPlaying(false)
@@ -402,7 +412,7 @@ export function ArchitectureDiagram() {
   }, [])
 
   useEffect(() => {
-    if (!playing || !inView) return
+    if (!playing || !inView || hold) return
     const last = stepIndex === current.steps.length - 1
     const t = setTimeout(
       () => {
@@ -415,7 +425,7 @@ export function ArchitectureDiagram() {
       (step.ms ?? 2300) + (last ? 1200 : 0),
     )
     return () => clearTimeout(t)
-  }, [playing, inView, scene, stepIndex, current.steps.length, step.ms])
+  }, [playing, inView, hold, scene, stepIndex, current.steps.length, step.ms])
 
   const pick = (s: number, i = 0) => {
     setScene(s)
@@ -423,7 +433,14 @@ export function ArchitectureDiagram() {
   }
 
   return (
-    <div ref={ref} className="rounded-2xl border border-border bg-card">
+    <div
+      ref={ref}
+      className="rounded-2xl border border-border bg-card"
+      onPointerEnter={() => setHold(true)}
+      onPointerLeave={() => setHold(false)}
+      onFocus={() => setHold(true)}
+      onBlur={() => setHold(false)}
+    >
       <div
         role="tablist"
         aria-label="Scenarios"
@@ -466,16 +483,23 @@ export function ArchitectureDiagram() {
         </button>
       </div>
 
-      <div role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-tab-${scene}`} className="p-2 sm:p-5">
+      <div className="h-0.5 bg-transparent" aria-hidden="true">
+        {playing && inView && !hold && (
+          <div key={runKey} className="arch-progress h-full origin-left bg-primary/60" style={{ animationDuration: `${(step.ms ?? 2300) + (stepIndex === current.steps.length - 1 ? 1200 : 0)}ms` }} />
+        )}
+      </div>
+
+      <div className="flex flex-col">
+      <div role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-tab-${scene}`} className="order-2 p-2 sm:p-5 lg:order-1">
         <div className="hidden lg:block">
-          <Scene L={wide} step={step} uid={`${uid}w`} runKey={`w${runKey}`} />
+          <Scene L={wide} step={step} uid={`${uid}w`} runKey={`w${runKey}`} desc={desc} />
         </div>
         <div className="mx-auto max-w-[520px] lg:hidden">
-          <Scene L={tall} step={step} uid={`${uid}t`} runKey={`t${runKey}`} />
+          <Scene L={tall} step={step} uid={`${uid}t`} runKey={`t${runKey}`} desc={desc} />
         </div>
       </div>
 
-      <div className="border-t border-border px-4 py-4 sm:px-6">
+      <div className="order-1 border-b border-border px-4 py-4 sm:px-6 lg:order-2 lg:border-b-0 lg:border-t">
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
           <ol className="flex w-full shrink-0 flex-wrap gap-1.5 pt-1 sm:w-52" aria-label="Steps">
             {current.steps.map((_, i) => (
@@ -504,6 +528,7 @@ export function ArchitectureDiagram() {
           <span className="inline-flex items-center gap-1.5"><i className="inline-block size-2 rounded-full bg-[var(--success)]" />response</span>
           <span className="inline-flex items-center gap-1.5"><i className="inline-block size-2 rounded-full bg-[var(--warning)]" />live event</span>
         </p>
+      </div>
       </div>
     </div>
   )
