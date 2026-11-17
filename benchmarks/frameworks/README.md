@@ -173,6 +173,39 @@ with all twelve builds on each route's runner. Requests per second for first vis
 - **Already-cheap routes don't gain**: the home page's JSON (a fixed list) was a little slower in some tuned builds, within the noise of
   one run.
 
+## The Node apps in cluster mode
+
+Node runs one request's JavaScript at a time, so a single Node server uses about one core. The usual fix in production is to run one
+server process per core behind one port, as PM2's cluster mode does. The `nextjs-cluster`, `tanstack-cluster` and `nuxt-cluster`
+builds do that: the plain image started through [shared/cluster.mjs](shared/cluster.mjs), which forks one worker per CPU
+(`WEB_CONCURRENCY`) with `node:cluster`. Each worker gets a one-thread `/compute/parallel` pool, so the app still has one compute
+thread per CPU. Nitro 3 (TanStack Start) listens with `exclusive: true`, which stops workers from sharing the port, so the wrapper
+passes `exclusive: false`, as Nitro's own `node-cluster` preset does.
+
+From one GitHub Actions run on 2026-11-17 ([results/2026-11-17-node-cluster.md](results/2026-11-17-node-cluster.md)), split by route
+with Inertia.Net (JIT) and the six Node builds on each route's runner. Requests per second, plain → cluster:
+
+| Route | Next.js | TanStack Start | Nuxt | Inertia.Net (JIT) |
+|---|---:|---:|---:|---:|
+| `/` page | 522 → 600 | 2,543 → 3,044 | 1,187 → 1,358 | **9,876** |
+| `/todos?perPage=25` page | 357 → 395 | 1,311 → 1,538 | 734 → 874 | **1,717** |
+| `/todos?perPage=100` page | 143 → 160 | 592 → **757** | 432 → 506 | 591 |
+| `/dashboard` page | 478 → 503 | 3,578 → 3,407 | 1,049 → 1,212 | **6,463** |
+| `/todos/new` page | 497 → 562 | 2,503 → 3,113 | 1,391 → 1,589 | **6,812** |
+| `/compute` JSON | 156 → 272 | 172 → 305 | 180 → 333 | **1,029** |
+| `/compute/parallel` JSON | 219 → 199 | 244 → 218 | 256 → 233 | **943** |
+| `/compute` JSON, 4 CPUs | 148 → 341 | 175 → 398 | 182 → 421 | **1,537** |
+| Memory at rest, SSR (MB) | 78 → 160 | 30 → 68 | 139 → 288 | 58 |
+
+- **Compute work nearly doubles at 2 CPUs and more than doubles at 4.** At a steady 200 req/s, `/compute` JSON went from a median of
+  0.6 to 1.2 s (the single process was overloaded) to 7 to 9 ms in all three apps. Inertia.Net (JIT), in one process, still served
+  3 to 4 times as much.
+- **Server-rendered pages gain less**: −5% to +28%. A single Node process already spends part of the second CPU on garbage
+  collection and I/O, so a second worker adds less than a second core.
+- **`/compute/parallel` gets 9 to 21% slower**: each worker's pool has one thread, so one request can no longer spread over the cores.
+- **Memory roughly doubles**, since every worker loads the whole app, and p99 under full load rose by up to 2 times.
+- The Inertia apps keep their one SSR renderer here; Inertia.Net can run more (`NodeProcess.Instances`).
+
 ## What the app does
 
 | Route | What the server does |
@@ -277,7 +310,7 @@ benchmarks/frameworks/run.sh                # parity check + the full benchmark,
 benchmarks/frameworks/run.sh --dev          # dev-server cold start
 ```
 
-Options: `--frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel`, `--modes ssr,spa`,
+Options: `--frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel` (add `-tuned` or, for the Node apps, `-cluster` to an id), `--modes ssr,spa`,
 `--routes home,todos25,todos100,dashboard,compute,parallel`, `--seconds 10`, `--warmup 5`, `--connections 16`, `--rates 50,200`,
 `--cpus 2`, `--memory 2g`, `--scale-cpus 1,2,4`, `--port 18080`, `--out <file>`, and `--keep-services` to leave Postgres and Redis
 running for the next run. Everything run.sh creates is named `inertia-bench-fw-*` and removed when it exits.
@@ -297,7 +330,8 @@ CPU each part ran on.
 - **Only numbers from a quiet machine mean anything.** The load client runs on the same machine as the apps and takes CPU too. On a
   4-CPU runner, the 4-CPU scaling step shares the machine with the client and with Postgres.
 - **One Node process renders SSR** in both Inertia apps, and Next.js and TanStack Start render in their one Node server process. Node
-  renders on one thread, so SSR throughput is roughly one core's worth of rendering in every app. Inertia.Net can run several SSR
+  renders on one thread, so SSR throughput is roughly one core's worth of rendering in every app. The `-cluster` builds run one Node
+  server per CPU instead (see [The Node apps in cluster mode](#the-node-apps-in-cluster-mode)). Inertia.Net can run several SSR
   processes (`NodeProcess.Instances`); this benchmark keeps the default of one.
 - **Pools**: .NET and Node use a Postgres pool of at most 10 connections. Laravel runs two Octane workers per CPU, each with its own
   connection. Node's worker pool for `/compute/parallel` is sized to the CPU limit (`BENCH_WORKERS`), because Node counts the host's
