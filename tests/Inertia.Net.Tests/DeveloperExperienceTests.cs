@@ -273,6 +273,10 @@ public sealed class DeveloperExperienceTests : IDisposable
             Assert.True(File.Exists(path));
             Assert.Equal(exitCode, Environment.ExitCode);
 
+            // A named mount without an output path is skipped, not a failure.
+            await Writer(new Harness(o => o.Mount = "admin", contentRoot: _root.Path)).StartAsync(CancellationToken.None);
+            Assert.Equal(exitCode, Environment.ExitCode);
+
             await Writer(new Harness(contentRoot: _root.Path)).StartAsync(CancellationToken.None);
             Assert.Equal(1, Environment.ExitCode);
         }

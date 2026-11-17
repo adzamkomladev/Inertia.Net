@@ -5,7 +5,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.9.3** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.4** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 **Fast.** In a benchmark where the same todo app was built in Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel, Inertia.Net
 served the most requests in every test: a server-rendered first visit to the todo list ran at 3,905 requests per second on Native
@@ -94,7 +94,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.3
+dotnet new install Inertia.Net.Templates::1.9.4
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -217,17 +217,17 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.3
-dotnet add package Inertia.Net.Mvc --version 1.9.3 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.3 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.3 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.3 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.3 # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.3 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.3 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.4
+dotnet add package Inertia.Net.Mvc --version 1.9.4 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.4 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.4 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.4 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.4 # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.4 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.4 # MongoDB pagination
 ```
 
-Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.3` for all Inertia.Net packages. Inertia.Net 1.9.3 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.4` for all Inertia.Net packages. Inertia.Net 1.9.4 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### .NET 10 and .NET 11
 
