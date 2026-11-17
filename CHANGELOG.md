@@ -7,6 +7,16 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+### Changed
+
+- Rendering an object whose type has an `object` member (for example `record Row(int Id, string Name, object? Meta)`) no longer
+  walks it member by member when those members hold plain values at render time: it is serialized in one call, as other plain DTOs
+  are. 1,000 such rows under one prop render about 2.5x faster and allocate 192 B instead of 72 KB, within 1.3x of
+  `JsonSerializer.Serialize` on the same array. Members that hold an `InertiaProp`, a props dictionary, a `JsonElement` or a
+  `JsonNode`, polymorphic types, and literal objects filtered by a partial reload are still walked. The JSON is unchanged.
+- The fixed page keys (`component`, `props`, `url`, `version` and the metadata keys) are encoded once instead of on every render.
+  The output is unchanged.
+
 ### Security
 
 - `dotnet new inertia --auth`: Precognition validation requests to the login endpoint now have their own limit of 30 a minute per

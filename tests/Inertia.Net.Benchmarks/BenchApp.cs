@@ -123,6 +123,12 @@ internal static class BenchApp
         Feed = Merge(Users),
     };
 
+    /// <summary>1,000 rows whose <c>object</c> member holds plain values (null or a string).</summary>
+    public static ObjectRow[] ObjectRows() =>
+        [.. Enumerable.Range(0, 1000).Select(i => new ObjectRow(i, $"Row {i}", $"row{i}@example.com", i % 2 == 0, i % 2 == 0 ? null : "note"))];
+
+    public static ScalarPage Scalars() => new();
+
     internal static string CreateContentRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "inertia-bench-" + Guid.NewGuid().ToString("N"));
@@ -178,6 +184,31 @@ public sealed class UsersPage
     public required InertiaProp Feed { get; init; }
 }
 
+public sealed record ObjectRow(int Id, string Name, string Email, bool Active, object? Meta);
+
+/// <summary>Page props as a class with 16 scalar members.</summary>
+public sealed class ScalarPage
+{
+    public int A { get; init; } = 1;
+    public int B { get; init; } = 2;
+    public int C { get; init; } = 3;
+    public int D { get; init; } = 4;
+    public long E { get; init; } = 5;
+    public long F { get; init; } = 6;
+    public bool G { get; init; } = true;
+    public bool H { get; init; }
+    public double I { get; init; } = 1.5;
+    public double J { get; init; } = 2.5;
+    public string K { get; init; } = "Users";
+    public string L { get; init; } = "Ada";
+    public string M { get; init; } = "ada@example.com";
+    public string N { get; init; } = "dark";
+    public string O { get; init; } = "en";
+    public string P { get; init; } = "name";
+}
+
+[JsonSerializable(typeof(ObjectRow[]))]
+[JsonSerializable(typeof(ScalarPage))]
 [JsonSerializable(typeof(PaginationFeedPage))]
 [JsonSerializable(typeof(Page<User>))]
 [JsonSerializable(typeof(User[]))]
