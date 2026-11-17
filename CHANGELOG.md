@@ -7,6 +7,13 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.4] - 2026-11-17
+
+### Fixed
+
+- `--inertia-types` no longer fails the exit code when a named mount (`AddInertia("name", ...)`) has no TypeScript output path.
+  Such a mount is skipped; the default mount still fails the run when neither `OutputPath` nor `RoutesOutputPath` is set.
+
 ## [1.9.3] - 2026-11-17
 
 ### Changed

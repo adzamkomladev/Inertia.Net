@@ -161,7 +161,8 @@ internal sealed partial class InertiaTypeScriptWriter(
         // Routes come from the app's endpoints, which all mounts share; the default mount writes them.
         var routes = options.Value.Mount is null ? typescript.RoutesOutputPath : null;
         var written = true;
-        if (GenerateOnly && typescript.OutputPath is not { Length: > 0 } && routes is not { Length: > 0 })
+        // A named mount without its own output path is skipped: the default mount reports a missing configuration.
+        if (GenerateOnly && options.Value.Mount is null && typescript.OutputPath is not { Length: > 0 } && routes is not { Length: > 0 })
         {
             LogNoOutputPath(logger);
             written = false;
