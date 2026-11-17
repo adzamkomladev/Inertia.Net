@@ -10,6 +10,7 @@
 #
 # Options: --frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel  --modes ssr,spa
 #          Any framework id + "-tuned" (e.g. nextjs-tuned) is that app with its own caching on (BENCH_TUNED=1, see the README).
+#          nextjs-cluster, tanstack-cluster, nuxt-cluster: the plain image run as one server process per CPU (shared/cluster.mjs).
 #          --routes home,todos25,todos100,dashboard,new,create,invalid,compute,parallel
 #          --seconds 10 --warmup 5 --connections 16 --rates 50,200 --cpus 2 --memory 2g --scale-cpus 1,2,4 --port 18080
 #          --out artifacts/framework-bench.md --keep-services (leave Postgres and Redis running)
@@ -93,7 +94,11 @@ services_up() {
 NPM=${NPM:-npm}
 declare -A PREPARED=()
 
+# The app without its -tuned and -cluster suffixes.
+app_id() { local fw=${1%-cluster}; echo "${fw%-tuned}"; }
+
 tag() { # framework mode -> image tag (mode dev: the dev-server image)
+  set -- "${1%-cluster}" "$2" # a cluster build is its plain app's image, started differently
   # Next.js, TanStack Start and Nuxt choose their caching at build time; the other tuned apps are their plain app's image.
   case $1 in nextjs-tuned | tanstack-tuned | nuxt-tuned) echo "inertia-bench-fw-${1%-tuned}:tuned-$2"; return ;; esac
   set -- "${1%-tuned}" "$2"
@@ -131,6 +136,7 @@ prepare() { # framework -> the shared components copied in, npm packages install
 
 build() { # framework mode
   local tuned=0 image
+  set -- "${1%-cluster}" "$2"
   [[ $1 == *-tuned ]] && tuned=1
   image=$(tag "$1" "$2")
   set -- "${1%-tuned}" "$2"
@@ -157,10 +163,15 @@ app_env() { # framework mode cpus -> docker run -e arguments, one per line
   local ssr=0
   [ "$2" = ssr ] && ssr=1
   printf -- '-e\n%s\n' "BENCH_TUNED=$([[ $1 == *-tuned ]] && echo 1 || echo 0)"
-  case ${1%-tuned} in
+  case $(app_id "$1") in
     inertianet*) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "DATABASE_URL=Host=$PG;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10" "REDIS_URL=$REDIS:6379" ;;
     # Node sizes its worker pool from the host's CPUs, not the container's quota, so the pool gets the CPU limit (rounded up).
-    nextjs | tanstack | nuxt) printf -- '-e\n%s\n' "BENCH_WORKERS=$(awk "BEGIN{print int($3 + 0.999)}")" "DATABASE_URL=postgres://bench:bench@$PG/bench" "REDIS_URL=redis://$REDIS:6379" ;;
+    # A -cluster build runs one server per CPU, each with a one-thread pool, so it too has one compute thread per CPU.
+    nextjs | tanstack | nuxt)
+      local cpus
+      cpus=$(awk "BEGIN{print int($3 + 0.999)}")
+      if [[ $1 == *-cluster ]]; then printf -- '-e\n%s\n' "WEB_CONCURRENCY=$cpus" BENCH_WORKERS=1; else printf -- '-e\n%s\n' "BENCH_WORKERS=$cpus"; fi
+      printf -- '-e\n%s\n' "DATABASE_URL=postgres://bench:bench@$PG/bench" "REDIS_URL=redis://$REDIS:6379" ;;
     # FrankenPHP workers block on I/O, so two per CPU; each keeps one Postgres connection.
     laravel) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "OCTANE_WORKERS=$(awk "BEGIN{print int($3 * 2 + 0.999)}")" "DB_HOST=$PG" "REDIS_HOST=$REDIS" ;;
   esac
@@ -170,8 +181,13 @@ now_ms() { echo $(($(date +%s%N) / 1000000)); }
 
 # Starts the app (replacing any previous one) and prints the cold start in ms: docker run until / answers 200.
 start_app() { # framework mode cpus [dev]
-  local image start env
+  local image start env run
   image=$(tag "$1" "${4:-$2}")
+  run=("$image")
+  if [[ $1 == *-cluster ]]; then
+    run=(-v "$HERE/shared/cluster.mjs:/cluster.mjs:ro" "$image" node /cluster.mjs)
+    [ "$(app_id "$1")" = nextjs ] && run+=(server.js) || run+=(.output/server/index.mjs)
+  fi
   # Rebuilt if it disappeared since the build step (a shared host may prune images that no container uses).
   docker image inspect "$image" >/dev/null 2>&1 || build "$1" "${4:-$2}"
   mapfile -t env < <(app_env "$1" "$2" "$3")
@@ -179,7 +195,7 @@ start_app() { # framework mode cpus [dev]
   docker exec "$REDIS" redis-cli FLUSHALL >/dev/null
   docker exec "$PG" psql -U bench -d bench -qc 'TRUNCATE submissions RESTART IDENTITY' >/dev/null
   start=$(now_ms)
-  docker run -d --name "$APP" --network "$NET" --cpus "$3" --memory "$MEMORY" -p "127.0.0.1:$PORT:8080" "${env[@]}" "$image" >/dev/null
+  docker run -d --name "$APP" --network "$NET" --cpus "$3" --memory "$MEMORY" -p "127.0.0.1:$PORT:8080" "${env[@]}" "${run[@]}" >/dev/null
   for _ in $(seq 6000); do
     if [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")" = 200 ]; then
       echo $(($(now_ms) - start))
@@ -340,16 +356,17 @@ load() { "$DOTNET" "$LOAD_DLL" load "$@"; } # prints {"rps","p50Ms","p95Ms","p99
 
 name() {
   local n
-  case ${1%-tuned} in
+  case $(app_id "$1") in
     inertianet) n="Inertia.Net (JIT)" ;; inertianet-aot) n="Inertia.Net (Native AOT)" ;; nextjs) n=Next.js ;;
     tanstack) n="TanStack Start" ;; nuxt) n=Nuxt ;; laravel) n="Laravel (Octane, FrankenPHP)" ;;
   esac
-  if [[ $1 != *-tuned ]]; then echo "$n"; elif [[ $n == *')' ]]; then echo "${n%)}, tuned)"; else echo "$n (tuned)"; fi
+  [[ $1 == *-cluster ]] && n="$n (cluster)"
+  if [[ ${1%-cluster} != *-tuned ]]; then echo "$n"; elif [[ $n == *')' ]]; then echo "${n%)}, tuned)"; else echo "$n (tuned)"; fi
 }
 
 mode_name() {
   if [ "$2" = ssr ]; then echo SSR
-  elif [ "${1%-tuned}" = nextjs ]; then echo "SPA (nearest)"
+  elif [ "$(app_id "$1")" = nextjs ]; then echo "SPA (nearest)"
   else echo SPA
   fi
 }
