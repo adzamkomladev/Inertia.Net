@@ -36,9 +36,9 @@ const scenes: Scene[] = [
     label: 'First visit',
     steps: [
       { title: 'The browser asks for /users', text: 'A normal navigation. Nothing is loaded yet, so the page area is empty.', on: ['browser', 'pipe'], packets: [{ path: 'req', label: 'GET /users', tone: 'req' }], url: '/users', page: { name: 'none yet', state: 'empty' }, wire: 'Accept: text/html' },
-      { title: 'Your endpoint runs', text: 'An ordinary Minimal API, controller or FastEndpoint. It loads data and returns Render("Users/Index", props).', on: ['handler', 'db'], packets: [{ path: 'dbReq', label: 'query', tone: 'req' }, { path: 'dbRes', label: '25 users', tone: 'res', delay: 0.9 }], url: '/users', page: { name: 'none yet', state: 'empty' }, ms: 2600 },
+      { title: 'Your endpoint runs', text: 'An ordinary Minimal API, controller or FastEndpoint. It loads data and returns Render("Users/Index", props).', on: ['handler', 'db'], packets: [{ path: 'dbReq', label: 'query', tone: 'req' }, { path: 'dbRes', label: '25 users', tone: 'res', delay: 1.5 }], url: '/users', page: { name: 'none yet', state: 'empty' }, ms: 4400 },
       { title: 'Inertia.Net builds the page object', text: 'The adapter wraps the result as one page object: the component name, its props, the URL and the asset version.', on: ['adapter'], url: '/users', page: { name: 'none yet', state: 'empty' }, wire: '{ page object }' },
-      { title: 'The SSR server renders it', text: 'On the first visit only, the page object goes to Bun or Node, which renders your real React, Vue or Svelte component to HTML.', on: ['adapter', 'ssr'], packets: [{ path: 'ssrReq', label: 'page object', tone: 'req' }, { path: 'ssrRes', label: 'HTML', tone: 'res', delay: 0.9 }], url: '/users', page: { name: 'none yet', state: 'empty' }, ms: 2600 },
+      { title: 'The SSR server renders it', text: 'On the first visit only, the page object goes to Bun or Node, which renders your real React, Vue or Svelte component to HTML.', on: ['adapter', 'ssr'], packets: [{ path: 'ssrReq', label: 'page object', tone: 'req' }, { path: 'ssrRes', label: 'HTML', tone: 'res', delay: 1.5 }], url: '/users', page: { name: 'none yet', state: 'empty' }, ms: 4400 },
       { title: 'HTML comes back with the data embedded', text: 'The browser gets complete markup it can show at once, with the page object tucked into a data-page attribute.', on: ['adapter', 'pipe', 'browser'], packets: [{ path: 'res', label: 'HTML + data-page', tone: 'res' }], url: '/users', page: { name: 'Users/Index', state: 'ready' }, wire: 'data-page="{…}"', stat: 'full HTML document' },
       { title: 'The Inertia client takes over', text: 'It boots from the embedded page object, hydrates the component and starts handling links and forms. No second fetch is needed.', on: ['client', 'page'], url: '/users', page: { name: 'Users/Index', state: 'ready' } },
     ],
@@ -47,9 +47,9 @@ const scenes: Scene[] = [
     id: 'nav',
     label: 'Click a link',
     steps: [
-      { title: 'A link is clicked', text: 'The Inertia client intercepts the click, so the browser does not reload the page.', cursor: true, ms: 2800, on: ['client', 'page'], url: '/users', page: { name: 'Users/Index', state: 'ready' } },
+      { title: 'A link is clicked', text: 'The Inertia client intercepts the click, so the browser does not reload the page.', cursor: true, ms: 4600, on: ['client', 'page'], url: '/users', page: { name: 'Users/Index', state: 'ready' } },
       { title: 'It sends a request with X-Inertia', text: 'The header tells the server the caller is the Inertia client, which wants JSON rather than a whole document.', on: ['client', 'pipe'], packets: [{ path: 'req', label: 'GET /users/1', tone: 'req' }], url: '/users/1', page: { name: 'Users/Index', state: 'ready' }, wire: 'X-Inertia: true' },
-      { title: 'The same endpoint runs', text: 'The route and the data access are exactly as on the first visit. The adapter sees the header and skips the HTML shell and the SSR server.', on: ['handler', 'db', 'adapter'], off: ['ssr'], packets: [{ path: 'dbReq', label: 'query', tone: 'req' }, { path: 'dbRes', label: 'user 1', tone: 'res', delay: 0.9 }], url: '/users/1', page: { name: 'Users/Index', state: 'ready' }, ms: 2600 },
+      { title: 'The same endpoint runs', text: 'The route and the data access are exactly as on the first visit. The adapter sees the header and skips the HTML shell and the SSR server.', on: ['handler', 'db', 'adapter'], off: ['ssr'], packets: [{ path: 'dbReq', label: 'query', tone: 'req' }, { path: 'dbRes', label: 'user 1', tone: 'res', delay: 1.5 }], url: '/users/1', page: { name: 'Users/Index', state: 'ready' }, ms: 4400 },
       { title: 'Only JSON goes back', text: 'The response is the page object and nothing else, a few kilobytes instead of a full page.', on: ['adapter', 'pipe'], off: ['ssr'], packets: [{ path: 'res', label: 'JSON page object', tone: 'res' }], url: '/users/1', page: { name: 'Users/Index', state: 'ready' }, wire: '{ page object }', stat: 'JSON only, no shell' },
       { title: 'The client swaps the component', text: 'It renders Users/Show with the new props and updates the URL and history. The page never reloaded.', on: ['client', 'page'], off: ['ssr'], url: '/users/1', page: { name: 'Users/Show', state: 'ready' } },
     ],
@@ -62,7 +62,7 @@ const scenes: Scene[] = [
       { title: 'The slow prop is left out', text: 'Defer(...) props are not computed for the first response. The adapter lists their names under deferredProps and answers straight away.', on: ['handler', 'adapter'], url: '/dashboard', page: { name: 'none yet', state: 'empty' }, wire: 'deferredProps' },
       { title: 'The page shows up at once', text: 'The visitor sees the page, with placeholders where the stats will go.', on: ['adapter', 'pipe', 'browser', 'page'], packets: [{ path: 'res', label: 'HTML + user', tone: 'res' }], url: '/dashboard', page: { name: 'Dashboard', state: 'loading' }, wire: 'data-page="{…}"', stat: 'stats left out' },
       { title: 'The client asks for the rest', text: 'As soon as the page mounts it sends a partial reload for just the deferred props. The page stays interactive meanwhile.', on: ['client', 'pipe'], packets: [{ path: 'req', label: 'reload: stats', tone: 'req' }], url: '/dashboard', page: { name: 'Dashboard', state: 'loading' }, wire: 'only: stats' },
-      { title: 'The slow query runs', text: 'Only the stats loader runs now, so nothing else is recomputed.', on: ['handler', 'db'], packets: [{ path: 'dbReq', label: 'big query', tone: 'req' }, { path: 'dbRes', label: 'stats', tone: 'res', delay: 1.3 }], url: '/dashboard', page: { name: 'Dashboard', state: 'loading' }, ms: 3200 },
+      { title: 'The slow query runs', text: 'Only the stats loader runs now, so nothing else is recomputed.', on: ['handler', 'db'], packets: [{ path: 'dbReq', label: 'big query', tone: 'req' }, { path: 'dbRes', label: 'stats', tone: 'res', delay: 2.2 }], url: '/dashboard', page: { name: 'Dashboard', state: 'loading' }, ms: 5200 },
       { title: 'The placeholders fill in', text: 'The stats arrive as JSON and the component re-renders with real data.', on: ['adapter', 'pipe', 'client', 'page'], packets: [{ path: 'res', label: 'stats', tone: 'res' }], url: '/dashboard', page: { name: 'Dashboard', state: 'ready' }, wire: '{ stats }', stat: 'just the stats' },
     ],
   },
@@ -401,7 +401,7 @@ function Scene({ L, step, uid, runKey, desc, ambient, tip, onTip, onJump }: Scen
         </g>
       )}
       {step.stat && (
-        <g key={`${runKey}-stat`} className="arch-fade" style={{ animationDelay: '0.9s' }}>
+        <g key={`${runKey}-stat`} className="arch-fade" style={{ animationDelay: '1.5s' }}>
           <rect x={L.wire.x - 74} y={L.wire.y + 20} width="148" height="22" rx="11" fill="var(--glue-fill)" stroke="var(--glue-stroke)" />
           <text x={L.wire.x} y={L.wire.y + 35} textAnchor="middle" className="fill-primary font-sans text-[11px] font-semibold">
             {step.stat}
@@ -498,7 +498,7 @@ function Scene({ L, step, uid, runKey, desc, ambient, tip, onTip, onJump }: Scen
           >
             <path d="M0 0 0 16 4.2 12.2 7 18.5 9.6 17.4 6.9 11.2 12.4 11 Z" fill="#fff" stroke="#111" strokeWidth="1.2" strokeLinejoin="round" />
           </g>
-          <circle cx={chips.page.x + 52} cy={chips.page.y + 72} r="7" fill="none" stroke="var(--primary)" strokeWidth="2" className="arch-ripple" style={{ '--delay': '0.85s' } as CSSProperties} />
+          <circle cx={chips.page.x + 52} cy={chips.page.y + 72} r="7" fill="none" stroke="var(--primary)" strokeWidth="2" className="arch-ripple" style={{ '--delay': '1.4s' } as CSSProperties} />
         </g>
       )}
 
@@ -511,7 +511,7 @@ function Scene({ L, step, uid, runKey, desc, ambient, tip, onTip, onJump }: Scen
         return (
           <g key={`${runKey}-${i}`}>
             {[3, 2, 1].map((k) => (
-              <g key={k} className="arch-packet" style={{ '--path': `path("${L.paths[p.path]}")`, '--delay': `${delay + k * 0.045}s` } as CSSProperties}>
+              <g key={k} className="arch-packet" style={{ '--path': `path("${L.paths[p.path]}")`, '--delay': `${delay + k * 0.07}s` } as CSSProperties}>
                 <circle r={5 - k * 0.9} fill={tone[p.tone]} opacity={0.42 - k * 0.1} />
               </g>
             ))}
@@ -525,7 +525,7 @@ function Scene({ L, step, uid, runKey, desc, ambient, tip, onTip, onJump }: Scen
                 </text>
               </g>
             </g>
-            <circle cx={end.x} cy={end.y} r="6" fill="none" stroke={tone[p.tone]} strokeWidth="2" className="arch-ripple" style={{ '--delay': `${delay + 1.02}s` } as CSSProperties} />
+            <circle cx={end.x} cy={end.y} r="6" fill="none" stroke={tone[p.tone]} strokeWidth="2" className="arch-ripple" style={{ '--delay': `${delay + 1.7}s` } as CSSProperties} />
           </g>
         )
       })}
@@ -579,7 +579,7 @@ export function ArchitectureDiagram() {
           setStep(0)
         }
       },
-      (step.ms ?? 2300) + (last ? 1200 : 0),
+      (step.ms ?? 3800) + (last ? 1800 : 0),
     )
     return () => clearTimeout(t)
   }, [playing, inView, hold, scene, stepIndex, current.steps.length, step.ms])
@@ -648,7 +648,7 @@ export function ArchitectureDiagram() {
 
       <div className="h-0.5 bg-transparent" aria-hidden="true">
         {playing && inView && !hold && (
-          <div key={runKey} className="arch-progress h-full origin-left bg-primary/60" style={{ animationDuration: `${(step.ms ?? 2300) + (stepIndex === current.steps.length - 1 ? 1200 : 0)}ms` }} />
+          <div key={runKey} className="arch-progress h-full origin-left bg-primary/60" style={{ animationDuration: `${(step.ms ?? 3800) + (stepIndex === current.steps.length - 1 ? 1800 : 0)}ms` }} />
         )}
       </div>
 

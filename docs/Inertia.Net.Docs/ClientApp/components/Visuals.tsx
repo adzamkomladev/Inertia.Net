@@ -304,7 +304,7 @@ export function Sequence({ actors, messages, caption }: { actors: Actor[]; messa
                   r="3.5"
                   fill={tone}
                   className="seq-dot"
-                  style={{ '--dx': `${x2 - x1 - dir * 10}px`, '--delay': `${i * 0.7}s` } as CSSProperties}
+                  style={{ '--dx': `${x2 - x1 - dir * 10}px`, '--delay': `${i * 1.1}s` } as CSSProperties}
                 />
                 {codeLines.length > 0 && (
                   <g>
@@ -502,7 +502,7 @@ export function Bars({
                 <div className="h-5 flex-1 overflow-hidden rounded bg-muted">
                   <div
                     className={`bar-grow h-full rounded ${brand ? '' : d.value === best ? 'bg-primary' : 'bg-primary/45'}`}
-                    style={{ animationDelay: `${i * 90}ms`, width: `${Math.max((d.value / max) * 100, 1)}%`, ...(brand && { background: brand.name === 'Inertia.Net' && /JIT/.test(d.label) ? `color-mix(in oklab, ${brand.bar} 58%, var(--card))` : brand.bar }) }}
+                    style={{ animationDelay: `${i * 140}ms`, width: `${Math.max((d.value / max) * 100, 1)}%`, ...(brand && { background: brand.name === 'Inertia.Net' && /JIT/.test(d.label) ? `color-mix(in oklab, ${brand.bar} 58%, var(--card))` : brand.bar }) }}
                   />
                 </div>
                 <span className="w-16 text-right font-mono tabular-nums text-foreground">{fmt.format(d.value)}</span>
