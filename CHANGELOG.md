@@ -7,6 +7,8 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.3] - 2026-11-17
+
 ### Changed
 
 - Rendering an object whose type has an `object` member (for example `record Row(int Id, string Name, object? Meta)`) no longer
