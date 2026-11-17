@@ -41,7 +41,7 @@ internal static class RenderProbe
         var nested = new InertiaProps { ["page"] = root };
         var rowsInfo = options.GetTypeInfo(typeof(ObjectRow[]));
         var buffer = new ArrayBufferWriter<byte>(256 * 1024);
-        var writer = new Utf8JsonWriter(buffer);
+        using var writer = new Utf8JsonWriter(buffer);
         Task Page(object props)
         {
             context.Response.Headers.Clear();
