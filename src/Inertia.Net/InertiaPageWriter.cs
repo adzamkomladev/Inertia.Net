@@ -22,6 +22,13 @@ internal sealed class InertiaPageWriter
 {
     private static readonly JavaScriptEncoder HtmlSafeEncoder = CreateHtmlSafeEncoder();
 
+    // Fixed page keys, encoded once: ASCII letters, which every encoder writes the same.
+    private static readonly JsonEncodedText ComponentName = JsonEncodedText.Encode("component"), PropsName = JsonEncodedText.Encode("props"),
+        UrlName = JsonEncodedText.Encode("url"), VersionName = JsonEncodedText.Encode("version"),
+        PreserveBigIntegersName = JsonEncodedText.Encode("preserveBigIntegers"), ClearHistoryName = JsonEncodedText.Encode("clearHistory"),
+        EncryptHistoryName = JsonEncodedText.Encode("encryptHistory"), FlashName = JsonEncodedText.Encode("flash"),
+        PreserveFragmentName = JsonEncodedText.Encode("preserveFragment");
+
     // The errors prop when there are none (the common case). Never mutated: the props walk only reads it.
     private static readonly InertiaProp NoErrors = Inertia.Always(new InertiaProps());
 
@@ -154,43 +161,43 @@ internal sealed class InertiaPageWriter
             var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestServices, httpContext.RequestAborted);
 
             writer.WriteStartObject();
-            writer.WriteString("component", component);
-            writer.WritePropertyName("props");
+            writer.WriteString(ComponentName, component);
+            writer.WritePropertyName(PropsName);
             await propsWriter.WritePropsAsync(entries);
             propsWriter.ScheduleRefreshes(httpContext);
             rootInfo?.OnSerialized?.Invoke(props!);
             feature = httpContext.Features.Get<InertiaFeature>();
             if (Options.UrlResolver is { } resolveUrl)
             {
-                writer.WriteString("url", resolveUrl(httpContext));
+                writer.WriteString(UrlName, resolveUrl(httpContext));
             }
             else
             {
-                writer.WritePropertyName("url");
+                writer.WritePropertyName(UrlName);
                 WriteUrl(writer, httpContext.Request);
             }
 
-            writer.WriteString("version", _versionProvider.GetVersion(httpContext));
+            writer.WriteString(VersionName, _versionProvider.GetVersion(httpContext));
             propsWriter.WriteMetadata(pooledEntries, Options.ExposeSharedPropKeys ? sharedCount : 0);
 
             if (Options.PreserveBigIntegers)
             {
-                writer.WriteBoolean("preserveBigIntegers", true);
+                writer.WriteBoolean(PreserveBigIntegersName, true);
             }
 
             if (feature?.HistoryCleared == true)
             {
-                writer.WriteBoolean("clearHistory", true);
+                writer.WriteBoolean(ClearHistoryName, true);
             }
 
             if (feature?.HistoryEncrypted ?? Options.EncryptHistory)
             {
-                writer.WriteBoolean("encryptHistory", true);
+                writer.WriteBoolean(EncryptHistoryName, true);
             }
 
             if (feature?.FlashData is { Count: > 0 } flash)
             {
-                writer.WriteStartObject("flash");
+                writer.WriteStartObject(FlashName);
                 foreach (var (key, value) in flash)
                 {
                     writer.WritePropertyName(key);
@@ -202,7 +209,7 @@ internal sealed class InertiaPageWriter
 
             if (feature?.FragmentPreserved == true)
             {
-                writer.WriteBoolean("preserveFragment", true);
+                writer.WriteBoolean(PreserveFragmentName, true);
             }
 
             writer.WriteEndObject();
