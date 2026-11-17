@@ -67,18 +67,23 @@ Memory is the whole container: for SSR that includes the Node renderer, for Lara
 | `/dashboard` (cached in Redis), client-side navigation | **13,465** | 12,842 | 7,153 | 10,262 | 2,283 | 1,056 |
 | New todo, valid post (validate and insert) | 2,810 | **2,956** | 2,464 | 1,996 | 957 | 517 |
 | New todo, invalid post (four errors) | 16,314 | **18,299** | 12,559 | 11,417 | 1,841 | 854 |
-| `/compute?n=20000` (CPU-heavy, JSON) | **1,212** | 1,033 | 227 | 240 | 207 | 81 |
+| `/compute?n=20000` (CPU-heavy, JSON)¹ | **1,194** | 824 | 389 | 424 | 349 | 67 |
 
-**Using more CPUs** (`/compute/parallel`, JSON, 16 connections)
+**Using more CPUs** (`/compute`, JSON, 16 connections)¹
 
 | App | 1 CPU | 2 CPUs | 4 CPUs |
 |---|---:|---:|---:|
-| Inertia.Net, JIT | 648 | 1,260 | 1,938 |
-| Inertia.Net, Native AOT | 614 | 1,062 | 1,576 |
-| Nuxt | 204 | 367 | 499 |
-| TanStack Start | 197 | 361 | 493 |
-| Next.js | 173 | 341 | 431 |
-| Laravel (sequential in PHP) | 56 | 79 | 157 |
+| Inertia.Net, JIT | **662** | **1,222** | **1,930** |
+| Inertia.Net, Native AOT | 598 | 939 | 1,457 |
+| Nuxt (cluster) | 209 | 408 | 519 |
+| TanStack Start (cluster) | 201 | 389 | 487 |
+| Next.js (cluster) | 179 | 330 | 445 |
+| Laravel | 49 | 66 | 129 |
+
+¹ The CPU-heavy rows come from a separate run with all six apps on one runner (AMD EPYC 9V74,
+[results/2026-11-17-heavy-work.md](results/2026-11-17-heavy-work.md)), with the Node apps in cluster mode: one server process per
+CPU (see [The Node apps in cluster mode](#the-node-apps-in-cluster-mode)). As one process they served 158 (Next.js), 212 (TanStack
+Start) and 222 (Nuxt) req/s at any CPU count; splitting each request over worker threads (`/compute/parallel`) gave 253 to 343.
 
 What stands out:
 
@@ -86,7 +91,7 @@ What stands out:
   TanStack Start, 5 times as many as Nuxt and 11 to 12 times as many as Next.js and Laravel.
 - **The data layer matters more than JIT or AOT.** On database routes the AOT build, on plain Npgsql, beat the JIT build on EF
   Core: 59% more JSON navigations and twice the SSR first visits. On the CPU-heavy route, where neither touches the database,
-  JIT was about 17% faster.
+  JIT was about 45% faster.
 - **Saving a todo is limited by the database for every app.** Valid posts are close across the fast apps, and their p99 rises to
   48 to 290 ms in every app, so the insert, not the framework, sets the pace. Invalid posts, which write nothing, show the
   framework cost: Inertia.Net served 16,000 to 18,000 per second with validation, antiforgery and a redirect.
@@ -94,11 +99,11 @@ What stands out:
   (27,698 req/s for `/` JSON against 27,584), but its server-rendered pages came behind TanStack Start's. Nuxt renders Vue
   pages, not the shared React ones, so part of that gap is Vue's SSR, not Nuxt itself.
 - **TanStack Start is the leanest Node app**: 28 MB at rest and a 258 ms cold start, the fastest SSR cold start of all six.
-- **CPU-heavy work is mostly a language-speed test.** Node runs one request's JavaScript at a time per process, so plain
-  `/compute` stays near 200 to 240 req/s at any CPU count in all three Node apps. .NET spreads both routes over every core with
-  no extra code.
-- **Laravel and Next.js can't keep up with 200 req/s on `/compute`,** so requests queue for one to seven seconds (see the
-  fixed-rate columns in the full results).
+- **CPU-heavy work is mostly a language-speed test.** On one CPU .NET was about three times as fast as Node and thirteen times
+  PHP. Node runs one request's JavaScript at a time per process, so the Node apps only use more CPUs in cluster mode; .NET spreads
+  the work over every core in one process with no extra code.
+- **Laravel can't keep up with 200 req/s on `/compute`,** so requests queue for about four to seven seconds (see the fixed-rate
+  columns in the full results).
 - **Next.js "SPA (nearest)" pages are a static shell.** The page then fetches its data from an API route. Its `page` rows measure
   serving that shell, so compare its `json` rows instead.
 

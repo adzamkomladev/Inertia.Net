@@ -26,7 +26,7 @@ Each framework runs the same todo app on the same Postgres database and Redis ca
 - **Todo list**: 25 or 100 todos from a table of 10,000, newest first.
 - **Dashboard**: totals for the whole table, cached in Redis for 60 seconds.
 - **New todo form**: checks four fields and saves the todo, or shows one error per field.
-- **Heavy page**: a CPU-intensive calculation, run once on one core and once split across all cores.
+- **Heavy page**: a CPU-intensive calculation, on 1, 2 and 4 CPU cores.
 
 Each app runs in two modes. In **SSR mode** the server sends a fully rendered page on the first visit. In **SPA mode** the server sends an empty shell and the browser renders it. After the first visit, moving between pages only fetches data, in every framework.
 
@@ -164,49 +164,29 @@ The heavy page runs a CPU-intensive calculation. This is mostly a test of the pr
   title="Heavy work"
   unit="requests per second"
   data={[
-    { label: 'Inertia.Net, JIT', value: 1212 },
-    { label: 'Inertia.Net, Native AOT', value: 1033 },
-    { label: 'Nuxt', value: 240 },
-    { label: 'TanStack Start', value: 227 },
-    { label: 'Next.js', value: 207 },
-    { label: 'Laravel', value: 81 },
+    { label: 'Inertia.Net, JIT', value: 1194 },
+    { label: 'Inertia.Net, Native AOT', value: 824 },
+    { label: 'Nuxt (cluster)', value: 424 },
+    { label: 'TanStack Start (cluster)', value: 389 },
+    { label: 'Next.js (cluster)', value: 349 },
+    { label: 'Laravel', value: 67 },
   ]}
 />
 
-| App | Requests per second | With 1 / 2 / 4 CPU cores (split across cores) |
+| App | Requests per second | With 1 / 2 / 4 CPU cores |
 |---|---:|---:|
-| Inertia.Net, JIT | **1,212** | 648 / 1,260 / 1,938 |
-| Inertia.Net, Native AOT | 1,033 | 614 / 1,062 / 1,576 |
-| Nuxt | 240 | 204 / 367 / 499 |
-| TanStack Start | 227 | 197 / 361 / 493 |
-| Next.js | 207 | 173 / 341 / 431 |
-| Laravel | 81 | 56 / 79 / 157 |
+| Inertia.Net, JIT | **1,194** | 662 / 1,222 / 1,930 |
+| Inertia.Net, Native AOT | 824 | 598 / 939 / 1,457 |
+| Nuxt (cluster) | 424 | 209 / 408 / 519 |
+| TanStack Start (cluster) | 389 | 201 / 389 / 487 |
+| Next.js (cluster) | 349 | 179 / 330 / 445 |
+| Laravel | 67 | 49 / 66 / 129 |
 
-.NET ran the calculation about five times faster than Node.js and fifteen times faster than PHP, and used extra cores without any extra code. Node.js runs one request's JavaScript at a time, so the JavaScript apps only use more cores when the work is moved to worker threads, as the right-hand column does, or when they run one server process per core, as the next section does. Laravel gains cores by running more PHP workers.
+On one core, .NET ran the calculation about three times faster than Node.js and thirteen times faster than PHP. Inertia.Net used the extra cores in one process without any extra code. Laravel gains cores by running more PHP workers. All six apps ran on the same machine for this test, so these numbers come from a different run than the other tables on this page.
 
-## The JavaScript frameworks in cluster mode
-
-A single Node.js server uses about one CPU core. In production, Node apps are often run as one server process per core, sharing one port, with PM2's cluster mode or Node's own `cluster` module. So we ran Next.js, TanStack Start and Nuxt that way too, with two server processes on the two cores, next to their normal single-process builds and Inertia.Net on the same machines.
-
-Requests per second, one process → cluster:
-
-| Page or route | Next.js | TanStack Start | Nuxt | Inertia.Net |
-|---|---:|---:|---:|---:|
-| Home, first visit | 522 → 600 | 2,543 → 3,044 | 1,187 → 1,358 | **9,876** |
-| Todo list, 25 rows | 357 → 395 | 1,311 → 1,538 | 734 → 874 | **1,717** |
-| Todo list, 100 rows | 143 → 160 | 592 → **757** | 432 → 506 | 591 |
-| Dashboard | 478 → 503 | 3,578 → 3,407 | 1,049 → 1,212 | **6,463** |
-| New todo form | 497 → 562 | 2,503 → 3,113 | 1,391 → 1,589 | **6,812** |
-| Heavy work (data only) | 156 → 272 | 172 → 305 | 180 → 333 | **1,029** |
-| Heavy work, 4 cores | 148 → 341 | 175 → 398 | 182 → 421 | **1,537** |
-| Memory at rest (MB) | 78 → 160 | 30 → 68 | 139 → 288 | 58 |
-
-- **Cluster mode nearly doubled heavy work** on two cores and more than doubled it on four. At a steady 200 requests per second, the heavy route's typical response went from about a second, because one process couldn't keep up, to under 10 ms. Inertia.Net, in one process, still did 3 to 4 times as much.
-- **Server-rendered pages gained much less**, between −5% and +28%, because one Node process already uses part of the second core for garbage collection and network work.
-- **Memory doubled**, since every process loads the whole app, and the slowest 1% of responses under full load got up to twice as slow.
-- **Splitting one request across cores got slower**, by 9 to 21%, because each process keeps one worker thread.
-
-Cluster mode is worth turning on for a Node app that does CPU-heavy work. It narrows the gap on heavy work, but it doesn't close it, and it costs memory. The full numbers are in the [cluster results](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-17-node-cluster.md).
+<Callout type="warning" title="The JavaScript apps ran in cluster mode here">
+Node.js runs one request's JavaScript at a time, so a single Node.js server uses about one core. For this test only, Next.js, TanStack Start and Nuxt ran in cluster mode: one server process per core, sharing one port, as PM2's cluster mode does. That is how a Node app usually does heavy work in production. As a single process they handled 158 (Next.js), 212 (TanStack Start) and 222 (Nuxt) requests per second, however many cores they had. Cluster mode roughly doubles their memory, since every process loads the whole app. Every other result on this page runs them as one process. The [full results](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-17-heavy-work.md) have both.
+</Callout>
 
 ## Inertia.Net with its caching turned on
 

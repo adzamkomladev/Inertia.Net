@@ -2713,8 +2713,11 @@ runners. Requests per second, SSR mode, 16 connections (run of 2026-11-16, [resu
 | `/todos?perPage=25`, first visit | 1,764 | **3,905** | 1,294 | 745 | 364 | 337 |
 | `/todos?perPage=25`, client-side navigation | 6,155 | **9,789** | 3,962 | 5,498 | 1,512 | 550 |
 | New todo, valid post | 2,810 | **2,956** | 2,464 | 1,996 | 957 | 517 |
-| `/compute?n=20000` (CPU-heavy) | **1,212** | 1,033 | 227 | 240 | 207 | 81 |
+| `/compute?n=20000` (CPU-heavy)¹ | **1,194** | 824 | 389 | 424 | 349 | 67 |
 | Memory at rest, SPA / SSR | 27 / 60 MB | **17** / 46 MB | 28 / 29 MB | 138 / 139 MB | 72 / 76 MB | 98 / 154 MB |
+
+¹ From a separate run with all six apps on one runner ([results](benchmarks/frameworks/results/2026-11-17-heavy-work.md)), with the
+Node apps in cluster mode (one server process per CPU); as one process they served 158 to 222.
 
 **With every framework's own caching on** (Inertia.Net's [SSR render cache](#6-response-cache) and [cached props](#cached-props);
 `'use cache'` in Next.js; Nitro route rules in TanStack Start and Nuxt; spatie/laravel-responsecache in Laravel), first visits to
