@@ -5373,7 +5373,7 @@ Keep pages well under a megabyte:
 - **Pooled buffers.** The page is written to a pooled `IBufferWriter<byte>`, and the path tracker is a pooled `char[]`. A path becomes a string only when metadata needs it.
 - **Version check before the handler.** A stale client costs one header comparison and a `409`.
 - **No per-request mutable singletons.** Per-request state lives in an `InertiaFeature` on `HttpContext.Features`, so concurrent requests cannot leak history or flash settings into one another.
-- **Plain DTOs take the fast path.** Inertia.Net checks whether a POCO, list or typed dictionary can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements). It caches this result per type and checks the contents for props only for those types. Everything else uses one `Serialize` call, through your [generated JSON context](#make-rendering-faster-register-your-json-context-first) when it writes the same output.
+- **Plain DTOs take the fast path.** Inertia.Net checks whether a POCO, list or typed dictionary can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements). It caches this result per type and checks the contents for props only for those types. Everything else uses one `Serialize` call, through your [generated JSON context](#make-rendering-faster-register-your-json-context-first) when it writes the same output. An object whose `object` members hold only plain values at render time (no `InertiaProp`, dictionary, `JsonElement` or `JsonNode`) is also serialized in one call, unless a partial reload filters inside it.
 - **UTF-8 throughout.** SSR output and the MVC tag helpers write UTF-8 bytes; nothing large is materialized as a .NET string.
 - **Cached assets.** The Vite manifest is parsed once, the root template is parsed once into pre-encoded UTF-8 segments, and the production tags are pre-rendered per entry set and path base. The version is a precomputed string compared ordinally. A missing manifest, template or SSR bundle is re-checked at most once per second.
 - **Sync loaders stay sync.** `Func<T>` loaders are not wrapped in closures.
@@ -5746,7 +5746,31 @@ The heavy page runs a CPU-intensive calculation. This is mostly a test of the pr
 | Next.js | 207 | 173 / 341 / 431 |
 | Laravel | 81 | 56 / 79 / 157 |
 
-.NET ran the calculation about five times faster than Node.js and fifteen times faster than PHP, and used extra cores without any extra code. Node.js runs one request's JavaScript at a time, so the JavaScript apps only use more cores when the work is moved to worker threads, as the right-hand column does. Laravel gains cores by running more PHP workers.
+.NET ran the calculation about five times faster than Node.js and fifteen times faster than PHP, and used extra cores without any extra code. Node.js runs one request's JavaScript at a time, so the JavaScript apps only use more cores when the work is moved to worker threads, as the right-hand column does, or when they run one server process per core, as the next section does. Laravel gains cores by running more PHP workers.
+
+## The JavaScript frameworks in cluster mode
+
+A single Node.js server uses about one CPU core. In production, Node apps are often run as one server process per core, sharing one port, with PM2's cluster mode or Node's own `cluster` module. So we ran Next.js, TanStack Start and Nuxt that way too, with two server processes on the two cores, next to their normal single-process builds and Inertia.Net on the same machines.
+
+Requests per second, one process → cluster:
+
+| Page or route | Next.js | TanStack Start | Nuxt | Inertia.Net |
+|---|---:|---:|---:|---:|
+| Home, first visit | 522 → 600 | 2,543 → 3,044 | 1,187 → 1,358 | **9,876** |
+| Todo list, 25 rows | 357 → 395 | 1,311 → 1,538 | 734 → 874 | **1,717** |
+| Todo list, 100 rows | 143 → 160 | 592 → **757** | 432 → 506 | 591 |
+| Dashboard | 478 → 503 | 3,578 → 3,407 | 1,049 → 1,212 | **6,463** |
+| New todo form | 497 → 562 | 2,503 → 3,113 | 1,391 → 1,589 | **6,812** |
+| Heavy work (data only) | 156 → 272 | 172 → 305 | 180 → 333 | **1,029** |
+| Heavy work, 4 cores | 148 → 341 | 175 → 398 | 182 → 421 | **1,537** |
+| Memory at rest (MB) | 78 → 160 | 30 → 68 | 139 → 288 | 58 |
+
+- **Cluster mode nearly doubled heavy work** on two cores and more than doubled it on four. At a steady 200 requests per second, the heavy route's typical response went from about a second, because one process couldn't keep up, to under 10 ms. Inertia.Net, in one process, still did 3 to 4 times as much.
+- **Server-rendered pages gained much less**, between −5% and +28%, because one Node process already uses part of the second core for garbage collection and network work.
+- **Memory doubled**, since every process loads the whole app, and the slowest 1% of responses under full load got up to twice as slow.
+- **Splitting one request across cores got slower**, by 9 to 21%, because each process keeps one worker thread.
+
+Cluster mode is worth turning on for a Node app that does CPU-heavy work. It narrows the gap on heavy work, but it doesn't close it, and it costs memory. The full numbers are in the [cluster results](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-17-node-cluster.md).
 
 ## Inertia.Net with its caching turned on
 
