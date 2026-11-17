@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -577,4 +579,59 @@ public class PropsWriterTests
         var page = await Page(new InertiaProps { ["a"] = Inertia.Prop(() => 1) });
         JsonAssert.Missing(page, "liveProps");
     }
+    [Fact]
+    public async Task Objects_whose_object_members_hold_plain_values_write_the_same_json()
+    {
+        using var document = JsonDocument.Parse("""{"x":1}""");
+        MetaRow[] rows =
+        [
+            new(1, "a", null),
+            new(2, "b", "text"),
+            new(3, "c", 7),
+            new(4, "d", new PlainMeta("p", 2)),
+            new(5, "e", Inertia.Defer(() => 1)),
+            new(6, "f", new InertiaProps { ["k"] = Inertia.Prop(() => "v") }),
+            new(7, "g", document.RootElement.Clone()),
+        ];
+
+        var page = await Page(new InertiaProps { ["rows"] = rows });
+
+        Assert.Equal(
+            """{"errors":{},"rows":[{"id":1,"name":"a","meta":null},{"id":2,"name":"b","meta":"text"},{"id":3,"name":"c","meta":7},"""
+            + """{"id":4,"name":"d","meta":{"label":"p","size":2}},{"id":5,"name":"e"},{"id":6,"name":"f","meta":{"k":"v"}},{"id":7,"name":"g","meta":{"x":1}}]}""",
+            page["props"]!.ToJsonString());
+        JsonAssert.Equal("""{"default":["rows.4.meta"]}""", page["deferredProps"]);
+    }
+
+    [Fact]
+    public async Task A_literal_object_with_plain_object_members_still_filters_on_a_partial_reload()
+    {
+        var page = await Page(new InertiaProps { ["row"] = new MetaRow(1, "a", "text"), ["other"] = 2 }, c => c.AsPartial("row.name"));
+
+        Assert.Equal("""{"errors":{},"row":{"name":"a"}}""", page["props"]!.ToJsonString());
+    }
+
+    [Fact]
+    public async Task A_polymorphic_type_with_an_object_member_keeps_its_discriminator()
+    {
+        var page = await Page(new InertiaProps { ["shapes"] = new MetaShape[] { new MetaSquare { Side = 2, Meta = "m" } } });
+
+        Assert.Equal("""{"errors":{},"shapes":[{"kind":"square","side":2,"meta":"m"}]}""", page["props"]!.ToJsonString());
+    }
+}
+
+public sealed record MetaRow(int Id, string Name, object? Meta);
+
+public sealed record PlainMeta(string Label, int Size);
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(MetaSquare), "square")]
+public class MetaShape
+{
+    public object? Meta { get; set; }
+}
+
+public sealed class MetaSquare : MetaShape
+{
+    public int Side { get; set; }
 }

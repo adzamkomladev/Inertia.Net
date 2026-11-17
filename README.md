@@ -5,7 +5,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.9.2** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.3** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 **Fast.** In a benchmark where the same todo app was built in Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel, Inertia.Net
 served the most requests in every test: a server-rendered first visit to the todo list ran at 3,905 requests per second on Native
@@ -94,7 +94,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Create an app with the starter template:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.2
+dotnet new install Inertia.Net.Templates::1.9.3
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -217,17 +217,17 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.2
-dotnet add package Inertia.Net.Mvc --version 1.9.2 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.2 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.2 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.2 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.2 # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.2 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.2 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.3
+dotnet add package Inertia.Net.Mvc --version 1.9.3 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.3 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.3 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.3 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.3 # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.3 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.3 # MongoDB pagination
 ```
 
-Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.2` for all Inertia.Net packages. Inertia.Net 1.9.2 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.3` for all Inertia.Net packages. Inertia.Net 1.9.3 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -2769,7 +2769,7 @@ Design notes:
 - **Pooled buffers.** The page is written to a pooled `IBufferWriter<byte>`, and the path tracker is a pooled `char[]`. A path becomes a string only when metadata needs it. The buffer also means a failing loader never produces a half-written 200.
 - **Version check before the handler.** A stale client costs one header comparison and a 409.
 - **No per-request mutable singletons.** Per-request state lives in an `InertiaFeature` on `HttpContext.Features`, so concurrent requests cannot leak history or flash settings into one another.
-- **Plain DTOs take the fast path.** A POCO, list or typed dictionary is walked only when its type can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements; cached per type). Everything else is one `Serialize` call.
+- **Plain DTOs take the fast path.** A POCO, list or typed dictionary is walked only when its type can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements; cached per type). Everything else is one `Serialize` call, and so is such an object whose `object` members hold only plain values at render time, unless a partial reload filters inside it.
 - **UTF-8 throughout.** SSR output and the MVC tag helpers write UTF-8 bytes; nothing large is materialized as a .NET string.
 - **Cached assets.** The Vite manifest is parsed once, the root template is parsed once into pre-encoded UTF-8 segments, and the production tags are pre-rendered per entry set and path base. The version is a precomputed string compared ordinally. A manifest, template or SSR bundle that is missing at startup is re-checked at most once per second, so files deployed after the app starts are picked up without a restart.
 - **Sync loaders stay sync.** `Func<T>` loaders are not wrapped in closures.

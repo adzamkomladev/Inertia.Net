@@ -22,6 +22,13 @@ internal sealed partial class PropsWriter
 {
     private const int MaxRetainedPath = 1024;
 
+    // Fixed metadata keys, encoded once: ASCII letters, which every encoder writes the same.
+    private static readonly JsonEncodedText SharedPropsName = JsonEncodedText.Encode("sharedProps"), MergePropsName = JsonEncodedText.Encode("mergeProps"),
+        PrependPropsName = JsonEncodedText.Encode("prependProps"), DeepMergePropsName = JsonEncodedText.Encode("deepMergeProps"),
+        MatchPropsOnName = JsonEncodedText.Encode("matchPropsOn"), DeferredPropsName = JsonEncodedText.Encode("deferredProps"),
+        RescuedPropsName = JsonEncodedText.Encode("rescuedProps"), ScrollPropsName = JsonEncodedText.Encode("scrollProps"),
+        OncePropsName = JsonEncodedText.Encode("onceProps");
+
     private readonly InertiaPageWriter _owner;
     private Utf8JsonWriter _writer = null!;
     private Utf8JsonWriter? _jsonWriter;
@@ -259,27 +266,28 @@ internal sealed partial class PropsWriter
     public void WriteMetadata(List<PropEntry> entries, int sharedCount)
     {
         WriteSharedKeys(entries, sharedCount);
-        WriteList("mergeProps", _mergeProps);
-        WriteList("prependProps", _prependProps);
-        WriteList("deepMergeProps", _deepMergeProps);
-        WriteList("matchPropsOn", _matchPropsOn);
+        WriteList(MergePropsName, _mergeProps);
+        WriteList(PrependPropsName, _prependProps);
+        WriteList(DeepMergePropsName, _deepMergeProps);
+        WriteList(MatchPropsOnName, _matchPropsOn);
 
         if (_deferredProps is not null)
         {
-            _writer.WriteStartObject("deferredProps");
+            _writer.WriteStartObject(DeferredPropsName);
             foreach (var (group, paths) in _deferredProps)
             {
-                WriteList(group, paths);
+                _writer.WriteStartArray(group);
+                WriteValues(paths);
             }
 
             _writer.WriteEndObject();
         }
 
-        WriteList("rescuedProps", _uncommon?.Rescued);
+        WriteList(RescuedPropsName, _uncommon?.Rescued);
 
         if (_scrollProps is not null)
         {
-            _writer.WriteStartObject("scrollProps");
+            _writer.WriteStartObject(ScrollPropsName);
             foreach (var (path, (metadata, reset)) in _scrollProps)
             {
                 _writer.WriteStartObject(path);
@@ -296,7 +304,7 @@ internal sealed partial class PropsWriter
 
         if (_onceProps is not null)
         {
-            _writer.WriteStartObject("onceProps");
+            _writer.WriteStartObject(OncePropsName);
             foreach (var (key, (prop, expiresAt)) in _onceProps)
             {
                 _writer.WriteStartObject(key);
@@ -401,7 +409,7 @@ internal sealed partial class PropsWriter
             return;
         }
 
-        _writer.WriteStartArray("sharedProps");
+        _writer.WriteStartArray(SharedPropsName);
         var dotted = false;
         for (var i = 0; i < count; i++)
         {
@@ -468,7 +476,8 @@ internal sealed partial class PropsWriter
         }
 
         var (info, containsProps) = _owner.TypeEntry(declaredType == typeof(object) ? prop.GetType() : declaredType);
-        if (containsProps)
+        // An object whose prop-capable members hold plain values is serialized whole, unless its children still filter (partial reload).
+        if (containsProps && !(info.Kind == JsonTypeInfoKind.Object && (!_isPartial || parentWasResolved) && _owner.HoldsNoProps(prop, info)))
         {
             return WriteEntryCoreAsync(key, index, prop, declaredType, parentWasResolved);
         }
@@ -1160,7 +1169,7 @@ internal sealed partial class PropsWriter
         _path = bigger;
     }
 
-    private void WriteList(string name, List<string>? values)
+    private void WriteList(JsonEncodedText name, List<string>? values)
     {
         if (values is not { Count: > 0 })
         {
@@ -1168,6 +1177,11 @@ internal sealed partial class PropsWriter
         }
 
         _writer.WriteStartArray(name);
+        WriteValues(values);
+    }
+
+    private void WriteValues(List<string> values)
+    {
         foreach (var value in values)
         {
             _writer.WriteStringValue(value);

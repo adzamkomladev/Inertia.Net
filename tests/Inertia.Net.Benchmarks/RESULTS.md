@@ -1,5 +1,30 @@
 # Inertia.Net benchmark results
 
+## 1.9.3: objects with `object` members, and pre-encoded page names — 2026-11-17
+
+`--render-probe` (net10.0 JIT, warm in-process renders into `Stream.Null`), new shape rows best of 25 interleaved rounds. "Before" is
+`main` at `d6603b5` with only the probe rows added; "after" is the `perf/1.9.3` branch. The host was busy (load 16 to 28 on 8 CPUs),
+so compare rows within one run and trust the allocated bytes; the absolute times are not quotable.
+
+| Row | Before | After | Gate |
+|---|---:|---:|---|
+| 1,000 `record ObjectRow(int, string, string, bool, object?)` under one key (`object` member null or a string) | 1,331 µs; 72,192 B | 527 µs; 192 B | met |
+| The same rows through `JsonSerializer.Serialize` (STJ reference) | 405 µs; 312 B | 408 µs; 312 B | |
+| Ratio to the STJ reference | 3.3x | 1.25x to 1.33x over four runs | ≤ 1.4x and ≤ 1,024 B |
+| Page props given as a class with 16 scalar members ("root plain object") | 8.2 µs; 400 B | 8.3 µs; 400 B | A2 dropped |
+| The same object nested under one key ("same object nested") | 4.5 µs; 160 B | 5.1 µs; 160 B | |
+| JSON / POCO / partial / HTML renders, 20 props (control) | 1,744 / 1,560 / 576 / 1,808 B | 1,744 / 1,560 / 576 / 1,808 B | unchanged |
+
+A1 (serialize an object whole when its `object` members hold plain values) shipped. A2 (write a plain page props object in one
+`Serialize` call, spliced after the shared props) was dropped: it reached 200 B but 1.30x to 1.55x of the nested row over five runs,
+against a 1.2x gate (1.83x before). A3 (pre-encoded fixed page names) has no row of its own; the control byte counts above are
+unchanged and its timing is within this host's noise.
+
+```sh
+cd tests/Inertia.Net.Benchmarks
+dotnet run -c Release -f net10.0 -- --render-probe
+```
+
 ## 1.9.2: rendering through the app's JSON context, and the SPA vs SSR suite — 2026-11-16
 
 Measured by the `hosting-probe` workflow on GitHub's `ubuntu-latest` runner (12 s measured, 8 s warmup, best of 5 rounds).

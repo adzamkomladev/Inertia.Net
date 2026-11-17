@@ -757,13 +757,14 @@ public sealed class CachedPropsTests
         });
         using var store = new MemoryInertiaCacheStore(intercepted, Options.Create(new InertiaOptions()), TimeProvider.System);
         var key = PropKey("publishing");
-        var writer = Task.Run(async () => await store.SetAsync(key, [1], new InertiaCacheEntryOptions(TimeSpan.FromMinutes(1), ["tag"]), default), TestContext.Current.CancellationToken);
+        // Both block on events: dedicated threads, so a busy thread pool cannot delay their start past the waits below.
+        var writer = Dedicated(async () => await store.SetAsync(key, [1], new InertiaCacheEntryOptions(TimeSpan.FromMinutes(1), ["tag"]), default));
         Assert.True(entered.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        var invalidation = Task.Run(async () =>
+        var invalidation = Dedicated(async () =>
         {
             invalidating.Set();
             await store.RemoveByTagAsync("tag", TestContext.Current.CancellationToken);
-        }, TestContext.Current.CancellationToken);
+        });
         try
         {
             Assert.True(invalidating.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
@@ -777,6 +778,9 @@ public sealed class CachedPropsTests
         }
 
         Assert.Null(await store.GetAsync(key, TestContext.Current.CancellationToken));
+
+        static Task Dedicated(Func<Task> work) =>
+            Task.Factory.StartNew(work, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
     }
 
     private sealed class PublicationCache(IMemoryCache inner, Action beforeCreate) : IMemoryCache

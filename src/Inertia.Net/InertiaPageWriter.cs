@@ -22,6 +22,13 @@ internal sealed class InertiaPageWriter
 {
     private static readonly JavaScriptEncoder HtmlSafeEncoder = CreateHtmlSafeEncoder();
 
+    // Fixed page keys, encoded once: ASCII letters, which every encoder writes the same.
+    private static readonly JsonEncodedText ComponentName = JsonEncodedText.Encode("component"), PropsName = JsonEncodedText.Encode("props"),
+        UrlName = JsonEncodedText.Encode("url"), VersionName = JsonEncodedText.Encode("version"),
+        PreserveBigIntegersName = JsonEncodedText.Encode("preserveBigIntegers"), ClearHistoryName = JsonEncodedText.Encode("clearHistory"),
+        EncryptHistoryName = JsonEncodedText.Encode("encryptHistory"), FlashName = JsonEncodedText.Encode("flash"),
+        PreserveFragmentName = JsonEncodedText.Encode("preserveFragment");
+
     // The errors prop when there are none (the common case). Never mutated: the props walk only reads it.
     private static readonly InertiaProp NoErrors = Inertia.Always(new InertiaProps());
 
@@ -41,6 +48,7 @@ internal sealed class InertiaPageWriter
 
     private readonly ConcurrentDictionary<Type, bool> _containsProps = new();
     private readonly ConcurrentDictionary<Type, (JsonTypeInfo Info, bool ContainsProps)> _types = new();
+    private readonly ConcurrentDictionary<Type, JsonPropertyInfo[]> _propSlots = new();
     private readonly JsonSerializerContext? _generated;
     private readonly ConcurrentDictionary<(JsonPropertyInfo Property, JsonNumberHandling? Handling), JsonTypeInfo> _propertySerializers = new();
     private readonly ConcurrentDictionary<(JsonConverter? Converter, JsonNumberHandling? Handling), JsonSerializerOptions> _memberOptions = new();
@@ -153,43 +161,43 @@ internal sealed class InertiaPageWriter
             var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestServices, httpContext.RequestAborted);
 
             writer.WriteStartObject();
-            writer.WriteString("component", component);
-            writer.WritePropertyName("props");
+            writer.WriteString(ComponentName, component);
+            writer.WritePropertyName(PropsName);
             await propsWriter.WritePropsAsync(entries);
             propsWriter.ScheduleRefreshes(httpContext);
             rootInfo?.OnSerialized?.Invoke(props!);
             feature = httpContext.Features.Get<InertiaFeature>();
             if (Options.UrlResolver is { } resolveUrl)
             {
-                writer.WriteString("url", resolveUrl(httpContext));
+                writer.WriteString(UrlName, resolveUrl(httpContext));
             }
             else
             {
-                writer.WritePropertyName("url");
+                writer.WritePropertyName(UrlName);
                 WriteUrl(writer, httpContext.Request);
             }
 
-            writer.WriteString("version", _versionProvider.GetVersion(httpContext));
+            writer.WriteString(VersionName, _versionProvider.GetVersion(httpContext));
             propsWriter.WriteMetadata(pooledEntries, Options.ExposeSharedPropKeys ? sharedCount : 0);
 
             if (Options.PreserveBigIntegers)
             {
-                writer.WriteBoolean("preserveBigIntegers", true);
+                writer.WriteBoolean(PreserveBigIntegersName, true);
             }
 
             if (feature?.HistoryCleared == true)
             {
-                writer.WriteBoolean("clearHistory", true);
+                writer.WriteBoolean(ClearHistoryName, true);
             }
 
             if (feature?.HistoryEncrypted ?? Options.EncryptHistory)
             {
-                writer.WriteBoolean("encryptHistory", true);
+                writer.WriteBoolean(EncryptHistoryName, true);
             }
 
             if (feature?.FlashData is { Count: > 0 } flash)
             {
-                writer.WriteStartObject("flash");
+                writer.WriteStartObject(FlashName);
                 foreach (var (key, value) in flash)
                 {
                     writer.WritePropertyName(key);
@@ -201,7 +209,7 @@ internal sealed class InertiaPageWriter
 
             if (feature?.FragmentPreserved == true)
             {
-                writer.WriteBoolean("preserveFragment", true);
+                writer.WriteBoolean(PreserveFragmentName, true);
             }
 
             writer.WriteEndObject();
@@ -315,6 +323,24 @@ internal sealed class InertiaPageWriter
 
             return (info, containsProps);
         }, this);
+
+    /// <summary>
+    /// Whether an object whose type can hold props holds none right now: every member that could hold one is null or a plain value
+    /// (not a prop, a props dictionary, a <see cref="JsonElement"/> or a <see cref="JsonNode"/>). Such an object is serialized whole.
+    /// </summary>
+    internal bool HoldsNoProps(object value, JsonTypeInfo info)
+    {
+        if (info.PolymorphismOptions is not null) return false;
+        var slots = _propSlots.GetOrAdd(info.Type, static (_, state) =>
+            [.. state.info.Properties.Where(p => p.Get is not null && state.self.ContainsProps(p.PropertyType))], (self: this, info));
+        foreach (var property in slots)
+        {
+            var slot = property.Get!(value);
+            if (slot is JsonElement or JsonNode || (slot is not null && ContainsProps(slot.GetType()))) return false;
+        }
+
+        return true;
+    }
 
     // The app's source-generated context, when Inertia's options would write exactly what the context's own options write: it is the
     // first resolver (so it supplies every type it knows), and the settings that change the output are the same. The encoders differ,
