@@ -18,12 +18,12 @@ header() { awk -v s="## $SECTION" '$0 == s {on = 1; next} /^## / {on = 0} on && 
 order() {
   awk -F'\t' 'BEGIN {
       o["Inertia.Net (JIT)"] = 1; o["Inertia.Net (JIT, tuned)"] = 2; o["Inertia.Net (Native AOT)"] = 3; o["Inertia.Net (Native AOT, tuned)"] = 4
-      o["Next.js"] = 5; o["Next.js (tuned)"] = 6; o["TanStack Start"] = 7; o["TanStack Start (tuned)"] = 8
-      o["Nuxt"] = 9; o["Nuxt (tuned)"] = 10; o["Laravel (Octane, FrankenPHP)"] = 11; o["Laravel (Octane, FrankenPHP, tuned)"] = 12
+      o["Next.js"] = 5; o["Next.js (tuned)"] = 6; o["Next.js (cluster)"] = 6.5; o["TanStack Start"] = 7; o["TanStack Start (tuned)"] = 8
+      o["TanStack Start (cluster)"] = 8.5; o["Nuxt"] = 9; o["Nuxt (tuned)"] = 10; o["Nuxt (cluster)"] = 10.5; o["Laravel (Octane, FrankenPHP)"] = 11; o["Laravel (Octane, FrankenPHP, tuned)"] = 12
       m["SSR"] = 1; m["SPA"] = 2; m["SPA (nearest)"] = 2 }
     { split($2, c, " \\| "); fw = substr(c[1], 3); mode = c[2]; if ('"$1"') mode = ""
-      printf "%d\t%d\t%04d\t%06d\t%s\n", (fw in o ? o[fw] : 9), (mode in m ? m[mode] : 0), $1, NR, $2 }' |
-    sort -t$'\t' -k1,1n -k2,2n -k3,3n -k4,4n | cut -f5
+      printf "%s\t%d\t%04d\t%06d\t%s\n", (fw in o ? o[fw] : 9), (mode in m ? m[mode] : 0), $1, NR, $2 }' |
+    sort -t$'\t' -k1,1g -k2,2n -k3,3n -k4,4n | cut -f5
 }
 
 head -n1 "$1"
