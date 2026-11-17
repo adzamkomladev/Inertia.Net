@@ -1773,78 +1773,78 @@
       "slug": "forget-me-not",
       "url": "/docs/forget-me-not",
       "title": "Build a todo app",
-      "description": "Build a complete Inertia.Net todo app with session login, public lists, paginated loading, reminders and SSR.",
+      "description": "Build ForgetMeNot step by step, a todo app with sign-in, shared lists, infinite scroll, live reminders and server-side rendering, using named routes, typed routes and caching.",
       "section": "Tutorial",
       "order": 1,
       "headings": [
         {
-          "id": "what-you-are-building",
-          "text": "What you are building",
+          "id": "what-you-will-build",
+          "text": "What you will build",
           "depth": 2
         },
         {
-          "id": "1-start-from-the-template",
-          "text": "1. Start from the template",
+          "id": "1-create-the-app",
+          "text": "1. Create the app",
           "depth": 2
         },
         {
-          "id": "2-make-it-look-good-with-shadcnui",
-          "text": "2. Make it look good with shadcn/ui",
+          "id": "2-add-tailwind-css",
+          "text": "2. Add Tailwind CSS",
           "depth": 2
         },
         {
-          "id": "3-give-the-app-a-clean-structure",
-          "text": "3. Give the app a clean structure",
+          "id": "3-add-a-database",
+          "text": "3. Add a database",
           "depth": 2
         },
         {
-          "id": "4-model-the-data",
-          "text": "4. Model the data",
+          "id": "4-decide-what-the-browser-sees",
+          "text": "4. Decide what the browser sees",
           "depth": 2
         },
         {
-          "id": "5-use-sessions-for-sign-in",
-          "text": "5. Use sessions for sign-in",
+          "id": "5-the-lists-page",
+          "text": "5. The lists page",
           "depth": 2
         },
         {
-          "id": "6-hide-the-inertia-setup",
-          "text": "6. Hide the Inertia setup",
+          "id": "make-the-frontend-ready",
+          "text": "Make the frontend ready",
+          "depth": 3
+        },
+        {
+          "id": "6-one-list-with-infinite-scroll",
+          "text": "6. One list, with infinite scroll",
           "depth": 2
         },
         {
-          "id": "7-register-sign-in-and-sign-out",
-          "text": "7. Register, sign in and sign out",
+          "id": "7-share-a-list-and-render-it-on-the-server",
+          "text": "7. Share a list, and render it on the server",
           "depth": 2
         },
         {
-          "id": "8-build-the-dashboard",
-          "text": "8. Build the dashboard",
+          "id": "8-a-reminder-that-appears-by-itself",
+          "text": "8. A reminder that appears by itself",
           "depth": 2
         },
         {
-          "id": "9-load-items-in-pages",
-          "text": "9. Load items in pages",
+          "id": "9-test-the-important-paths",
+          "text": "9. Test the important paths",
           "depth": 2
         },
         {
-          "id": "10-share-a-list-publicly",
-          "text": "10. Share a list publicly",
+          "id": "10-run-it-in-production",
+          "text": "10. Run it in production",
           "depth": 2
         },
         {
-          "id": "11-send-reminders-once",
-          "text": "11. Send reminders once",
+          "id": "if-something-does-not-build",
+          "text": "If something does not build",
           "depth": 2
         },
         {
-          "id": "12-test-the-important-paths",
-          "text": "12. Test the important paths",
-          "depth": 2
-        },
-        {
-          "id": "13-run-it-in-production",
-          "text": "13. Run it in production",
+          "id": "where-to-go-next",
+          "text": "Where to go next",
           "depth": 2
         }
       ]

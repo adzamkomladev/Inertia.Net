@@ -1,663 +1,137 @@
 ---
 title: Build a todo app
-description: Build a complete Inertia.Net todo app with session login, public lists, paginated loading, reminders and SSR.
+description: Build ForgetMeNot step by step, a todo app with sign-in, shared lists, infinite scroll, live reminders and server-side rendering, using named routes, typed routes and caching.
 section: Tutorial
 order: 1
 ---
 
-ForgetMeNot is a small todo app, but it uses the same pieces as a real product: sign-in, private data, a public share page, a list that loads as you scroll, and reminders that run in the background. You will start from the official `Inertia.Net.Templates` template, then add each feature one small step at a time.
+ForgetMeNot is a small todo app. It is small, but it uses the same pieces as a real product: sign-in, private data, a public page, a long list that loads as you scroll, and a reminder that appears on your screen without a refresh.
+
+Each step tells you **what** to do and **why**. If you know why a line is there, you can change it later without fear.
 
 <Callout type="info" title="What you need">
-- .NET 10 or .NET 11 SDK
-- JavaScript tooling with npm, Bun, pnpm or Yarn
-- A code editor
-- A terminal
+- The .NET 10 or .NET 11 SDK
+- Bun, npm, pnpm or Yarn. The commands use Bun; swap in your own.
+- A code editor and a terminal
 
-No database server is required. ForgetMeNot uses SQLite, and the template already gives you a working React, Vue or Svelte app.
+You do not need a database server. The app uses SQLite, a database that lives in one file.
 </Callout>
 
-Commands below use Bun; npm, pnpm and Yarn work as alternatives. The production example uses Bun as its SSR runtime.
+## What you will build
 
-This guide is for someone who has not built an Inertia app before. Run the commands, look at the checkpoints, and only move on when the app behaves the way the checkpoint says.
+Every feature below is here because it shows one idea from Inertia.Net. The right column says which one.
 
-## What you are building
+| You build | You learn |
+|---|---|
+| Sign in with a cookie | The `--auth` starter, redirects to the login page, and a sign-in rate limit |
+| A page of lists | Page records, named routes and the typed `routes.ts` file |
+| A form that checks itself | Precognition: the server validates a field as you type |
+| Slow numbers that load after the page | Deferred props, plus a cache you clear when data changes |
+| A list with thousands of items | `ToPageAsync` and infinite scroll |
+| A link anyone can open | Server-side rendering and the SSR cache |
+| A reminder that shows up by itself | Live props over SignalR |
+| Tests | `Inertia.Net.Testing` |
 
-<Cards>
-  <Card title="Sign in with sessions" icon="shield">Register, sign in, sign out and keep flash messages in the same session.</Card>
-  <Card title="Private todo lists" icon="book">Create lists, add items, mark them done and set due dates.</Card>
-  <Card title="Public share pages" icon="sparkles">Share an unguessable URL that opens without an account.</Card>
-  <Card title="Virtual loading" icon="code">Load todo items in pages with `Scroll` and `InfiniteScroll`.</Card>
-  <Card title="Reminders" icon="gauge">Set a reminder time and let a background worker send it once.</Card>
-  <Card title="Pretty UI" icon="blocks">Use Tailwind CSS and shadcn/ui components instead of inline styles.</Card>
-</Cards>
+## 1. Create the app
 
-## 1. Start from the template
-
-Install the templates once, then create the app. The commands use React; pass `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below:
+Install the templates once, then create the app. `--auth` adds cookie sign-in, so you do not write that yourself. Use `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below.
 
 ```sh
 dotnet new install Inertia.Net.Templates::1.9.2
-dotnet new inertia -n ForgetMeNot --framework react
+dotnet new inertia -n ForgetMeNot --framework react --auth
 cd ForgetMeNot
 bun install
 ```
 
-For npm, pnpm or Yarn, use `npm install`, `pnpm install` or `yarn install`. Start the two development processes. Keep both terminals open:
+Start the two development processes and keep both terminals open:
 
 ```sh
-# terminal 1
+# terminal 1: the frontend (Vite)
 bun run dev
 
-# terminal 2
+# terminal 2: the backend
 dotnet watch
 ```
 
-Alternatively run `npm run dev`, `pnpm run dev` or `yarn run dev` in terminal 1. Open `http://localhost:5180`. You should see the template home page and a working Todos page. Click around before changing anything.
+Open `http://localhost:5180`, click **Log in**, and sign in with `demo@example.com` and the password `password`. Click around before you change anything.
 
-<Callout type="tip" title="Checkpoint">
-If the app does not load, run `dotnet new inertia --help` and confirm the template version. The frontend must be started before `dotnet watch` reads the Vite hot file, but a refresh is enough if you started them in the other order.
+<Callout type="info" title="Why two processes?">
+Vite serves your React, Vue or Svelte code and reloads it the moment you save. ASP.NET Core serves the pages. While Vite runs, it writes a small file called `wwwroot/hot`, and the app uses it to find Vite. Nothing else is needed.
 </Callout>
 
-Open these files. You do not need to understand all of them yet:
+The template is not empty. It already uses the features we want, and it is worth knowing where they are:
 
-```text
-Program.cs
-app.html
-ClientApp/app.tsx
-ClientApp/Layout.tsx
-ClientApp/pages/Home.tsx
-ClientApp/pages/Todos/Index.tsx
-```
+| Where | What it does | Why it matters |
+|---|---|---|
+| `HomePage`, `LoginPage` in `Program.cs` | **Page records.** A record that names its component once: `Component => "Home"` | The props and the page name stay together, and the compiler checks them |
+| `.WithName("login")` on each route | **Named routes** | A name is a stable handle for a URL. You can change the URL and nothing breaks |
+| `ClientApp/types/routes.ts` | **Typed routes**, written from the names | In the browser you write `routes.login()`, never the string `"/login"` |
+| `ClientApp/types/inertia.d.ts` | TypeScript types for every page, written from the C# records | A renamed property is a compile error, not a blank spot on the page |
+| `.WithInertiaPrecognition()` on the login | The form checks a field on the server when you leave it | One set of rules, run in the browser and on the server |
+| `AddInertiaErrorPages()` | A 404 or 500 shows your `Error` page | Visitors never see a raw error |
 
-For Vue and Svelte the entry is `ClientApp/app.ts` and the components end in `.vue` or `.svelte`.
+Both generated files are rewritten when the app starts in Development. You never edit them by hand.
 
-The template already has Inertia, Vite, a deferred prop, a form and validation. We are going to grow it into a full app.
+## 2. Add Tailwind CSS
 
-## 2. Make it look good with shadcn/ui
-
-The template uses a tiny inline-style layout. Replace it with Tailwind and shadcn/ui.
-
-Install the packages:
-
-<Tabs>
-  <Tab label="React">
+The template has almost no styling. Tailwind lets us style a page with short class names inside the markup, so there are no extra style files to keep in sync.
 
 ```sh
 bun add -d tailwindcss @tailwindcss/vite
-bun add class-variance-authority clsx tailwind-merge lucide-react
 ```
 
-  </Tab>
-  <Tab label="Vue">
-
-```sh
-bun add -d tailwindcss @tailwindcss/vite
-bun add class-variance-authority clsx tailwind-merge lucide-vue-next
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```sh
-bun add -d tailwindcss @tailwindcss/vite
-bun add class-variance-authority clsx tailwind-merge @lucide/svelte
-```
-
-  </Tab>
-</Tabs>
-
-For npm use `npm install -D tailwindcss @tailwindcss/vite` and `npm install` with the same runtime packages as your tab. For pnpm or Yarn substitute `pnpm add -D` / `pnpm add` or `yarn add -D` / `yarn add`.
-
-Update `vite.config.ts`:
-
-<Tabs>
-  <Tab label="React">
+Add the plugin to `vite.config.ts`. This is the only change in this step:
 
 ```ts
-import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
-// ...your existing imports
+// ...your other imports
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // react(), vue() or svelte() stays where it is; just add tailwindcss() to the list
   plugins: [react(), tailwindcss(), inertia(), hotFile()],
-  resolve: {
-    alias: { '@': path.resolve(import.meta.dirname, 'ClientApp') },
-  },
   // ...the rest stays the same
-})
+}))
 ```
 
-  </Tab>
-  <Tab label="Vue">
-
-```ts
-import path from 'node:path'
-import tailwindcss from '@tailwindcss/vite'
-// ...your existing imports
-
-export default defineConfig({
-  plugins: [vue(), tailwindcss(), inertia(), hotFile()],
-  resolve: {
-    alias: { '@': path.resolve(import.meta.dirname, 'ClientApp') },
-  },
-  // ...the rest stays the same
-})
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```ts
-import path from 'node:path'
-import tailwindcss from '@tailwindcss/vite'
-// ...your existing imports
-
-export default defineConfig({
-  plugins: [svelte(), tailwindcss(), inertia(), hotFile()],
-  resolve: {
-    alias: { '@': path.resolve(import.meta.dirname, 'ClientApp') },
-  },
-  // ...the rest stays the same
-})
-```
-
-  </Tab>
-</Tabs>
-
-Add these two properties inside `compilerOptions` in `tsconfig.json`:
-
-```json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./ClientApp/*"]
-    }
-  }
-}
-```
-
-Create `ClientApp/app.css` and import it from the client entry (`ClientApp/app.tsx` for React, `ClientApp/app.ts` for Vue and Svelte):
+Create `ClientApp/app.css` with one line, and import it at the top of the client entry (`ClientApp/app.tsx` for React, `ClientApp/app.ts` for Vue and Svelte):
 
 ```css
 @import "tailwindcss";
 ```
 
-<Tabs>
-  <Tab label="React">
-
-```tsx
-// ClientApp/app.tsx
-import './app.css'
-import { createInertiaApp } from '@inertiajs/react'
-
-createInertiaApp()
-```
-
-  </Tab>
-  <Tab label="Vue">
-
 ```ts
-// ClientApp/app.ts
 import './app.css'
-import { createInertiaApp } from '@inertiajs/vue3'
-
-createInertiaApp()
 ```
 
-  </Tab>
-  <Tab label="Svelte">
+## 3. Add a database
 
-```ts
-// ClientApp/app.ts
-import './app.css'
-import { createInertiaApp } from '@inertiajs/svelte'
-
-createInertiaApp()
-```
-
-  </Tab>
-</Tabs>
-
-Now initialize shadcn/ui from the project directory:
-
-<Tabs>
-  <Tab label="React">
+Lists and items must survive a restart, so they need a database. We use **EF Core with SQLite**: EF Core is the usual way to talk to a database from C#, and SQLite needs no server.
 
 ```sh
-bunx --bun shadcn@latest init
+dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version "10.*"
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.2
 ```
 
-  </Tab>
-  <Tab label="Vue">
-
-```sh
-bunx --bun shadcn-vue@latest init
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```sh
-bunx --bun shadcn-svelte@latest init
-```
-
-  </Tab>
-</Tabs>
-
-For npm, pnpm or Yarn replace `bunx --bun` with `npx`, `pnpm dlx` or `yarn dlx`. React uses shadcn/ui; Vue and Svelte use its ports, [shadcn-vue](https://www.shadcn-vue.com) and [shadcn-svelte](https://www.shadcn-svelte.com). Accept the defaults. When it asks for the CSS file, choose `ClientApp/app.css`; when it asks for the import alias, use `@/`. Then add the components we need:
-
-<Tabs>
-  <Tab label="React">
-
-```sh
-bunx --bun shadcn@latest add button card input label badge checkbox separator
-```
-
-  </Tab>
-  <Tab label="Vue">
-
-```sh
-bunx --bun shadcn-vue@latest add button card input label badge checkbox separator
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```sh
-bunx --bun shadcn-svelte@latest add button card input label badge checkbox separator
-```
-
-  </Tab>
-</Tabs>
-
-For the add command make the same `bunx --bun` replacement and keep the component names.
-
-<Callout type="tip" title="Checkpoint">
-`ClientApp/components/ui/` should now contain the components: `button.tsx`, `card.tsx`, `input.tsx` and so on for React, or one folder per component (`button/`, `card/`, ...) for Vue and Svelte. If the CLI asks a question you do not understand, choose the default; you can always rerun it.
+<Callout type="tip" title="On .NET 11?">
+Use `--version "11.*"` for the SQLite package. The EF Core version must match your .NET version.
 </Callout>
 
-Replace `ClientApp/Layout.tsx` (`Layout.vue` or `Layout.svelte`) with the shared shell:
-
-<Tabs>
-  <Tab label="React">
-
-```tsx
-import { Link, usePage } from '@inertiajs/react'
-import { LogOut, NotebookPen, UserRound } from 'lucide-react'
-import type { ReactNode } from 'react'
-import { Button } from '@/components/ui/button'
-
-export default function Layout({ children }: { children: ReactNode }) {
-  const { props, flash } = usePage()
-
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b">
-        <div className="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <NotebookPen className="size-5 text-primary" />
-            ForgetMeNot
-          </Link>
-
-          <nav className="ml-auto flex items-center gap-2">
-            {props.auth ? (
-              <>
-                <Button asChild variant="ghost" size="sm"><Link href="/todos">My lists</Link></Button>
-                <span className="hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
-                  <UserRound className="size-4" /> {props.auth.displayName}
-                </span>
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/logout" method="post" as="button"><LogOut className="size-4" /> Sign out</Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button asChild variant="ghost" size="sm"><Link href="/login">Sign in</Link></Button>
-                <Button asChild size="sm"><Link href="/register">Create account</Link></Button>
-              </>
-            )}
-          </nav>
-        </div>
-      </header>
-
-      {flash.success && (
-        <div className="border-b bg-emerald-50 px-4 py-2 text-center text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-          {flash.success}
-        </div>
-      )}
-
-      <main className="mx-auto max-w-5xl px-4 py-10">{children}</main>
-    </div>
-  )
-}
-```
-
-  </Tab>
-  <Tab label="Vue">
-
-```vue
-<script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3'
-import { LogOut, NotebookPen, UserRound } from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-
-const page = usePage()
-</script>
-
-<template>
-  <div class="min-h-screen bg-background text-foreground">
-    <header class="border-b">
-      <div class="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4">
-        <Link href="/" class="flex items-center gap-2 font-semibold">
-          <NotebookPen class="size-5 text-primary" />
-          ForgetMeNot
-        </Link>
-
-        <nav class="ml-auto flex items-center gap-2">
-          <template v-if="page.props.auth">
-            <Button as-child variant="ghost" size="sm"><Link href="/todos">My lists</Link></Button>
-            <span class="hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
-              <UserRound class="size-4" /> {{ page.props.auth.displayName }}
-            </span>
-            <Button as-child variant="ghost" size="sm">
-              <Link href="/logout" method="post" as="button"><LogOut class="size-4" /> Sign out</Link>
-            </Button>
-          </template>
-          <template v-else>
-            <Button as-child variant="ghost" size="sm"><Link href="/login">Sign in</Link></Button>
-            <Button as-child size="sm"><Link href="/register">Create account</Link></Button>
-          </template>
-        </nav>
-      </div>
-    </header>
-
-    <div
-      v-if="page.flash.success"
-      class="border-b bg-emerald-50 px-4 py-2 text-center text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
-    >
-      {{ page.flash.success }}
-    </div>
-
-    <main class="mx-auto max-w-5xl px-4 py-10"><slot /></main>
-  </div>
-</template>
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```svelte
-<script lang="ts">
-  import { Link, page } from '@inertiajs/svelte'
-  import { LogOut, NotebookPen, UserRound } from '@lucide/svelte'
-  import type { Snippet } from 'svelte'
-  import { buttonVariants } from '@/components/ui/button'
-
-  let { children }: { children: Snippet } = $props()
-</script>
-
-<div class="min-h-screen bg-background text-foreground">
-  <header class="border-b">
-    <div class="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4">
-      <Link href="/" class="flex items-center gap-2 font-semibold">
-        <NotebookPen class="size-5 text-primary" />
-        ForgetMeNot
-      </Link>
-
-      <nav class="ml-auto flex items-center gap-2">
-        {#if page.props.auth}
-          <Link href="/todos" class={buttonVariants({ variant: 'ghost', size: 'sm' })}>My lists</Link>
-          <span class="hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
-            <UserRound class="size-4" /> {page.props.auth.displayName}
-          </span>
-          <Link href="/logout" method="post" as="button" class={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-            <LogOut class="size-4" /> Sign out
-          </Link>
-        {:else}
-          <Link href="/login" class={buttonVariants({ variant: 'ghost', size: 'sm' })}>Sign in</Link>
-          <Link href="/register" class={buttonVariants({ size: 'sm' })}>Create account</Link>
-        {/if}
-      </nav>
-    </div>
-  </header>
-
-  {#if page.flash.success}
-    <div class="border-b bg-emerald-50 px-4 py-2 text-center text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-      {page.flash.success}
-    </div>
-  {/if}
-
-  <main class="mx-auto max-w-5xl px-4 py-10">{@render children()}</main>
-</div>
-```
-
-  </Tab>
-</Tabs>
-
-And replace the template home page with a friendly landing page:
-
-<Tabs>
-  <Tab label="React">
-
-```tsx
-// ClientApp/pages/Home.tsx
-import { Link } from '@inertiajs/react'
-import { ArrowRight, CheckCircle2 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import Layout from '../Layout'
-
-export default function Home() {
-  return (
-    <Layout>
-      <section className="mx-auto max-w-3xl py-16 text-center">
-        <Badge variant="secondary">Inertia.Net sample</Badge>
-        <h1 className="mt-6 text-balance text-5xl font-semibold tracking-tight">
-          Remember everything. Share what matters.
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-          Private lists, public links, due dates and reminders — built with ASP.NET Core and Inertia.
-        </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <Button asChild size="lg"><Link href="/register">Create an account <ArrowRight className="size-4" /></Link></Button>
-          <Button asChild size="lg" variant="outline"><Link href="/login">Sign in</Link></Button>
-        </div>
-      </section>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        {['Private by default', 'One public link', 'Reminders that fire once'].map((text) => (
-          <Card key={text}>
-            <CardContent className="flex items-center gap-2 p-5 text-sm">
-              <CheckCircle2 className="size-4 text-primary" /> {text}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </Layout>
-  )
-}
-```
-
-  </Tab>
-  <Tab label="Vue">
-
-```vue
-<!-- ClientApp/pages/Home.vue -->
-<script setup lang="ts">
-import { Link } from '@inertiajs/vue3'
-import { ArrowRight, CheckCircle2 } from 'lucide-vue-next'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import Layout from '../Layout.vue'
-
-const features = ['Private by default', 'One public link', 'Reminders that fire once']
-</script>
-
-<template>
-  <Layout>
-    <section class="mx-auto max-w-3xl py-16 text-center">
-      <Badge variant="secondary">Inertia.Net sample</Badge>
-      <h1 class="mt-6 text-balance text-5xl font-semibold tracking-tight">
-        Remember everything. Share what matters.
-      </h1>
-      <p class="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-        Private lists, public links, due dates and reminders — built with ASP.NET Core and Inertia.
-      </p>
-      <div class="mt-8 flex justify-center gap-3">
-        <Button as-child size="lg"><Link href="/register">Create an account <ArrowRight class="size-4" /></Link></Button>
-        <Button as-child size="lg" variant="outline"><Link href="/login">Sign in</Link></Button>
-      </div>
-    </section>
-
-    <div class="grid gap-4 sm:grid-cols-3">
-      <Card v-for="text in features" :key="text">
-        <CardContent class="flex items-center gap-2 p-5 text-sm">
-          <CheckCircle2 class="size-4 text-primary" /> {{ text }}
-        </CardContent>
-      </Card>
-    </div>
-  </Layout>
-</template>
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```svelte
-<!-- ClientApp/pages/Home.svelte -->
-<script lang="ts">
-  import { Link } from '@inertiajs/svelte'
-  import { ArrowRight, CheckCircle2 } from '@lucide/svelte'
-  import { Badge } from '@/components/ui/badge'
-  import { buttonVariants } from '@/components/ui/button'
-  import * as Card from '@/components/ui/card'
-  import Layout from '../Layout.svelte'
-
-  const features = ['Private by default', 'One public link', 'Reminders that fire once']
-</script>
-
-<Layout>
-  <section class="mx-auto max-w-3xl py-16 text-center">
-    <Badge variant="secondary">Inertia.Net sample</Badge>
-    <h1 class="mt-6 text-balance text-5xl font-semibold tracking-tight">
-      Remember everything. Share what matters.
-    </h1>
-    <p class="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-      Private lists, public links, due dates and reminders — built with ASP.NET Core and Inertia.
-    </p>
-    <div class="mt-8 flex justify-center gap-3">
-      <Link href="/register" class={buttonVariants({ size: 'lg' })}>Create an account <ArrowRight class="size-4" /></Link>
-      <Link href="/login" class={buttonVariants({ size: 'lg', variant: 'outline' })}>Sign in</Link>
-    </div>
-  </section>
-
-  <div class="grid gap-4 sm:grid-cols-3">
-    {#each features as text (text)}
-      <Card.Root>
-        <Card.Content class="flex items-center gap-2 p-5 text-sm">
-          <CheckCircle2 class="size-4 text-primary" /> {text}
-        </Card.Content>
-      </Card.Root>
-    {/each}
-  </div>
-</Layout>
-```
-
-  </Tab>
-</Tabs>
-
-## 3. Give the app a clean structure
-
-The template keeps everything in `Program.cs`. We will move the setup into small files so `Program.cs` stays readable. Create these folders:
-
-```text
-ForgetMeNot/
-  Data/
-  Endpoints/
-  Infrastructure/
-```
-
-The final `Program.cs` is only a few lines:
+Create `Data.cs`. These classes are the **database shape**. They are not what the browser sees; that comes next.
 
 ```csharp
-using ForgetMeNot;
-using ForgetMeNot.Endpoints;
-using ForgetMeNot.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
-var builder = WebApplication.CreateBuilder(args);
-builder.AddForgetMeNot();
-
-var app = builder.Build();
-app.UseForgetMeNot();
-app.MapForgetMeNot();
-
-app.Run();
-```
-
-Each extension does one job:
-
-| File | Responsibility |
-|---|---|
-| `Infrastructure/ForgetMeNotSetup.cs` | The one `AddForgetMeNot()` and `UseForgetMeNot()` entry point |
-| `Infrastructure/DataSetup.cs` | EF Core and SQLite |
-| `Infrastructure/SessionAuthSetup.cs` | Session, antiforgery and password hashing |
-| `Infrastructure/InertiaSetup.cs` | Inertia options, shared props and SSR |
-| `Infrastructure/SessionAuth.cs` | Sign in/out helpers and the `RequireSessionUser` filter |
-| `Endpoints/AuthEndpoints.cs` | Register, login and logout |
-| `Endpoints/TodoEndpoints.cs` | Private lists and items |
-| `Endpoints/PublicEndpoints.cs` | The public share page |
-
-A beginner can read `Program.cs` in one glance. That is the point.
-
-The route table is also one readable file:
-
-```csharp
-// Endpoints/ForgetMeNotEndpoints.cs
-public static class ForgetMeNotEndpoints
-{
-    public static IEndpointRouteBuilder MapForgetMeNot(this IEndpointRouteBuilder app)
-    {
-        app.MapGet("/health", () => Results.Ok("ok"));
-        app.MapGet("/", () => Render("Home"));
-        app.MapGet("/login", () => Render("Auth/Login"));
-        app.MapGet("/register", () => Render("Auth/Register"));
-
-        app.MapAuthEndpoints();
-        app.MapTodoEndpoints();
-        app.MapPublicEndpoints();
-        return app;
-    }
-}
-```
-
-If a route is hard to find, start there.
-
-## 4. Model the data
-
-Add the entities:
-
-```csharp
-// Data/Entities.cs
-public sealed class AppUser
-{
-    public int Id { get; set; }
-    public required string Email { get; set; }
-    public required string DisplayName { get; set; }
-    public required string PasswordHash { get; set; }
-    public List<TodoList> Lists { get; } = [];
-}
+namespace ForgetMeNot;
 
 public sealed class TodoList
 {
     public int Id { get; set; }
-    public int UserId { get; set; }
-    public AppUser User { get; set; } = null!;
+    public required string OwnerEmail { get; set; }
     public required string Title { get; set; }
-    public required string PublicSlug { get; set; }
-    public bool IsPublic { get; set; }
+
+    /// <summary>The secret part of the public URL. Null while the list is private.</summary>
+    public string? ShareSlug { get; set; }
+
     public List<TodoItem> Items { get; } = [];
 }
 
@@ -668,428 +142,312 @@ public sealed class TodoItem
     public TodoList List { get; set; } = null!;
     public required string Title { get; set; }
     public bool IsDone { get; set; }
-    public DateTimeOffset? DueAt { get; set; }
-    public DateTimeOffset? RemindAt { get; set; }
-    public DateTimeOffset? RemindedAt { get; set; }
+
+    // / <summary>When to remind the owner, in UTC. Null means no reminder. (A DateTime, not a
+    // DateTimeOffset: SQLite cannot compare those in a query.)</summary>
+    public DateTime? RemindAt { get; set; }
+
+    /// <summary>Set once the reminder has fired, so a restart never sends it twice.</summary>
+    public DateTime? RemindedAt { get; set; }
 }
-```
 
-`PublicSlug` is the secret part of a public URL. `RemindedAt` makes reminder delivery idempotent: if the worker restarts, it does not send the same reminder again.
-
-```csharp
-// Data/AppDbContext.cs
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 {
-    public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<TodoList> Lists => Set<TodoList>();
     public DbSet<TodoItem> Items => Set<TodoItem>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
-        model.Entity<TodoList>().HasIndex(l => l.PublicSlug).IsUnique();
-        model.Entity<TodoItem>().HasIndex(i => new { i.TodoListId, i.RemindAt, i.RemindedAt });
+        model.Entity<TodoList>().HasIndex(l => l.OwnerEmail);
+        model.Entity<TodoList>().HasIndex(l => l.ShareSlug).IsUnique();
     }
 }
 ```
+
+A few choices are worth explaining:
+
+- **`OwnerEmail` instead of a users table.** The template's demo user already has an email in the sign-in cookie. Using it as the owner key keeps this guide short. In a real app you would use ASP.NET Core Identity and a user id.
+- **`ShareSlug` is null until you share.** A random secret in the URL is the only thing that opens a public list. There is nothing to guess, and turning sharing off simply forgets the secret.
+- **`RemindedAt` makes reminders safe to repeat.** If the app restarts halfway through, a reminder that was already sent is never sent twice.
+- **`DateTime`, not `DateTimeOffset`, for reminders.** SQLite cannot compare `DateTimeOffset` values inside a query. We store UTC times as plain `DateTime`, and the query `RemindAt <= now` works.
+
+Now open `Program.cs`. First, **delete the demo todo code** that came with the template. We replace it with our own:
+
+- the `AddSingleton<TodoStore>()` line
+- the `/todos` endpoints (the ones named `todos.index`, `todos.store`, `todos.toggle` and `todos.destroy`)
+- the `/dashboard` endpoint and the `DashboardPage` record
+- the `Todo`, `TodoStats`, `TodosPage`, `NewTodo` and `TodoStore` types
+- their lines in `AppJsonContext` at the bottom
+
+Then register the database where the other services are registered:
 
 ```csharp
-// Data/PageModels.cs
-public sealed record TodoListDto(int Id, string Title, string PublicSlug, bool IsPublic, int Total, int Open);
-public sealed record TodoItemDto(int Id, string Title, bool IsDone, DateTimeOffset? DueAt);
-public sealed record TodoListHeader(int Id, string Title, string PublicSlug, bool IsPublic);
-public sealed record ReminderDto(int Id, string Title, DateTimeOffset RemindAt);
-public sealed record TodoStats(int Open, int Done, int DueToday);
-public sealed record PublicListHeader(int Id, string Title, string Owner, int OpenCount);
-public sealed record PublicTodoDto(int Id, string Title, DateTimeOffset? DueAt);
-public sealed record TodoItemsPage(List<TodoItemDto> Data);
-public sealed record PublicTodoPage(List<PublicTodoDto> Data);
+using Microsoft.EntityFrameworkCore; // at the top of the file
 
-public sealed class CreateListForm
-{
-    [Required, MaxLength(120)]
-    public string? Title { get; set; }
-
-    public bool IsPublic { get; set; }
-}
-
-public sealed class CreateTodoForm
-{
-    [Required, MaxLength(200)]
-    public string? Title { get; set; }
-
-    public DateTimeOffset? DueAt { get; set; }
-    public DateTimeOffset? RemindAt { get; set; }
-}
+builder.Services.AddDbContext<AppDb>(o =>
+    o.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=forgetmenot.db"));
 ```
 
-The template uses source-generated JSON. Add every prop and form type to its `AppJsonContext`:
+And create the tables right after `var app = builder.Build();`:
 
 ```csharp
-[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
-[JsonSerializable(typeof(AuthUser))]
-[JsonSerializable(typeof(SharedProps))]
-[JsonSerializable(typeof(Flash))]
-[JsonSerializable(typeof(TodoListDto))]
-[JsonSerializable(typeof(List<TodoListDto>))]
-[JsonSerializable(typeof(TodoItemDto))]
-[JsonSerializable(typeof(TodoListHeader))]
-[JsonSerializable(typeof(TodoItemsPage))]
-[JsonSerializable(typeof(ReminderDto))]
-[JsonSerializable(typeof(List<ReminderDto>))]
-[JsonSerializable(typeof(TodoStats))]
-[JsonSerializable(typeof(PublicListHeader))]
-[JsonSerializable(typeof(PublicTodoDto))]
-[JsonSerializable(typeof(PublicTodoPage))]
-[JsonSerializable(typeof(RegisterForm))]
-[JsonSerializable(typeof(LoginForm))]
-[JsonSerializable(typeof(CreateListForm))]
-[JsonSerializable(typeof(CreateTodoForm))]
-internal sealed partial class AppJsonContext : JsonSerializerContext;
-```
-
-The data setup extension:
-
-```csharp
-// Infrastructure/DataSetup.cs
-public static class DataSetup
+using (var scope = app.Services.CreateScope())
 {
-    public static WebApplicationBuilder AddForgetMeNotData(this WebApplicationBuilder builder)
-    {
-        builder.Services.AddDbContext<AppDbContext>(o =>
-            o.UseSqlite("Data Source=forgetmenot.db"));
-        return builder;
-    }
-
-    public static WebApplication EnsureForgetMeNotData(this WebApplication app)
-    {
-        using var scope = app.Services.CreateScope();
-        scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
-        return app;
-    }
+    // fine for a first app; use migrations later
+    scope.ServiceProvider.GetRequiredService<AppDb>().Database.EnsureCreated();
 }
 ```
 
-`EnsureCreated()` is perfect for a first app. For production, replace it with EF migrations.
-
-## 5. Use sessions for sign-in
-
-Sessions keep the signed-in user id and Inertia's flash/error state on the server. The browser only holds an HttpOnly session cookie.
-
-```csharp
-// Infrastructure/SessionAuthSetup.cs
-public static class SessionAuthSetup
-{
-    public static WebApplicationBuilder AddForgetMeNotSessionAuth(this WebApplicationBuilder builder)
-    {
-        builder.Services.AddDistributedMemoryCache();
-        builder.Services.AddSession(o =>
-        {
-            o.Cookie.Name = ".fmn.session";
-            o.Cookie.HttpOnly = true;
-            o.Cookie.IsEssential = true;
-            o.Cookie.SameSite = SameSiteMode.Lax;
-            o.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-                ? CookieSecurePolicy.SameAsRequest
-                : CookieSecurePolicy.Always;
-            o.IdleTimeout = TimeSpan.FromDays(7);
-        });
-
-        builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
-        builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
-        return builder;
-    }
-
-    public static WebApplication UseForgetMeNotSession(this WebApplication app)
-    {
-        app.UseSession();
-        return app;
-    }
-}
-```
-
-The session helpers and the endpoint filter:
-
-```csharp
-// Infrastructure/SessionAuth.cs
-public static class SessionAuth
-{
-    public const string UserIdKey = "fmn.user-id";
-    public const string DisplayNameKey = "fmn.display-name";
-
-    public static int? UserId(this HttpContext http) => http.Session.GetInt32(UserIdKey);
-
-    public static void SignIn(this HttpContext http, AppUser user)
-    {
-        http.Session.SetInt32(UserIdKey, user.Id);
-        http.Session.SetString(DisplayNameKey, user.DisplayName);
-    }
-
-    public static void SignOut(this HttpContext http) => http.Session.Clear();
-}
-
-public sealed class RequireSessionUser : IEndpointFilter
-{
-    public async ValueTask<object?> InvokeAsync(
-        EndpointFilterInvocationContext context,
-        EndpointFilterDelegate next)
-    {
-        if (context.HttpContext.UserId() is null)
-        {
-            return Inertia.Net.Inertia.Location("/login");
-        }
-
-        return await next(context);
-    }
-}
-```
-
-<Callout type="warning" title="One instance for this sample">
-`AddDistributedMemoryCache()` keeps sessions in memory. That is fine for one app instance. For more than one replica, register a shared cache such as Redis, or the session will only exist on the instance that created it.
+<Callout type="info" title="Why read the connection string from configuration?">
+Production and tests need a different database than your laptop. With `GetConnectionString("Default")` they can set `ConnectionStrings:Default` without touching the code. We use this in the tests.
 </Callout>
 
-## 6. Hide the Inertia setup
+`EnsureCreated()` builds the tables on the first run. It cannot change them later. When the model changes in a real app, switch to EF Core migrations.
 
-`InertiaSetup.cs` is the only file a beginner needs to know when they want to change Inertia behavior.
+## 4. Decide what the browser sees
+
+Never send a database entity to the browser. It may have columns you did not mean to share (like `OwnerEmail`), and every change to the table would change your page. Send small **records** that hold only what a page needs.
+
+Create `Models.cs`:
 
 ```csharp
-// Infrastructure/InertiaSetup.cs
-public static class InertiaSetup
+using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
+
+namespace ForgetMeNot;
+
+// What the browser receives: small records, never the database entities.
+
+public sealed record ListCard(int Id, string Title, int Open, int Total, bool IsShared);
+public sealed record Stats(int Open, int Done);
+public sealed record ReminderRow(int Id, int ListId, string Title, DateTime RemindAt);
+public sealed record ListHeader(int Id, string Title, bool IsShared, string? ShareUrl);
+public sealed record ItemRow(int Id, string Title, bool IsDone, DateTime? RemindAt);
+public sealed record PublicHeader(string Title, int Open);
+public sealed record PublicItem(int Id, string Title);
+
+// What the browser sends. These are public classes because the AddValidation() generator skips internal
+// types.
+
+public sealed class NewList
 {
-    public static WebApplicationBuilder AddForgetMeNotInertia(this WebApplicationBuilder builder)
-    {
-        builder.Services.AddInertia(o =>
-        {
-            o.Share("appName", "ForgetMeNot");
-            o.Share("auth", ctx =>
-            {
-                var id = ctx.Session.GetInt32(SessionAuth.UserIdKey);
-                var name = ctx.Session.GetString(SessionAuth.DisplayNameKey);
-                return id is null ? null : new AuthUser(id.Value, name ?? "You");
-            });
-            o.Share("baseUrl", ctx =>
-                $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}");
-
-            o.Pages.Directory = "ClientApp/pages";
-            o.Vite.Prefetch = VitePrefetch.Waterfall;
-            o.State.UseSession();                  // flash/errors live in the session too
-            o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";
-            o.TypeScript.SharedProps<SharedProps>().FlashData<Flash>();
-            o.Ssr.BundlePath = "ssr/ssr.js";
-            o.Ssr.Mode = SsrMode.Preferred;
-            o.Ssr.UseNodeProcess(n => n.Executable = "bun");
-        });
-
-        builder.Services.AddInertiaDevTools();
-        return builder;
-    }
-
-    public static WebApplication UseForgetMeNotInertia(this WebApplication app)
-    {
-        app.UseInertia();
-        app.UseInertiaAntiforgery();
-        return app;
-    }
+    [Required, StringLength(80)]
+    public string? Title { get; set; }
 }
 
-public sealed record AuthUser(int Id, string DisplayName);
-public sealed record SharedProps(string AppName, AuthUser? Auth, string BaseUrl);
-public sealed record Flash(string? Success);
-```
-
-Now the aggregate setup:
-
-```csharp
-// Infrastructure/ForgetMeNotSetup.cs
-public static class ForgetMeNotSetup
+public sealed class NewItem
 {
-    public static WebApplicationBuilder AddForgetMeNot(this WebApplicationBuilder builder)
-    {
-        builder.Services.Configure<ForwardedHeadersOptions>(o =>
-        {
-            o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            o.ForwardLimit = 1;
-            o.KnownIPNetworks.Clear();
-            o.KnownProxies.Clear();
-        });
+    [Required, StringLength(200)]
+    public string? Title { get; set; }
 
-        builder.Services.AddValidation();
-        builder.Services.AddProblemDetails();
-        builder.Services.AddResponseCompression(o => o.EnableForHttps = true);
-        builder.Services.ConfigureHttpJsonOptions(o =>
-            o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
+    public DateTime? RemindAt { get; set; }
+}
 
-        builder.AddForgetMeNotData();
-        builder.AddForgetMeNotSessionAuth();
-        builder.AddForgetMeNotInertia();
-        return builder;
-    }
+// / <summary>An event name plus the channel it travels on. The page and the publisher both use this one
+// value.</summary>
+public static class Events
+{
+    public static LiveEvent RemindersChanged(string email) => new("RemindersChanged", LiveChannel.Private($"users.{email}"));
+}
 
-    public static WebApplication UseForgetMeNot(this WebApplication app)
-    {
-        app.UseForwardedHeaders();
-        app.UseResponseCompression();
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            OnPrepareResponse = c =>
-            {
-                if (c.Context.Request.Path.StartsWithSegments("/build/assets"))
-                    c.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
-            },
-        });
-
-        app.UseForgetMeNotSession();
-        app.UseForgetMeNotInertia();
-        app.EnsureForgetMeNotData();
-        return app;
-    }
+public static class UserExtensions
+{
+    /// <summary>The signed-in person's email: our key for "whose list is this?".</summary>
+    public static string Email(this ClaimsPrincipal user) => user.FindFirstValue(ClaimTypes.Email)!;
 }
 ```
 
-`UseSession()` must run before `UseInertia()`. Add forwarded-header configuration if you deploy behind Coolify or another TLS proxy.
+Three things here are easy to miss:
 
-## 7. Register, sign in and sign out
+- **Form classes are `public`.** The validation generator, `AddValidation()`, skips `internal` types. A private form class means the `[Required]` rules silently do nothing.
+- **`Events.RemindersChanged(email)` is one value used twice.** The page uses it to say "refresh me when this happens", and the worker uses it to say "this happened". Because both use the same value, they cannot drift apart.
+- **`Email()` hides one claim lookup.** Every endpoint asks the same question, "whose list is this?", so we ask it in one place.
 
-The endpoints live in `Endpoints/AuthEndpoints.cs` and are mapped from `MapForgetMeNot()`. `WithInertiaValidation()` turns model errors into a redirect back with `errors`.
+The template turned off reflection-based JSON, which keeps the app ready for Native AOT. The price is that you list every type that goes to or from the browser. Add these lines to `AppJsonContext` at the bottom of `Program.cs`:
 
 ```csharp
-public sealed class RegisterForm
+[JsonSerializable(typeof(ListCard))]
+[JsonSerializable(typeof(Stats))]
+[JsonSerializable(typeof(List<ReminderRow>))]
+[JsonSerializable(typeof(Page<ItemRow>))]
+[JsonSerializable(typeof(Page<PublicItem>))]
+[JsonSerializable(typeof(NewList))]
+[JsonSerializable(typeof(NewItem))]
+```
+
+Each page record gets its own line when you create it: `ListsPage` in step 5, `ListPage` in step 6 and `PublicPage` in step 7.
+
+<Callout type="tip" title="Forgot one?">
+You get an error the first time that type is sent, and the message names the type. Add it and try again.
+</Callout>
+
+## 5. The lists page
+
+A **page record** holds the props of a page and also the code that fills them. Create `ListsPage.cs`:
+
+```csharp
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+
+namespace ForgetMeNot;
+
+public sealed record ListsPage(
+    List<ListCard> Lists,
+    [property: InertiaPropType(typeof(Stats))] InertiaProp Stats,
+    [property: InertiaPropType(typeof(List<ReminderRow>))] InertiaProp Reminders) : IInertiaPage
 {
-    [Required, EmailAddress]
-    public string? Email { get; set; }
+    public static string Component => "Lists/Index";
 
-    [Required, MinLength(8)]
-    public string? Password { get; set; }
-
-    [Required, MaxLength(80)]
-    public string? DisplayName { get; set; }
-}
-
-public sealed class LoginForm
-{
-    [Required, EmailAddress]
-    public string? Email { get; set; }
-
-    [Required]
-    public string? Password { get; set; }
-}
-
-public static class AuthEndpoints
-{
-    public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
+    public static async Task<IResult> Handle(ClaimsPrincipal user, AppDb db, CancellationToken ct)
     {
-        app.MapPost("/register", async (
-            RegisterForm form, AppDbContext db, IPasswordHasher<AppUser> hasher, HttpContext http) =>
+        var email = user.Email();
+
+        var lists = await db.Lists.AsNoTracking()
+            .Where(l => l.OwnerEmail == email)
+            .OrderBy(l => l.Title)
+            .Select(l => new ListCard(l.Id, l.Title, l.Items.Count(i => !i.IsDone), l.Items.Count, l.ShareSlug != null))
+            .ToListAsync(ct);
+
+        return Render(new ListsPage(
+            lists,
+            // Slow part: sent after the page shows. Cached per person, and cleared by tag whenever their
+            // data changes.
+            Defer(c => LoadStats(db, email, c))
+                .Cache($"stats:{email}", TimeSpan.FromMinutes(5), tags: [$"user:{email}"]),
+            // Refreshes by itself when the reminder worker publishes this event.
+            Defer(c => LoadReminders(db, email, c)).Live(Events.RemindersChanged(email))));
+    }
+
+    private static async Task<Stats> LoadStats(AppDb db, string email, CancellationToken ct) =>
+        new(await db.Items.CountAsync(i => i.List.OwnerEmail == email && !i.IsDone, ct),
+            await db.Items.CountAsync(i => i.List.OwnerEmail == email && i.IsDone, ct));
+
+    private static Task<List<ReminderRow>> LoadReminders(AppDb db, string email, CancellationToken ct) =>
+        db.Items.AsNoTracking()
+            .Where(i => i.List.OwnerEmail == email && i.RemindedAt != null && !i.IsDone)
+            .OrderByDescending(i => i.Id)
+            .Take(10)
+            .Select(i => new ReminderRow(i.Id, i.TodoListId, i.Title, i.RemindAt!.Value))
+            .ToListAsync(ct);
+}
+```
+
+Add `[JsonSerializable(typeof(ListsPage))]` to `AppJsonContext`, then read the handler from top to bottom:
+
+1. `lists` is read straight from the database into `ListCard` records. `AsNoTracking()` tells EF Core we will not change these rows, which makes the query cheaper.
+2. `Stats` is **deferred**. The page is sent right away and the browser asks for the numbers a moment later. The visitor sees the page sooner, even if counting is slow.
+3. `.Cache(...)` keeps the finished stats for five minutes, so a second visit does not count again. The `tags` give us a way to throw them away: every write will remove the tag `user:email`, so the numbers are never wrong for long.
+4. `Reminders` is deferred and **live**. We come back to it in step 8.
+
+Now the routes. Create `Endpoints.cs`:
+
+```csharp
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+
+namespace ForgetMeNot;
+
+public static class ForgetMeNotEndpoints
+{
+    public static void MapForgetMeNot(this IEndpointRouteBuilder app)
+    {
+        // Everything in this group needs a signed-in person. The cookie handler sends everyone else to
+        // /login.
+        var signedIn = app.MapGroup("").RequireAuthorization();
+
+        // Each .WithName(...) gives the route a typed function in ClientApp/types/routes.ts.
+        signedIn.MapGet("/lists", ListsPage.Handle).WithName("lists.index");
+
+        signedIn.MapPost("/lists", async (
+            NewList input, ClaimsPrincipal user, AppDb db, IInertiaCache cache, CancellationToken ct) =>
         {
-            var email = form.Email!.Trim().ToLowerInvariant();
-            if (await db.Users.AnyAsync(u => u.Email == email))
-            {
-                return Back().WithErrors(new Dictionary<string, string>
-                {
-                    ["email"] = "An account with this email already exists.",
-                });
-            }
-
-            var user = new AppUser
-            {
-                Email = email,
-                DisplayName = form.DisplayName!.Trim(),
-                PasswordHash = "",
-            };
-            user.PasswordHash = hasher.HashPassword(user, form.Password!);
-
-            db.Users.Add(user);
-            await db.SaveChangesAsync();
-
-            http.Inertia().Flash("success", "Account created. Sign in to continue.");
-            return Results.Redirect("/login");
-        }).WithInertiaValidation();
-
-        app.MapPost("/login", async (
-            LoginForm form, AppDbContext db, IPasswordHasher<AppUser> hasher, HttpContext http) =>
-        {
-            var email = form.Email!.Trim().ToLowerInvariant();
-            var user = await db.Users.SingleOrDefaultAsync(u => u.Email == email);
-
-            if (user is null || hasher.VerifyHashedPassword(user, user.PasswordHash, form.Password!)
-                == PasswordVerificationResult.Failed)
-            {
-                return Back().WithErrors(new Dictionary<string, string>
-                {
-                    ["email"] = "These credentials do not match our records.",
-                });
-            }
-
-            http.SignIn(user);
-            return Results.Redirect("/todos");
-        }).WithInertiaValidation();
-
-        app.MapPost("/logout", (HttpContext http) =>
-        {
-            http.SignOut();
-            http.Inertia().ClearHistory();
-            return Results.Redirect("/");
-        });
-
-        return app;
+            var list = new TodoList { OwnerEmail = user.Email(), Title = input.Title!.Trim() };
+            db.Lists.Add(list);
+            await db.SaveChangesAsync(ct);
+            // the cached stats are out of date now
+            await cache.RemoveByTagAsync($"user:{user.Email()}", ct);
+            return Results.Redirect($"/lists/{list.Id}");
+        }).WithInertiaPrecognition().WithName("lists.store");
     }
 }
 ```
 
-The login page uses `useForm` and shadcn components:
+Call it from `Program.cs`, in the place where the `/dashboard` endpoint used to be:
+
+```csharp
+app.MapForgetMeNot(); // our lists, items and the public page
+```
+
+Also send people to their lists after they sign in. In the `/login` endpoint, change the last `"/dashboard"` to `"/lists"`.
+
+<Callout type="info" title="Why these routes have names">
+`.WithName("lists.store")` costs nothing, and it pays you back twice. The name becomes `routes.lists.store()` in your frontend, so you never type `"/lists"` again. And the form's type, `RouteBodies['lists.store']`, is taken from the C# class `NewList`, so the C# and the TypeScript cannot disagree.
+</Callout>
+
+<Callout type="info" title="Why .WithInertiaPrecognition()?">
+It does two jobs. A normal submit with bad data is sent back to the form with the error messages. And when the page asks, "is this one field valid?" while the person is still typing, the server answers without running your code. You write the rules once, on the class, with `[Required]` and `[StringLength]`.
+</Callout>
+
+### Make the frontend ready
+
+Write the types and routes files now. The app does this by itself when it starts in Development; this command does it on demand, which is handy in CI:
+
+```sh
+bun run types
+```
+
+Open `ClientApp/types/routes.ts` and look. You will find functions you did not write, one per named route:
+
+```ts
+routes.lists.index()            // { url: '/lists', method: 'get' }
+routes.lists.store()            // { url: '/lists', method: 'post' }
+routes.lists.index.url()        // '/lists'
+```
+
+Now run the checker. It should fail, and that is the point:
+
+```sh
+bun run build
+```
+
+Because we deleted the `todos` and `dashboard` routes, TypeScript lists every place that still uses them: the layout and the home page. A string URL would have failed silently, in front of a visitor. A typed route fails at your desk.
+
+Fix them one by one. First the layout, which is used by every page. It shows the **My lists** link and the messages the server sends after an action (the **flash** messages):
 
 <Tabs>
   <Tab label="React">
 
 ```tsx
-// ClientApp/pages/Auth/Login.tsx
-import { Link, useForm } from '@inertiajs/react'
-import type { FormEvent } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import Layout from '../../Layout'
+// ClientApp/Layout.tsx
+import { Link, router, usePage } from '@inertiajs/react'
+import type { ReactNode } from 'react'
+import { routes } from './types/routes'
 
-export default function Login() {
-  const form = useForm({ email: '', password: '' })
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    form.post('/login', { onFinish: () => form.reset('password') })
-  }
+export default function Layout({ children }: { children: ReactNode }) {
+  // props.appName, props.auth and flash are typed by types/inertia.d.ts.
+  const { props, flash } = usePage()
+  const user = props.auth.user
 
   return (
-    <Layout>
-      <Card className="mx-auto mt-12 max-w-md">
-        <CardHeader>
-          <CardTitle>Welcome back</CardTitle>
-          <CardDescription>Sign in to see your lists and reminders.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} />
-              {form.errors.email && <p className="text-sm text-red-600">{form.errors.email}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={form.data.password} onChange={(e) => form.setData('password', e.target.value)} />
-              {form.errors.password && <p className="text-sm text-red-600">{form.errors.password}</p>}
-            </div>
-
-            <Button type="submit" className="w-full" disabled={form.processing}>
-              {form.processing ? 'Signing in...' : 'Sign in'}
-            </Button>
-
-            <p className="text-center text-sm text-muted-foreground">
-              New here? <Link href="/register" className="font-medium text-foreground underline">Create an account</Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
-    </Layout>
+    <div className="mx-auto max-w-2xl px-4 py-6 font-sans text-slate-900">
+      <header className="flex items-center gap-4 border-b border-slate-200 pb-4">
+        <Link href={routes.home()} className="font-semibold">{props.appName}</Link>
+        <nav className="flex flex-1 items-center gap-4 text-sm">
+          {user ? (
+            <>
+              <Link href={routes.lists.index()}>My lists</Link>
+              <span className="ml-auto text-slate-500">{user.name}</span>
+              <button className="underline" onClick={() => router.visit(routes.logout())}>Log out</button>
+            </>
+          ) : (
+            <Link href={routes.login()} className="ml-auto">Log in</Link>
+          )}
+        </nav>
+      </header>
+      {flash.success && <p className="mt-4 rounded bg-green-50 px-3 py-2 text-sm text-green-800">{flash.success}</p>}
+      {flash.error && <p role="alert" className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-800">{flash.error}</p>}
+      <main className="py-6">{children}</main>
+    </div>
   )
 }
 ```
@@ -1098,52 +456,34 @@ export default function Login() {
   <Tab label="Vue">
 
 ```vue
-<!-- ClientApp/pages/Auth/Login.vue -->
+<!-- ClientApp/Layout.vue -->
 <script setup lang="ts">
-import { Link, useForm } from '@inertiajs/vue3'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import Layout from '../../Layout.vue'
+import { Link, router, usePage } from '@inertiajs/vue3'
+import { computed } from 'vue'
+import { routes } from './types/routes'
 
-const form = useForm({ email: '', password: '' })
-
-const submit = () => form.post('/login', { onFinish: () => form.reset('password') })
+// page.props.appName, page.props.auth and page.flash are typed by types/inertia.d.ts.
+const page = usePage()
+const user = computed(() => page.props.auth.user)
 </script>
 
 <template>
-  <Layout>
-    <Card class="mx-auto mt-12 max-w-md">
-      <CardHeader>
-        <CardTitle>Welcome back</CardTitle>
-        <CardDescription>Sign in to see your lists and reminders.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form class="space-y-4" @submit.prevent="submit">
-          <div class="space-y-2">
-            <Label for="email">Email</Label>
-            <Input id="email" v-model="form.email" type="email" />
-            <p v-if="form.errors.email" class="text-sm text-red-600">{{ form.errors.email }}</p>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="password">Password</Label>
-            <Input id="password" v-model="form.password" type="password" />
-            <p v-if="form.errors.password" class="text-sm text-red-600">{{ form.errors.password }}</p>
-          </div>
-
-          <Button type="submit" class="w-full" :disabled="form.processing">
-            {{ form.processing ? 'Signing in...' : 'Sign in' }}
-          </Button>
-
-          <p class="text-center text-sm text-muted-foreground">
-            New here? <Link href="/register" class="font-medium text-foreground underline">Create an account</Link>
-          </p>
-        </form>
-      </CardContent>
-    </Card>
-  </Layout>
+  <div class="mx-auto max-w-2xl px-4 py-6 font-sans text-slate-900">
+    <header class="flex items-center gap-4 border-b border-slate-200 pb-4">
+      <Link :href="routes.home()" class="font-semibold">{{ page.props.appName }}</Link>
+      <nav class="flex flex-1 items-center gap-4 text-sm">
+        <template v-if="user">
+          <Link :href="routes.lists.index()">My lists</Link>
+          <span class="ml-auto text-slate-500">{{ user.name }}</span>
+          <button class="underline" @click="router.visit(routes.logout())">Log out</button>
+        </template>
+        <Link v-else :href="routes.login()" class="ml-auto">Log in</Link>
+      </nav>
+    </header>
+    <p v-if="page.flash.success" class="mt-4 rounded bg-green-50 px-3 py-2 text-sm text-green-800">{{ page.flash.success }}</p>
+    <p v-if="page.flash.error" role="alert" class="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-800">{{ page.flash.error }}</p>
+    <main class="py-6"><slot /></main>
+  </div>
 </template>
 ```
 
@@ -1151,554 +491,432 @@ const submit = () => form.post('/login', { onFinish: () => form.reset('password'
   <Tab label="Svelte">
 
 ```svelte
-<!-- ClientApp/pages/Auth/Login.svelte -->
+<!-- ClientApp/Layout.svelte -->
 <script lang="ts">
-  import { Link, useForm } from '@inertiajs/svelte'
-  import { Button } from '@/components/ui/button'
-  import * as Card from '@/components/ui/card'
-  import { Input } from '@/components/ui/input'
-  import { Label } from '@/components/ui/label'
-  import Layout from '../../Layout.svelte'
+  import { Link, page, router } from '@inertiajs/svelte'
+  import type { Snippet } from 'svelte'
+  import { routes } from './types/routes'
 
-  const form = useForm({ email: '', password: '' })
-
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault()
-    form.post('/login', { onFinish: () => form.reset('password') })
-  }
+  let { children }: { children: Snippet } = $props()
+  const user = $derived(page.props.auth.user)
 </script>
 
-<Layout>
-  <Card.Root class="mx-auto mt-12 max-w-md">
-    <Card.Header>
-      <Card.Title>Welcome back</Card.Title>
-      <Card.Description>Sign in to see your lists and reminders.</Card.Description>
-    </Card.Header>
-    <Card.Content>
-      <form onsubmit={submit} class="space-y-4">
-        <div class="space-y-2">
-          <Label for="email">Email</Label>
-          <Input id="email" type="email" bind:value={form.email} />
-          {#if form.errors.email}<p class="text-sm text-red-600">{form.errors.email}</p>{/if}
-        </div>
-
-        <div class="space-y-2">
-          <Label for="password">Password</Label>
-          <Input id="password" type="password" bind:value={form.password} />
-          {#if form.errors.password}<p class="text-sm text-red-600">{form.errors.password}</p>{/if}
-        </div>
-
-        <Button type="submit" class="w-full" disabled={form.processing}>
-          {form.processing ? 'Signing in...' : 'Sign in'}
-        </Button>
-
-        <p class="text-center text-sm text-muted-foreground">
-          New here? <Link href="/register" class="font-medium text-foreground underline">Create an account</Link>
-        </p>
-      </form>
-    </Card.Content>
-  </Card.Root>
-</Layout>
+<!-- page.props.appName, page.props.auth and page.flash are typed by types/inertia.d.ts. -->
+<div class="mx-auto max-w-2xl px-4 py-6 font-sans text-slate-900">
+  <header class="flex items-center gap-4 border-b border-slate-200 pb-4">
+    <Link href={routes.home()} class="font-semibold">{page.props.appName}</Link>
+    <nav class="flex flex-1 items-center gap-4 text-sm">
+      {#if user}
+        <Link href={routes.lists.index()}>My lists</Link>
+        <span class="ml-auto text-slate-500">{user.name}</span>
+        <button class="underline" onclick={() => router.visit(routes.logout())}>Log out</button>
+      {:else}
+        <Link href={routes.login()} class="ml-auto">Log in</Link>
+      {/if}
+    </nav>
+  </header>
+  {#if page.flash.success}
+    <p class="mt-4 rounded bg-green-50 px-3 py-2 text-sm text-green-800">{page.flash.success}</p>
+  {/if}
+  {#if page.flash.error}
+    <p role="alert" class="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-800">{page.flash.error}</p>
+  {/if}
+  <main class="py-6">{@render children()}</main>
+</div>
 ```
 
   </Tab>
 </Tabs>
 
-The register page is the same pattern with `displayName`, `email` and `password`.
+In the home page, change the link from the todos page to `routes.lists.index()`. Then delete `ClientApp/pages/Todos` and the Dashboard page (`Dashboard.tsx`, `Dashboard.vue` or `Dashboard.svelte`). Run `bun run build` again. It passes.
 
-<Callout type="tip" title="Checkpoint">
-Create an account, sign in, refresh the page and confirm you stay signed in. Sign out and confirm you return to the home page. If the session cookie is not sent, check that `UseForgetMeNotSession()` runs before `UseForgetMeNotInertia()`.
+<Callout type="info" title="Why a warning appears when you build the C#">
+`dotnet build` prints `INERTIA002` for `ListsPage`: "this component has no file under `ClientApp/pages`". That is a helper catching a typo, or a page you forgot to write. It goes away in the next step, when we add the page.
 </Callout>
 
-## 8. Build the dashboard
+## 6. One list, with infinite scroll
 
-Map the private endpoints from `TodoEndpoints.cs`:
+A list can have thousands of items. Sending them all would make the page slow, so we send one page of items and the browser asks for the next page when the reader scrolls to the end.
+
+Create `ListPage.cs`, and add `[JsonSerializable(typeof(ListPage))]` to `AppJsonContext`:
 
 ```csharp
-public static class TodoEndpoints
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+
+namespace ForgetMeNot;
+
+public sealed record ListPage(
+    ListHeader List,
+    [property: InertiaPropType(typeof(Page<ItemRow>))] InertiaProp Items) : IInertiaPage
 {
-    public static IEndpointRouteBuilder MapTodoEndpoints(this IEndpointRouteBuilder app)
+    public static string Component => "Lists/Show";
+
+    public static async Task<IResult> Handle(
+        int id, PageRequest request, ClaimsPrincipal user, AppDb db, LinkGenerator links, CancellationToken ct)
     {
-        app.MapGet("/todos", async (HttpContext http, AppDbContext db, CancellationToken ct) =>
-        {
-            var userId = http.UserId()!.Value;
+        var email = user.Email();
 
-            var lists = await db.Lists
-                .AsNoTracking()
-                .Where(l => l.UserId == userId)
-                .OrderBy(l => l.Title)
-                .Select(l => new TodoListDto(
-                    l.Id, l.Title, l.PublicSlug, l.IsPublic,
-                    l.Items.Count, l.Items.Count(i => !i.IsDone)))
-                .ToListAsync(ct);
+        var row = await db.Lists.AsNoTracking()
+            // another person's list looks like a missing one
+            .Where(l => l.Id == id && l.OwnerEmail == email)
+            .Select(l => new { l.Id, l.Title, l.ShareSlug })
+            .FirstOrDefaultAsync(ct);
+        if (row is null) return Results.NotFound();
 
-            return Render("Todos/Index", new InertiaProps
-            {
-                ["lists"] = lists,
-                ["reminders"] = Defer(ct => LoadReminders(db, userId, ct), group: "sidebar"),
-                ["stats"] = Defer(ct => LoadStats(db, userId, ct), group: "sidebar"),
-            });
-        }).AddEndpointFilter<RequireSessionUser>();
+        // Named routes work on the server too: ask the link generator for the public address of this list.
+        var shareUrl = row.ShareSlug is null ? null : links.GetPathByName("public.show", new { slug = row.ShareSlug });
+        var list = new ListHeader(row.Id, row.Title, row.ShareSlug is not null, shareUrl);
 
-        // ...the list, create and toggle endpoints below...
-        return app;
+        // ToPageAsync adds Skip/Take and counts the rows. A unique order (Id last) keeps pages from
+        // overlapping.
+        var items = await db.Items.AsNoTracking()
+            .Where(i => i.TodoListId == id)
+            .OrderBy(i => i.IsDone).ThenBy(i => i.Id)
+            .Select(i => new ItemRow(i.Id, i.Title, i.IsDone, i.RemindAt))
+            .ToPageAsync(request, ct: ct);
+
+        return Render(new ListPage(list, Scroll(items)));
     }
 }
 ```
 
-Create a list from the dashboard:
+- **`.ToPageAsync(request)`** (from `Inertia.Net.EntityFrameworkCore`) adds `Skip` and `Take` for you and counts the rows. `PageRequest` reads `?page=2` from the URL by itself.
+- **The order must be unique.** We sort by `IsDone` and then by `Id`. If two items could tie, a row might appear on two pages or on none.
+- **`Scroll(items)`** tells the browser that this value is a list that grows. New pages are merged into `items.data` instead of replacing it.
+- **Someone else's list is a 404.** The query asks for the id and the owner together. It does not reveal that the list exists.
+- **`links.GetPathByName("public.show", ...)`** is a named route used on the **server**. The page needs the public address, and the name builds it, so the URL pattern lives in one place only. (The route is added in step 7, until then the address is simply empty.)
+
+Add the rest of the routes inside `MapForgetMeNot`, after the two list routes. Add `using System.Security.Cryptography;` at the top of the file too:
 
 ```csharp
-app.MapPost("/lists", async (
-    CreateListForm form, HttpContext http, AppDbContext db, CancellationToken ct) =>
+signedIn.MapGet("/lists/{id:int}", ListPage.Handle).WithName("lists.show");
+
+signedIn.MapPost("/lists/{id:int}/items", async (
+    int id, NewItem input, ClaimsPrincipal user, AppDb db, IInertiaCache cache, CancellationToken ct) =>
 {
-    var list = new TodoList
-    {
-        UserId = http.UserId()!.Value,
-        Title = form.Title!.Trim(),
-        IsPublic = form.IsPublic,
-        PublicSlug = NewPublicSlug(),
-    };
-    db.Lists.Add(list);
+    if (!await db.Lists.AnyAsync(l => l.Id == id && l.OwnerEmail == user.Email(), ct)) return Results.NotFound();
+
+    db.Items.Add(new TodoItem { TodoListId = id, Title = input.Title!.Trim(), RemindAt = input.RemindAt });
     await db.SaveChangesAsync(ct);
-    return Results.Redirect($"/todos/{list.Id}");
-}).AddEndpointFilter<RequireSessionUser>().WithInertiaValidation();
+    await cache.RemoveByTagAsync($"user:{user.Email()}", ct);
+    return Back($"/lists/{id}").WithFlash("success", "Added");
+}).WithInertiaPrecognition().WithName("items.store");
 
-static string NewPublicSlug() =>
-    Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant();
-```
-
-The two deferred loaders:
-
-```csharp
-static async Task<List<ReminderDto>> LoadReminders(AppDbContext db, int userId, CancellationToken ct) =>
-    await db.Items
-        .AsNoTracking()
-        .Where(i => i.List.UserId == userId && i.RemindAt != null && i.RemindedAt == null)
-        .OrderBy(i => i.RemindAt)
-        .Take(10)
-        .Select(i => new ReminderDto(i.Id, i.Title, i.RemindAt!.Value))
-        .ToListAsync(ct);
-
-static async Task<TodoStats> LoadStats(AppDbContext db, int userId, CancellationToken ct)
+signedIn.MapPatch("/items/{id:int}/toggle", async (
+    int id, ClaimsPrincipal user, AppDb db, IInertiaCache cache, CancellationToken ct) =>
 {
-    var today = DateTimeOffset.UtcNow.Date;
-    return new TodoStats(
-        await db.Items.CountAsync(i => i.List.UserId == userId && !i.IsDone, ct),
-        await db.Items.CountAsync(i => i.List.UserId == userId && i.IsDone, ct),
-        await db.Items.CountAsync(i => i.List.UserId == userId && !i.IsDone
-            && i.DueAt != null && i.DueAt < today.AddDays(1), ct));
-}
-```
-
-The dashboard page uses `Card`, `Badge` and `Deferred`:
-
-<Tabs>
-  <Tab label="React">
-
-```tsx
-// ClientApp/pages/Todos/Index.tsx
-import { Deferred, Link, useForm } from '@inertiajs/react'
-import { Plus } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import Layout from '../../Layout'
-
-interface Props {
-  lists: { id: number; title: string; isPublic: boolean; total: number; open: number }[]
-  reminders?: { id: number; title: string; remindAt: string }[]
-  stats?: { open: number; done: number; dueToday: number }
-}
-
-export default function Index({ lists, reminders, stats }: Props) {
-  const form = useForm({ title: '' })
-
-  return (
-    <Layout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Your lists</h1>
-          <p className="mt-1 text-muted-foreground">Private by default. Share a list when you want to.</p>
-        </div>
-      </div>
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {lists.map((list) => (
-          <Link key={list.id} href={`/todos/${list.id}`}>
-            <Card className="transition-colors hover:border-primary/40">
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle>{list.title}</CardTitle>
-                  <Badge variant={list.isPublic ? 'default' : 'secondary'}>{list.isPublic ? 'Public' : 'Private'}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                {list.open} open of {list.total}
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      <Card className="mt-8">
-        <CardHeader><CardTitle>New list</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={(event) => { event.preventDefault(); form.post('/lists', { onSuccess: () => form.reset() }) }} className="flex gap-2">
-            <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="Weekend plans" />
-            <Button type="submit" disabled={form.processing}><Plus className="size-4" /> Add</Button>
-          </form>
-          {form.errors.title && <p className="mt-2 text-sm text-red-600">{form.errors.title}</p>}
-        </CardContent>
-      </Card>
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <Deferred data="stats" fallback={<p className="text-sm text-muted-foreground">Counting...</p>}>
-          <Card>
-            <CardHeader><CardTitle>Overview</CardTitle></CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              {stats?.open} open · {stats?.done} done · {stats?.dueToday} due today
-            </CardContent>
-          </Card>
-        </Deferred>
-
-        <Deferred data="reminders" fallback={<p className="text-sm text-muted-foreground">Loading reminders...</p>}>
-          <Card>
-            <CardHeader><CardTitle>Upcoming reminders</CardTitle></CardHeader>
-            <CardContent>
-              {reminders?.length ? reminders.map((reminder) => (
-                <p key={reminder.id} className="text-sm">{reminder.title}</p>
-              )) : <p className="text-sm text-muted-foreground">Nothing scheduled.</p>}
-            </CardContent>
-          </Card>
-        </Deferred>
-      </div>
-    </Layout>
-  )
-}
-```
-
-  </Tab>
-  <Tab label="Vue">
-
-```vue
-<!-- ClientApp/pages/Todos/Index.vue -->
-<script setup lang="ts">
-import { Deferred, Link, useForm } from '@inertiajs/vue3'
-import { Plus } from 'lucide-vue-next'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import Layout from '../../Layout.vue'
-
-defineProps<{
-  lists: { id: number; title: string; isPublic: boolean; total: number; open: number }[]
-  reminders?: { id: number; title: string; remindAt: string }[]
-  stats?: { open: number; done: number; dueToday: number }
-}>()
-
-const form = useForm({ title: '' })
-const submit = () => form.post('/lists', { onSuccess: () => form.reset() })
-</script>
-
-<template>
-  <Layout>
-    <div class="flex items-end justify-between gap-4">
-      <div>
-        <h1 class="text-3xl font-semibold tracking-tight">Your lists</h1>
-        <p class="mt-1 text-muted-foreground">Private by default. Share a list when you want to.</p>
-      </div>
-    </div>
-
-    <div class="mt-8 grid gap-4 sm:grid-cols-2">
-      <Link v-for="list in lists" :key="list.id" :href="`/todos/${list.id}`">
-        <Card class="transition-colors hover:border-primary/40">
-          <CardHeader>
-            <div class="flex items-center justify-between gap-2">
-              <CardTitle>{{ list.title }}</CardTitle>
-              <Badge :variant="list.isPublic ? 'default' : 'secondary'">{{ list.isPublic ? 'Public' : 'Private' }}</Badge>
-            </div>
-          </CardHeader>
-          <CardContent class="text-sm text-muted-foreground">
-            {{ list.open }} open of {{ list.total }}
-          </CardContent>
-        </Card>
-      </Link>
-    </div>
-
-    <Card class="mt-8">
-      <CardHeader><CardTitle>New list</CardTitle></CardHeader>
-      <CardContent>
-        <form class="flex gap-2" @submit.prevent="submit">
-          <Input v-model="form.title" placeholder="Weekend plans" />
-          <Button type="submit" :disabled="form.processing"><Plus class="size-4" /> Add</Button>
-        </form>
-        <p v-if="form.errors.title" class="mt-2 text-sm text-red-600">{{ form.errors.title }}</p>
-      </CardContent>
-    </Card>
-
-    <div class="mt-8 grid gap-4 sm:grid-cols-2">
-      <Deferred data="stats">
-        <template #fallback><p class="text-sm text-muted-foreground">Counting...</p></template>
-        <Card>
-          <CardHeader><CardTitle>Overview</CardTitle></CardHeader>
-          <CardContent class="text-sm text-muted-foreground">
-            {{ stats?.open }} open · {{ stats?.done }} done · {{ stats?.dueToday }} due today
-          </CardContent>
-        </Card>
-      </Deferred>
-
-      <Deferred data="reminders">
-        <template #fallback><p class="text-sm text-muted-foreground">Loading reminders...</p></template>
-        <Card>
-          <CardHeader><CardTitle>Upcoming reminders</CardTitle></CardHeader>
-          <CardContent>
-            <template v-if="reminders?.length">
-              <p v-for="reminder in reminders" :key="reminder.id" class="text-sm">{{ reminder.title }}</p>
-            </template>
-            <p v-else class="text-sm text-muted-foreground">Nothing scheduled.</p>
-          </CardContent>
-        </Card>
-      </Deferred>
-    </div>
-  </Layout>
-</template>
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```svelte
-<!-- ClientApp/pages/Todos/Index.svelte -->
-<script lang="ts">
-  import { Deferred, Link, useForm } from '@inertiajs/svelte'
-  import { Plus } from '@lucide/svelte'
-  import { Badge } from '@/components/ui/badge'
-  import { Button } from '@/components/ui/button'
-  import * as Card from '@/components/ui/card'
-  import { Input } from '@/components/ui/input'
-  import Layout from '../../Layout.svelte'
-
-  interface Props {
-    lists: { id: number; title: string; isPublic: boolean; total: number; open: number }[]
-    reminders?: { id: number; title: string; remindAt: string }[]
-    stats?: { open: number; done: number; dueToday: number }
-  }
-
-  let { lists, reminders, stats }: Props = $props()
-
-  const form = useForm({ title: '' })
-
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault()
-    form.post('/lists', { onSuccess: () => form.reset() })
-  }
-</script>
-
-<Layout>
-  <div class="flex items-end justify-between gap-4">
-    <div>
-      <h1 class="text-3xl font-semibold tracking-tight">Your lists</h1>
-      <p class="mt-1 text-muted-foreground">Private by default. Share a list when you want to.</p>
-    </div>
-  </div>
-
-  <div class="mt-8 grid gap-4 sm:grid-cols-2">
-    {#each lists as list (list.id)}
-      <Link href={`/todos/${list.id}`}>
-        <Card.Root class="transition-colors hover:border-primary/40">
-          <Card.Header>
-            <div class="flex items-center justify-between gap-2">
-              <Card.Title>{list.title}</Card.Title>
-              <Badge variant={list.isPublic ? 'default' : 'secondary'}>{list.isPublic ? 'Public' : 'Private'}</Badge>
-            </div>
-          </Card.Header>
-          <Card.Content class="text-sm text-muted-foreground">
-            {list.open} open of {list.total}
-          </Card.Content>
-        </Card.Root>
-      </Link>
-    {/each}
-  </div>
-
-  <Card.Root class="mt-8">
-    <Card.Header><Card.Title>New list</Card.Title></Card.Header>
-    <Card.Content>
-      <form onsubmit={submit} class="flex gap-2">
-        <Input bind:value={form.title} placeholder="Weekend plans" />
-        <Button type="submit" disabled={form.processing}><Plus class="size-4" /> Add</Button>
-      </form>
-      {#if form.errors.title}<p class="mt-2 text-sm text-red-600">{form.errors.title}</p>{/if}
-    </Card.Content>
-  </Card.Root>
-
-  <div class="mt-8 grid gap-4 sm:grid-cols-2">
-    <Deferred data="stats">
-      {#snippet fallback()}<p class="text-sm text-muted-foreground">Counting...</p>{/snippet}
-      <Card.Root>
-        <Card.Header><Card.Title>Overview</Card.Title></Card.Header>
-        <Card.Content class="text-sm text-muted-foreground">
-          {stats?.open} open · {stats?.done} done · {stats?.dueToday} due today
-        </Card.Content>
-      </Card.Root>
-    </Deferred>
-
-    <Deferred data="reminders">
-      {#snippet fallback()}<p class="text-sm text-muted-foreground">Loading reminders...</p>{/snippet}
-      <Card.Root>
-        <Card.Header><Card.Title>Upcoming reminders</Card.Title></Card.Header>
-        <Card.Content>
-          {#each reminders ?? [] as reminder (reminder.id)}
-            <p class="text-sm">{reminder.title}</p>
-          {:else}
-            <p class="text-sm text-muted-foreground">Nothing scheduled.</p>
-          {/each}
-        </Card.Content>
-      </Card.Root>
-    </Deferred>
-  </div>
-</Layout>
-```
-
-  </Tab>
-</Tabs>
-
-## 9. Load items in pages
-
-These snippets live inside `MapTodoEndpoints` in `Endpoints/TodoEndpoints.cs`.
-
-Add the list endpoint with `Scroll`:
-
-```csharp
-app.MapGet("/todos/{id:int}", async (
-    int id, int? page, HttpContext http, AppDbContext db, CancellationToken ct) =>
-{
-    var userId = http.UserId()!.Value;
-    var list = await db.Lists
-        .AsNoTracking()
-        .Where(l => l.Id == id && l.UserId == userId)
-        .Select(l => new TodoListHeader(l.Id, l.Title, l.PublicSlug, l.IsPublic))
-        .FirstOrDefaultAsync(ct);
-
-    if (list is null) return Results.NotFound();
-
-    const int pageSize = 40;
-    var current = Math.Max(1, page ?? 1);
-    var rows = await db.Items
-        .AsNoTracking()
-        .Where(i => i.TodoListId == id)
-        .OrderBy(i => i.IsDone)
-        .ThenBy(i => i.DueAt)
-        .ThenBy(i => i.Id)
-        .Skip((current - 1) * pageSize)
-        .Take(pageSize + 1)
-        .Select(i => new TodoItemDto(i.Id, i.Title, i.IsDone, i.DueAt))
-        .ToListAsync(ct);
-
-    return Render("Todos/Show", new InertiaProps
-    {
-        ["list"] = list,
-        ["items"] = Scroll(
-            new TodoItemsPage(rows.Take(pageSize).ToList()),
-            metadata: ScrollMetadata.FromPage(current, rows.Count > pageSize)),
-    });
-}).AddEndpointFilter<RequireSessionUser>();
-```
-
-Add the write endpoints:
-
-```csharp
-app.MapPost("/todos/{id:int}/items", async (
-    int id, CreateTodoForm form, HttpContext http, AppDbContext db, CancellationToken ct) =>
-{
-    var userId = http.UserId()!.Value;
-    if (!await db.Lists.AnyAsync(l => l.Id == id && l.UserId == userId, ct))
-        return Results.NotFound();
-
-    db.Items.Add(new TodoItem
-    {
-        TodoListId = id,
-        Title = form.Title!.Trim(),
-        DueAt = form.DueAt,
-        RemindAt = form.RemindAt,
-    });
-    await db.SaveChangesAsync(ct);
-
-    return Back().WithFlash("success", "Todo added");
-}).AddEndpointFilter<RequireSessionUser>().WithInertiaValidation();
-
-app.MapPatch("/items/{id:int}", async (
-    int id, HttpContext http, AppDbContext db, CancellationToken ct) =>
-{
-    var userId = http.UserId()!.Value;
-    var item = await db.Items
-        .Include(i => i.List)
-        .FirstOrDefaultAsync(i => i.Id == id && i.List.UserId == userId, ct);
-
+    var item = await db.Items.FirstOrDefaultAsync(i => i.Id == id && i.List.OwnerEmail == user.Email(), ct);
     if (item is null) return Results.NotFound();
 
     item.IsDone = !item.IsDone;
     await db.SaveChangesAsync(ct);
-    return Back();
-}).AddEndpointFilter<RequireSessionUser>();
+    await cache.RemoveByTagAsync($"user:{user.Email()}", ct);
+    return Back($"/lists/{item.TodoListId}");
+}).WithName("items.toggle");
+
+signedIn.MapDelete("/items/{id:int}", async (
+    int id, ClaimsPrincipal user, AppDb db, IInertiaCache cache, CancellationToken ct) =>
+{
+    var item = await db.Items.FirstOrDefaultAsync(i => i.Id == id && i.List.OwnerEmail == user.Email(), ct);
+    if (item is null) return Results.NotFound();
+
+    db.Items.Remove(item);
+    await db.SaveChangesAsync(ct);
+    await cache.RemoveByTagAsync($"user:{user.Email()}", ct);
+    return Back($"/lists/{item.TodoListId}").WithFlash("success", "Deleted");
+}).WithName("items.destroy");
+
+// Turn sharing on (make a secret link) or off (forget it, so the old link stops working).
+signedIn.MapPost("/lists/{id:int}/share", async (
+    int id, ClaimsPrincipal user, AppDb db, CancellationToken ct) =>
+{
+    var list = await db.Lists.FirstOrDefaultAsync(l => l.Id == id && l.OwnerEmail == user.Email(), ct);
+    if (list is null) return Results.NotFound();
+
+    list.ShareSlug = list.ShareSlug is null ? Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant() : null;
+    await db.SaveChangesAsync(ct);
+    return Back($"/lists/{id}");
+}).WithName("lists.share");
 ```
 
-The page asks for the next page as the user scrolls:
+Notice the pattern. Each write **checks the owner in the query**, **saves**, **clears the stats cache**, and **sends the person back** with `Back(...)`. `Back` returns them to the page they came from, so the page shows the new state, and `WithFlash` carries the one-time message.
+
+<Callout type="warning" title="Do not forget the owner check">
+`GET /lists/5` is protected, but `PATCH /items/9` is a separate door. Every endpoint that takes an id must check that the id belongs to the signed-in person. This is the most common security bug in apps like this one.
+</Callout>
+
+Sharing works like this: the first press creates a random secret, and the second press forgets it. Eight random bytes are 16 characters nobody can guess. Do not use `Random` or a counter for a secret.
+
+Run `bun run types` again, so the browser knows the new routes and pages. Then add the two pages.
+
+The lists page. `useForm` holds the form's values, and `withPrecognition` gives it `validate`, which asks the server about one field:
 
 <Tabs>
   <Tab label="React">
 
 ```tsx
-// ClientApp/pages/Todos/Show.tsx
-import { InfiniteScroll, router, useForm } from '@inertiajs/react'
+// ClientApp/pages/Lists/Index.tsx
+import { Deferred, Link, useForm } from '@inertiajs/react'
 import type { FormEvent } from 'react'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import Layout from '../../Layout'
+import type { InertiaPages } from '../../types/inertia'
+import { routes, type RouteBodies } from '../../types/routes'
 
-interface Props {
-  list: { id: number; title: string }
-  items: { data: { id: number; title: string; isDone: boolean; dueAt: string | null }[] }
-}
+export default function Index({ lists, stats, reminders }: InertiaPages['Lists/Index']) {
+  // The form's fields come from the C# NewList class, and withPrecognition checks the title on the server as you type.
+  const form = useForm<RouteBodies['lists.store']>({ title: '' }).withPrecognition(routes.lists.store())
 
-export default function Show({ list, items }: Props) {
-  const form = useForm({ title: '', dueAt: '', remindAt: '' })
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    form.post(`/todos/${list.id}/items`, { onSuccess: () => form.reset() })
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    form.submit(routes.lists.store())
   }
 
   return (
     <Layout>
-      <h1 className="text-3xl font-semibold tracking-tight">{list.title}</h1>
-      <p className="mt-1 text-muted-foreground">Loaded in pages, merged as you scroll.</p>
+      <h1 className="text-2xl font-semibold">My lists</h1>
 
-      <Card className="mt-6">
-        <CardContent className="p-4">
-          <form onSubmit={submit} className="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto]">
-            <Input placeholder="What needs doing?" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
-            <Input type="datetime-local" value={form.data.dueAt} onChange={(e) => form.setData('dueAt', e.target.value)} aria-label="Due date" />
-            <Input type="datetime-local" value={form.data.remindAt} onChange={(e) => form.setData('remindAt', e.target.value)} aria-label="Remind me" />
-            <Button type="submit" disabled={form.processing}>Add</Button>
-          </form>
-          {form.errors.title && <p className="mt-2 text-sm text-red-600">{form.errors.title}</p>}
-        </CardContent>
-      </Card>
+      <form onSubmit={submit} className="mt-4 flex gap-2">
+        <input
+          value={form.data.title ?? ''}
+          onChange={(e) => form.setData('title', e.target.value)}
+          onBlur={() => form.validate('title')}
+          placeholder="A new list"
+          className="flex-1 rounded border border-slate-300 px-3 py-2"
+        />
+        <button disabled={form.processing} className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
+      </form>
+      {form.errors.title && <p role="alert" className="mt-1 text-sm text-red-700">{form.errors.title}</p>}
 
-      <InfiniteScroll data="items" className="mt-8 space-y-3">
-        {items.data.map((item) => (
-          <Card key={item.id}>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Checkbox checked={item.isDone} onCheckedChange={() => router.patch(`/items/${item.id}`)} />
-              <span className={item.isDone ? 'text-muted-foreground line-through' : ''}>{item.title}</span>
-              {item.dueAt && <span className="ml-auto text-xs text-muted-foreground">{new Date(item.dueAt).toLocaleDateString()}</span>}
-            </CardContent>
-          </Card>
+      <ul className="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+        {lists.map((list) => (
+          <li key={list.id}>
+            <Link href={routes.lists.show(list.id)} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+              <span>{list.title}{list.isShared && <span className="ml-2 rounded bg-blue-100 px-2 text-xs text-blue-800">shared</span>}</span>
+              <span className="text-sm text-slate-500">{list.open} open of {list.total}</span>
+            </Link>
+          </li>
+        ))}
+        {lists.length === 0 && <li className="px-4 py-3 text-slate-500">No lists yet. Add your first one above.</li>}
+      </ul>
+
+      <Deferred data="stats" fallback={<p className="mt-6 text-sm text-slate-400">Counting...</p>}>
+        <p className="mt-6 text-sm text-slate-600">{stats?.open} open, {stats?.done} done</p>
+      </Deferred>
+
+      <Deferred data="reminders" fallback={null}>
+        {reminders && reminders.length > 0 && (
+          <section className="mt-6 rounded bg-amber-50 p-4">
+            <h2 className="font-medium">Reminders</h2>
+            <ul className="mt-2 space-y-1 text-sm">
+              {reminders.map((r) => (
+                <li key={r.id}><Link href={routes.lists.show(r.listId)} className="underline">{r.title}</Link></li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </Deferred>
+    </Layout>
+  )
+}
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<!-- ClientApp/pages/Lists/Index.vue -->
+<script setup lang="ts">
+import { Deferred, Link, useForm } from '@inertiajs/vue3'
+import Layout from '../../Layout.vue'
+import type { InertiaPages } from '../../types/inertia'
+import { routes, type RouteBodies } from '../../types/routes'
+
+defineProps<InertiaPages['Lists/Index']>()
+
+// The form's fields come from the C# NewList class, and withPrecognition checks the title on the server as you type.
+const form = useForm<RouteBodies['lists.store']>({ title: '' }).withPrecognition(routes.lists.store())
+const submit = () => form.submit(routes.lists.store())
+</script>
+
+<template>
+  <Layout>
+    <h1 class="text-2xl font-semibold">My lists</h1>
+
+    <form class="mt-4 flex gap-2" @submit.prevent="submit">
+      <input v-model="form.title" placeholder="A new list" class="flex-1 rounded border border-slate-300 px-3 py-2" @blur="form.validate('title')" />
+      <button :disabled="form.processing" class="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
+    </form>
+    <p v-if="form.errors.title" role="alert" class="mt-1 text-sm text-red-700">{{ form.errors.title }}</p>
+
+    <ul class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+      <li v-for="list in lists" :key="list.id">
+        <Link :href="routes.lists.show(list.id)" class="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+          <span>
+            {{ list.title }}
+            <span v-if="list.isShared" class="ml-2 rounded bg-blue-100 px-2 text-xs text-blue-800">shared</span>
+          </span>
+          <span class="text-sm text-slate-500">{{ list.open }} open of {{ list.total }}</span>
+        </Link>
+      </li>
+      <li v-if="lists.length === 0" class="px-4 py-3 text-slate-500">No lists yet. Add your first one above.</li>
+    </ul>
+
+    <Deferred data="stats">
+      <template #fallback><p class="mt-6 text-sm text-slate-400">Counting...</p></template>
+      <p class="mt-6 text-sm text-slate-600">{{ stats?.open }} open, {{ stats?.done }} done</p>
+    </Deferred>
+
+    <Deferred data="reminders">
+      <section v-if="reminders && reminders.length > 0" class="mt-6 rounded bg-amber-50 p-4">
+        <h2 class="font-medium">Reminders</h2>
+        <ul class="mt-2 space-y-1 text-sm">
+          <li v-for="r in reminders" :key="r.id"><Link :href="routes.lists.show(r.listId)" class="underline">{{ r.title }}</Link></li>
+        </ul>
+      </section>
+    </Deferred>
+  </Layout>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<!-- ClientApp/pages/Lists/Index.svelte -->
+<script lang="ts">
+  import { Deferred, Link, useForm } from '@inertiajs/svelte'
+  import Layout from '../../Layout.svelte'
+  import type { InertiaPages } from '../../types/inertia'
+  import { routes, type RouteBodies } from '../../types/routes'
+
+  let { lists, stats, reminders }: InertiaPages['Lists/Index'] = $props()
+
+  // The form's fields come from the C# NewList class, and withPrecognition checks the title on the server as you type.
+  const form = useForm<RouteBodies['lists.store']>({ title: '' }).withPrecognition(routes.lists.store())
+  const submit = (e: SubmitEvent) => {
+    e.preventDefault()
+    form.submit(routes.lists.store())
+  }
+</script>
+
+<Layout>
+  <h1 class="text-2xl font-semibold">My lists</h1>
+
+  <form onsubmit={submit} class="mt-4 flex gap-2">
+    <input bind:value={form.title} onblur={() => form.validate('title')} placeholder="A new list" class="flex-1 rounded border border-slate-300 px-3 py-2" />
+    <button disabled={form.processing} class="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
+  </form>
+  {#if form.errors.title}
+    <p role="alert" class="mt-1 text-sm text-red-700">{form.errors.title}</p>
+  {/if}
+
+  <ul class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+    {#each lists as list (list.id)}
+      <li>
+        <Link href={routes.lists.show(list.id)} class="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+          <span>
+            {list.title}
+            {#if list.isShared}<span class="ml-2 rounded bg-blue-100 px-2 text-xs text-blue-800">shared</span>{/if}
+          </span>
+          <span class="text-sm text-slate-500">{list.open} open of {list.total}</span>
+        </Link>
+      </li>
+    {:else}
+      <li class="px-4 py-3 text-slate-500">No lists yet. Add your first one above.</li>
+    {/each}
+  </ul>
+
+  <Deferred data="stats">
+    {#snippet fallback()}
+      <p class="mt-6 text-sm text-slate-400">Counting...</p>
+    {/snippet}
+    <p class="mt-6 text-sm text-slate-600">{stats?.open} open, {stats?.done} done</p>
+  </Deferred>
+
+  <Deferred data="reminders">
+    {#if reminders && reminders.length > 0}
+      <section class="mt-6 rounded bg-amber-50 p-4">
+        <h2 class="font-medium">Reminders</h2>
+        <ul class="mt-2 space-y-1 text-sm">
+          {#each reminders as r (r.id)}
+            <li><Link href={routes.lists.show(r.listId)} class="underline">{r.title}</Link></li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+  </Deferred>
+</Layout>
+```
+
+  </Tab>
+</Tabs>
+
+And the page for one list. Pay attention to `InfiniteScroll`: it wraps your rows and does the loading for you.
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+// ClientApp/pages/Lists/Show.tsx
+import { InfiniteScroll, Link, router, useForm } from '@inertiajs/react'
+import type { FormEvent } from 'react'
+import Layout from '../../Layout'
+import type { InertiaPages } from '../../types/inertia'
+import { routes, type RouteBodies } from '../../types/routes'
+
+export default function Show({ list, items }: InertiaPages['Lists/Show']) {
+  const form = useForm<RouteBodies['items.store']>({ title: '', remindAt: null })
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    form.submit(routes.items.store(list.id), { onSuccess: () => form.reset() })
+  }
+
+  return (
+    <Layout>
+      <Link href={routes.lists.index()} className="text-sm text-slate-500 underline">All lists</Link>
+      <div className="mt-2 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">{list.title}</h1>
+        <button onClick={() => router.visit(routes.lists.share(list.id))} className="text-sm underline">
+          {list.isShared ? 'Stop sharing' : 'Share'}
+        </button>
+      </div>
+      {list.shareUrl && (
+        <p className="mt-2 text-sm text-slate-600">
+          Anyone with this link can read the list: <a className="underline" href={list.shareUrl}>{list.shareUrl}</a>
+        </p>
+      )}
+
+      <form onSubmit={submit} className="mt-6 flex flex-wrap gap-2">
+        <input
+          value={form.data.title ?? ''}
+          onChange={(e) => form.setData('title', e.target.value)}
+          placeholder="What needs doing?"
+          className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2"
+        />
+        <input
+          type="datetime-local"
+          title="Remind me at"
+          onChange={(e) => form.setData('remindAt', e.target.value ? new Date(e.target.value).toISOString() : null)}
+          className="rounded border border-slate-300 px-2 py-2"
+        />
+        <button disabled={form.processing} className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
+      </form>
+      {form.errors.title && <p role="alert" className="mt-1 text-sm text-red-700">{form.errors.title}</p>}
+
+      {/* InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there because a prop made with Scroll() can be left out by a partial reload, so its generated type is optional. */}
+      <InfiniteScroll data="items" className="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+        {items?.data.map((item) => (
+          <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+            <input
+              type="checkbox"
+              checked={item.isDone}
+              onChange={() => router.visit(routes.items.toggle(item.id), { preserveScroll: true })}
+            />
+            <span className={item.isDone ? 'flex-1 text-slate-400 line-through' : 'flex-1'}>{item.title}</span>
+            <button onClick={() => router.visit(routes.items.destroy(item.id), { preserveScroll: true })} className="text-sm text-slate-400 hover:text-red-700">Delete</button>
+          </div>
         ))}
       </InfiniteScroll>
     </Layout>
@@ -1710,50 +928,52 @@ export default function Show({ list, items }: Props) {
   <Tab label="Vue">
 
 ```vue
-<!-- ClientApp/pages/Todos/Show.vue -->
+<!-- ClientApp/pages/Lists/Show.vue -->
 <script setup lang="ts">
-import { InfiniteScroll, router, useForm } from '@inertiajs/vue3'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { InfiniteScroll, Link, router, useForm } from '@inertiajs/vue3'
 import Layout from '../../Layout.vue'
+import type { InertiaPages } from '../../types/inertia'
+import { routes, type RouteBodies } from '../../types/routes'
 
-const props = defineProps<{
-  list: { id: number; title: string }
-  items: { data: { id: number; title: string; isDone: boolean; dueAt: string | null }[] }
-}>()
+const props = defineProps<InertiaPages['Lists/Show']>()
 
-const form = useForm({ title: '', dueAt: '', remindAt: '' })
-
-const submit = () => form.post(`/todos/${props.list.id}/items`, { onSuccess: () => form.reset() })
+const form = useForm<RouteBodies['items.store']>({ title: '', remindAt: null })
+const submit = () => form.submit(routes.items.store(props.list.id), { onSuccess: () => form.reset() })
+const setReminder = (e: Event) => {
+  const value = (e.target as HTMLInputElement).value
+  form.remindAt = value ? new Date(value).toISOString() : null
+}
 </script>
 
 <template>
   <Layout>
-    <h1 class="text-3xl font-semibold tracking-tight">{{ list.title }}</h1>
-    <p class="mt-1 text-muted-foreground">Loaded in pages, merged as you scroll.</p>
+    <Link :href="routes.lists.index()" class="text-sm text-slate-500 underline">All lists</Link>
+    <div class="mt-2 flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">{{ list.title }}</h1>
+      <button class="text-sm underline" @click="router.visit(routes.lists.share(list.id))">
+        {{ list.isShared ? 'Stop sharing' : 'Share' }}
+      </button>
+    </div>
+    <p v-if="list.shareUrl" class="mt-2 text-sm text-slate-600">
+      Anyone with this link can read the list:
+      <a class="underline" :href="list.shareUrl">{{ list.shareUrl }}</a>
+    </p>
 
-    <Card class="mt-6">
-      <CardContent class="p-4">
-        <form class="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto]" @submit.prevent="submit">
-          <Input v-model="form.title" placeholder="What needs doing?" />
-          <Input v-model="form.dueAt" type="datetime-local" aria-label="Due date" />
-          <Input v-model="form.remindAt" type="datetime-local" aria-label="Remind me" />
-          <Button type="submit" :disabled="form.processing">Add</Button>
-        </form>
-        <p v-if="form.errors.title" class="mt-2 text-sm text-red-600">{{ form.errors.title }}</p>
-      </CardContent>
-    </Card>
+    <form class="mt-6 flex flex-wrap gap-2" @submit.prevent="submit">
+      <input v-model="form.title" placeholder="What needs doing?" class="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
+      <input type="datetime-local" title="Remind me at" class="rounded border border-slate-300 px-2 py-2" @change="setReminder" />
+      <button :disabled="form.processing" class="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
+    </form>
+    <p v-if="form.errors.title" role="alert" class="mt-1 text-sm text-red-700">{{ form.errors.title }}</p>
 
-    <InfiniteScroll data="items" class="mt-8 space-y-3">
-      <Card v-for="item in items.data" :key="item.id">
-        <CardContent class="flex items-center gap-3 p-4">
-          <Checkbox :model-value="item.isDone" @update:model-value="router.patch(`/items/${item.id}`)" />
-          <span :class="item.isDone ? 'text-muted-foreground line-through' : ''">{{ item.title }}</span>
-          <span v-if="item.dueAt" class="ml-auto text-xs text-muted-foreground">{{ new Date(item.dueAt).toLocaleDateString() }}</span>
-        </CardContent>
-      </Card>
+    <!-- InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there because a
+         prop made with Scroll() can be left out by a partial reload, so its generated type is optional. -->
+    <InfiniteScroll data="items" class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+      <div v-for="item in items?.data" :key="item.id" class="flex items-center gap-3 px-4 py-3">
+        <input type="checkbox" :checked="item.isDone" @change="router.visit(routes.items.toggle(item.id), { preserveScroll: true })" />
+        <span :class="item.isDone ? 'flex-1 text-slate-400 line-through' : 'flex-1'">{{ item.title }}</span>
+        <button class="text-sm text-slate-400 hover:text-red-700" @click="router.visit(routes.items.destroy(item.id), { preserveScroll: true })">Delete</button>
+      </div>
     </InfiniteScroll>
   </Layout>
 </template>
@@ -1763,55 +983,59 @@ const submit = () => form.post(`/todos/${props.list.id}/items`, { onSuccess: () 
   <Tab label="Svelte">
 
 ```svelte
-<!-- ClientApp/pages/Todos/Show.svelte -->
+<!-- ClientApp/pages/Lists/Show.svelte -->
 <script lang="ts">
-  import { InfiniteScroll, router, useForm } from '@inertiajs/svelte'
-  import { Checkbox } from '@/components/ui/checkbox'
-  import { Button } from '@/components/ui/button'
-  import * as Card from '@/components/ui/card'
-  import { Input } from '@/components/ui/input'
+  import { InfiniteScroll, Link, router, useForm } from '@inertiajs/svelte'
   import Layout from '../../Layout.svelte'
+  import type { InertiaPages } from '../../types/inertia'
+  import { routes, type RouteBodies } from '../../types/routes'
 
-  interface Props {
-    list: { id: number; title: string }
-    items: { data: { id: number; title: string; isDone: boolean; dueAt: string | null }[] }
+  let { list, items }: InertiaPages['Lists/Show'] = $props()
+
+  const form = useForm<RouteBodies['items.store']>({ title: '', remindAt: null })
+  const submit = (e: SubmitEvent) => {
+    e.preventDefault()
+    form.submit(routes.items.store(list.id), { onSuccess: () => form.reset() })
   }
-
-  let { list, items }: Props = $props()
-
-  const form = useForm({ title: '', dueAt: '', remindAt: '' })
-
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault()
-    form.post(`/todos/${list.id}/items`, { onSuccess: () => form.reset() })
+  const setReminder = (e: Event) => {
+    const value = (e.target as HTMLInputElement).value
+    form.remindAt = value ? new Date(value).toISOString() : null
   }
 </script>
 
 <Layout>
-  <h1 class="text-3xl font-semibold tracking-tight">{list.title}</h1>
-  <p class="mt-1 text-muted-foreground">Loaded in pages, merged as you scroll.</p>
+  <Link href={routes.lists.index()} class="text-sm text-slate-500 underline">All lists</Link>
+  <div class="mt-2 flex items-center justify-between">
+    <h1 class="text-2xl font-semibold">{list.title}</h1>
+    <button class="text-sm underline" onclick={() => router.visit(routes.lists.share(list.id))}>
+      {list.isShared ? 'Stop sharing' : 'Share'}
+    </button>
+  </div>
+  {#if list.shareUrl}
+    <p class="mt-2 text-sm text-slate-600">
+      Anyone with this link can read the list:
+      <a class="underline" href={list.shareUrl}>{list.shareUrl}</a>
+    </p>
+  {/if}
 
-  <Card.Root class="mt-6">
-    <Card.Content class="p-4">
-      <form onsubmit={submit} class="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto]">
-        <Input placeholder="What needs doing?" bind:value={form.title} />
-        <Input type="datetime-local" bind:value={form.dueAt} aria-label="Due date" />
-        <Input type="datetime-local" bind:value={form.remindAt} aria-label="Remind me" />
-        <Button type="submit" disabled={form.processing}>Add</Button>
-      </form>
-      {#if form.errors.title}<p class="mt-2 text-sm text-red-600">{form.errors.title}</p>{/if}
-    </Card.Content>
-  </Card.Root>
+  <form onsubmit={submit} class="mt-6 flex flex-wrap gap-2">
+    <input bind:value={form.title} placeholder="What needs doing?" class="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
+    <input type="datetime-local" title="Remind me at" onchange={setReminder} class="rounded border border-slate-300 px-2 py-2" />
+    <button disabled={form.processing} class="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">Add</button>
+  </form>
+  {#if form.errors.title}
+    <p role="alert" class="mt-1 text-sm text-red-700">{form.errors.title}</p>
+  {/if}
 
-  <InfiniteScroll data="items" class="mt-8 space-y-3">
-    {#each items.data as item (item.id)}
-      <Card.Root>
-        <Card.Content class="flex items-center gap-3 p-4">
-          <Checkbox checked={item.isDone} onCheckedChange={() => router.patch(`/items/${item.id}`)} />
-          <span class={item.isDone ? 'text-muted-foreground line-through' : ''}>{item.title}</span>
-          {#if item.dueAt}<span class="ml-auto text-xs text-muted-foreground">{new Date(item.dueAt).toLocaleDateString()}</span>{/if}
-        </Card.Content>
-      </Card.Root>
+  <!-- InfiniteScroll loads the next page at the end of the list and merges it into items.data. The "?." is there because a
+       prop made with Scroll() can be left out by a partial reload, so its generated type is optional. -->
+  <InfiniteScroll data="items" class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+    {#each items?.data ?? [] as item (item.id)}
+      <div class="flex items-center gap-3 px-4 py-3">
+        <input type="checkbox" checked={item.isDone} onchange={() => router.visit(routes.items.toggle(item.id), { preserveScroll: true })} />
+        <span class={item.isDone ? 'flex-1 text-slate-400 line-through' : 'flex-1'}>{item.title}</span>
+        <button class="text-sm text-slate-400 hover:text-red-700" onclick={() => router.visit(routes.items.destroy(item.id), { preserveScroll: true })}>Delete</button>
+      </div>
     {/each}
   </InfiniteScroll>
 </Layout>
@@ -1820,58 +1044,113 @@ const submit = () => form.post(`/todos/${props.list.id}/items`, { onSuccess: () 
   </Tab>
 </Tabs>
 
-`Scroll` merges the `data` array and tells `InfiniteScroll` which URL parameter to use. The browser only renders the pages it has requested.
+Try it. Open **My lists**, leave the box empty and click out of it: the error appears without a submit, and it is the same message the server would send. Then add a list, add a few items and tick one off. After you add an item the number of open items on the lists page changes, because every write cleared the cached stats.
 
-<Callout type="tip" title="Checkpoint">
-Create a list, add more than one page of items, then scroll. The network panel should show a partial reload for each new page, and existing items should remain in place.
+## 7. Share a list, and render it on the server
+
+A shared list is a page that anyone can open, and many people may open the same one. That makes it the perfect page for **server-side rendering (SSR)**.
+
+Without SSR, the server sends an empty page and the browser has to download JavaScript, run it, and only then show the list. With SSR, the server runs your component first and sends finished HTML. Search engines and slow phones get the content at once, and the browser then "wakes up" the page with the same code.
+
+The share button already exists, from step 6. All that is missing is the page it points to.
+
+Create `PublicPage.cs`, add `[JsonSerializable(typeof(PublicPage))]` to `AppJsonContext`, and map the route:
+
+```csharp
+// inside MapForgetMeNot, at the end. No sign-in here: anyone with the link can read the list.
+app.MapGet("/p/{slug}", PublicPage.Handle).WithName("public.show");
+```
+
+The page record:
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+
+namespace ForgetMeNot;
+
+public sealed record PublicPage(
+    PublicHeader List,
+    [property: InertiaPropType(typeof(Page<PublicItem>))] InertiaProp Items) : IInertiaPage
+{
+    public static string Component => "Public/Show";
+
+    public static async Task<IResult> Handle(
+        string slug, PageRequest request, AppDb db, CancellationToken ct)
+    {
+        var list = await db.Lists.AsNoTracking()
+            .Where(l => l.ShareSlug == slug)
+            .Select(l => new PublicHeader(l.Title, l.Items.Count(i => !i.IsDone)))
+            .FirstOrDefaultAsync(ct);
+        if (list is null) return Results.NotFound();
+
+        var items = await db.Items.AsNoTracking()
+            .Where(i => i.List.ShareSlug == slug && !i.IsDone)
+            .OrderBy(i => i.Id)
+            .Select(i => new PublicItem(i.Id, i.Title))
+            .ToPageAsync(request, ct: ct);
+
+        // Everyone sees the same page, so the server-rendered HTML can be reused: fresh for 5 minutes, then
+        // served for up to an
+        // hour more while a new render is made in the background. The cache key includes the page's JSON,
+        // so a changed list is
+        // never served from an old render.
+        return Render(new PublicPage(list, Scroll(items))).WithSsrCache(TimeSpan.FromMinutes(5), staleFor: TimeSpan.FromHours(1));
+    }
+}
+```
+
+Look at the last line. `.WithSsrCache(...)` is the **SSR cache**. Rendering takes time, and this page looks the same for everyone, so the finished HTML can be reused:
+
+- For **5 minutes** the saved HTML is served without calling the SSR server at all.
+- For **one hour more** it is still served, and a new render is made in the background (`staleFor`). Nobody waits.
+- The cache key is built from the page's **JSON**, which includes the title and the items. If the list changes, the JSON changes, the key changes, and the old render is never used. You cannot show a stale page by mistake.
+
+<Callout type="warning" title="Cache only pages that everyone sees the same">
+A page with per-person props makes one cache entry per person. That wastes memory and gains nothing. Our list pages are **not** cached for that reason, and the public page is.
 </Callout>
 
-## 10. Share a list publicly
-
-Public routes do not use `RequireSessionUser`. Use a random slug, not the numeric id, and return a small DTO instead of the entity.
+Turn SSR on. In `AddInertia(...)` in `Program.cs`, add:
 
 ```csharp
-app.MapGet("/p/{slug}", async (
-    string slug, int? page, AppDbContext db, CancellationToken ct) =>
-{
-    var list = await db.Lists
-        .AsNoTracking()
-        .Where(l => l.PublicSlug == slug && l.IsPublic)
-        .Select(l => new PublicListHeader(l.Id, l.Title, l.User.DisplayName, l.Items.Count(i => !i.IsDone)))
-        .FirstOrDefaultAsync(ct);
-
-    if (list is null) return Results.NotFound();
-
-    const int pageSize = 25;
-    var current = Math.Max(1, page ?? 1);
-    var rows = await db.Items
-        .AsNoTracking()
-        .Where(i => i.TodoListId == list.Id && !i.IsDone)
-        .OrderBy(i => i.DueAt)
-        .ThenBy(i => i.Id)
-        .Skip((current - 1) * pageSize)
-        .Take(pageSize + 1)
-        .Select(i => new PublicTodoDto(i.Id, i.Title, i.DueAt))
-        .ToListAsync(ct);
-
-    return Render("Public/Show", new InertiaProps
-    {
-        ["list"] = list,
-        ["items"] = Scroll(
-            new PublicTodoPage(rows.Take(pageSize).ToList()),
-            metadata: ScrollMetadata.FromPage(current, rows.Count > pageSize)),
-    });
-});
+// Server-side rendering: Bun runs the bundle that "vite build --ssr" writes. While Vite runs in
+// development, Vite renders instead.
+o.Ssr.BundlePath = "ssr/ssr.js";
+o.Ssr.UseNodeProcess(n => n.Executable = "bun");
 ```
 
-The handler above is the body of `PublicEndpoints.MapPublicEndpoints` in `Endpoints/PublicEndpoints.cs`.
+`UseNodeProcess` makes the app start and watch the SSR process for you. If it stops answering, it is restarted, and while it is down the pages are rendered in the browser instead. Use `n.Executable = "node"` if you do not have Bun.
 
-```csharp
-static string NewPublicSlug() =>
-    Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant();
+The SSR bundle needs an entry file and a build setting. The entry is two lines:
+
+```tsx
+// ClientApp/ssr.tsx (ClientApp/ssr.ts for Vue and Svelte, importing from @inertiajs/vue3 or @inertiajs/svelte)
+import { createInertiaApp } from '@inertiajs/react'
+
+createInertiaApp()
 ```
 
-The public page is the same `InfiniteScroll` pattern, wrapped in a clean card:
+In `vite.config.ts`, tell the Inertia plugin where the entry is, and build the SSR bundle into the `ssr` folder with its dependencies included, so it runs without `node_modules`:
+
+```ts
+export default defineConfig(({ command, isSsrBuild }) => ({
+  plugins: [react(), tailwindcss(), inertia({ ssr: { entry: 'ClientApp/ssr.tsx', host: '127.0.0.1', port: 13714 } }), hotFile()],
+  ssr: isSsrBuild ? { noExternal: true } : undefined,
+  build: isSsrBuild
+    ? { outDir: 'ssr', emptyOutDir: true }
+    : { outDir: 'wwwroot/build', emptyOutDir: true, manifest: true, rolldownOptions: { input: 'ClientApp/app.tsx' } },
+  // ...the rest stays the same. For Vue and Svelte, the entries are ssr.ts and app.ts.
+}))
+```
+
+Change the `build` script in `package.json` so it builds both bundles:
+
+```json
+{ "scripts": { "build": "tsc --noEmit && vite build && vite build --ssr" } }
+```
+
+Use `vue-tsc --noEmit` (Vue) or `svelte-check --tsconfig ./tsconfig.json` (Svelte) instead of `tsc --noEmit`. The template's script already has the right one; only add the last part.
+
+And the public page:
 
 <Tabs>
   <Tab label="React">
@@ -1879,28 +1158,17 @@ The public page is the same `InfiniteScroll` pattern, wrapped in a clean card:
 ```tsx
 // ClientApp/pages/Public/Show.tsx
 import { InfiniteScroll } from '@inertiajs/react'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Layout from '../../Layout'
+import type { InertiaPages } from '../../types/inertia'
 
-interface Props {
-  list: { title: string; owner: string; openCount: number }
-  items: { data: { id: number; title: string; dueAt: string | null }[] }
-}
-
-export default function PublicShow({ list, items }: Props) {
+export default function Show({ list, items }: InertiaPages['Public/Show']) {
   return (
     <Layout>
-      <Badge variant="secondary">Public list</Badge>
-      <h1 className="mt-4 text-4xl font-semibold tracking-tight">{list.title}</h1>
-      <p className="mt-2 text-muted-foreground">Shared by {list.owner} · {list.openCount} open items</p>
-
-      <InfiniteScroll data="items" className="mt-8 space-y-3">
-        {items.data.map((item) => (
-          <Card key={item.id}>
-            <CardHeader><CardTitle className="text-base">{item.title}</CardTitle></CardHeader>
-            {item.dueAt && <CardContent className="text-sm text-muted-foreground">Due {new Date(item.dueAt).toLocaleDateString()}</CardContent>}
-          </Card>
+      <h1 className="text-2xl font-semibold">{list.title}</h1>
+      <p className="mt-1 text-sm text-slate-500">{list.open} open items</p>
+      <InfiniteScroll data="items" className="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+        {items?.data.map((item) => (
+          <div key={item.id} className="px-4 py-3">{item.title}</div>
         ))}
       </InfiniteScroll>
     </Layout>
@@ -1915,27 +1183,18 @@ export default function PublicShow({ list, items }: Props) {
 <!-- ClientApp/pages/Public/Show.vue -->
 <script setup lang="ts">
 import { InfiniteScroll } from '@inertiajs/vue3'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Layout from '../../Layout.vue'
+import type { InertiaPages } from '../../types/inertia'
 
-defineProps<{
-  list: { title: string; owner: string; openCount: number }
-  items: { data: { id: number; title: string; dueAt: string | null }[] }
-}>()
+defineProps<InertiaPages['Public/Show']>()
 </script>
 
 <template>
   <Layout>
-    <Badge variant="secondary">Public list</Badge>
-    <h1 class="mt-4 text-4xl font-semibold tracking-tight">{{ list.title }}</h1>
-    <p class="mt-2 text-muted-foreground">Shared by {{ list.owner }} · {{ list.openCount }} open items</p>
-
-    <InfiniteScroll data="items" class="mt-8 space-y-3">
-      <Card v-for="item in items.data" :key="item.id">
-        <CardHeader><CardTitle class="text-base">{{ item.title }}</CardTitle></CardHeader>
-        <CardContent v-if="item.dueAt" class="text-sm text-muted-foreground">Due {{ new Date(item.dueAt).toLocaleDateString() }}</CardContent>
-      </Card>
+    <h1 class="text-2xl font-semibold">{{ list.title }}</h1>
+    <p class="mt-1 text-sm text-slate-500">{{ list.open }} open items</p>
+    <InfiniteScroll data="items" class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+      <div v-for="item in items?.data" :key="item.id" class="px-4 py-3">{{ item.title }}</div>
     </InfiniteScroll>
   </Layout>
 </template>
@@ -1948,29 +1207,18 @@ defineProps<{
 <!-- ClientApp/pages/Public/Show.svelte -->
 <script lang="ts">
   import { InfiniteScroll } from '@inertiajs/svelte'
-  import { Badge } from '@/components/ui/badge'
-  import * as Card from '@/components/ui/card'
   import Layout from '../../Layout.svelte'
+  import type { InertiaPages } from '../../types/inertia'
 
-  interface Props {
-    list: { title: string; owner: string; openCount: number }
-    items: { data: { id: number; title: string; dueAt: string | null }[] }
-  }
-
-  let { list, items }: Props = $props()
+  let { list, items }: InertiaPages['Public/Show'] = $props()
 </script>
 
 <Layout>
-  <Badge variant="secondary">Public list</Badge>
-  <h1 class="mt-4 text-4xl font-semibold tracking-tight">{list.title}</h1>
-  <p class="mt-2 text-muted-foreground">Shared by {list.owner} · {list.openCount} open items</p>
-
-  <InfiniteScroll data="items" class="mt-8 space-y-3">
-    {#each items.data as item (item.id)}
-      <Card.Root>
-        <Card.Header><Card.Title class="text-base">{item.title}</Card.Title></Card.Header>
-        {#if item.dueAt}<Card.Content class="text-sm text-muted-foreground">Due {new Date(item.dueAt).toLocaleDateString()}</Card.Content>{/if}
-      </Card.Root>
+  <h1 class="text-2xl font-semibold">{list.title}</h1>
+  <p class="mt-1 text-sm text-slate-500">{list.open} open items</p>
+  <InfiniteScroll data="items" class="mt-6 divide-y divide-slate-200 rounded border border-slate-200">
+    {#each items?.data ?? [] as item (item.id)}
+      <div class="px-4 py-3">{item.title}</div>
     {/each}
   </InfiniteScroll>
 </Layout>
@@ -1979,101 +1227,546 @@ defineProps<{
   </Tab>
 </Tabs>
 
-Put the `/p/{slug}` handler in `Endpoints/PublicEndpoints.cs` inside `MapPublicEndpoints`, then add it to the route table. Open the URL in a private browser window to prove no session is needed.
-
-<Callout type="warning" title="Do not leak the private shape">
-Return `PublicTodoDto`, not `TodoItem`. Public pages must not include `RemindAt`, the owner's email or private lists.
+<Callout type="info" title="Your component runs on the server too">
+Code in a page runs in Node or Bun during SSR, where there is no `window` or `document`. That is why `Show` uses a relative link and not `window.location.origin`. If a component must use the browser, do it inside an effect, which runs only in the browser.
 </Callout>
 
-## 11. Send reminders once
+To see it work, build, start the app in the Production setting, and look at the page source of a shared list. The list title and items are there as real HTML:
 
-A background service checks for due items every minute, sends them, and records `RemindedAt`.
+```sh
+bun run build
+ASPNETCORE_ENVIRONMENT=Production dotnet run
+```
+
+While Vite runs in development, Vite does the rendering itself and the SSR cache is switched off, so every change shows at once. That is why you build and run in Production to see the real thing.
+
+## 8. A reminder that appears by itself
+
+Add a reminder time to an item. When the time comes, the **My lists** page should show it, without anyone reloading. Two parts make that work: a **worker** that notices due reminders, and a **live prop** that refreshes the page when told.
+
+First the worker. A `BackgroundService` runs for as long as the app runs:
 
 ```csharp
-public interface IEmailSender
-{
-    Task SendAsync(string to, string subject, string body, CancellationToken ct = default);
-}
+using Microsoft.EntityFrameworkCore;
 
-public sealed class ReminderWorker(
-    IServiceScopeFactory scopes,
-    ILogger<ReminderWorker> logger) : BackgroundService
+namespace ForgetMeNot;
+
+// / <summary>Every 20 seconds: find reminders that are due, mark them as sent, and tell the owner's open
+// pages to refresh.</summary>
+public sealed class ReminderWorker(IServiceScopeFactory scopes, ILogger<ReminderWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
-
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(20));
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            using var scope = scopes.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var mail = scope.ServiceProvider.GetRequiredService<IEmailSender>();
-            var now = DateTimeOffset.UtcNow;
-
-            var due = await db.Items
-                .Include(i => i.List).ThenInclude(l => l.User)
-                .Where(i => i.RemindAt != null && i.RemindAt <= now && i.RemindedAt == null)
-                .OrderBy(i => i.RemindAt)
-                .Take(100)
-                .ToListAsync(stoppingToken);
-
-            foreach (var item in due)
+            try
             {
-                await mail.SendAsync(item.List.User.Email, $"Reminder: {item.Title}", item.Title, stoppingToken);
-                item.RemindedAt = now;
+                await SendDueRemindersAsync(stoppingToken);
             }
-
-            if (due.Count > 0)
+            catch (Exception e) when (e is not OperationCanceledException)
             {
-                await db.SaveChangesAsync(stoppingToken);
-                logger.LogInformation("Sent {Count} reminders", due.Count);
+                logger.LogError(e, "Sending reminders failed; trying again on the next tick");
             }
         }
+    }
+
+    private async Task SendDueRemindersAsync(CancellationToken ct)
+    {
+        using var scope = scopes.CreateScope(); // the worker lives forever, but a DbContext should not
+        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        var live = scope.ServiceProvider.GetRequiredService<IInertiaLive>();
+        var now = DateTime.UtcNow;
+
+        var due = await db.Items.Include(i => i.List)
+            .Where(i => i.RemindAt != null && i.RemindAt <= now && i.RemindedAt == null)
+            .Take(100)
+            .ToListAsync(ct);
+
+        // saved before publishing, so a restart cannot send it twice
+        foreach (var item in due) item.RemindedAt = now;
+        await db.SaveChangesAsync(ct);
+
+        foreach (var email in due.Select(i => i.List.OwnerEmail).Distinct())
+        {
+            await live.PublishAsync(Events.RemindersChanged(email), cancellationToken: ct);
+        }
+
+        if (due.Count > 0) logger.LogInformation("Sent {Count} reminders", due.Count);
     }
 }
 ```
 
-Register the service in `ForgetMeNotSetup`:
+- **Every 20 seconds** is plenty for a demo. A real app might use a minute.
+- **`CreateScope()`** gives the worker its own `AppDb`. The worker lives forever, but a database context must not.
+- **Save first, publish second.** The reminders are marked as sent before anyone is told. If the app dies in between, nobody gets the same reminder twice.
+- **`try`/`catch` around the work.** If one round fails, the worker logs it and tries again next time instead of stopping for good.
+
+Now the line that connects the worker to the page. In `ListsPage` we wrote `.Live(Events.RemindersChanged(email))`. When the worker publishes that event, the browser reloads **only** the `reminders` prop. Nothing else on the page is touched.
+
+Install the SignalR transport. It carries the "something changed" message to the browser:
+
+```sh
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.2
+bun add @microsoft/signalr
+```
+
+In `Program.cs`, register it and the worker, and map the connection endpoint:
 
 ```csharp
-builder.Services.AddScoped<IEmailSender, SmtpEmailSender>(); // your implementation
 builder.Services.AddHostedService<ReminderWorker>();
+
+// Live props: the server can tell a signed-in browser that something changed.
+builder.Services.AddInertiaLive().AddSignalR(o =>
+    o.Authorize((context, channel, ct) =>
+        ValueTask.FromResult(channel.Name == $"users.{context.User?.FindFirstValue(ClaimTypes.Email)}")));
+
+// ...after app.MapInertiaDevTools();
+app.MapInertiaLiveHub(); // the SignalR connection, at /inertia-live
 ```
 
-For a single instance, the timer is enough. For several instances, use a durable queue with leases (TickerQ, Hangfire or a database outbox) so only one worker claims each reminder.
+<Callout type="danger" title="This Authorize rule is the security">
+Without it, nobody can join a private channel. With it, a person can join only the channel named after their own email. Without this check, anyone could listen to anyone's reminders. Keep the rule tight.
+</Callout>
 
-## 12. Test the important paths
+Finally, turn the client side on. The template already includes `ClientApp/lib/inertia-signalr.ts`. Import it in the client entry (`app.tsx` or `app.ts`) and pass it to `createInertiaApp`:
 
-Add `public partial class Program;` to the app, then use `Inertia.Net.Testing`:
+```ts
+import { signalr } from './lib/inertia-signalr'
+
+createInertiaApp({
+  serverHead: true,
+  live: signalr(), // props marked .Live(...) refresh themselves when the server publishes their event
+})
+```
+
+Run it. Add an item with a reminder one minute from now, open **My lists** and wait. When the time comes, the reminder shows up on its own. Open the browser's network tab to see how little happens: one small request, only for `reminders`.
+
+<Callout type="info" title="Why not just poll?">
+Polling asks "anything new?" every few seconds, for every open page, all day. A live prop sends nothing until something changes, and then sends one small request. It is cheaper for the server and faster for the person.
+</Callout>
+
+<Callout type="warning" title="More than one server">
+A SignalR message reaches only the browsers connected to the server that sent it, and each server would also run its own worker. Behind a load balancer, add a Redis backplane, keep the props cache in Redis (see [Redis cache](/docs/redis)), and run the worker on one instance. For a single server, what you have now is right.
+</Callout>
+
+## 9. Test the important paths
+
+You have a few rules the app must never break: nobody reads another person's list, a private list has no public page, and the dashboard's slow numbers arrive after the page. Tests make sure these stay true.
+
+Create a test project next to the app. Make sure its `TargetFramework` matches the app's:
+
+```sh
+dotnet new xunit -n ForgetMeNot.Tests
+cd ForgetMeNot.Tests
+dotnet add reference ../ForgetMeNot/ForgetMeNot.csproj
+dotnet add package Microsoft.AspNetCore.Mvc.Testing --version "10.*"
+dotnet add package Inertia.Net.Testing --version 1.9.2
+```
+
+The test project starts your real app in memory, so add one line at the very end of `Program.cs` of the app:
 
 ```csharp
-var page = await client.GetInertiaPageAsync("/todos");
-
-new AssertableInertia(page)
-    .Component("Todos/Index")
-    .Has("lists")
-    .Missing("reminders");
-
-var loaded = await page.LoadDeferredPropsAsync(client, "sidebar");
-new AssertableInertia(loaded).Has("reminders");
+public partial class Program; // lets the test project start the app
 ```
 
-For the public route, sign out first and assert that `remindAt` and the owner's email are absent. This is the test that protects you from accidentally returning the entity.
+Delete the generated `UnitTest1.cs` and create `ListTests.cs`:
 
-## 13. Run it in production
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using Inertia.Net;
+using Inertia.Net.Testing;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
-Build both bundles with your package manager:
+namespace ForgetMeNot.Tests;
+
+public sealed class ListTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
+{
+    private readonly string _db = Path.Combine(Path.GetTempPath(), $"forgetmenot-{Guid.NewGuid():N}.db");
+    private readonly HttpClient _client;
+
+    public ListTests(WebApplicationFactory<Program> factory)
+    {
+        // A fresh SQLite file per test class, a fixed asset version, and no SSR server to start.
+        _client = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("ConnectionStrings:Default", $"Data Source={_db}");
+            builder.ConfigureTestServices(services => services.PostConfigure<InertiaOptions>(o =>
+            {
+                o.Version = "test";
+                o.Ssr.Mode = SsrMode.Disabled;
+            }));
+        }).CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
+    }
+
+    public void Dispose()
+    {
+        _client.Dispose();
+        foreach (var file in Directory.GetFiles(Path.GetTempPath(), Path.GetFileName(_db) + "*")) File.Delete(file);
+    }
+
+    [Fact]
+    public async Task Lists_need_a_signed_in_person()
+    {
+        using var response = await _client.InertiaGetAsync("/lists", version: "test");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/login", response.Headers.Location!.ToString());
+    }
+
+    [Fact]
+    public async Task A_list_can_be_created_filled_and_shared()
+    {
+        await SignInAsync();
+
+        // Create a list. The POST redirects to the new list's page.
+        using var created = await PostAsync("/lists", new { title = "Groceries" }, referer: "/lists");
+        Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
+        Assert.Equal("/lists/1", created.Headers.Location!.ToString());
+
+        // Add an item, then look at the list. Items are a scroll prop: a "Page" of rows.
+        using var added = await PostAsync("/lists/1/items", new { title = "Milk" }, referer: "/lists/1");
+        Assert.Equal(HttpStatusCode.Redirect, added.StatusCode); // Back() sends the person to the page they came from
+
+        using var show = await _client.InertiaGetAsync("/lists/1", version: "test");
+        await show.AssertInertiaAsync(page => page
+            .Component("Lists/Show")
+            .Has("list", list => list.Where("title", "Groceries").Where("isShared", false).Etc())
+            .HasScroll("items")
+            .Has("items.data", 1, first => first.Where("title", "Milk").Etc()));
+
+        // Nobody can read a private list from the public address.
+        using var notYet = await _client.InertiaGetAsync("/p/not-a-real-link", version: "test");
+        Assert.Equal(HttpStatusCode.NotFound, notYet.StatusCode);
+
+        // Share it, then read the public page.
+        using var shared = await PostAsync("/lists/1/share", new { }, referer: "/lists/1");
+        using var afterShare = await _client.InertiaGetAsync("/lists/1", version: "test");
+        var shareUrl = (await afterShare.GetInertiaPageAsync()).Prop("list.shareUrl")!.ToString()!; // "/p/<secret>"
+
+        using var publicPage = await _client.InertiaGetAsync(shareUrl, version: "test");
+        await publicPage.AssertInertiaAsync(page => page
+            .Component("Public/Show")
+            .Has("list", list => list.Where("title", "Groceries").Where("open", 1).Etc())
+            .Has("items.data", 1, first => first.Where("title", "Milk").Missing("remindAt").Etc()));
+    }
+
+    [Fact]
+    public async Task The_dashboard_defers_its_slow_props_and_listens_for_reminders()
+    {
+        await SignInAsync();
+        using var created = await PostAsync("/lists", new { title = "Work" }, referer: "/lists");
+        using var added = await PostAsync("/lists/1/items", new { title = "Write tests" }, referer: "/lists/1");
+
+        var page = await (await _client.InertiaGetAsync("/lists", version: "test")).GetInertiaPageAsync();
+        new AssertableInertia(page)
+            .Component("Lists/Index")
+            .HasDeferred("stats")
+            .Missing("stats")
+            .HasLive("reminders", "private:users.demo@example.com", "RemindersChanged");
+
+        var loaded = await page.LoadDeferredPropsAsync(_client);
+        new AssertableInertia(loaded).Has("stats", stats => stats.Where("open", 1).Where("done", 0).Etc());
+    }
+
+
+    private async Task SignInAsync()
+    {
+        using var form = await _client.InertiaGetAsync("/login", version: "test");
+        using var request = JsonRequest(HttpMethod.Post, "/login", new { email = "demo@example.com", password = "password" }, "/login");
+        request.WithXsrfToken(form);
+        using var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    }
+
+    private async Task<HttpResponseMessage> PostAsync(string url, object body, string referer)
+    {
+        // The XSRF cookie is issued on any page response; read the token from one and send it back as a header.
+        using var any = await _client.InertiaGetAsync(referer, version: "test");
+        using var request = JsonRequest(HttpMethod.Post, url, body, referer);
+        request.WithXsrfToken(any);
+        return await _client.SendAsync(request);
+    }
+
+    private HttpRequestMessage JsonRequest(HttpMethod method, string url, object body, string referer)
+    {
+        var request = new HttpRequestMessage(method, url) { Content = JsonContent.Create(body) };
+        request.Headers.Add("X-Inertia", "true");
+        request.Headers.Add("X-Inertia-Version", "test");
+        request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+        request.Headers.Referrer = new Uri(_client.BaseAddress!, referer);
+        return request;
+    }
+}
+```
+
+Read the setup, because it explains most of the rest:
+
+- **A fresh database file per test class.** Tests must not see each other's lists.
+- **`o.Version = "test"`** fixes the asset version, so requests do not need a first visit to learn it.
+- **`SsrMode.Disabled`** means no Bun is started during tests.
+- **`AllowAutoRedirect = false`** lets a test look at the redirect itself, such as "a signed-out visitor is sent to `/login`".
+- **`HandleCookies = true`** keeps the sign-in cookie and the anti-forgery cookie between requests, like a browser.
+
+Run them:
+
+```sh
+dotnet test
+```
+
+<Callout type="info" title="Why does the helper read an XSRF token?">
+The template protects every form against CSRF. A real browser gets a cookie and sends it back as a header. In a test, `WithXsrfToken` copies the token from a page response into your request, so the server accepts it. If a test fails with a 400, this is usually the reason.
+</Callout>
+
+## 10. Run it in production
+
+Build both bundles and publish:
 
 ```sh
 bun run build
 dotnet publish -c Release
 ```
 
-Use `npm run build`, `pnpm run build` or `yarn run build` instead if preferred. ForgetMeNot starts `ssr/ssr.js` with Bun; install Bun in the production environment or configure a compatible Node runtime. The container pattern is in the docs app and the published samples:
+Before the app is public, go through this short list. Each item has a reason.
 
-- `Dockerfile` from `docs/Inertia.Net.Docs`
-- `samples/Inkwell/Dockerfile` for a single app with SQLite and Bun SSR
-- `samples/CarParker/Dockerfile` for a Mongo-backed app with public pages
-- `samples/TechLandierDistributed/Dockerfile` for a separate SSR pool
+| Do this | Why |
+|---|---|
+| Install Bun (or set `Executable = "node"`) where the app runs | The app starts the SSR bundle with it |
+| Keep the Data Protection keys somewhere that survives a restart | The sign-in cookie is encrypted with them. A new key signs everyone out |
+| Use EF Core migrations instead of `EnsureCreated()` | The tables will change, and `EnsureCreated()` cannot change them |
+| Set `ConnectionStrings__Default` for the real database | The file next to the app is only for your laptop |
+| Forward the proxy headers when you run behind one | The sign-in rate limit counts clients by address, and every client looks like the proxy. See [Deploying behind a proxy](/docs/deploying) |
+| Run one instance, or add Redis for the caches and SignalR | The props cache, SSR cache and live messages are per server unless you share them |
 
-Read [Server-side rendering](/docs/server-side-rendering) and [Deploying behind a proxy](/docs/deploying) before exposing the app publicly. Size the container with the [memory table](/docs/performance#memory-and-hosting).
+Container examples are in [Deploying behind a proxy](/docs/deploying) and the [server-side rendering](/docs/server-side-rendering) guide. For the container's memory, use the [memory table](/docs/performance#memory-and-hosting).
+
+## If something does not build
+
+Compare your `Program.cs` with the finished one:
+
+<Accordion>
+  <AccordionItem title="The finished Program.cs">
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using ForgetMeNot;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Props are serialized through the app's source-generated JSON context.
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
+builder.Services.AddValidation();
+// CSRF: the Inertia client sends the XSRF-TOKEN cookie back as X-XSRF-TOKEN; UseInertiaAntiforgery() issues and validates it.
+builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+builder.Services.AddResponseCompression();
+builder.Services.AddDbContext<AppDb>(o =>
+    o.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=forgetmenot.db"));
+builder.Services.AddHostedService<ReminderWorker>();
+builder.Services.AddSingleton<UserStore>();
+// Cookie sign-in. UseInertiaRedirects(): an Inertia visit to a protected page is redirected to /login like a browser request
+// (303 after a POST, PUT or DELETE), not answered with 401.
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/login";
+        o.UseInertiaRedirects();
+    });
+builder.Services.AddAuthorization();
+// At most 5 sign-in attempts a minute per client. Precognition requests (checking a field as you type) get their own allowance of 30 a
+// minute, so typing doesn't use up sign-in attempts and validation can't be called without limit.
+// Behind a reverse proxy every client has the proxy's address: configure forwarded headers first (README, "Deploying behind a proxy").
+builder.Services.AddRateLimiter(o =>
+{
+    o.AddPolicy("login", http =>
+    {
+        var client = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        // The metadata check keeps the Precognition header from skipping the limit on an endpoint whose handler runs for it.
+        return http.GetEndpoint()?.Metadata.GetMetadata<InertiaPrecognitionMetadata>() is not null && InertiaPrecognition.IsPrecognitive(http.Request)
+            ? RateLimitPartition.GetSlidingWindowLimiter("validation:" + client,
+                _ => new SlidingWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6 })
+            : RateLimitPartition.GetFixedWindowLimiter("login:" + client,
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) });
+    });
+    o.OnRejected = InertiaRateLimiting.OnRejected(); // back to the form, with flash.error
+});
+// Live props: the server can push "something changed" to a signed-in browser. A person may only join their own channel.
+builder.Services.AddInertiaLive().AddSignalR(o =>
+    o.Authorize((context, channel, ct) =>
+        ValueTask.FromResult(channel.Name == $"users.{context.User?.FindFirstValue(ClaimTypes.Email)}")));
+builder.Services.AddInertia(o =>
+{
+    o.Share("appName", "ForgetMeNot");
+    // The signed-in user on every page (page.props.auth.user), typed in the generated SharedProps.
+    o.Share("auth", http => new Auth(http.User.Identity?.IsAuthenticated == true
+        ? new AuthUser(http.User.FindFirstValue(ClaimTypes.Name)!, http.User.FindFirstValue(ClaimTypes.Email)!)
+        : null));
+    o.Vite.Prefetch = VitePrefetch.Waterfall; // fetch the other pages' chunks once a page has loaded
+    // Development only: rendering a component without a page file fails fast, and ClientApp/types/inertia.d.ts (from these
+    // C# types) and ClientApp/types/routes.ts (from the named endpoints below) are rewritten when the app starts.
+    o.Pages.Directory = "ClientApp/pages";
+    o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";
+    o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+    o.TypeScript.AddGeneratedPages().FlashData<Flash>(); // every IInertiaPage record, listed at compile time
+    // Server-side rendering: Bun runs the bundle that "vite build --ssr" writes. While Vite runs in development, Vite renders instead.
+    o.Ssr.BundlePath = "ssr/ssr.js";
+    o.Ssr.UseNodeProcess(n => n.Executable = "bun");
+});
+// Render the Error page for production navigation errors; Development keeps its diagnostics.
+builder.Services.AddInertiaErrorPages();
+builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension, in Development only
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<AppDb>().Database.EnsureCreated(); // fine for a first app; use migrations later
+}
+
+app.UseResponseCompression();
+app.UseStaticFiles(new StaticFileOptions
+{
+    // Vite puts a content hash in every file name under build/assets, so browsers can keep them for good.
+    OnPrepareResponse = c =>
+    {
+        if (c.Context.Request.Path.StartsWithSegments("/build/assets"))
+        {
+            c.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        }
+    },
+});
+app.UseInertiaErrorPages(); // before UseInertia(): also handles unmatched routes and unhandled exceptions
+app.UseInertia();
+app.UseAuthentication(); // after UseInertiaErrorPages(): a 403 renders the Error page
+app.UseAuthorization();
+app.UseRateLimiter(); // after UseInertia(): a rejected sign-in redirects back with a flash message
+app.UseInertiaAntiforgery(); // after UseAuthentication(): the token is tied to the signed-in user
+app.MapInertiaDevTools();
+app.MapInertiaLiveHub(); // the SignalR hub at /inertia-live
+
+app.MapInertia("/", HomePage.Component, new HomePage("Welcome to ForgetMeNot, an Inertia.js app on ASP.NET Core.")).WithName("home");
+
+// The cookie handler sends signed-out visitors here with ?ReturnUrl=/the/page; the form posts it back.
+app.MapGet("/login", (string? returnUrl) => Render(new LoginPage(returnUrl))).WithName("login");
+
+// WithInertiaPrecognition(): the form checks each field as you leave it, with the same validation as the submit.
+app.MapPost("/login", async (HttpContext http, UserStore users, LoginInput input) =>
+{
+    if (users.Find(input.Email!, input.Password!) is not { } user)
+    {
+        return Back("/login").WithErrors(new Dictionary<string, string> { ["email"] = "These credentials do not match our records." });
+    }
+
+    var identity = new ClaimsIdentity(
+        [new Claim(ClaimTypes.Name, user.Name), new Claim(ClaimTypes.Email, user.Email)], CookieAuthenticationDefaults.AuthenticationScheme);
+    await http.SignInAsync(new ClaimsPrincipal(identity));
+
+    // Only a path on this site: an absolute or protocol-relative URL here would be an open redirect.
+    return Results.Redirect(input.ReturnUrl is ['/'] or ['/', not ('/' or '\\'), ..] ? input.ReturnUrl : "/lists");
+}).WithInertiaPrecognition().RequireRateLimiting("login").WithName("login.store");
+
+app.MapPost("/logout", async (HttpContext http) =>
+{
+    await http.SignOutAsync();
+    return Results.Redirect("/");
+}).WithName("logout");
+
+app.MapForgetMeNot(); // our lists, items and the public page
+
+app.Run();
+
+public partial class Program; // lets the test project start the app
+
+namespace ForgetMeNot
+{
+    // A page record names its client component once: Render(new HomePage(...)) and o.TypeScript.Page<HomePage>() both use it.
+    public sealed record HomePage(string Message) : IInertiaPage
+    {
+        public static string Component => "Home";
+    }
+
+    /// <summary>The flash data the pages read (<c>page.flash</c>).</summary>
+    public sealed record Flash(string? Success, string? Error);
+
+    public sealed record LoginPage(string? ReturnUrl) : IInertiaPage
+    {
+        public static string Component => "Auth/Login";
+    }
+
+    /// <summary>The shared <c>auth</c> prop: the signed-in user, or null.</summary>
+    public sealed record Auth(AuthUser? User);
+
+    public sealed record AuthUser(string Name, string Email);
+
+    public sealed class LoginInput
+    {
+        [Required, EmailAddress]
+        public string? Email { get; set; }
+
+        [Required]
+        public string? Password { get; set; }
+
+        /// <summary>Where to go after signing in: the page that sent the visitor to the login page.</summary>
+        public string? ReturnUrl { get; set; }
+    }
+
+    /// <summary>One demo user (demo@example.com / password). Swap it for ASP.NET Core Identity or your user database.</summary>
+    public sealed class UserStore
+    {
+        private readonly PasswordHasher<AuthUser> _hasher = new();
+        private readonly AuthUser _demo = new("Demo User", "demo@example.com");
+        private readonly string _hash;
+
+        public UserStore() => _hash = _hasher.HashPassword(_demo, "password");
+
+        public AuthUser? Find(string email, string password) =>
+            string.Equals(email, _demo.Email, StringComparison.OrdinalIgnoreCase)
+            && _hasher.VerifyHashedPassword(_demo, _hash, password) != PasswordVerificationResult.Failed
+                ? _demo
+                : null;
+    }
+
+    [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+    [JsonSerializable(typeof(HomePage))]
+    [JsonSerializable(typeof(Flash))]
+    [JsonSerializable(typeof(LoginPage))]
+    [JsonSerializable(typeof(Auth))]
+    [JsonSerializable(typeof(LoginInput))]
+    // Our pages, props and forms. The template turns reflection-based JSON off, so each type is listed here.
+    [JsonSerializable(typeof(ListsPage))]
+    [JsonSerializable(typeof(ListPage))]
+    [JsonSerializable(typeof(PublicPage))]
+    [JsonSerializable(typeof(ListCard))]
+    [JsonSerializable(typeof(Stats))]
+    [JsonSerializable(typeof(List<ReminderRow>))]
+    [JsonSerializable(typeof(Page<ItemRow>))]
+    [JsonSerializable(typeof(Page<PublicItem>))]
+    [JsonSerializable(typeof(NewList))]
+    [JsonSerializable(typeof(NewItem))]
+    internal sealed partial class AppJsonContext : JsonSerializerContext;
+}
+```
+
+  </AccordionItem>
+</Accordion>
+
+## Where to go next
+
+You used page records, named and typed routes, Precognition, deferred and cached props, `ToPageAsync`, infinite scroll, server-side rendering with its cache, live props and the testing helpers. These are the next ones to try:
+
+- [Once props](/docs/once-props): remember a value that never changes on the client, such as a list of countries.
+- [Merging props](/docs/merging-props) and [Partial reloads](/docs/partial-reloads): update part of a page without replacing it.
+- [Redis cache](/docs/redis): share the props and SSR caches between servers.
+- [Authentication](/docs/authentication): replace the demo user with ASP.NET Core Identity.
+- [Native AOT](/docs/native-aot): a much smaller and faster-starting app, once you avoid EF Core.
+- [Performance](/docs/performance): what each feature costs, measured.
