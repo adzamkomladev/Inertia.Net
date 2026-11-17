@@ -8334,6 +8334,10 @@ o.Ssr.UseNodeProcess(n => n.Executable = "bun");
 
 `UseNodeProcess` makes the app start and watch the SSR process for you. If it stops answering, it is restarted, and while it is down the pages are rendered in the browser instead. Use `n.Executable = "node"` if you do not have Bun.
 
+<Callout type="warning" title="Two apps on one machine">
+The SSR process listens on port 13714. If a second Inertia.Net app tries to start its own on the same machine, its SSR process cannot start, and that app quietly renders in the browser instead (you will see a warning in the log). Give each app its own port: `o.Ssr.UseNodeProcess(n => { n.Executable = "bun"; n.BasePort = 13715; })`, and set the same port in the `inertia({ ssr: { port: ... } })` line of `vite.config.ts`, then run the build again. The port is written into the SSR bundle when it is built, so changing only the C# side does not work. We ran two apps side by side this way and both rendered on the server.
+</Callout>
+
 The SSR bundle needs an entry file and a build setting. The entry is two lines:
 
 ```tsx
