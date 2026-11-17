@@ -468,7 +468,8 @@ internal sealed partial class PropsWriter
         }
 
         var (info, containsProps) = _owner.TypeEntry(declaredType == typeof(object) ? prop.GetType() : declaredType);
-        if (containsProps)
+        // An object whose prop-capable members hold plain values is serialized whole, unless its children still filter (partial reload).
+        if (containsProps && !(info.Kind == JsonTypeInfoKind.Object && (!_isPartial || parentWasResolved) && _owner.HoldsNoProps(prop, info)))
         {
             return WriteEntryCoreAsync(key, index, prop, declaredType, parentWasResolved);
         }

@@ -41,6 +41,7 @@ internal sealed class InertiaPageWriter
 
     private readonly ConcurrentDictionary<Type, bool> _containsProps = new();
     private readonly ConcurrentDictionary<Type, (JsonTypeInfo Info, bool ContainsProps)> _types = new();
+    private readonly ConcurrentDictionary<Type, JsonPropertyInfo[]> _propSlots = new();
     private readonly JsonSerializerContext? _generated;
     private readonly ConcurrentDictionary<(JsonPropertyInfo Property, JsonNumberHandling? Handling), JsonTypeInfo> _propertySerializers = new();
     private readonly ConcurrentDictionary<(JsonConverter? Converter, JsonNumberHandling? Handling), JsonSerializerOptions> _memberOptions = new();
@@ -315,6 +316,24 @@ internal sealed class InertiaPageWriter
 
             return (info, containsProps);
         }, this);
+
+    /// <summary>
+    /// Whether an object whose type can hold props holds none right now: every member that could hold one is null or a plain value
+    /// (not a prop, a props dictionary, a <see cref="JsonElement"/> or a <see cref="JsonNode"/>). Such an object is serialized whole.
+    /// </summary>
+    internal bool HoldsNoProps(object value, JsonTypeInfo info)
+    {
+        if (info.PolymorphismOptions is not null) return false;
+        var slots = _propSlots.GetOrAdd(info.Type, static (_, state) =>
+            [.. state.info.Properties.Where(p => p.Get is not null && state.self.ContainsProps(p.PropertyType))], (self: this, info));
+        foreach (var property in slots)
+        {
+            var slot = property.Get!(value);
+            if (slot is JsonElement or JsonNode || (slot is not null && ContainsProps(slot.GetType()))) return false;
+        }
+
+        return true;
+    }
 
     // The app's source-generated context, when Inertia's options would write exactly what the context's own options write: it is the
     // first resolver (so it supplies every type it knows), and the settings that change the output are the same. The encoders differ,
