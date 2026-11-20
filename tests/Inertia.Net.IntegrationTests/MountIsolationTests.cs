@@ -248,10 +248,11 @@ public sealed class MountIsolationTests
         app.Run(http => Render("Home").WithSsrCache(TimeSpan.FromMinutes(5)).ExecuteAsync(http));
         await app.StartAsync(TestContext.Current.CancellationToken);
         var client = app.GetTestClient();
-        Task<string> Visit(string host)
+        async Task<string> Visit(string host)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, "http://" + host + "/");
-            return client.SendAsync(request, TestContext.Current.CancellationToken).ContinueWith(t => t.Result.Content.ReadAsStringAsync()).Unwrap();
+            using var request = new HttpRequestMessage(HttpMethod.Get, "http://" + host + "/");
+            using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+            return await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         }
 
         // Simultaneous first visits: neither may join the other's fill.

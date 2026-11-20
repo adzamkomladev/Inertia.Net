@@ -86,15 +86,7 @@ public static class InertiaHeaders
             return;
         }
 
-        var missing = new List<string>(PageVaryHeaders.Length);
-        foreach (var header in PageVaryHeaders)
-        {
-            if (!Lists(vary, header))
-            {
-                missing.Add(header);
-            }
-        }
-
+        var missing = PageVaryHeaders.Where(header => !Lists(vary, header)).ToList();
         if (missing.Count > 0)
         {
             headers.Vary = StringValues.Concat(vary, missing.Count == PageVaryHeaders.Length ? PageVary : string.Join(", ", missing));
