@@ -521,178 +521,1100 @@ html.dark .shiki span {
   [data-play] .edge-flow { animation: none; }
 }
 
-/* Landing-page architecture diagram: packets ride the lanes with a comet tail, parts ping when they wake, pages fill in. */
-.arch-packet {
-  offset-path: var(--path);
-  offset-rotate: 0deg;
-  animation: arch-travel 1.8s cubic-bezier(0.45, 0, 0.25, 1) var(--delay, 0s) both;
+/* Landing walkthrough: a browser and an ASP.NET Core app trade real Inertia messages as cards that slide through the protocol wire. */
+.ia-root {
+  --fly: cubic-bezier(0.33, 1, 0.68, 1);
+  --sink: cubic-bezier(0.32, 0, 0.67, 0);
+  --soft: cubic-bezier(0.25, 1, 0.5, 1);
+  --glide: cubic-bezier(0.65, 0, 0.35, 1);
+  --ia-shadow: 0 1px 2px oklch(0.2 0.02 286 / 0.04), 0 8px 24px -14px oklch(0.2 0.03 286 / 0.16);
 }
 
-@keyframes arch-travel {
-  0% { offset-distance: 0%; opacity: 0; }
-  12%, 88% { opacity: 1; }
-  100% { offset-distance: 100%; opacity: 0; }
+.dark .ia-root {
+  --ia-shadow: 0 1px 2px oklch(0 0 0 / 0.22), 0 10px 26px -16px oklch(0 0 0 / 0.55);
 }
 
-.arch-chip,
-.arch-frame {
-  transition: opacity 300ms var(--ease-out), filter 300ms var(--ease-out), transform 200ms var(--ease-out);
-  transform-box: fill-box;
-  transform-origin: center;
+[data-tone='req'] { --tone: var(--primary); }
+[data-tone='res'] { --tone: var(--success); }
+[data-tone='live'] { --tone: var(--warning); }
+
+.ia-stage {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: 340px 156px 432px;
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 14px 12px;
 }
 
-.arch-chip {
-  cursor: pointer;
+@media (min-width: 1024px) {
+  .ia-stage {
+    grid-template-columns: minmax(0, 1fr) 260px minmax(0, 1.08fr);
+    grid-template-rows: 470px;
+    max-width: none;
+    padding: 28px 24px;
+  }
 }
 
-.arch-chip rect {
-  transition: stroke 250ms, stroke-width 250ms;
+/* A faint blueprint grid and a violet bloom behind the wire. */
+.ia-stage::before,
+.ia-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
 }
 
+.ia-stage::before {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--border) 75%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--border) 75%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, #000 15%, transparent 78%);
+}
+
+.ia-stage::after {
+  background: radial-gradient(32% 42% at 50% 50%, color-mix(in oklab, var(--primary) 13%, transparent), transparent 70%);
+}
+
+.ia-cell {
+  position: relative;
+  z-index: 10;
+  min-width: 0;
+  min-height: 0;
+  transition: opacity 1000ms var(--soft), translate 1200ms var(--fly);
+}
+
+.ia-cell-s {
+  transition-delay: 120ms;
+}
+
+/* The two windows slide together the first time the walkthrough scrolls into view. */
+[data-armed]:not([data-in]) .ia-cell-b { opacity: 0; translate: 0 -18px; }
+[data-armed]:not([data-in]) .ia-cell-s { opacity: 0; translate: 0 18px; }
+[data-armed]:not([data-in]) .ia-wire { opacity: 0; }
+
+@media (min-width: 1024px) {
+  [data-armed]:not([data-in]) .ia-cell-b { translate: -32px 0; }
+  [data-armed]:not([data-in]) .ia-cell-s { translate: 32px 0; }
+}
+
+.ia-win {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--ia-shadow);
+}
+
+.ia-chrome {
+  display: flex;
+  height: 38px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--muted) 70%, var(--card));
+}
+
+.ia-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.ia-dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: var(--border-strong);
+  transition: background-color 250ms;
+}
+
+/* The traffic lights wake up under the pointer. */
 @media (hover: hover) {
-  .arch-chip:hover {
-    transform: translateY(-2px);
-  }
-
-  .arch-chip:hover > rect:first-child {
-    stroke: var(--primary);
-  }
+  .ia-win:hover .ia-dots i:nth-child(1) { background: #ff5f57; }
+  .ia-win:hover .ia-dots i:nth-child(2) { background: #febc2e; transition-delay: 40ms; }
+  .ia-win:hover .ia-dots i:nth-child(3) { background: #28c840; transition-delay: 80ms; }
 }
 
-.arch-on {
-  filter: drop-shadow(0 0 9px color-mix(in oklab, var(--primary) 42%, transparent));
-  animation: arch-ping 1000ms var(--ease-out);
+.ia-url {
+  display: flex;
+  height: 24px;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  font: 11px/1 var(--font-mono);
 }
 
-@keyframes arch-ping {
-  0% { filter: drop-shadow(0 0 0 color-mix(in oklab, var(--primary) 0%, transparent)); transform: scale(0.985); }
-  45% { filter: drop-shadow(0 0 20px color-mix(in oklab, var(--primary) 70%, transparent)); transform: scale(1.012); }
+.ia-type {
+  display: inline-block;
+  overflow: hidden;
+  width: calc(var(--n) * 1ch);
+  vertical-align: bottom;
+  white-space: nowrap;
+  border-right: 1.5px solid transparent;
+  animation: ia-type 1000ms steps(var(--n)) 400ms both, ia-caret 1.6s step-end 0s 1;
 }
 
-.arch-off {
-  opacity: 0.38;
+@keyframes ia-type {
+  from { width: 0; }
 }
 
-@keyframes arch-fade {
-  from { opacity: 0; transform: translateY(3px); }
+@keyframes ia-caret {
+  0%, 50% { border-color: var(--primary); }
 }
 
-.arch-fade {
-  animation: arch-fade 550ms var(--ease-out) both;
+.ia-path-flash {
+  border-radius: 3px;
+  animation: ia-flash 1.8s var(--soft) both;
 }
 
-@keyframes arch-shimmer {
-  50% { opacity: 0.45; }
+@keyframes ia-flash {
+  from { background: color-mix(in oklab, var(--primary) 22%, transparent); }
 }
 
-.arch-shimmer {
-  animation: arch-shimmer 2.2s ease-in-out infinite;
+.ia-spin {
+  animation: ia-spin 0.8s linear infinite;
 }
 
-@keyframes arch-rise {
-  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+@keyframes ia-spin {
+  to { rotate: 360deg; }
 }
 
-.arch-rise {
-  animation: arch-rise 700ms var(--ease-out) both;
-  transform-box: fill-box;
-  transform-origin: center;
+.ia-viewport {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: var(--background);
 }
 
-/* Idle lanes drift only while the diagram is playing; a hot lane draws itself in. */
-.arch-ambient .arch-lane {
-  animation: arch-flow 2.8s linear infinite;
+.ia-page {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  animation: ia-page 800ms var(--soft) var(--land) both;
 }
 
-@keyframes arch-flow {
-  to { stroke-dashoffset: -22; }
+@keyframes ia-page {
+  from { opacity: 0; }
 }
 
-.arch-draw {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: arch-draw 1.2s cubic-bezier(0.45, 0, 0.25, 1) var(--delay, 0s) forwards;
-  filter: drop-shadow(0 0 4px currentColor);
+/* Server HTML paints in one go; a client swap staggers in. */
+.ia-page[data-paint] {
+  animation: ia-paint 650ms ease-out var(--land) both;
 }
 
-@keyframes arch-draw {
-  to { stroke-dashoffset: 0; }
+@keyframes ia-paint {
+  from { opacity: 0; filter: blur(4px); }
 }
 
-.arch-ripple {
-  transform-box: fill-box;
-  transform-origin: center;
+.ia-page:not([data-paint]) .ia-in,
+.ia-sub .ia-in {
+  animation: ia-in 800ms var(--soft) calc(var(--land) + var(--i, 0) * 80ms) both;
+}
+
+.ia-page[data-paint] > .ia-sub:first-of-type .ia-in {
+  animation: none;
+}
+
+@keyframes ia-in {
+  from { opacity: 0; translate: 0 8px; }
+}
+
+.ia-tabline {
+  position: absolute;
+  bottom: -13px;
+  left: 14px;
+  width: 40px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+  translate: calc(var(--x) * 68px) 0;
+  transition: translate 700ms var(--glide);
+}
+
+.ia-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  transition: background-color 200ms;
+}
+
+[data-hydrated] .ia-row:hover {
+  background: color-mix(in oklab, var(--primary) 7%, transparent);
+}
+
+.ia-chev {
   opacity: 0;
-  animation: arch-ripple 1100ms var(--ease-out) var(--delay, 0s) both;
+  translate: -4px 0;
+  transition: opacity 600ms, translate 600ms var(--soft);
 }
 
-@keyframes arch-ripple {
-  0% { transform: scale(0.6); opacity: 0.9; }
-  100% { transform: scale(3.2); opacity: 0; }
+[data-hydrated] .ia-chev {
+  opacity: 1;
+  translate: 0 0;
+  transition-delay: calc(700ms + var(--i) * 90ms);
 }
 
-.arch-load {
-  transform-box: fill-box;
-  transform-origin: left center;
-  animation: arch-load 1.8s cubic-bezier(0.45, 0, 0.25, 1) both;
+/* Hover, press, release: the click the cursor makes. */
+.ia-target {
+  animation: ia-target 2.9s both;
 }
 
-@keyframes arch-load {
-  from { transform: scaleX(0); opacity: 1; }
+@keyframes ia-target {
+  0%, 45% { background: transparent; scale: 1; }
+  58% { background: color-mix(in oklab, var(--primary) 8%, transparent); }
+  66% { scale: 0.975; }
+  76%, 100% { scale: 1; background: color-mix(in oklab, var(--primary) 13%, transparent); }
+}
+
+.ia-cursor {
+  position: absolute;
+  z-index: 40;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.28));
+  animation: ia-cursor 2.6s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+@keyframes ia-cursor {
+  0% { translate: 150px 120px; opacity: 0; }
+  14% { opacity: 1; }
+  66% { translate: 0 0; scale: 1; }
+  74% { scale: 0.82; }
+  86%, 100% { translate: 0 0; scale: 1; opacity: 1; }
+}
+
+.ia-click {
+  position: absolute;
+  z-index: 39;
+  width: 32px;
+  height: 32px;
+  margin: -15px 0 0 -15px;
+  border: 2px solid var(--primary);
+  border-radius: 99px;
+  animation: ia-click 1000ms var(--soft) 1.95s both;
+}
+
+@keyframes ia-click {
+  0% { opacity: 0; scale: 0.3; }
+  1% { opacity: 0.9; }
+  100% { opacity: 0; scale: 1.7; }
+}
+
+/* Hydration: a scan line passes over the page and the controls come alive behind it. */
+.ia-sweep {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 30;
+  height: 45%;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, color-mix(in oklab, var(--primary) 14%, transparent) 92%, var(--primary) 99%, transparent);
+  animation: ia-sweep 2s var(--glide) 0.3s both;
+}
+
+@keyframes ia-sweep {
+  0% { translate: 0 -100%; opacity: 1; }
   85% { opacity: 1; }
-  to { transform: scaleX(1); opacity: 0; }
+  100% { translate: 0 230%; opacity: 0; }
 }
 
-.arch-cursor {
-  animation: arch-cursor 2s cubic-bezier(0.45, 0, 0.2, 1) both;
+/* Inertia's progress bar for client visits. */
+.ia-prog {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 35;
+  height: 2px;
+  transform-origin: left;
+  background: var(--primary);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--primary) 60%, transparent);
 }
 
-@keyframes arch-cursor {
-  0% { transform: translate(var(--x0), var(--y0)); opacity: 0; }
-  15% { opacity: 1; }
-  70% { transform: translate(var(--x1), var(--y1)) scale(1); }
-  80% { transform: translate(var(--x1), var(--y1)) scale(0.88); }
-  100% { transform: translate(var(--x1), var(--y1)) scale(1); opacity: 1; }
+.ia-prog[data-state='run'] {
+  animation: ia-prog-run 4.2s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
-.arch-hl {
+.ia-prog[data-state='done'] {
+  animation: ia-prog-done 1100ms ease-out var(--land) both;
+}
+
+@keyframes ia-prog-run {
+  from { scale: 0 1; }
+  to { scale: 0.82 1; }
+}
+
+@keyframes ia-prog-done {
+  0% { scale: 0.82 1; opacity: 1; }
+  40% { scale: 1 1; opacity: 1; }
+  100% { scale: 1 1; opacity: 0; }
+}
+
+.ia-status {
+  display: flex;
+  height: 30px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--muted) 55%, var(--card));
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.ia-fw {
+  display: inline-flex;
+  min-height: 22px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--foreground);
+  font-weight: 500;
+  transition: border-color 200ms, scale 150ms var(--soft);
+}
+
+.ia-fw:hover { border-color: var(--primary); }
+.ia-fw:active { scale: 0.94; }
+
+.ia-pop {
+  animation: ia-pop 500ms var(--fly) both;
+}
+
+@keyframes ia-pop {
+  from { scale: 0.4; rotate: -40deg; opacity: 0; }
+}
+
+.ia-stack {
+  display: inline-grid;
+}
+
+.ia-stack > * {
+  grid-area: 1 / 1;
+}
+
+.ia-until-land {
+  animation: ia-gone 300ms ease-in var(--land) forwards;
+}
+
+.ia-from-land {
+  animation: ia-come 600ms var(--soft) var(--land) both;
+}
+
+@keyframes ia-gone {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes ia-come {
+  from { opacity: 0; }
+}
+
+/* Dashboard */
+.ia-skel {
+  display: block;
+  background: linear-gradient(90deg, var(--muted) 20%, color-mix(in oklab, var(--muted-foreground) 20%, var(--muted)) 50%, var(--muted) 80%);
+  background-size: 220% 100%;
+  animation: ia-shimmer 1.3s linear infinite;
+}
+
+@keyframes ia-shimmer {
+  from { background-position: 110% 0; }
+  to { background-position: -110% 0; }
+}
+
+.ia-odo {
+  display: inline-flex;
+}
+
+.ia-digit {
+  display: inline-block;
+  height: 1.25em;
+  overflow: hidden;
+}
+
+.ia-digit > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25em;
+  translate: 0 calc(var(--d) * -10%);
+  transition: translate 1300ms var(--glide);
+  animation: ia-roll 1800ms var(--soft) calc(var(--land) + var(--k) * 110ms) backwards;
+}
+
+@keyframes ia-roll {
+  from { translate: 0 0; }
+}
+
+.ia-bar {
+  height: 100%;
+  flex: 1;
+  border-radius: 3px 3px 1px 1px;
+  transform-origin: bottom;
+  background: color-mix(in oklab, var(--primary) 50%, var(--card));
+  scale: 1 var(--h);
+  transition: scale 1100ms var(--soft) calc(var(--land) + var(--i) * 60ms), background-color 600ms;
+  animation: ia-bar-in 1100ms var(--soft) calc(var(--land) + var(--i) * 60ms) backwards;
+}
+
+.ia-bar.ia-skel {
+  background: linear-gradient(90deg, var(--muted) 20%, color-mix(in oklab, var(--muted-foreground) 20%, var(--muted)) 50%, var(--muted) 80%);
+  background-size: 220% 100%;
+  animation: ia-shimmer 1.3s linear infinite;
+}
+.ia-bar-hot { background: var(--success); }
+
+@keyframes ia-bar-in {
+  from { scale: 1 0; }
+}
+
+.ia-bump {
+  animation: ia-bump 2s var(--soft) both;
+}
+
+@keyframes ia-bump {
+  0% { border-color: var(--success); box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 30%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+
+.ia-plus {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font: 600 10.5px/1 var(--font-mono);
+  color: var(--success);
+  animation: ia-plus 2.4s var(--soft) 0.25s both;
+}
+
+@keyframes ia-plus {
+  0% { opacity: 0; translate: 0 8px; }
+  22% { opacity: 1; translate: 0 0; }
+  70% { opacity: 1; }
+  100% { opacity: 0; translate: 0 -10px; }
+}
+
+.ia-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--card);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.ia-live-dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--success) 20%, transparent);
+}
+
+.ia-live[data-ping] {
+  animation: ia-live 2s var(--soft) var(--land) both;
+}
+
+.ia-live[data-ping] .ia-live-dot {
+  animation: ia-dot 2s var(--soft) var(--land) both;
+}
+
+.ia-live[data-ping] .ia-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  background: var(--warning);
+  animation: ia-burst 1.5s var(--soft) var(--land) both;
+}
+
+.ia-live-evt {
+  overflow: hidden;
+  max-width: 0;
+  font-family: var(--font-mono);
+  color: var(--warning);
   opacity: 0;
-  animation: arch-hl 1100ms ease-out 1.4s both;
+  animation: ia-evt 900ms var(--soft) var(--land) forwards;
 }
 
-@keyframes arch-hl {
-  0% { opacity: 0.28; }
-  100% { opacity: 0.1; }
+@keyframes ia-live {
+  0% { border-color: var(--warning); box-shadow: 0 0 0 0 color-mix(in oklab, var(--warning) 28%, transparent); }
+  100% { box-shadow: 0 0 0 6px transparent; }
 }
 
-.arch-spin {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: arch-spin 2.6s linear 1;
+@keyframes ia-dot {
+  0%, 60% { background: var(--warning); }
 }
 
-@keyframes arch-spin {
-  to { transform: rotate(360deg); }
+@keyframes ia-burst {
+  0% { opacity: 0.9; scale: 1; }
+  100% { opacity: 0; scale: 5; }
 }
 
-@keyframes arch-progress {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+@keyframes ia-evt {
+  to { max-width: 96px; opacity: 1; }
 }
 
-.arch-progress {
-  animation: arch-progress linear both;
+/* Server: code with a moving execution band, then a live request trace. */
+.ia-code {
+  --lh: 15px;
+  --pad: 10px;
+  --gut: 24px;
+  --cw: 6px;
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  padding: var(--pad) 0;
+  font: 10px/var(--lh) var(--font-mono);
+  font-variant-ligatures: none;
+  animation: ia-fade 600ms var(--soft) both;
 }
+
+@media (min-width: 1024px) {
+  .ia-code { --lh: 17px; --gut: 30px; --cw: 6.6px; font-size: 11px; }
+}
+
+.ia-line {
+  display: flex;
+  height: var(--lh);
+  white-space: pre;
+  transition: opacity 700ms var(--soft);
+}
+
+.ia-code[data-hl] .ia-line:not([data-on]) {
+  opacity: 0.4;
+}
+
+.ia-gutter {
+  width: var(--gut);
+  flex-shrink: 0;
+  padding-right: 8px;
+  text-align: right;
+  color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+  user-select: none;
+  transition: color 300ms;
+}
+
+.ia-line[data-on] .ia-gutter {
+  color: var(--primary);
+}
+
+.ia-hl {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--pad) + var(--a) * var(--lh));
+  height: calc(var(--n) * var(--lh));
+  border-left: 2px solid var(--primary);
+  background: linear-gradient(to right, color-mix(in oklab, var(--primary) 14%, transparent), color-mix(in oklab, var(--primary) 4%, transparent));
+  transition: top 900ms var(--glide), height 900ms var(--glide), opacity 500ms;
+}
+
+.ia-note {
+  position: absolute;
+  top: calc(var(--pad) + var(--a) * var(--lh) + 1px);
+  left: min(calc(var(--gut) + (var(--len) + 1) * var(--cw)), calc(100% - var(--nw) - 8px));
+  display: flex;
+  height: calc(var(--lh) - 2px);
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font: 600 9.5px/1 var(--font-sans);
+  white-space: nowrap;
+  box-shadow: 0 1px 6px -2px color-mix(in oklab, var(--primary) 35%, transparent);
+  animation: ia-note 700ms var(--soft) 0.7s both;
+}
+
+@keyframes ia-note {
+  from { opacity: 0; translate: -8px 0; scale: 0.9; }
+}
+
+.ia-glue {
+  padding: 2px 8px;
+  border: 1px solid var(--glue-stroke);
+  border-radius: 99px;
+  background: var(--glue-fill);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ia-toast {
+  position: absolute;
+  top: 46px;
+  right: 10px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in oklab, var(--success) 40%, var(--border));
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--success);
+  font-size: 10.5px;
+  font-weight: 600;
+  box-shadow: var(--ia-shadow);
+  animation: ia-toast 2.4s var(--fly) both;
+}
+
+@keyframes ia-toast {
+  0% { opacity: 0; translate: 0 -8px; scale: 0.95; }
+  12%, 80% { opacity: 1; translate: 0 0; scale: 1; }
+  100% { opacity: 0; translate: 0 -4px; }
+}
+
+.ia-trace {
+  height: 144px;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--muted) 45%, var(--card));
+}
+
+.ia-span {
+  display: grid;
+  height: 17px;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 10px;
+  font: 10px/1 var(--font-mono);
+}
+
+@media (min-width: 1024px) {
+  .ia-span { grid-template-columns: 110px 1fr; }
+}
+
+.ia-track {
+  position: relative;
+  height: 100%;
+}
+
+.ia-bar-span {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--from) * 1%);
+  width: calc((var(--to) - var(--from)) * 1%);
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 99px;
+  transform-origin: left;
+  background: var(--k);
+  animation: ia-span 1000ms var(--soft) var(--delay) backwards;
+}
+
+.ia-bar-span[data-slow] {
+  animation-duration: 3.8s;
+  animation-timing-function: cubic-bezier(0.4, 0.1, 0.4, 1);
+}
+
+@keyframes ia-span {
+  from { scale: 0 1; }
+}
+
+.ia-span-root {
+  scale: var(--w) 1;
+  transition: scale 1200ms var(--soft);
+}
+
+.ia-span-root[data-open] {
+  background-image: repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in oklab, var(--card) 55%, transparent) 3px 6px);
+  background-size: 8.5px 8.5px;
+  animation: ia-span 1.4s var(--soft) var(--delay) backwards, ia-stripes 0.9s linear infinite;
+}
+
+.ia-span-root[data-open][data-slow] {
+  animation-duration: 4.2s, 0.9s;
+}
+
+@keyframes ia-stripes {
+  to { background-position: 8.5px 0; }
+}
+
+.ia-k-root { --k: color-mix(in oklab, var(--primary) 32%, var(--card)); }
+.ia-k-code { --k: color-mix(in oklab, var(--muted-foreground) 45%, var(--card)); }
+.ia-k-db { --k: var(--info); }
+.ia-k-render { --k: var(--primary); }
+.ia-k-ssr { --k: var(--success); }
+.ia-k-live { --k: var(--warning); }
+
+.ia-span-note {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--from) * 1%);
+  translate: 0 -50%;
+  padding: 1px 7px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 99px;
+  color: var(--muted-foreground);
+  font: 500 9px/1.3 var(--font-sans);
+  animation: ia-come 700ms var(--soft) var(--delay) both;
+}
+
+.ia-rec,
+.ia-idle {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 99px;
+  background: var(--danger);
+  animation: ia-breathe 1.1s ease-in-out infinite;
+}
+
+.ia-idle {
+  background: var(--muted-foreground);
+  animation-duration: 2.4s;
+}
+
+@keyframes ia-breathe {
+  50% { opacity: 0.25; }
+}
+
+.ia-fade {
+  animation: ia-fade 650ms var(--soft) both;
+}
+
+@keyframes ia-fade {
+  from { opacity: 0; }
+}
+
+/* Highlighting with the docs code-block palette. */
+.ia-root { --tk-kw: #d73a49; --tk-str: #032f62; --tk-fn: #6f42c1; --tk-type: #005cc5; --tk-tag: #22863a; }
+.dark .ia-root { --tk-kw: #f97583; --tk-str: #9ecbff; --tk-fn: #b392f0; --tk-type: #79b8ff; --tk-tag: #85e89d; }
+.ia-t-kw { color: var(--tk-kw); }
+.ia-t-str { color: var(--tk-str); }
+.ia-t-fn { color: var(--tk-fn); }
+.ia-t-type, .ia-t-key { color: var(--tk-type); }
+.ia-t-tag { color: var(--tk-tag); }
+
+/* The wire: a lane between two ports. Cards slide out from under one window and into the other. */
+.ia-wire {
+  position: relative;
+  transition: opacity 900ms var(--soft) 250ms;
+}
+
+.ia-lane {
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 1px;
+  background-image: linear-gradient(to bottom, var(--border-strong) 50%, transparent 50%);
+  background-size: 1px 8px;
+  animation: ia-lane-y 1.4s linear infinite;
+}
+
+.ia-lane::after {
+  content: '';
+  position: absolute;
+  inset: 0 -1px;
+  background: var(--tone, var(--primary));
+  box-shadow: 0 0 8px color-mix(in oklab, var(--tone, var(--primary)) 60%, transparent);
+  opacity: 0;
+}
+
+.ia-wire[data-busy] .ia-lane::after {
+  animation: ia-hot 3.6s ease-in-out both;
+}
+
+@keyframes ia-hot {
+  0% { opacity: 0; }
+  25%, 75% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+
+@keyframes ia-lane-y {
+  to { background-position: 0 8px; }
+}
+
+@keyframes ia-lane-x {
+  to { background-position: 8px 0; }
+}
+
+.ia-port {
+  position: absolute;
+  left: 50%;
+  z-index: 20;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 99px;
+  background: var(--card);
+}
+
+.ia-port-b { top: 0; }
+.ia-port-s { top: 100%; }
+
+.ia-port[data-flash] {
+  animation: ia-port 1.4s var(--soft) both;
+}
+
+.ia-port[data-flash='recv'] {
+  animation-delay: var(--land);
+}
+
+@keyframes ia-port {
+  0% { border-color: var(--border-strong); }
+  15% { border-color: var(--tone); background: var(--tone); box-shadow: 0 0 0 4px color-mix(in oklab, var(--tone) 18%, transparent), 0 0 10px color-mix(in oklab, var(--tone) 60%, transparent); }
+  100% { border-color: var(--border-strong); box-shadow: 0 0 0 12px transparent; }
+}
+
+.ia-wire-label,
+.ia-wire-sub {
+  position: absolute;
+  top: 50%;
+  white-space: nowrap;
+  transition: opacity 300ms;
+}
+
+.ia-wire-label {
+  right: calc(50% + 14px);
+  translate: 0 -50%;
+  font: 600 9.5px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.ia-wire-sub {
+  left: calc(50% + 14px);
+  translate: 0 -50%;
+  font: 10px/1 var(--font-mono);
+  color: var(--muted-foreground);
+}
+
+.ia-wire[data-rest] .ia-wire-label,
+.ia-wire[data-rest] .ia-wire-sub {
+  opacity: 0;
+}
+
+.ia-wire[data-tone]:not([data-rest]) .ia-wire-label,
+.ia-wire[data-tone]:not([data-rest]) .ia-wire-sub {
+  animation: ia-relabel calc(var(--land) + 0.9s) both;
+}
+
+@keyframes ia-relabel {
+  0%, 85% { opacity: 0; }
+}
+
+@media (min-width: 1024px) {
+  .ia-lane {
+    inset: 50% 0 auto;
+    width: auto;
+    height: 1px;
+    background-image: linear-gradient(to right, var(--border-strong) 50%, transparent 50%);
+    background-size: 8px 1px;
+    animation-name: ia-lane-x;
+  }
+
+  .ia-lane::after { inset: -1px 0; }
+  .ia-port { top: 50%; margin: -5.5px 0 0 -5.5px; }
+  .ia-port-b { left: 0; }
+  .ia-port-s { left: 100%; }
+  .ia-wire-label { right: auto; left: 50%; top: calc(50% - 18px); translate: -50% 0; }
+  .ia-wire-sub { left: 50%; top: calc(50% + 10px); translate: -50% 0; }
+}
+
+.ia-card-slot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.ia-card {
+  --far-b: 0 -175px;
+  --far-s: 0 175px;
+  z-index: 0;
+  width: 232px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--tone) 45%, var(--border));
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--ia-shadow), 0 0 0 3px color-mix(in oklab, var(--tone) 6%, transparent), 0 12px 28px -18px color-mix(in oklab, var(--tone) 40%, transparent);
+}
+
+@media (min-width: 1024px) {
+  .ia-card { --far-b: -256px 0; --far-s: 256px 0; width: 244px; }
+}
+
+.ia-card[data-motion='out'] { --from: var(--far-b); --to: var(--far-s); animation: ia-fly 3.6s both; }
+.ia-card[data-motion='in'] { --from: var(--far-s); --to: var(--far-b); animation: ia-fly 3.6s both; }
+.ia-card[data-motion='emerge'] { --from: var(--far-s); animation: ia-emerge 1300ms var(--fly) both; }
+.ia-card[data-motion='deliver'] { --to: var(--far-b); animation: ia-deliver 2s both; }
+
+@keyframes ia-fly {
+  0% { translate: var(--from); scale: 0.96; animation-timing-function: var(--fly); }
+  30% { translate: 0 0; scale: 1; }
+  70% { translate: 0 0; scale: 1; animation-timing-function: var(--sink); }
+  100% { translate: var(--to); scale: 0.96; }
+}
+
+@keyframes ia-emerge {
+  from { translate: var(--from); scale: 0.96; }
+}
+
+@keyframes ia-deliver {
+  0%, 40% { translate: 0 0; scale: 1; animation-timing-function: var(--sink); }
+  100% { translate: var(--to); scale: 0.96; }
+}
+
+.ia-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(to bottom, color-mix(in oklab, var(--tone) 10%, var(--card)), var(--card));
+  color: var(--tone);
+  font: 600 9.5px/1 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ia-card-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--tone);
+  box-shadow: 0 0 5px color-mix(in oklab, var(--tone) 70%, transparent);
+}
+
+.ia-card-meta {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font: 500 10px/1 var(--font-mono);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.ia-card-body {
+  padding: 8px 10px 10px;
+  color: var(--foreground);
+  font: 10px/1.6 var(--font-mono);
+  font-variant-ligatures: none;
+  white-space: pre;
+  animation: ia-fade 650ms var(--soft) both;
+}
+
+@media (min-width: 1024px) {
+  .ia-card-body { font-size: 10.5px; }
+}
+
+/* Each window glows briefly in the tone of whatever just arrived. */
+.ia-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  border-radius: 14px;
+  pointer-events: none;
+  animation: ia-ring 1.4s var(--soft) var(--land) both;
+}
+
+@keyframes ia-ring {
+  0% { opacity: 0; }
+  1% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in oklab, var(--tone) 30%, transparent), inset 0 0 0 1px var(--tone); }
+  100% { opacity: 0; box-shadow: 0 0 0 10px transparent, inset 0 0 0 1px var(--tone); }
+}
+
+/* Chrome around the stage. */
+.ia-tab-pill {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  border-radius: 99px;
+  background: var(--primary);
+  box-shadow: 0 3px 10px -6px color-mix(in oklab, var(--primary) 45%, transparent);
+  transition: translate 700ms var(--glide), width 700ms var(--glide);
+}
+
+.ia-cap {
+  animation: ia-cap 850ms var(--soft) both;
+}
+
+@keyframes ia-cap {
+  from { opacity: 0; filter: blur(4px); translate: 0 4px; }
+}
+
+.ia-seg {
+  display: flex;
+  width: 100%;
+  height: 24px;
+  align-items: center;
+}
+
+.ia-seg > span {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border) 60%, transparent);
+  transition: height 250ms var(--soft);
+}
+
+.ia-seg:hover > span { height: 6px; }
+
+.ia-seg i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: left;
+  background: var(--primary);
+  scale: var(--p, 0) 1;
+}
+
+.ia-ctl {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 99px;
+  color: var(--muted-foreground);
+  transition: background-color 200ms, color 200ms, scale 150ms var(--soft);
+}
+
+.ia-ctl:hover { background: var(--accent); color: var(--foreground); }
+.ia-ctl:active { scale: 0.9; }
 
 @media (prefers-reduced-motion: reduce) {
-  .arch-progress { animation: none; display: none; }
-  .arch-on, .arch-rise, .arch-ripple, .arch-load, .arch-cursor, .arch-hl, .arch-spin, .arch-ambient .arch-lane { animation: none; }
-  .arch-ripple, .arch-load, .arch-cursor { display: none; }
-  .arch-draw { animation: none; stroke-dashoffset: 0; }
-  .arch-chip:hover { transform: none; }
-  /* Without motion the packet rests mid-lane, so its label still tells the story. */
-  .arch-packet { animation: none; offset-distance: 50%; opacity: 1; }
-  .arch-fade, .arch-shimmer { animation: none; }
+  .ia-root *,
+  .ia-root *::before,
+  .ia-root *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+
+  /* Without motion a card rests on the wire, so its contents still tell the story. */
+  .ia-card { animation: none !important; }
+  .ia-cursor, .ia-click, .ia-sweep { display: none; }
 }
 
 /* Bars grow in when first seen and again on replay. They stay full if scripts or motion are off. */
@@ -710,6 +1632,10 @@ html.dark .shiki span {
 
 @keyframes bar-grow {
   from { transform: scaleX(0); }
+}
+
+@keyframes arch-rise {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
 }
 
 .flow-node {
