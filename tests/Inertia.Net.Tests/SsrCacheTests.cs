@@ -257,7 +257,7 @@ public sealed class SsrCacheTests
             o.Ssr.Cache.Duration = TimeSpan.FromMinutes(1);
         }, configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
         var cache = harness.Services.GetRequiredService<InertiaCaching>();
-        var key = InertiaCaching.SsrKey("{}"u8);
+        var key = InertiaCaching.SsrKey(null, "{}"u8);
         Assert.True(cache.TryBeginFill(key, out var completion));
         var renderer = harness.Services.GetRequiredService<IInertiaSsrRenderer>();
         var context = new InertiaRootViewContext(harness.Context(), "Home", "app.html", new Dictionary<string, object?>(), "{}"u8.ToArray(), "app");
@@ -485,7 +485,7 @@ public sealed class SsrCacheTests
         Assert.Contains("render 1", await RenderAsync(harness), StringComparison.Ordinal);
         var (key, options) = Assert.Single(store.Sets);
         Assert.Equal(InertiaCacheEntryKind.Ssr, key.Kind);
-        Assert.Matches("^inertia:ssr:[0-9A-F]{64}$", key.ToString());
+        Assert.Matches("^inertia:ssr:2[.][0-9A-F]{64}$", key.ToString());
         Assert.Equal(new[] { InertiaCacheTags.Ssr }, options.Tags);
     }
 }

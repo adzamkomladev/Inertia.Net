@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -67,5 +68,99 @@ public sealed class DevToolsRecorderTests
 
         await recorder.ListEntriesAsync(context);
         Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+    }
+
+    private static Harness Recording(Action<InertiaDevToolsOptions>? configure = null) =>
+        new(environment: "Development", configureServices: services => services.AddInertiaDevTools(configure));
+
+    // Records an Inertia visit to a page whose one prop is `size` characters; returns the response body and the stored entry.
+    private static async Task<(string Body, JsonObject Entry)> RecordAsync(Harness harness, int size, string tab = "t")
+    {
+        var recorder = harness.Services.GetRequiredService<DevToolsRecorder>();
+        var context = harness.Context().AsInertia();
+        context.Request.Headers["X-Inertia-Devtools-Tab"] = tab;
+        var capture = recorder.Begin(context)!;
+        var body = await Harness.ExecuteAsync(context, Inertia.Render("Report", new InertiaProps { ["text"] = new string('x', size) }));
+        await recorder.CompleteAsync(context, capture, failed: false);
+        return (body, await ReadEntryAsync(harness, capture.Id));
+    }
+
+    private static async Task<JsonObject> ReadEntryAsync(Harness harness, string id)
+    {
+        var read = new DefaultHttpContext { RequestServices = harness.Services };
+        read.Connection.RemoteIpAddress = IPAddress.Loopback;
+        read.Request.Host = new HostString("localhost");
+        read.Request.RouteValues["id"] = id;
+        read.Response.Body = new MemoryStream();
+        await harness.Services.GetRequiredService<DevToolsRecorder>().GetEntryAsync(read);
+        return (JsonObject)JsonNode.Parse(Harness.Body(read))!;
+    }
+
+    [Theory]
+    [InlineData(-1, true)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    public async Task A_page_over_the_response_limit_is_recorded_without_its_body(int over, bool kept)
+    {
+        var (_, probe) = await RecordAsync(Recording(), 10_000);
+        var size = (int)probe["__meta"]!["responseBytes"]!;
+        var harness = Recording(o => o.MaxResponseBytes = size - over);
+
+        var (body, entry) = await RecordAsync(harness, 10_000);
+
+        Assert.Equal(size, System.Text.Encoding.UTF8.GetByteCount(body)); // the browser still gets the whole page
+        var meta = entry["__meta"]!;
+        Assert.Equal("Report", (string?)meta["component"]);
+        Assert.Equal("navigate", (string?)meta["requestType"]);
+        Assert.Equal(200, (int)meta["status"]!);
+        Assert.Equal(size, (int)meta["responseBytes"]!);
+        var response = entry["http"]!["responseBody"]!;
+        if (kept)
+        {
+            Assert.Equal("present", (string?)response["status"]);
+            Assert.Equal(10_000, ((string?)response["value"]!["props"]!["text"])!.Length);
+        }
+        else
+        {
+            Assert.Equal("omitted", (string?)response["status"]);
+            Assert.Equal("too-large", (string?)response["reason"]);
+            Assert.Null(entry["propValues"]?["text"]);
+        }
+    }
+
+    [Fact]
+    public async Task Retained_entries_stay_within_the_byte_budget_across_tabs()
+    {
+        var (_, probe) = await RecordAsync(Recording(), 50_000);
+        var entrySize = probe.ToJsonString().Length;
+        var harness = Recording(o => o.MaxTotalBytes = entrySize * 3L + entrySize / 2);
+        var recorder = harness.Services.GetRequiredService<DevToolsRecorder>();
+
+        await Task.WhenAll(Enumerable.Range(0, 12).Select(i => Task.Run(() => RecordOnlyAsync(harness, 50_000, "tab" + (i % 3)), TestContext.Current.CancellationToken)));
+
+        Assert.InRange(recorder.RetainedBytes, 1, entrySize * 3L + entrySize / 2);
+        Assert.Equal(3, recorder.Count);
+    }
+
+    [Fact]
+    public async Task An_entry_larger_than_the_whole_budget_is_not_kept()
+    {
+        var harness = Recording(o => o.MaxTotalBytes = 1_000);
+        var recorder = harness.Services.GetRequiredService<DevToolsRecorder>();
+        var body = await RecordOnlyAsync(harness, 50_000, "t");
+        Assert.Contains("\"text\"", body, StringComparison.Ordinal);
+        Assert.Equal(0, recorder.Count);
+        Assert.Equal(0, recorder.RetainedBytes);
+    }
+
+    private static async Task<string> RecordOnlyAsync(Harness harness, int size, string tab)
+    {
+        var recorder = harness.Services.GetRequiredService<DevToolsRecorder>();
+        var context = harness.Context().AsInertia();
+        context.Request.Headers["X-Inertia-Devtools-Tab"] = tab;
+        var capture = recorder.Begin(context)!;
+        var body = await Harness.ExecuteAsync(context, Inertia.Render("Report", new InertiaProps { ["text"] = new string('x', size) }));
+        await recorder.CompleteAsync(context, capture, failed: false);
+        return body;
     }
 }

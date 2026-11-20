@@ -92,6 +92,26 @@ public sealed class RedisCacheStoreTests
     }
 
     [Fact]
+    public async Task Removing_a_former_tag_after_expiry_leaves_the_retagged_entry()
+    {
+        await using var app = App();
+        var store = Store(app);
+        // The sibling keeps the "old" tag set alive after the short entry and its index expire.
+        await store.SetAsync(Key("sibling"), [9], Entry(TimeSpan.FromMinutes(1), "old"), Ct);
+        await store.SetAsync(Key("k"), [1], Entry(TimeSpan.FromMilliseconds(100), "old"), Ct);
+        await Task.Delay(300, Ct);
+        Assert.Null(await store.GetAsync(Key("k"), Ct));
+
+        await store.SetAsync(Key("k"), [2], Entry(TimeSpan.FromMinutes(1), "new"), Ct);
+        await store.RemoveByTagAsync("old", Ct);
+        Assert.Equal([2], await store.GetAsync(Key("k"), Ct));
+        Assert.Null(await store.GetAsync(Key("sibling"), Ct));
+
+        await store.RemoveByTagAsync("new", Ct);
+        Assert.Null(await store.GetAsync(Key("k"), Ct));
+    }
+
+    [Fact]
     public async Task Removing_a_tag_with_more_entries_than_one_batch_removes_them_all()
     {
         await using var app = App();

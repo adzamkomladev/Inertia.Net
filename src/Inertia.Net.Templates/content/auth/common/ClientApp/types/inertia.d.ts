@@ -26,6 +26,7 @@ export interface HomePage {
 
 export interface LoginPage {
   returnUrl: string | null
+  demoAccount: boolean
 }
 
 export interface TodosPage {

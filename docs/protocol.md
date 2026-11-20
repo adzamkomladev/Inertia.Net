@@ -56,7 +56,7 @@ All list headers are comma-separated. Parse them as: split on `,`, trim, drop em
 
 ## 3. Responses and middleware flow
 
-- `Vary: X-Inertia` goes on **every** response that passes through the middleware.
+- `Vary: X-Inertia` goes on **every** response that passes through the middleware. A rendered page and the version-mismatch `409` also vary on `X-Inertia-Version`, `X-Inertia-Partial-Component`, `X-Inertia-Partial-Data`, `X-Inertia-Partial-Except`, `X-Inertia-Reset`, `X-Inertia-Except-Once-Props`, `X-Inertia-Error-Bag` and `X-Inertia-Infinite-Scroll-Merge-Intent`, the headers that select their status, props or metadata, so a shared cache cannot serve a full visit's page to a partial reload (or the reverse). Existing `Vary` values are kept (case-insensitive), and `Vary: *` is left alone. Personalization (cookies, authorization) is the application's to express with `Cache-Control`.
 - A JSON page response normally has status 200, `Content-Type: application/json`, and `X-Inertia: true`. Error pages are ordinary pages with a non-200 status; `AddInertiaErrorPages()` can render them for routing failures and unhandled exceptions.
 - An HTML page response is the root template with the page embedded (§5).
 

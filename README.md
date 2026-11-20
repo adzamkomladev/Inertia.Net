@@ -4,7 +4,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.9.4** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.5** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 **Fast.** In a benchmark where the same todo app was built in Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel, Inertia.Net
 served the most requests in every test: a server-rendered first visit to the todo list ran at 3,905 requests per second on Native
@@ -125,7 +125,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Install the template once.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.4
+dotnet new install Inertia.Net.Templates@1.9.5
 ```
 
 Run the command for your frontend, then change into the new app directory with `cd MyApp`.
@@ -254,17 +254,17 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.4
-dotnet add package Inertia.Net.Mvc --version 1.9.4 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.4 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.4 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.4 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.4 # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.4 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.4 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.5
+dotnet add package Inertia.Net.Mvc --version 1.9.5 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.5 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.5 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.5 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.5 # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.5 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.5 # MongoDB pagination
 ```
 
-Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.4` for all Inertia.Net packages. Inertia.Net 1.9.4 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.5` for all Inertia.Net packages. Inertia.Net 1.9.5 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -913,7 +913,10 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 
 `ClearPropsAsync()` removes every cached prop and `ClearSsrAsync()` every [cached render](#6-response-cache). `SetPropAsync` serializes
 the value as a prop of its type would be (a scroll value's paging metadata comes from `IProvidesScrollMetadata`), and takes the same
-`staleFor` and `tags`. With the default store a removal frees the entries at once.
+`staleFor` and `tags`. With the default store a removal frees the entries at once. A removal or `SetPropAsync` waits for this app
+instance's cache writes already under way, and a load or refresh that started before it neither stores nor shares its value
+afterwards: later requests see the new value, or load again. The guarantee is per app instance; with a shared store (Redis, MongoDB),
+another instance's load that finishes after the removal can still store a value it read before it.
 
 **Stale-while-revalidate.** `staleFor` keeps serving a value once its `duration` has passed. The first request that reads a stale
 value gets it at once, and the loader runs after that response has been sent, to store a fresh value; requests in the meantime get the
@@ -1717,7 +1720,13 @@ Only successful status-200 page GET renders are remembered, including initial HT
 
 This cookie is used with both cookie and session state stores. It is **per browser, not per tab**: the most recent page render wins across tabs. The `Referer` still takes precedence when available.
 
-`Vary: X-Inertia` is added to every response that passes through the middleware.
+`Vary: X-Inertia` is added to every response that passes through the middleware. A rendered page, and the version-mismatch `409`,
+also vary on every request header that selects its content: `X-Inertia-Version`, `X-Inertia-Partial-Component`,
+`X-Inertia-Partial-Data`, `X-Inertia-Partial-Except`, `X-Inertia-Reset`, `X-Inertia-Except-Once-Props`, `X-Inertia-Error-Bag` and
+`X-Inertia-Infinite-Scroll-Merge-Intent`. A shared cache (CDN or proxy) allowed to store a page then keeps a full and a partial
+visit to the same URL apart. Values already in `Vary` are kept, and `Vary: *` is left alone. This is protocol variation only:
+a page that depends on the user (cookies, authorization) must still be sent `Cache-Control: private` or `no-store`, and a cache
+that would store too many selector combinations is better configured to bypass Inertia pages.
 
 **Pages without a handler.** `app.MapInertia("/about", "About", props)` maps GET and HEAD to `Render("About", props)`, like Laravel's
 `Route::inertia`. In MVC, `return this.InertiaView(props);` renders the action's own component, `{Controller}/{Action}` by default
@@ -2627,7 +2636,7 @@ first page carries the discovery tag the extension reads. Values of names contai
 `RedactedKeys`. Nothing leaves the app. The recorder warns when it is enabled without a mapped reader endpoint.
 Sensitive query parameters are also redacted in recorded request/page URLs, redirects and URL headers; actual application URLs are
 unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered;
-unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk.
+unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk. A page larger than `MaxResponseBytes` (default 1 MiB) is recorded without its body (`too-large`, with its size in `__meta.responseBytes`) and is never copied; the browser still receives all of it. Kept entries are also bounded by `MaxTotalBytes` (default 64 MiB, oldest dropped first).
 
 Without an `Authorize` callback the read API answers in Development only, and only requests from this machine: a loopback connection
 to a loopback host name such as `localhost`, with no `X-Forwarded-For`, `Forwarded`, `X-Forwarded-Host`, `X-Real-IP` or `Via` header
@@ -2940,7 +2949,7 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | `services.AddInertiaErrorPages(name, configure)` | Error pages of a named mount. A mount without them leaves its errors to the pipeline. |
 | `app.UseInertiaAntiforgery(configure?)` | Issues the `XSRF-TOKEN` cookie and validates every unsafe request (`419` on failure). Options: `CookieName` (`"XSRF-TOKEN"`), `SecurePolicy` (`SameAsRequest`), `ShouldValidate`, `OnRejected`, `CookieRefresh` (`Always` by default, or `Lazy`). |
 | `app.MapInertia(pattern, component, props?)` | GET and HEAD endpoint that renders the component. |
-| `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder and its read API. `Enabled` (default: Development only), `Authorize`, `MaxEntriesPerTab` 100, `MaxEntries` 1000, `MaxAge` 30 min, `MaxBodyBytes` 64 KiB, `RedactedKeys`. |
+| `services.AddInertiaDevTools(configure?)` / `app.MapInertiaDevTools()` | DevTools recorder and its read API. `Enabled` (default: Development only), `Authorize`, `MaxEntriesPerTab` 100, `MaxEntries` 1000, `MaxAge` 30 min, `MaxBodyBytes` 64 KiB, `MaxResponseBytes` 1 MiB, `MaxTotalBytes` 64 MiB, `RedactedKeys`. |
 | `app.UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` | Only writes the antiforgery request token to a script-readable cookie; validation is up to you. |
 | `endpoint.WithInertiaValidation()` | Minimal API: validation failures redirect back with errors. Endpoint or group. |
 | `endpoint.WithInertiaPrecognition()` | Minimal API: `WithInertiaValidation()` plus Precognition. |

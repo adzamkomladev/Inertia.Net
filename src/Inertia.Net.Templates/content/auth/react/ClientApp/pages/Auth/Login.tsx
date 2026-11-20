@@ -4,7 +4,7 @@ import Layout from '../../Layout'
 import type { InertiaPages } from '../../types/inertia'
 import { routes } from '../../types/routes'
 
-export default function Login({ returnUrl }: InertiaPages['Auth/Login']) {
+export default function Login({ returnUrl, demoAccount }: InertiaPages['Auth/Login']) {
   // Precognition: each field is checked on the server when you leave it, with the same rules as the submit.
   const form = useForm({ email: '', password: '', returnUrl }).withPrecognition(routes.login.store())
 
@@ -16,7 +16,7 @@ export default function Login({ returnUrl }: InertiaPages['Auth/Login']) {
   return (
     <Layout>
       <h1>Log in</h1>
-      <p>Use demo@example.com and the password "password".</p>
+      {demoAccount && <p>Use demo@example.com and the password "password".</p>}
       <form onSubmit={submit} style={{ display: 'grid', gap: 12, maxWidth: 320 }}>
         <label>
           Email

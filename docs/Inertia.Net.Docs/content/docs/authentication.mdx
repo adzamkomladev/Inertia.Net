@@ -63,11 +63,11 @@ Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected
 `dotnet new inertia --auth` creates an app with both:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.4
+dotnet new install Inertia.Net.Templates::1.9.5
 dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
 ```
 
-- A `/login` page (demo@example.com / password) whose form checks fields with [Precognition](/docs/precognition).
+- A `/login` page (demo@example.com / password, accepted only in Development) whose form checks fields with [Precognition](/docs/precognition).
 - A protected `/dashboard`, and logout.
 - The signed-in user shared as `auth.user`.
 - A sign-in rate limit that sends the form back with a flash message.

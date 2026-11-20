@@ -865,8 +865,10 @@ internal sealed class InertiaPageWriter
         }
 
         var entry = CreateCacheEntry(prop.ValueType, value, PropsWriter.ScrollOf(prop, value), caching, caching.Key, out var stored);
-        await Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken, stamp);
-        completion?.SetResult(entry);
+        if (await Caching.SetAsync(caching.StoreKey, entry, caching.Expiration, caching.Tags, cancellationToken, stamp))
+        {
+            completion?.SetResult(entry); // a value loaded before a removal or replacement is this request's only
+        }
         return stored;
     }
 

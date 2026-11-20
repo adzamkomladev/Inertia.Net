@@ -9,6 +9,7 @@ using System.Threading.RateLimiting;
 using InertiaStarter;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 #else
 using InertiaStarter;
@@ -24,7 +25,8 @@ builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
 builder.Services.AddResponseCompression();
 builder.Services.AddSingleton<TodoStore>();
 #if (auth)
-builder.Services.AddSingleton<UserStore>();
+// The demo account signs in only in Development: a published app starts with it switched off.
+builder.Services.AddSingleton(new UserStore(demoEnabled: builder.Environment.IsDevelopment()));
 // Cookie sign-in. UseInertiaRedirects(): an Inertia visit to a protected page is redirected to /login like a browser request
 // (303 after a POST, PUT or DELETE), not answered with 401.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -132,7 +134,7 @@ app.MapDelete("/todos/{id:int}", (TodoStore todos, int id) =>
 
 #if (auth)
 // The cookie handler sends signed-out visitors here with ?ReturnUrl=/the/page; the form posts it back.
-app.MapGet("/login", (string? returnUrl) => Render(new LoginPage(returnUrl))).WithName("login");
+app.MapGet("/login", (string? returnUrl, UserStore users) => Render(new LoginPage(returnUrl, users.DemoEnabled))).WithName("login");
 
 // WithInertiaPrecognition(): the form checks each field as you leave it, with the same validation as the submit.
 app.MapPost("/login", async (HttpContext http, UserStore users, LoginInput input) =>
@@ -147,7 +149,7 @@ app.MapPost("/login", async (HttpContext http, UserStore users, LoginInput input
     await http.SignInAsync(new ClaimsPrincipal(identity));
 
     // Only a path on this site: an absolute or protocol-relative URL here would be an open redirect.
-    return Results.Redirect(input.ReturnUrl is ['/'] or ['/', not ('/' or '\\'), ..] ? input.ReturnUrl : "/dashboard");
+    return Results.LocalRedirect(RedirectHttpResult.IsLocalUrl(input.ReturnUrl) ? input.ReturnUrl! : "/dashboard");
 }).WithInertiaPrecognition().RequireRateLimiting("login").WithName("login.store");
 
 app.MapPost("/logout", async (HttpContext http) =>
@@ -247,7 +249,8 @@ namespace InertiaStarter
     }
 
 #if (auth)
-    public sealed record LoginPage(string? ReturnUrl) : IInertiaPage
+    /// <summary>The login page. <c>DemoAccount</c> is true when the demo user can sign in (Development only).</summary>
+    public sealed record LoginPage(string? ReturnUrl, bool DemoAccount) : IInertiaPage
     {
         public static string Component => "Auth/Login";
     }
@@ -274,19 +277,23 @@ namespace InertiaStarter
         public string? ReturnUrl { get; set; }
     }
 
-    /// <summary>One demo user (demo@example.com / password). Swap it for ASP.NET Core Identity or your user database.</summary>
-    public sealed class UserStore
+    /// <summary>
+    /// One demo user (demo@example.com / password), accepted only when <c>demoEnabled</c> is true (Development). Swap it for
+    /// ASP.NET Core Identity or your user database.
+    /// </summary>
+    public sealed class UserStore(bool demoEnabled)
     {
-        private readonly PasswordHasher<AuthUser> _hasher = new();
-        private readonly AuthUser _demo = new("Demo User", "demo@example.com");
-        private readonly string _hash;
+        private static readonly PasswordHasher<AuthUser> Hasher = new();
+        private static readonly AuthUser Demo = new("Demo User", "demo@example.com");
+        private readonly string _hash = Hasher.HashPassword(Demo, "password");
 
-        public UserStore() => _hash = _hasher.HashPassword(_demo, "password");
+        public bool DemoEnabled => demoEnabled;
 
         public AuthUser? Find(string email, string password) =>
-            string.Equals(email, _demo.Email, StringComparison.OrdinalIgnoreCase)
-            && _hasher.VerifyHashedPassword(_demo, _hash, password) != PasswordVerificationResult.Failed
-                ? _demo
+            demoEnabled
+            && string.Equals(email, Demo.Email, StringComparison.OrdinalIgnoreCase)
+            && Hasher.VerifyHashedPassword(Demo, _hash, password) != PasswordVerificationResult.Failed
+                ? Demo
                 : null;
     }
 

@@ -22,6 +22,14 @@ dotnet watch       # http://localhost:5180
 While Vite runs it writes `wwwroot/hot`, and the app serves the pages through it. For production, run the build command from
 your row to write `wwwroot/build`, then publish with `dotnet publish -c Release`.
 
+<!--#if (auth) -->
+## Sign-in
+
+In Development you can sign in with `demo@example.com` and the password `password`. In any other environment (Production,
+Staging) the demo account is switched off and the login page hides the hint: replace `UserStore` in `Program.cs` with ASP.NET Core
+Identity or your user database before you publish.
+
+<!--#endif -->
 ## Where things are
 
 | Path | What |

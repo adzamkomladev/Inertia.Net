@@ -52,7 +52,8 @@ internal sealed class InertiaMiddleware
 
         if (isInertia && HttpMethods.IsGet(request.Method) && !_versionProvider.Matches(httpContext))
         {
-            InertiaHeaders.AppendVary(response.Headers);
+            // The page's variation: a shared cache must not answer a current client with this 409, or a stale one with a cached page.
+            InertiaHeaders.AppendPageVary(response.Headers);
             response.StatusCode = StatusCodes.Status409Conflict;
             response.Headers[InertiaHeaders.Location] = request.GetEncodedUrl();
             response.Headers[InertiaHeaders.Version] = _versionProvider.GetVersion(httpContext);

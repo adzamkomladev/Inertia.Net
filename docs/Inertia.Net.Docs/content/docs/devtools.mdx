@@ -27,7 +27,7 @@ Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry
 
 The first page carries the discovery tag the extension reads. Values of names containing `password`, `secret`, `token`, `authorization`, `cookie` or `api_key` are replaced with `[REDACTED]` in props, bodies and headers. Add names with `RedactedKeys`. Nothing leaves the app.
 
-Sensitive query parameters are also redacted in recorded request/page URLs, redirects and URL headers; actual application URLs are unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered; unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk.
+Sensitive query parameters are also redacted in recorded request/page URLs, redirects and URL headers; actual application URLs are unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered; unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk. A page larger than `MaxResponseBytes` (default 1 MiB) is recorded without its body (`too-large`, with its size in `__meta.responseBytes`) and is never copied; the browser still receives all of it. Kept entries are also bounded by `MaxTotalBytes` (default 64 MiB, oldest dropped first).
 
 Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize` accepts (`404` otherwise). With `Pages.Directory` set, entries link the component to its file.
 

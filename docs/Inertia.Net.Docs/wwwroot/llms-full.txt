@@ -316,7 +316,7 @@ Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.
 Run these commands in the folder where you want to create `MyApp`.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.4
+dotnet new install Inertia.Net.Templates@1.9.5
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -463,17 +463,17 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.4
-dotnet add package Inertia.Net.Mvc --version 1.9.4            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.4  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.4 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.4        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.4   # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.4          # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.4        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.5
+dotnet add package Inertia.Net.Mvc --version 1.9.5            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.5  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.5 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.5        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.5   # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.5          # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.5        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.4 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.5 implements Inertia.js v3.
 
 ## Requirements
 
@@ -496,7 +496,7 @@ Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.4
+dotnet new install Inertia.Net.Templates@1.9.5
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -2554,11 +2554,11 @@ Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected
 `dotnet new inertia --auth` creates an app with both:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.4
+dotnet new install Inertia.Net.Templates::1.9.5
 dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
 ```
 
-- A `/login` page (demo@example.com / password) whose form checks fields with [Precognition](/docs/precognition).
+- A `/login` page (demo@example.com / password, accepted only in Development) whose form checks fields with [Precognition](/docs/precognition).
 - A protected `/dashboard`, and logout.
 - The signed-in user shared as `auth.user`.
 - A sign-in rate limit that sends the form back with a flash message.
@@ -3248,7 +3248,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.4
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.5
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3280,7 +3280,7 @@ The EF Core package is not marked Native AOT compatible. EF Core has its own com
 `Inertia.Net.MongoDB` builds the same `Page<T>` and `CursorPage<T>` values from a `collection.Find(filter)`:
 
 ```sh
-dotnet add package Inertia.Net.MongoDB --version 1.9.4
+dotnet add package Inertia.Net.MongoDB --version 1.9.5
 ```
 
 ```csharp
@@ -5541,7 +5541,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/redis
 `Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all.
 
 ```sh
-dotnet add package Inertia.Net.Redis --version 1.9.4
+dotnet add package Inertia.Net.Redis --version 1.9.5
 ```
 
 ```csharp
@@ -6162,7 +6162,7 @@ Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry
 
 The first page carries the discovery tag the extension reads. Values of names containing `password`, `secret`, `token`, `authorization`, `cookie` or `api_key` are replaced with `[REDACTED]` in props, bodies and headers. Add names with `RedactedKeys`. Nothing leaves the app.
 
-Sensitive query parameters are also redacted in recorded request/page URLs, redirects and URL headers; actual application URLs are unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered; unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk.
+Sensitive query parameters are also redacted in recorded request/page URLs, redirects and URL headers; actual application URLs are unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered; unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk. A page larger than `MaxResponseBytes` (default 1 MiB) is recorded without its body (`too-large`, with its size in `__meta.responseBytes`) and is never copied; the browser still receives all of it. Kept entries are also bounded by `MaxTotalBytes` (default 64 MiB, oldest dropped first).
 
 Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize` accepts (`404` otherwise). With `Pages.Directory` set, entries link the component to its file.
 
@@ -6400,7 +6400,7 @@ Every feature below is here because it shows one idea from Inertia.Net. The righ
 Install the templates once, then create the app. `--auth` adds cookie sign-in, so you do not write that yourself. Use `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below.
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.4
+dotnet new install Inertia.Net.Templates::1.9.5
 dotnet new inertia -n ForgetMeNot --framework react --auth
 cd ForgetMeNot
 bun install
@@ -6726,7 +6726,7 @@ Lists and items must survive a restart, so they need a database. We use **EF Cor
 
 ```sh
 dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version "10.*"
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.4
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.5
 ```
 
 <Callout type="tip" title="On .NET 11?">
@@ -8604,7 +8604,7 @@ Now the line that connects the worker to the page. In `ListsPage` we wrote `.Liv
 Install the SignalR transport. It carries the "something changed" message to the browser:
 
 ```sh
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.4
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.5
 bun add @microsoft/signalr
 ```
 
@@ -8658,7 +8658,7 @@ dotnet new xunit -n ForgetMeNot.Tests
 cd ForgetMeNot.Tests
 dotnet add reference ../ForgetMeNot/ForgetMeNot.csproj
 dotnet add package Microsoft.AspNetCore.Mvc.Testing --version "10.*"
-dotnet add package Inertia.Net.Testing --version 1.9.4
+dotnet add package Inertia.Net.Testing --version 1.9.5
 ```
 
 The test project starts your real app in memory, so add one line at the very end of `Program.cs` of the app:

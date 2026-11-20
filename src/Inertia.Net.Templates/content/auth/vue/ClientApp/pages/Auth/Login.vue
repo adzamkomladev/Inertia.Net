@@ -14,7 +14,7 @@ const submit = () => form.submit(routes.login.store(), { onFinish: () => form.re
 <template>
   <Layout>
     <h1>Log in</h1>
-    <p>Use demo@example.com and the password "password".</p>
+    <p v-if="demoAccount">Use demo@example.com and the password "password".</p>
     <form @submit.prevent="submit" style="display: grid; gap: 12px; max-width: 320px">
       <label>
         Email

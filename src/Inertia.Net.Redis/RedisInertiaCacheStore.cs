@@ -65,15 +65,19 @@ internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
         return redis.call('UNLINK', KEYS[1], KEYS[2])
         """);
 
-    // KEYS: tag set. ARGV: prefix, batch size. Removes up to a batch of the tag's entries with their other memberships; returns how many.
+    // KEYS: tag set. ARGV: prefix, batch size, tag. Removes up to a batch of the tag's entries with their other memberships; returns how
+    // many members it took from the set. A member whose entry's current index lacks the tag is obsolete (the entry expired with its index,
+    // then the key was stored again under other tags): it is dropped from the set, and the live entry is left alone.
     private static readonly LuaScript RemoveTagged = LuaScript.Prepare("""
         local members = redis.call('SPOP', KEYS[1], ARGV[2])
         for _, member in ipairs(members) do
           local index = ARGV[1] .. 'tags:' .. member
-          for _, tag in ipairs(redis.call('SMEMBERS', index)) do
-            redis.call('SREM', ARGV[1] .. 'tag:' .. tag, member)
+          if redis.call('SISMEMBER', index, ARGV[3]) == 1 then
+            for _, tag in ipairs(redis.call('SMEMBERS', index)) do
+              redis.call('SREM', ARGV[1] .. 'tag:' .. tag, member)
+            end
+            redis.call('UNLINK', ARGV[1] .. member, index)
           end
-          redis.call('UNLINK', ARGV[1] .. member, index)
         end
         return #members
         """);
@@ -147,7 +151,7 @@ internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
         ArgumentNullException.ThrowIfNull(tag);
         RedisKey set = Prefix + "tag:" + tag;
         // In batches, so a tag on every entry (InertiaCacheTags.Props) does not block the server in one long script.
-        while ((int)await Database.ScriptEvaluateAsync(RemoveTagged.ExecutableScript, [set], [Prefix, RemoveBatch]) == RemoveBatch)
+        while ((int)await Database.ScriptEvaluateAsync(RemoveTagged.ExecutableScript, [set], [Prefix, RemoveBatch, tag]) == RemoveBatch)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }

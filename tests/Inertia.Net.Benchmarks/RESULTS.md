@@ -1,5 +1,23 @@
 # Inertia.Net benchmark results
 
+## 1.9.5: partial reload selector width — 2026-11-20
+
+`PartialSelectorBenchmarks`: 96 scalar props, one selected (`p0`, or `group.b` for `Nested`), the rest of `X-Inertia-Partial-Data`
+naming absent optional props. `ParseOnly` is `new InertiaRequest(headers)`. .NET 10, Release, BenchmarkDotNet `--job short --inProcess`
+on a shared Linux host, 2026-11-20.
+
+| Selectors | Flat mean | Nested mean | Render allocated | Parse allocated |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 8.7 µs | 8.3 µs | 320 B | 64 B |
+| 3 | 10.1 µs | 11.3 µs | 464 B | 160 B |
+| 8 | 14.9 µs | 23.6 µs | 824 B | 400 B |
+| 32 | 126 µs ± 35 µs | 73 µs ± 35 µs | 2,585 B | 1,552 B |
+
+Allocation grows with the list (about 60% of it at 32 selectors is parsing: the array and one string per entry). The timings on this host
+varied more than the effect being measured (the 99.9% error exceeded the mean at 8 and 32 selectors), so the plan's bar for landing a
+request-local index (a repeatable gain on wide lists with the 1–3 selector case within noise) was not met. The matcher is unchanged;
+rerun on a quiet machine with interleaved runs before changing it.
+
 ## 1.9.3: objects with `object` members, and pre-encoded page names — 2026-11-17
 
 `--render-probe` (net10.0 JIT, warm in-process renders into `Stream.Null`), new shape rows best of 25 interleaved rounds. "Before" is
