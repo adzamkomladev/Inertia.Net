@@ -5,7 +5,9 @@ section: Get started
 order: 5
 ---
 
-Already using the starter template? Its services, middleware, root template and frontend are configured for you. These steps are for adding Inertia to an existing app or building one manually.
+Use this guide to add Inertia to an existing ASP.NET Core app. To create an app with the server and frontend already wired up, follow [First 10 minutes](/docs/first-10-minutes).
+
+Install the core NuGet package and the integration package if you use MVC or FastEndpoints. [Package commands](/docs/installation)
 
 Every app needs the same four things:
 
@@ -242,6 +244,10 @@ Pass your own `resolve` and `setup` functions to `createInertiaApp`. The [client
 </Callout>
 
 ## 4. Run it
+
+If your app has no Vite setup yet, follow the package and configuration steps in [Client setup](/docs/client-setup#install-the-client). Use `ClientApp/app.tsx` (React) or `ClientApp/app.ts` (Vue and Svelte) as the Vite entry to match the root template above.
+
+For the `createInertiaApp()` examples above, add `@inertiajs/vite@^3` as a development dependency. Import `inertia` from `@inertiajs/vite` in `vite.config.ts` and add `inertia()` after your framework plugin in the `plugins` array. This resolves the page files under `ClientApp/pages`.
 
 Install dependencies and start Vite from the project directory with your package manager:
 

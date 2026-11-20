@@ -1,7 +1,6 @@
 # Inertia.Net
 
-> **Reading as a person? Start at the docs site: [inertia-dotnet.temtem.dev](https://inertia-dotnet.temtem.dev).** This README is the
-> complete reference in one file, kept long on purpose for coding agents and offline search.
+> Start with the [first-app walkthrough](https://inertia-dotnet.temtem.dev/docs/first-10-minutes) to run a starter and change a C# validation rule. Use this README as a reference for implementation and offline search.
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
@@ -12,6 +11,18 @@ served the most requests in every test: a server-rendered first visit to the tod
 AOT, against 1,294 for TanStack Start, 745 for Nuxt, 364 for Next.js and 337 for Laravel. With every framework's own caching on, it
 served 34,020, more than twice the next best. See [Performance](#performance) and the
 [framework comparison](https://inertia-dotnet.temtem.dev/docs/framework-comparison).
+
+## Implementation tasks
+
+| Task | Reference |
+|---|---|
+| Scaffold a new app | [Template commands](#start-a-new-app) for React, Vue and Svelte |
+| Add Inertia to an existing project | [Install the NuGet packages](#installation), then choose [Minimal API](#minimal-api), [MVC](#mvc) or [FastEndpoints](#fastendpoints) |
+| Wire up the frontend | [Vite configuration](#vite-config), [React](#react), [Vue](#vue), [Svelte](#svelte) and the [root template](#the-root-template) |
+| Add a page or form to a scaffolded app | [Shared C# handlers](src/Inertia.Net.Templates/content/common/Program.cs) and the matching Todos page in [React](src/Inertia.Net.Templates/content/react/ClientApp/pages/Todos/Index.tsx), [Vue](src/Inertia.Net.Templates/content/vue/ClientApp/pages/Todos/Index.vue) or [Svelte](src/Inertia.Net.Templates/content/svelte/ClientApp/pages/Todos/Index.svelte) |
+| Follow a complete sample | [Minimal API + React](samples/MinimalApi.React/README.md), [MVC + Vue](samples/Mvc.Vue/README.md) or [FastEndpoints + Svelte](samples/FastEndpoints.Svelte/README.md) |
+| Generate contracts, inspect a visit or test a form | [TypeScript declarations](#typescript-types), [typed routes](#typed-routes), [DevTools](#devtools) and [testing](#testing) |
+| Check adapter-specific behavior | [Protocol and deliberate deviations](docs/protocol.md) and the [configuration reference](#configuration-reference) |
 
 ## Contents
 
@@ -72,13 +83,33 @@ app.MapGet("/", () => Render("Home", new InertiaProps
 }));
 ```
 
-The matching React page receives it as a normal component prop:
+The matching page receives `greeting` as a component prop. Use the file for your framework under the starter's `ClientApp/pages` directory.
 
 ```tsx
-// ClientApp/pages/Home.tsx (in the starter template)
+// ClientApp/pages/Home.tsx
 export default function Home({ greeting }: { greeting: string }) {
   return <h1>{greeting}</h1>
 }
+```
+
+```vue
+<!-- ClientApp/pages/Home.vue -->
+<script setup lang="ts">
+defineProps<{ greeting: string }>()
+</script>
+
+<template>
+  <h1>{{ greeting }}</h1>
+</template>
+```
+
+```svelte
+<!-- ClientApp/pages/Home.svelte -->
+<script lang="ts">
+  let { greeting }: { greeting: string } = $props()
+</script>
+
+<h1>{greeting}</h1>
 ```
 
 The page name must match your client-side page resolver. The starter templates configure that resolver for you.
@@ -91,15 +122,21 @@ A typical React, Vue or Svelte app on ASP.NET Core means two things to build: a 
 
 You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bun, pnpm and Yarn are supported; choose the package manager you use for your app. Use an Inertia v3 client; v2 clients are not supported.
 
-Create an app with the starter template:
+Install the template once.
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.4
-dotnet new inertia -n MyApp --framework react
-cd MyApp
+dotnet new install Inertia.Net.Templates@1.9.4
 ```
 
-Choose `--framework vue` or `--framework svelte` for another frontend. Each template uses Minimal APIs and includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+Run the command for your frontend, then change into the new app directory with `cd MyApp`.
+
+| Frontend | Command |
+|---|---|
+| React | `dotnet new inertia -n MyApp --framework react` |
+| Vue | `dotnet new inertia -n MyApp --framework vue` |
+| Svelte | `dotnet new inertia -n MyApp --framework svelte` |
+
+Each template uses Minimal APIs and includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
 The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11. Add `--auth` for cookie sign-in: a login page with
 Precognition and a demo user, a protected dashboard, logout, a shared `auth.user` and a sign-in rate limit. Every app also generates typed
 `ClientApp/types/inertia.d.ts` and `routes.ts`, and wires up error pages and DevTools.

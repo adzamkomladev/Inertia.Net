@@ -5,7 +5,15 @@ section: Reference
 order: 5
 ---
 
-The [Inertia DevTools](https://inertiajs.com/docs/v3/advanced/devtools) browser extension shows every visit, its props, headers and page state. Inertia.Net implements the server protocol.
+Inertia DevTools lets you see what your browser sent and what ASP.NET Core returned for an Inertia visit.
+
+## Try it in the starter
+
+1. Install the browser extension using the [Inertia.js DevTools guide](https://inertiajs.com/docs/v3/advanced/devtools#installation).
+2. Start the app and Vite from [First 10 minutes](/docs/first-10-minutes). Open `http://localhost:5180/todos`, open your browser's developer tools, and select the **Inertia** panel.
+3. Submit an empty todo title. Select the visit in the timeline and look at the request and the resulting page data. The validation message is under `props.errors.title`.
+
+The starter enables recording in Development. To add recording to an existing app, use the setup below.
 
 ## Enable DevTools
 
@@ -53,10 +61,6 @@ The development startup also writes TypeScript declarations when `o.TypeScript.O
 - DevTools recording is off unless explicitly enabled.
 - The generated TypeScript file is committed if the client build type-checks in CI.
 - Production logs do not contain the DevTools read API.
-
-<Callout type="tip" title="Pair with the browser extension">
-Install the Inertia DevTools extension, open your app in Development, and use the extension's panel. The server entries are correlated by the `X-Inertia-Devtools-Id` header.
-</Callout>
 
 Without an `Authorize` callback, the read API responds only in Development. Requests must come from this machine through a loopback connection to a loopback host name such as `localhost`. They must have no `X-Forwarded-For`, `Forwarded`, `X-Forwarded-Host`, `X-Real-IP` or `Via` header. Set `Authorize` to allow access from a container or another machine.
 

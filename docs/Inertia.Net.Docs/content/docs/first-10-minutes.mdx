@@ -1,27 +1,45 @@
 ---
 title: First 10 minutes
-description: Start a template app, try its validated form, and test the redirect.
+description: Run your first app, change a C# validation rule, and see the result in your browser.
 section: Get started
-order: 4
+order: 3
 ---
 
-Create the React starter (choose `vue` or `svelte` for another client; add `--tfm net11.0` to target .NET 11 instead of .NET 10):
+You'll run a small todo app, submit a form, and change how C# validates it. The starter sets up ASP.NET Core, your frontend, and Vite for you.
+
+## 1. Create the app
+
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) and use Node.js 22.12 or newer with npm for the commands below. Run `dotnet --list-sdks` to check for an installed 10.0 SDK and `node --version` to check Node.
+
+Run these commands in the folder where you want to create `MyApp`.
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.4
+dotnet new install Inertia.Net.Templates@1.9.4
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
 npm run dev
 ```
 
-Use `bun install` and `bun run dev`, `pnpm install` and `pnpm run dev`, or `yarn install` and `yarn run dev` if you prefer. In a second terminal run `dotnet run`. Open the address printed by `dotnet run` (`http://localhost:5180` for the template) and visit `/todos`; submit an empty title to see the validation message. The template includes Vite, antiforgery and a complete form.
+For Vue or Svelte, use `--framework vue` or `--framework svelte` in the template command. For .NET 11, install the .NET 11 SDK and add `--tfm net11.0`.
 
-<Callout type="warning" title="Open the .NET URL, not the Vite one">
-Vite prints `http://localhost:5173` when it starts, but that server only supplies JavaScript, CSS and hot reload to your app. It has no pages, so opening it shows a blank page. Your app is the ASP.NET Core address from `dotnet run`: `http://localhost:5180`.
-</Callout>
+Leave Vite running. In a second terminal, open the same `MyApp` folder and start the server.
 
-The handler in `Program.cs` is:
+```sh
+dotnet watch
+```
+
+Open [http://localhost:5180/todos](http://localhost:5180/todos) in your browser. That's the address from `dotnet watch`. Vite also prints an address on port 5173, where it serves JavaScript, CSS and live updates to the page.
+
+## 2. Change a C# validation rule
+
+1. With the title empty, click **Add**. The page shows an error below the input.
+2. In `Program.cs`, find `NewTodo` and change `StringLength(100)` to `StringLength(10)`. Save the file, then restart the server to load the new rule. Press **Ctrl+C** in the server terminal and run `dotnet watch` again. Leave Vite running.
+3. Enter `Buy groceries` and click **Add**. The new error shows the 10-character limit. Try `Buy milk` to see the todo appear in the list.
+
+## 3. Follow the form from the browser to C#
+
+In `Program.cs`, `MapPost` tells ASP.NET Core what to run when the browser submits to `/todos`. The name `todos.store` also gives the frontend a typed function for this route.
 
 ```csharp
 app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
@@ -29,10 +47,12 @@ app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
     todos.Add(input.Title!);
     http.Inertia().Flash("success", "Todo added");
     return Results.Redirect("/todos");
-}).WithInertiaValidation();
+}).WithInertiaValidation().WithName("todos.store");
 ```
 
-`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The template's `ClientApp/pages/Todos/Index.tsx` (`Index.vue` or `Index.svelte` for the other clients) uses `useForm` to submit and display the error:
+`WithInertiaValidation()` checks the rules on `NewTodo.Title`. If validation fails, Inertia.Net sends the browser back to the page with the error. If the title passes, the handler adds the todo and sends back a one-time success message.
+
+Open `ClientApp/pages/Todos/Index.tsx`, `Index.vue`, or `Index.svelte` for your frontend. The excerpts below show how the form uses the generated route and displays `form.errors.title`.
 
 <Tabs>
   <Tab label="React">
@@ -40,12 +60,13 @@ app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
 ```tsx
 import { useForm } from '@inertiajs/react'
 import type { FormEvent } from 'react'
+import { routes } from '../../types/routes'
 
 // Inside the page component:
 const form = useForm({ title: '' })
 const submit = (e: FormEvent) => {
   e.preventDefault()
-  form.post('/todos', { onSuccess: () => form.reset() })
+  form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
 }
 
 // Inside its return:
@@ -62,9 +83,10 @@ const submit = (e: FormEvent) => {
 ```vue
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3'
+import { routes } from '../../types/routes'
 
 const form = useForm({ title: '' })
-const submit = () => form.post('/todos', { onSuccess: () => form.reset() })
+const submit = () => form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
 </script>
 
 <template>
@@ -82,11 +104,12 @@ const submit = () => form.post('/todos', { onSuccess: () => form.reset() })
 ```svelte
 <script lang="ts">
   import { useForm } from '@inertiajs/svelte'
+  import { routes } from '../../types/routes'
 
   const form = useForm({ title: '' })
   const submit = (e: SubmitEvent) => {
     e.preventDefault()
-    form.post('/todos', { onSuccess: () => form.reset() })
+    form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
   }
 </script>
 
@@ -102,27 +125,15 @@ const submit = () => form.post('/todos', { onSuccess: () => form.reset() })
   </Tab>
 </Tabs>
 
-To test the round trip, add `Inertia.Net.Testing` and `Microsoft.AspNetCore.Mvc.Testing` to a test project, expose `public partial class Program;` in the app, and create a cookie-preserving `WebApplicationFactory<Program>` client with `AllowAutoRedirect = false`:
+## 4. Try the development tools
 
-```csharp
-using System.Net;
-using System.Net.Http.Json;
-using Inertia.Net.Testing;
+**Follow the route in your editor.** Jump to the definition of `routes.todos.store()`. The starter generates `ClientApp/types/routes.ts` from your named C# endpoints. That function supplies both the URL and the HTTP method to the form.
 
-client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
-using var page = await client.GetAsync("/todos");
-using var request = new HttpRequestMessage(HttpMethod.Post, "/todos")
-{
-    Content = JsonContent.Create(new { title = "" }),
-};
-request.Headers.Add("X-Inertia", "true");
-request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-request.Headers.Referrer = new Uri(client.BaseAddress!, "/todos");
-request.WithXsrfToken(page);
-using var response = await client.SendAsync(request);
-Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-using var redirected = await client.GetAsync("/todos");
-await redirected.AssertInertiaAsync(p => p.HasErrors().HasError("title"));
-```
+**Explore the data your page receives.** Find `InertiaPages['Todos/Index']` in the page component. Hover over `todos` in your editor to see the type or open `ClientApp/types/inertia.d.ts`. The starter generates that declaration from the C# `TodosPage` record in `Program.cs`.
 
-See [Testing](/docs/testing) for named error bags and custom XSRF names, and [Quick start](/docs/quick-start) for an existing application.
+**Inspect a submission in your browser.** The starter already records visits in Development. Open the Inertia panel, submit an empty title again, and inspect the request and the page data that contains the error. [Install the browser extension and open the panel](/docs/devtools#try-it-in-the-starter)
+
+## Next steps
+
+- [Test a form submission](/docs/testing#testing-a-form-with-antiforgery) to check the validation error in a .NET test.
+- [Add Inertia to an existing ASP.NET Core app](/docs/quick-start) to bring the same workflow to your own project.

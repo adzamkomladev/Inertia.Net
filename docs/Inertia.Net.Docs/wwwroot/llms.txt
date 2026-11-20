@@ -7,9 +7,9 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 ## Get started
 
 - [Introduction](https://inertia-dotnet.temtem.dev/docs/introduction): Inertia.Net is a .NET 10 and .NET 11 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
-- [Why Inertia?](https://inertia-dotnet.temtem.dev/docs/why-inertia): What Inertia is, how it compares to React, Vue or Svelte with a Web API, and the features and prop types Inertia.Net adds.
+- [Why Inertia?](https://inertia-dotnet.temtem.dev/docs/why-inertia): Build a C# backend for React, Vue or Svelte and see what Inertia.Net handles between them.
+- [First 10 minutes](https://inertia-dotnet.temtem.dev/docs/first-10-minutes): Run your first app, change a C# validation rule, and see the result in your browser.
 - [Installation](https://inertia-dotnet.temtem.dev/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.
-- [First 10 minutes](https://inertia-dotnet.temtem.dev/docs/first-10-minutes): Start a template app, try its validated form, and test the redirect.
 - [Client setup](https://inertia-dotnet.temtem.dev/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
 - [Quick start](https://inertia-dotnet.temtem.dev/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 - [AI agents](https://inertia-dotnet.temtem.dev/docs/ai-agents): Give coding agents the context and conventions they need to build Inertia.Net pages correctly.

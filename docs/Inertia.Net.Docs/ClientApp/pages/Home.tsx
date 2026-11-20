@@ -3,7 +3,6 @@ import { ArrowRight } from 'lucide-react'
 import { useState, type ComponentProps, type ComponentType, type SVGProps } from 'react'
 import { ArchitectureDiagram } from '../components/ArchitectureDiagram'
 import { ReactLogo, SvelteLogo, VueLogo } from '../components/icons/FrameworkLogos'
-import { GithubIcon } from '../components/icons/GithubIcon'
 import { InstallCommand } from '../components/InstallCommand'
 import { routes } from '../types/routes'
 import { SiteHeader } from '../components/SiteHeader'
@@ -123,28 +122,25 @@ export default function Home() {
                 Modern frontends for ASP.NET Core apps
               </h1>
               <p className="mt-5 max-w-lg text-pretty text-base leading-7 text-muted-foreground">
-                An Inertia.js v3 adapter for .NET 10 and .NET 11. Keep your routes, auth and validation in C#. Build the UI in React, Vue or Svelte. Inertia.Net connects the two, so you skip the API layer and the client-side router.
+                Build a web app with C# on the server and React, Vue or Svelte in the browser. Your ASP.NET Core routes send data straight to your pages, so you can build and deploy both sides as one app.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
-                  href={routes.docs.show.url('quick-start')}
+                  href={routes.docs.show.url('first-10-minutes')}
                   className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
-                  Get started
+                  Build your first app
                   <ArrowRight className="size-4" />
                 </Link>
-                <a
-                  href="https://github.com/adzamkomladev/Inertia.Net"
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  href={routes.docs.show.url('quick-start')}
                   className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-4 text-sm font-medium transition-colors hover:bg-accent"
                 >
-                  <GithubIcon className="size-4" />
-                  GitHub
-                </a>
+                  Add to an existing ASP.NET Core app
+                </Link>
               </div>
               <div className="mt-6">
-                <InstallCommand command="dotnet add package Inertia.Net" />
+                <InstallCommand command="dotnet new install Inertia.Net.Templates" />
               </div>
             </div>
             <CodePreview />

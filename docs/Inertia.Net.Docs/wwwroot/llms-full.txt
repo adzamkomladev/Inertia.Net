@@ -10,9 +10,9 @@ URL: https://inertia-dotnet.temtem.dev/docs/introduction
 
 > Inertia.Net is a .NET 10 and .NET 11 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
 
-Inertia.Net connects ASP.NET Core to the Inertia.js v3 client. Your endpoints return pages and props; the client renders them as React, Vue or Svelte components. The first visit is a normal HTML response, and later visits are Inertia requests that update the page without a full reload.
+Inertia.Net lets your C# routes render React, Vue or Svelte pages. In each route, you choose a component and pass it the data it needs. Inertia calls that data **props**. Sign-in, validation and database queries live in your ASP.NET Core app. Your frontend framework handles what the user sees and interacts with.
 
-It is an adapter, not a framework. Routing, authentication, authorization, validation and persistence stay in ASP.NET Core. There is no separate JSON API to design and no client-side router to keep in sync.
+You can build and ship the server and frontend as one app. Start with a working todo app and try a C# validation rule in the browser. [First 10 minutes](/docs/first-10-minutes)
 
 ## How it works
 
@@ -119,8 +119,8 @@ Use the starter template: `dotnet new install Inertia.Net.Templates`, then `dotn
 
 ## Next steps
 
-- [Why Inertia?](/docs/why-inertia) compares it with a React, Vue or Svelte app plus a Web API.
-- [First 10 minutes](/docs/first-10-minutes) takes you from the template to a form test.
+- [Why Inertia?](/docs/why-inertia) explains what you get with C# on the server and React, Vue or Svelte in the browser.
+- [First 10 minutes](/docs/first-10-minutes) takes you from the template to a working form you can change.
 - [Install the packages](/docs/installation) in an existing app.
 - [Follow the quick start](/docs/quick-start) for a minimal end-to-end setup.
 - [Read the props reference](/docs/props) when you are ready to model page data.
@@ -131,20 +131,30 @@ Use the starter template: `dotnet new install Inertia.Net.Templates`, then `dotn
 
 URL: https://inertia-dotnet.temtem.dev/docs/why-inertia
 
-> What Inertia is, how it compares to React, Vue or Svelte with a Web API, and the features and prop types Inertia.Net adds.
+> Build a C# backend for React, Vue or Svelte and see what Inertia.Net handles between them.
 
-## The short version
+## Coming from TypeScript?
 
-If you build a React, Vue or Svelte frontend on ASP.NET Core today, you probably have two projects: a Web API that returns JSON, and a single-page app (SPA) that calls it. Inertia lets you keep the modern frontend and drop the second half of that setup.
+Keep React, Vue or Svelte and the frontend tools you know. Write your routes and business logic in C#. The compiler checks your server code at build time. You can set a breakpoint in a C# route and step through it as you click around the app.
 
-Your endpoint does not return JSON. It returns the **name of a frontend page** and the **data that page needs**:
+ASP.NET Core gives you routing, cookie sign-in and authorization in one web framework. When you add a database, Entity Framework Core lets you write queries in C# and manage schema changes alongside the app.
+
+Inertia.Net can generate TypeScript types from your C# page data and named routes. Change a field in C# and your editor can show where the frontend needs to catch up. [TypeScript types](/docs/typescript) · [Typed routes](/docs/typed-routes)
+
+## Already building in .NET?
+
+Keep your ASP.NET Core routes, controllers and validation rules. Add interactive pages in React, Vue or Svelte in the same project. The starter shows the whole workflow with a todo form. A C# rule checks the title, and Inertia makes the error available beside the input. [First 10 minutes](/docs/first-10-minutes)
+
+## From a C# route to a page
+
+Your C# handler chooses a frontend component and supplies its data. This route sends a list of users to the `Users/Index` page.
 
 ```csharp
 app.MapGet("/users", (UserStore users) =>
     Render("Users/Index", new InertiaProps { ["users"] = users.All() }));
 ```
 
-The matching component receives that data as ordinary props:
+The matching component receives `users` as a prop, just like data passed in by another component.
 
 <Tabs>
   <Tab label="React">
@@ -188,18 +198,16 @@ defineProps<{ users: { id: number; name: string }[] }>()
   </Tab>
 </Tabs>
 
-The first visit is a normal HTML response. After that, links and form submissions fetch the next page's props in the background and swap the component without a full reload. It feels like a SPA, but ASP.NET Core still owns routing, authentication and validation.
+On the first visit, Inertia.Net sends HTML. When someone follows an Inertia link, the server sends the next page's data as JSON and the browser updates the screen without a full reload.
 
-**Choose it when** one team ships the frontend and backend together: dashboards, admin tools, SaaS products, internal apps. **Skip it when** you need a public JSON API for mobile apps or third parties, or the frontend is a separate product with its own release cycle.
-
-Want to see it run? Try [First 10 minutes](/docs/first-10-minutes). Want the details? Keep reading.
+Inertia fits apps where the frontend and backend ship together, including dashboards, admin tools and SaaS products. If mobile apps or third parties also need access to your data, you can add API endpoints alongside your Inertia pages.
 
 ## How a request works
 
-The first visit returns HTML. Every later click is an `X-Inertia` request that returns only JSON, so the page never reloads.
+The Inertia client sends the `X-Inertia` header when it requests a page in the background. Inertia.Net uses that header to send the page as JSON.
 
 <Sequence
-  caption="Figure: the first visit returns HTML; every later click returns only JSON."
+  caption="A direct visit loads HTML. An Inertia link requests the next page as JSON."
   actors={[
     { name: 'Browser', sub: 'Inertia client' },
     { name: 'ASP.NET Core', sub: 'Inertia.Net' },
@@ -209,9 +217,9 @@ The first visit returns HTML. Every later click is an `X-Inertia` request that r
     { from: 0, to: 1, text: 'GET /users', code: 'Accept: text/html', phase: 'First visit' },
     { from: 1, to: 2, text: 'Run the route' },
     { from: 2, to: 1, text: 'Return the page name and props', reply: true, code: 'Render("Users/Index", props)' },
-    { from: 1, to: 0, text: 'HTML shell with the page object', reply: true, code: '<div id="app" data-page="{...}">' },
+    { from: 1, to: 0, text: 'HTML with the page data embedded', reply: true, code: '<script data-page="app" type="application/json">' },
     { from: 0, to: 0, text: 'Client app boots and renders the page' },
-    { from: 0, to: 1, text: 'Click a link: GET /users/1', code: 'X-Inertia: true', phase: 'Every click after' },
+    { from: 0, to: 1, text: 'Follow an Inertia link to /users/1', code: 'X-Inertia: true', phase: 'Inertia navigation' },
     { from: 1, to: 2, text: 'Run the route' },
     { from: 2, to: 1, text: 'Same Render call', reply: true },
     { from: 1, to: 0, text: 'Only the page object, as JSON', reply: true, code: '{ "component": "Users/Show", "props": {...} }' },
@@ -234,13 +242,6 @@ The first visit returns HTML. Every later click is an `X-Inertia` request that r
 | Frontend | React, Vue or Svelte | React, Vue or Svelte |
 
 You still write components, hooks and styles. What goes away is the glue: the API layer, the client router, and the code that keeps state in sync with the server.
-
-### Why a .NET developer might like it
-
-- **Minimal APIs, MVC controllers and FastEndpoints stay in charge.** Model binding, authorization, validation attributes and dependency injection work as they always have.
-- **One deployment.** `dotnet publish` produces the server and the built frontend assets together.
-- **Security defaults you already know.** CSRF protection, cookies and policies are ASP.NET Core's, with [antiforgery wired up](/docs/csrf-and-antiforgery) for you.
-- **Pages are real URLs.** Links, refresh, back and bookmarks behave, and optional [server-side rendering](/docs/server-side-rendering) renders the first visit's HTML on the server.
 
 ### Features
 
@@ -292,15 +293,152 @@ Partial reloads let the client ask for only some props (`only` and `except`), so
 - **Heavy offline use.** Inertia expects the server for every page change.
 - **You want no JavaScript at all.** For server-rendered HTML with a little interactivity, Razor Pages or Blazor may be simpler.
 
-### What it is not
-
-Inertia is not a framework and not a new frontend library. It is a small protocol between your server and the official [Inertia.js](https://inertiajs.com) client, and Inertia.Net is the ASP.NET Core side of it. You keep using React, Vue or Svelte exactly as documented.
-
 ## Next steps
 
 - [First 10 minutes](/docs/first-10-minutes) creates an app from the starter template and walks through a validated form.
 - [Quick start](/docs/quick-start) adds Inertia.Net to an existing ASP.NET Core app.
 - [Introduction](/docs/introduction) summarizes what the adapter provides.
+
+---
+
+# First 10 minutes
+
+URL: https://inertia-dotnet.temtem.dev/docs/first-10-minutes
+
+> Run your first app, change a C# validation rule, and see the result in your browser.
+
+You'll run a small todo app, submit a form, and change how C# validates it. The starter sets up ASP.NET Core, your frontend, and Vite for you.
+
+## 1. Create the app
+
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) and use Node.js 22.12 or newer with npm for the commands below. Run `dotnet --list-sdks` to check for an installed 10.0 SDK and `node --version` to check Node.
+
+Run these commands in the folder where you want to create `MyApp`.
+
+```sh
+dotnet new install Inertia.Net.Templates@1.9.4
+dotnet new inertia -n MyApp --framework react
+cd MyApp
+npm install
+npm run dev
+```
+
+For Vue or Svelte, use `--framework vue` or `--framework svelte` in the template command. For .NET 11, install the .NET 11 SDK and add `--tfm net11.0`.
+
+Leave Vite running. In a second terminal, open the same `MyApp` folder and start the server.
+
+```sh
+dotnet watch
+```
+
+Open [http://localhost:5180/todos](http://localhost:5180/todos) in your browser. That's the address from `dotnet watch`. Vite also prints an address on port 5173, where it serves JavaScript, CSS and live updates to the page.
+
+## 2. Change a C# validation rule
+
+1. With the title empty, click **Add**. The page shows an error below the input.
+2. In `Program.cs`, find `NewTodo` and change `StringLength(100)` to `StringLength(10)`. Save the file, then restart the server to load the new rule. Press **Ctrl+C** in the server terminal and run `dotnet watch` again. Leave Vite running.
+3. Enter `Buy groceries` and click **Add**. The new error shows the 10-character limit. Try `Buy milk` to see the todo appear in the list.
+
+## 3. Follow the form from the browser to C#
+
+In `Program.cs`, `MapPost` tells ASP.NET Core what to run when the browser submits to `/todos`. The name `todos.store` also gives the frontend a typed function for this route.
+
+```csharp
+app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
+{
+    todos.Add(input.Title!);
+    http.Inertia().Flash("success", "Todo added");
+    return Results.Redirect("/todos");
+}).WithInertiaValidation().WithName("todos.store");
+```
+
+`WithInertiaValidation()` checks the rules on `NewTodo.Title`. If validation fails, Inertia.Net sends the browser back to the page with the error. If the title passes, the handler adds the todo and sends back a one-time success message.
+
+Open `ClientApp/pages/Todos/Index.tsx`, `Index.vue`, or `Index.svelte` for your frontend. The excerpts below show how the form uses the generated route and displays `form.errors.title`.
+
+<Tabs>
+  <Tab label="React">
+
+```tsx
+import { useForm } from '@inertiajs/react'
+import type { FormEvent } from 'react'
+import { routes } from '../../types/routes'
+
+// Inside the page component:
+const form = useForm({ title: '' })
+const submit = (e: FormEvent) => {
+  e.preventDefault()
+  form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
+}
+
+// Inside its return:
+<form onSubmit={submit}>
+  <input placeholder="What needs doing?" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
+  <button type="submit" disabled={form.processing}>Add</button>
+  {form.errors.title && <div style={{ color: 'crimson' }}>{form.errors.title}</div>}
+</form>
+```
+
+  </Tab>
+  <Tab label="Vue">
+
+```vue
+<script setup lang="ts">
+import { useForm } from '@inertiajs/vue3'
+import { routes } from '../../types/routes'
+
+const form = useForm({ title: '' })
+const submit = () => form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
+</script>
+
+<template>
+  <form @submit.prevent="submit">
+    <input v-model="form.title" placeholder="What needs doing?" />
+    <button type="submit" :disabled="form.processing">Add</button>
+    <div v-if="form.errors.title" style="color: crimson">{{ form.errors.title }}</div>
+  </form>
+</template>
+```
+
+  </Tab>
+  <Tab label="Svelte">
+
+```svelte
+<script lang="ts">
+  import { useForm } from '@inertiajs/svelte'
+  import { routes } from '../../types/routes'
+
+  const form = useForm({ title: '' })
+  const submit = (e: SubmitEvent) => {
+    e.preventDefault()
+    form.submit(routes.todos.store(), { onSuccess: () => form.reset() })
+  }
+</script>
+
+<form onsubmit={submit}>
+  <input placeholder="What needs doing?" bind:value={form.title} />
+  <button type="submit" disabled={form.processing}>Add</button>
+  {#if form.errors.title}
+    <div style="color: crimson">{form.errors.title}</div>
+  {/if}
+</form>
+```
+
+  </Tab>
+</Tabs>
+
+## 4. Try the development tools
+
+**Follow the route in your editor.** Jump to the definition of `routes.todos.store()`. The starter generates `ClientApp/types/routes.ts` from your named C# endpoints. That function supplies both the URL and the HTTP method to the form.
+
+**Explore the data your page receives.** Find `InertiaPages['Todos/Index']` in the page component. Hover over `todos` in your editor to see the type or open `ClientApp/types/inertia.d.ts`. The starter generates that declaration from the C# `TodosPage` record in `Program.cs`.
+
+**Inspect a submission in your browser.** The starter already records visits in Development. Open the Inertia panel, submit an empty title again, and inspect the request and the page data that contains the error. [Install the browser extension and open the panel](/docs/devtools#try-it-in-the-starter)
+
+## Next steps
+
+- [Test a form submission](/docs/testing#testing-a-form-with-antiforgery) to check the validation error in a .NET test.
+- [Add Inertia to an existing ASP.NET Core app](/docs/quick-start) to bring the same workflow to your own project.
 
 ---
 
@@ -358,7 +496,7 @@ Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.4
+dotnet new install Inertia.Net.Templates@1.9.4
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -404,136 +542,6 @@ Set `<InertiaNetImplicitUsings>false</InertiaNetImplicitUsings>` and add `using 
     Install React, Vue or Svelte and configure Vite for development and production.
   </Card>
 </Cards>
-
----
-
-# First 10 minutes
-
-URL: https://inertia-dotnet.temtem.dev/docs/first-10-minutes
-
-> Start a template app, try its validated form, and test the redirect.
-
-Create the React starter (choose `vue` or `svelte` for another client; add `--tfm net11.0` to target .NET 11 instead of .NET 10):
-
-```sh
-dotnet new install Inertia.Net.Templates::1.9.4
-dotnet new inertia -n MyApp --framework react
-cd MyApp
-npm install
-npm run dev
-```
-
-Use `bun install` and `bun run dev`, `pnpm install` and `pnpm run dev`, or `yarn install` and `yarn run dev` if you prefer. In a second terminal run `dotnet run`. Open the address printed by `dotnet run` (`http://localhost:5180` for the template) and visit `/todos`; submit an empty title to see the validation message. The template includes Vite, antiforgery and a complete form.
-
-<Callout type="warning" title="Open the .NET URL, not the Vite one">
-Vite prints `http://localhost:5173` when it starts, but that server only supplies JavaScript, CSS and hot reload to your app. It has no pages, so opening it shows a blank page. Your app is the ASP.NET Core address from `dotnet run`: `http://localhost:5180`.
-</Callout>
-
-The handler in `Program.cs` is:
-
-```csharp
-app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
-{
-    todos.Add(input.Title!);
-    http.Inertia().Flash("success", "Todo added");
-    return Results.Redirect("/todos");
-}).WithInertiaValidation();
-```
-
-`NewTodo.Title` has `[Required, StringLength(100)]`; invalid requests redirect with errors before the handler runs. The template's `ClientApp/pages/Todos/Index.tsx` (`Index.vue` or `Index.svelte` for the other clients) uses `useForm` to submit and display the error:
-
-<Tabs>
-  <Tab label="React">
-
-```tsx
-import { useForm } from '@inertiajs/react'
-import type { FormEvent } from 'react'
-
-// Inside the page component:
-const form = useForm({ title: '' })
-const submit = (e: FormEvent) => {
-  e.preventDefault()
-  form.post('/todos', { onSuccess: () => form.reset() })
-}
-
-// Inside its return:
-<form onSubmit={submit}>
-  <input placeholder="What needs doing?" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
-  <button type="submit" disabled={form.processing}>Add</button>
-  {form.errors.title && <div style={{ color: 'crimson' }}>{form.errors.title}</div>}
-</form>
-```
-
-  </Tab>
-  <Tab label="Vue">
-
-```vue
-<script setup lang="ts">
-import { useForm } from '@inertiajs/vue3'
-
-const form = useForm({ title: '' })
-const submit = () => form.post('/todos', { onSuccess: () => form.reset() })
-</script>
-
-<template>
-  <form @submit.prevent="submit">
-    <input v-model="form.title" placeholder="What needs doing?" />
-    <button type="submit" :disabled="form.processing">Add</button>
-    <div v-if="form.errors.title" style="color: crimson">{{ form.errors.title }}</div>
-  </form>
-</template>
-```
-
-  </Tab>
-  <Tab label="Svelte">
-
-```svelte
-<script lang="ts">
-  import { useForm } from '@inertiajs/svelte'
-
-  const form = useForm({ title: '' })
-  const submit = (e: SubmitEvent) => {
-    e.preventDefault()
-    form.post('/todos', { onSuccess: () => form.reset() })
-  }
-</script>
-
-<form onsubmit={submit}>
-  <input placeholder="What needs doing?" bind:value={form.title} />
-  <button type="submit" disabled={form.processing}>Add</button>
-  {#if form.errors.title}
-    <div style="color: crimson">{form.errors.title}</div>
-  {/if}
-</form>
-```
-
-  </Tab>
-</Tabs>
-
-To test the round trip, add `Inertia.Net.Testing` and `Microsoft.AspNetCore.Mvc.Testing` to a test project, expose `public partial class Program;` in the app, and create a cookie-preserving `WebApplicationFactory<Program>` client with `AllowAutoRedirect = false`:
-
-```csharp
-using System.Net;
-using System.Net.Http.Json;
-using Inertia.Net.Testing;
-
-client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
-using var page = await client.GetAsync("/todos");
-using var request = new HttpRequestMessage(HttpMethod.Post, "/todos")
-{
-    Content = JsonContent.Create(new { title = "" }),
-};
-request.Headers.Add("X-Inertia", "true");
-request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-request.Headers.Referrer = new Uri(client.BaseAddress!, "/todos");
-request.WithXsrfToken(page);
-using var response = await client.SendAsync(request);
-Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-using var redirected = await client.GetAsync("/todos");
-await redirected.AssertInertiaAsync(p => p.HasErrors().HasError("title"));
-```
-
-See [Testing](/docs/testing) for named error bags and custom XSRF names, and [Quick start](/docs/quick-start) for an existing application.
 
 ---
 
@@ -1013,7 +1021,9 @@ URL: https://inertia-dotnet.temtem.dev/docs/quick-start
 
 > Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 
-Already using the starter template? Its services, middleware, root template and frontend are configured for you. These steps are for adding Inertia to an existing app or building one manually.
+Use this guide to add Inertia to an existing ASP.NET Core app. To create an app with the server and frontend already wired up, follow [First 10 minutes](/docs/first-10-minutes).
+
+Install the core NuGet package and the integration package if you use MVC or FastEndpoints. [Package commands](/docs/installation)
 
 Every app needs the same four things:
 
@@ -1250,6 +1260,10 @@ Pass your own `resolve` and `setup` functions to `createInertiaApp`. The [client
 </Callout>
 
 ## 4. Run it
+
+If your app has no Vite setup yet, follow the package and configuration steps in [Client setup](/docs/client-setup#install-the-client). Use `ClientApp/app.tsx` (React) or `ClientApp/app.ts` (Vue and Svelte) as the Vite entry to match the root template above.
+
+For the `createInertiaApp()` examples above, add `@inertiajs/vite@^3` as a development dependency. Import `inertia` from `@inertiajs/vite` in `vite.config.ts` and add `inertia()` after your framework plugin in the `plugins` array. This resolves the page files under `ClientApp/pages`.
 
 Install dependencies and start Vite from the project directory with your package manager:
 
@@ -6126,7 +6140,15 @@ URL: https://inertia-dotnet.temtem.dev/docs/devtools
 
 > Record visits for the Inertia DevTools extension and catch missing page components during development.
 
-The [Inertia DevTools](https://inertiajs.com/docs/v3/advanced/devtools) browser extension shows every visit, its props, headers and page state. Inertia.Net implements the server protocol.
+Inertia DevTools lets you see what your browser sent and what ASP.NET Core returned for an Inertia visit.
+
+## Try it in the starter
+
+1. Install the browser extension using the [Inertia.js DevTools guide](https://inertiajs.com/docs/v3/advanced/devtools#installation).
+2. Start the app and Vite from [First 10 minutes](/docs/first-10-minutes). Open `http://localhost:5180/todos`, open your browser's developer tools, and select the **Inertia** panel.
+3. Submit an empty todo title. Select the visit in the timeline and look at the request and the resulting page data. The validation message is under `props.errors.title`.
+
+The starter enables recording in Development. To add recording to an existing app, use the setup below.
 
 ## Enable DevTools
 
@@ -6174,10 +6196,6 @@ The development startup also writes TypeScript declarations when `o.TypeScript.O
 - DevTools recording is off unless explicitly enabled.
 - The generated TypeScript file is committed if the client build type-checks in CI.
 - Production logs do not contain the DevTools read API.
-
-<Callout type="tip" title="Pair with the browser extension">
-Install the Inertia DevTools extension, open your app in Development, and use the extension's panel. The server entries are correlated by the `X-Inertia-Devtools-Id` header.
-</Callout>
 
 Without an `Authorize` callback, the read API responds only in Development. Requests must come from this machine through a loopback connection to a loopback host name such as `localhost`. They must have no `X-Forwarded-For`, `Forwarded`, `X-Forwarded-Host`, `X-Real-IP` or `Via` header. Set `Authorize` to allow access from a container or another machine.
 
