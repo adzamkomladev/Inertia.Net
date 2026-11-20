@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { productionURL } from './playwright.config'
 
 test('signs in, sees the dashboard, signs out and is sent back to the login page', async ({ page }) => {
   await page.goto('/dashboard')
@@ -9,6 +10,7 @@ test('signs in, sees the dashboard, signs out and is sent back to the login page
   await page.getByLabel('Password').focus()
   await expect(page.getByRole('alert')).toContainText('Email')
 
+  await expect(page.getByText('Use demo@example.com')).toBeVisible()
   await page.getByLabel('Email').fill('demo@example.com')
   await page.getByLabel('Password').fill('wrong')
   await page.getByRole('button', { name: 'Log in' }).click()
@@ -41,4 +43,19 @@ test('returns to the page that asked for the sign-in, only on this site', async 
   await page.goto('/login?ReturnUrl=%2F%2Fevil.example')
   await signIn()
   await expect(page).toHaveURL(/\/dashboard$/)
+})
+
+test('Production rejects the demo account and keeps the dashboard protected', async ({ page, context }) => {
+  await page.goto(`${productionURL}/login?ReturnUrl=%2Fdashboard`)
+  await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible()
+  await expect(page.getByText('Use demo@example.com')).toHaveCount(0)
+
+  await page.getByLabel('Email').fill('demo@example.com')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Log in' }).click()
+  await expect(page.getByRole('alert')).toHaveText('These credentials do not match our records.')
+  expect((await context.cookies(productionURL)).map((c) => c.name)).not.toContain('.AspNetCore.Cookies')
+
+  await page.goto(`${productionURL}/dashboard`)
+  await expect(page).toHaveURL(/\/login\?ReturnUrl=%2Fdashboard$/)
 })

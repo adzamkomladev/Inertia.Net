@@ -21,7 +21,7 @@ public class ResultTests
         Assert.Equal(200, context.Response.StatusCode);
         Assert.Equal("application/json; charset=utf-8", context.Response.ContentType);
         Assert.Equal("true", context.Response.Headers[InertiaHeaders.Inertia]);
-        Assert.Equal("X-Inertia", context.Response.Headers.Vary);
+        Assert.Equal(InertiaHeaders.PageVary, context.Response.Headers.Vary);
         Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(body), context.Response.ContentLength);
         Assert.Equal("Home", (string?)Harness.ParsePage(body)["component"]);
     }
@@ -35,7 +35,7 @@ public class ResultTests
         Assert.Equal(200, context.Response.StatusCode);
         Assert.Equal("text/html; charset=utf-8", context.Response.ContentType);
         Assert.False(context.Response.Headers.ContainsKey(InertiaHeaders.Inertia));
-        Assert.Equal("X-Inertia", context.Response.Headers.Vary);
+        Assert.Equal(InertiaHeaders.PageVary, context.Response.Headers.Vary);
         Assert.StartsWith("<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body><script data-page=\"app\" type=\"application/json\">{", body, StringComparison.Ordinal);
         Assert.EndsWith("}</script><div id=\"app\"></div></body></html>", body, StringComparison.Ordinal);
     }
@@ -73,12 +73,21 @@ public class ResultTests
         var context = _harness.Context().AsInertia();
         context.Response.Headers.Vary = "Accept-Encoding";
         await Harness.ExecuteAsync(context, Inertia.Render("Home"));
-        Assert.Equal(["Accept-Encoding", "X-Inertia"], context.Response.Headers.Vary.ToArray());
+        Assert.Equal(["Accept-Encoding", InertiaHeaders.PageVary], context.Response.Headers.Vary.ToArray());
 
+        // Listed tokens are matched case-insensitively and not repeated; the rest are appended.
         var again = _harness.Context();
-        again.Response.Headers.Vary = "accept, x-inertia";
+        again.Response.Headers.Vary = "accept, x-inertia, X-INERTIA-VERSION";
         await Harness.ExecuteAsync(again, Inertia.Render("Home"));
-        Assert.Equal("accept, x-inertia", again.Response.Headers.Vary);
+        Assert.Equal(
+            ["accept, x-inertia, X-INERTIA-VERSION", InertiaHeaders.PageVary.Replace("X-Inertia, X-Inertia-Version, ", "", StringComparison.Ordinal)],
+            again.Response.Headers.Vary.ToArray());
+
+        // * already varies on everything.
+        var wildcard = _harness.Context();
+        wildcard.Response.Headers.Vary = "*";
+        await Harness.ExecuteAsync(wildcard, Inertia.Render("Home"));
+        Assert.Equal("*", wildcard.Response.Headers.Vary);
     }
 
     [Fact]

@@ -47,6 +47,19 @@ public sealed class InertiaDevToolsOptions
     public int MaxBodyBytes { get; set; } = 64 * 1024;
 
     /// <summary>
+    /// Pages larger than this are not copied for recording: the entry keeps the component, request type, status and size
+    /// (<c>__meta.responseBytes</c>), and its response body is omitted (reason <c>too-large</c>). The browser still receives the whole
+    /// page. Default 1 MiB.
+    /// </summary>
+    public int MaxResponseBytes { get; set; } = 1024 * 1024;
+
+    /// <summary>
+    /// The serialized size of all kept entries; the oldest are dropped past it, and an entry larger than it is not kept. Applies together
+    /// with <see cref="MaxEntriesPerTab"/>, <see cref="MaxEntries"/> and <see cref="MaxAge"/>. Default 64 MiB.
+    /// </summary>
+    public long MaxTotalBytes { get; set; } = 64L * 1024 * 1024;
+
+    /// <summary>
     /// Prop, body, URL query and header names whose values are replaced with <c>[REDACTED]</c>, compared without case. Names containing
     /// <c>password</c>, <c>secret</c>, <c>token</c>, <c>authorization</c>, <c>cookie</c> or <c>api_key</c>/<c>apikey</c> are always redacted.
     /// </summary>
@@ -75,7 +88,8 @@ public static class InertiaDevToolsExtensions
             options.Configure(configure);
         }
 
-        options.Validate(o => o.MaxEntriesPerTab > 0 && o.MaxEntries > 0 && o.MaxAge > TimeSpan.Zero && o.MaxBodyBytes >= 0,
+        options.Validate(o => o.MaxEntriesPerTab > 0 && o.MaxEntries > 0 && o.MaxAge > TimeSpan.Zero && o.MaxBodyBytes >= 0
+            && o.MaxResponseBytes >= 0 && o.MaxTotalBytes > 0,
             "InertiaDevToolsOptions limits must be positive.").ValidateOnStart();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<DevToolsRecorder>();
@@ -100,8 +114,14 @@ public static class InertiaDevToolsExtensions
 }
 
 /// <summary>Per-request recording state, on <see cref="HttpContext.Features"/> while a request is recorded.</summary>
-internal sealed class DevToolsCapture(string id, long started)
+internal sealed class DevToolsCapture(string id, long started, int maxPageBytes = int.MaxValue)
 {
+    /// <summary>Pages up to this size are copied into <see cref="PageJson"/> (<see cref="InertiaDevToolsOptions.MaxResponseBytes"/>).</summary>
+    public int MaxPageBytes { get; } = maxPageBytes;
+
+    /// <summary>The rendered page's size in bytes, or 0 when no page was rendered.</summary>
+    public int PageBytes { get; set; }
+
     public string Id { get; } = id;
 
     public long Started { get; } = started;
@@ -126,6 +146,7 @@ internal sealed partial class DevToolsRecorder
     private readonly Lock _lock = new();
     private readonly Dictionary<string, Stored> _byId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, LinkedList<Stored>> _byTab = new(StringComparer.Ordinal);
+    private long _bytes; // the Json lengths of the entries in _byId
 
     public DevToolsRecorder(IOptions<InertiaDevToolsOptions> options, IHostEnvironment environment, TimeProvider time, PageComponentCheck pages, ILogger<DevToolsRecorder> logger)
     {
@@ -147,6 +168,17 @@ internal sealed partial class DevToolsRecorder
 
     public bool Enabled => _enabled;
 
+    internal long RetainedBytes
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _bytes;
+            }
+        }
+    }
+
     internal int Count
     {
         get
@@ -167,7 +199,7 @@ internal sealed partial class DevToolsRecorder
             return null;
         }
 
-        var capture = new DevToolsCapture(Guid.CreateVersion7().ToString("N"), Stopwatch.GetTimestamp());
+        var capture = new DevToolsCapture(Guid.CreateVersion7().ToString("N"), Stopwatch.GetTimestamp(), _options.MaxResponseBytes);
         httpContext.Features.Set(capture);
         if (!string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]) && IsTextBody(request)
             && request.ContentLength is > 0 && request.ContentLength <= _options.MaxBodyBytes)
@@ -196,7 +228,7 @@ internal sealed partial class DevToolsRecorder
             var requestBody = await ReadRequestBodyAsync(httpContext.Request);
             var now = _time.GetUtcNow();
             var tab = Header(httpContext.Request, "X-Inertia-Devtools-Tab");
-            var requestType = RequestType(httpContext.Request, capture.PageJson is not null);
+            var requestType = RequestType(httpContext.Request, capture.PageBytes > 0);
             var json = Write(httpContext, capture, requestBody, requestType, tab, now, failed);
             Add(new Stored(capture.Id, tab ?? "", capture.Component, requestType, now, json));
         }
@@ -256,20 +288,7 @@ internal sealed partial class DevToolsRecorder
                 .Select(e => e.Json)];
         }
 
-        var buffer = new ArrayBufferWriter<byte>();
-        buffer.Write("["u8);
-        for (var i = 0; i < selected.Count; i++)
-        {
-            if (i > 0)
-            {
-                buffer.Write(","u8);
-            }
-
-            buffer.Write(selected[i]);
-        }
-
-        buffer.Write("]"u8);
-        return WriteJsonAsync(httpContext, buffer.WrittenMemory);
+        return WriteListAsync(httpContext, selected);
 
         static string[] Split(StringValues value) => value.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
@@ -300,6 +319,22 @@ internal sealed partial class DevToolsRecorder
         return Task.CompletedTask;
     }
 
+    // Writes the stored entries one by one: no second copy of them all is buffered for the response.
+    private static async Task WriteListAsync(HttpContext httpContext, List<byte[]> entries)
+    {
+        httpContext.Response.ContentType = "application/json; charset=utf-8";
+        httpContext.Response.Headers.CacheControl = "no-store";
+        var body = httpContext.Response.Body;
+        await body.WriteAsync("["u8.ToArray(), httpContext.RequestAborted);
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (i > 0) await body.WriteAsync(","u8.ToArray(), httpContext.RequestAborted);
+            await body.WriteAsync(entries[i], httpContext.RequestAborted);
+        }
+
+        await body.WriteAsync("]"u8.ToArray(), httpContext.RequestAborted);
+    }
+
     private static async Task WriteJsonAsync(HttpContext httpContext, ReadOnlyMemory<byte> json)
     {
         httpContext.Response.ContentType = "application/json; charset=utf-8";
@@ -309,6 +344,11 @@ internal sealed partial class DevToolsRecorder
 
     private void Add(Stored entry)
     {
+        if (entry.Json.Length > _options.MaxTotalBytes)
+        {
+            return; // larger than the whole budget: never kept
+        }
+
         lock (_lock)
         {
             Prune();
@@ -319,13 +359,14 @@ internal sealed partial class DevToolsRecorder
 
             list.AddLast(entry);
             _byId[entry.Id] = entry;
+            _bytes += entry.Json.Length;
             if (list.Count > _options.MaxEntriesPerTab)
             {
                 Remove(list.First!.Value);
             }
 
             // The oldest entry of all, which is the first of some tab.
-            while (_byId.Count > _options.MaxEntries)
+            while (_byId.Count > _options.MaxEntries || _bytes > _options.MaxTotalBytes)
             {
                 Remove(_byTab.Values.Select(l => l.First!.Value).MinBy(e => e.At)!);
             }
@@ -347,7 +388,11 @@ internal sealed partial class DevToolsRecorder
 
     private void Remove(Stored entry)
     {
-        _byId.Remove(entry.Id);
+        if (_byId.Remove(entry.Id))
+        {
+            _bytes -= entry.Json.Length;
+        }
+
         if (_byTab.TryGetValue(entry.Tab, out var list))
         {
             list.Remove(entry);
@@ -497,6 +542,11 @@ internal sealed partial class DevToolsRecorder
             writer.WriteNumber("utime", now.ToUnixTimeMilliseconds() / 1000.0);
             WriteStringOrNull(writer, "tabUuid", tab);
             WriteStringOrNull(writer, "batchId", Header(request, "X-Inertia-Devtools-Parent"));
+            if (capture.PageBytes > 0)
+            {
+                writer.WriteNumber("responseBytes", capture.PageBytes);
+            }
+
             writer.WriteNumber("serverTimingMs", Math.Round(Stopwatch.GetElapsedTime(capture.Started).TotalMilliseconds, 2));
             // A redirect, Location() or a fragment redirect.
             var location = new[] { response.Headers.Location, response.Headers[InertiaHeaders.Location], response.Headers[InertiaHeaders.Redirect] }
@@ -519,6 +569,7 @@ internal sealed partial class DevToolsRecorder
             WriteHeaders(writer, "responseHeaders", response.Headers);
             WriteBody(writer, "requestBody", requestBody);
             WriteBody(writer, "responseBody", page is not null ? Body.Json(page.DeepClone())
+                : capture.PageBytes > capture.MaxPageBytes ? Body.Omitted("too-large")
                 : IsRedirectOrEmpty(response) ? Body.Empty
                 : Body.Omitted("non-inertia-response"));
             writer.WriteEndObject();

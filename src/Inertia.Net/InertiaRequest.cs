@@ -51,23 +51,71 @@ public static class InertiaHeaders
     /// <summary><c>X-XSRF-TOKEN</c>: the antiforgery token the client copies from the <c>XSRF-TOKEN</c> cookie.</summary>
     public const string XsrfToken = "X-XSRF-TOKEN";
 
-    /// <summary>Adds <c>X-Inertia</c> to <c>Vary</c> unless it is already listed.</summary>
+    // The request headers that select a rendered page's status, props or metadata. A shared cache must key a page on all of them:
+    // a full and a partial visit to the same URL (or a current and a stale asset version) get different responses.
+    private static readonly string[] PageVaryHeaders =
+        [Inertia, Version, PartialComponent, PartialData, PartialExcept, Reset, ExceptOnceProps, ErrorBag, InfiniteScrollMergeIntent];
+
+    internal static readonly string PageVary = string.Join(", ", PageVaryHeaders);
+
+    /// <summary>Adds <c>X-Inertia</c> to <c>Vary</c> unless it (or <c>*</c>) is already listed.</summary>
     internal static void AppendVary(IHeaderDictionary headers)
     {
         var vary = headers.Vary;
+        if (!Lists(vary, Inertia) && !Lists(vary, "*"))
+        {
+            headers.Vary = StringValues.Concat(vary, Inertia);
+        }
+    }
+
+    /// <summary>
+    /// Adds every request header that selects a page's content (<c>X-Inertia</c>, the version, partial reload, reset, once,
+    /// error bag and merge intent headers) to <c>Vary</c>, skipping those already listed (case-insensitive) and all of them after <c>*</c>.
+    /// </summary>
+    internal static void AppendPageVary(IHeaderDictionary headers)
+    {
+        var vary = headers.Vary;
+        if (vary.Count == 0)
+        {
+            headers.Vary = PageVary;
+            return;
+        }
+
+        if (Lists(vary, "*"))
+        {
+            return;
+        }
+
+        var missing = new List<string>(PageVaryHeaders.Length);
+        foreach (var header in PageVaryHeaders)
+        {
+            if (!Lists(vary, header))
+            {
+                missing.Add(header);
+            }
+        }
+
+        if (missing.Count > 0)
+        {
+            headers.Vary = StringValues.Concat(vary, missing.Count == PageVaryHeaders.Length ? PageVary : string.Join(", ", missing));
+        }
+    }
+
+    private static bool Lists(StringValues vary, string token)
+    {
         foreach (var value in vary)
         {
             var span = value.AsSpan();
             foreach (var range in span.Split(','))
             {
-                if (span[range].Trim().Equals(Inertia, StringComparison.OrdinalIgnoreCase))
+                if (span[range].Trim().Equals(token, StringComparison.OrdinalIgnoreCase))
                 {
-                    return;
+                    return true;
                 }
             }
         }
 
-        headers.Vary = StringValues.Concat(vary, Inertia);
+        return false;
     }
 }
 

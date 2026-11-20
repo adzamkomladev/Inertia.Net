@@ -187,7 +187,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     private async ValueTask<SsrRender?> RenderCachedAsync(SsrMode mode, InertiaRootViewContext context, TimeSpan duration, TimeSpan staleFor)
     {
         var http = context.HttpContext;
-        var key = InertiaCaching.SsrKey(context.PageJson.Span);
+        var key = InertiaCaching.SsrKey(_mount, context.PageJson.Span);
         if (await _caching.GetRenderAsync(key, http.RequestAborted) is { } hit)
         {
             if (hit.IsStale)
@@ -312,16 +312,16 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
     // The page JSON is copied: the response's buffer goes back to the pool when the response ends.
     private void ScheduleRefresh(HttpContext http, InertiaCacheKey key, ReadOnlyMemory<byte> pageJson, TimeSpan duration, TimeSpan staleFor)
     {
-        if (_caching.TryBeginRefresh(key))
+        if (_caching.TryBeginRefresh(key, out var claim))
         {
-            OnCompleted(http, key, pageJson.ToArray(), duration, staleFor);
+            OnCompleted(http, key, claim, pageJson.ToArray(), duration, staleFor);
         }
     }
 
     // Its own method: the closure would otherwise be allocated on every stale hit, refresh or not.
-    private void OnCompleted(HttpContext http, InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor)
+    private void OnCompleted(HttpContext http, InertiaCacheKey key, long claim, byte[] pageJson, TimeSpan duration, TimeSpan staleFor)
     {
-        var work = new RefreshWork(ct => RefreshAsync(key, pageJson, duration, staleFor, ct), () => _caching.EndRefresh(key), "ssr");
+        var work = new RefreshWork(ct => RefreshAsync(key, pageJson, duration, staleFor, ct), () => _caching.EndRefresh(key, claim), "ssr");
         http.Response.OnCompleted(() =>
         {
             _refreshes.Enqueue(work);
@@ -827,8 +827,10 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         var (freshUntil, expiresAt) = _caching.Times(duration, expiration);
         var entry = CacheEntry.CreateRender(render.Head.Span, render.Body.Span, freshUntil, expiresAt, out var stored);
         render.Dispose();
-        await _caching.SetAsync(key, entry, expiration, InertiaCaching.SsrTags, cancellationToken, stamp);
-        fill?.SetResult(entry);
+        if (await _caching.SetAsync(key, entry, expiration, InertiaCaching.SsrTags, cancellationToken, stamp))
+        {
+            fill?.SetResult(entry);
+        }
         return new SsrRender(stored.Head, stored.Body);
     }
 

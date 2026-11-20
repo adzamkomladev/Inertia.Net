@@ -647,7 +647,7 @@ public sealed class CachedPropsTests
     }
 
     [Fact]
-    public async Task Taking_back_a_raced_store_keeps_a_value_set_after_the_removal()
+    public async Task A_removal_and_replacement_wait_for_a_store_under_way_and_land_after_it()
     {
         var written = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -659,13 +659,55 @@ public sealed class CachedPropsTests
         // The fill's store has written its bytes but not returned when the key is removed and a new value is set.
         var filling = harness.PageAsync(Page());
         await written.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        await cache.RemovePropAsync("orders", TestContext.Current.CancellationToken);
-        await cache.SetPropAsync("orders", "seeded", TimeSpan.FromMinutes(5), cancellationToken: TestContext.Current.CancellationToken);
+        var mutations = Task.Run(async () =>
+        {
+            await cache.RemovePropAsync("orders", TestContext.Current.CancellationToken);
+            await cache.SetPropAsync("orders", "seeded", TimeSpan.FromMinutes(5), cancellationToken: TestContext.Current.CancellationToken);
+        }, TestContext.Current.CancellationToken);
+        await Task.WhenAny(mutations, Task.Delay(100, TestContext.Current.CancellationToken));
+        Assert.False(mutations.IsCompleted); // the removal lands after the store under way, not before it
         release.SetResult();
+        await mutations.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Equal("load 1", (string?)(await filling)["props"]!["orders"]);
 
         Assert.Equal("seeded", (string?)(await harness.PageAsync(Page()))["props"]!["orders"]);
         Assert.Equal(1, _loads);
+    }
+
+    [Theory]
+    [InlineData("remove")]
+    [InlineData("replace")]
+    public async Task A_reader_after_a_mutation_does_not_join_or_receive_an_older_fill(string mutation)
+    {
+        var cache = _harness.Services.GetRequiredService<IInertiaCache>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        InertiaProp Orders(bool slow) => Prop(async ct =>
+        {
+            var load = ++_loads;
+            if (slow)
+            {
+                started.TrySetResult();
+                await release.Task.WaitAsync(ct);
+            }
+
+            return $"orders {load}";
+        }).Cache("orders", TimeSpan.FromMinutes(5));
+
+        var old = _harness.PageAsync(new InertiaProps { ["orders"] = Orders(slow: true) });
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        if (mutation == "remove") await cache.RemovePropAsync("orders", TestContext.Current.CancellationToken);
+        else await cache.SetPropAsync("orders", "replaced", TimeSpan.FromMinutes(5), cancellationToken: TestContext.Current.CancellationToken);
+
+        // Started after the mutation, before the old fill finishes: it must not wait for, or be handed, the old value.
+        var reader = await _harness.PageAsync(new InertiaProps { ["orders"] = Orders(slow: false) });
+        Assert.Equal(mutation == "remove" ? "orders 2" : "replaced", (string?)reader["props"]!["orders"]);
+
+        release.SetResult();
+        Assert.Equal("orders 1", (string?)(await old)["props"]!["orders"]); // the initiating request keeps its own value
+        var after = await _harness.PageAsync(new InertiaProps { ["orders"] = Orders(slow: false) });
+        Assert.Equal(mutation == "remove" ? "orders 2" : "replaced", (string?)after["props"]!["orders"]); // a hit, not the old bytes
+        Assert.Equal(mutation == "remove" ? 2 : 1, _loads);
     }
 
     [Fact]

@@ -277,7 +277,7 @@ public abstract class ProtocolConformanceTests<THost>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("X-Inertia", response.Header("Vary"));
+        Assert.Equal(InertiaHeaders.PageVary, response.Header("Vary"));
         Assert.Null(response.Header(InertiaHeaders.Inertia));
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains("<script data-page=\"app\" type=\"application/json\">", html, StringComparison.Ordinal);
@@ -295,7 +295,7 @@ public abstract class ProtocolConformanceTests<THost>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal("true", response.Header(InertiaHeaders.Inertia));
-        Assert.Equal("X-Inertia", response.Header("Vary"));
+        Assert.Equal(InertiaHeaders.PageVary, response.Header("Vary"));
         JsonAssert.Equal("""{"component":"Page","props":{"errors":{},"message":"hello"},"url":"/page","version":"","sharedProps":["errors"]}""", await response.PageAsync());
     }
 
@@ -317,6 +317,92 @@ public abstract class ProtocolConformanceTests<THost>
         Assert.Equal("X-Inertia", response.Header("Vary"));
     }
 
+    /// <summary>
+    /// A shared cache that stores every GET and answers a later request from it when the request headers named by the stored
+    /// response's <c>Vary</c> match (RFC 9111 §4.1). It stores regardless of <c>Cache-Control</c>, so it checks <c>Vary</c> alone.
+    /// </summary>
+    private sealed class SharedCache(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        private readonly List<(string Url, string[] Vary, Dictionary<string, string> Selected, int Status, byte[] Body)> _entries = [];
+
+        public int Hits { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var url = request.RequestUri!.ToString();
+            foreach (var entry in _entries)
+            {
+                if (entry.Url == url && !entry.Vary.Contains("*") && entry.Vary.All(h => entry.Selected[h] == Value(request, h)))
+                {
+                    Hits++;
+                    return new HttpResponseMessage((HttpStatusCode)entry.Status) { Content = new ByteArrayContent(entry.Body) };
+                }
+            }
+
+            var response = await base.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var vary = response.Headers.Vary.SelectMany(v => v.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                .Select(v => v.ToLowerInvariant()).ToArray();
+            _entries.Add((url, vary, vary.ToDictionary(h => h, h => Value(request, h)), (int)response.StatusCode, body));
+            return new HttpResponseMessage(response.StatusCode) { Content = new ByteArrayContent(body) };
+        }
+
+        private static string Value(HttpRequestMessage request, string header) =>
+            request.Headers.TryGetValues(header, out var values) ? string.Join(",", values) : "";
+    }
+
+    public static TheoryData<string, string> SharedCacheVisits => new()
+    {
+        { "full", "partial" },
+        { "partial", "full" },
+        { "full", "partial-html" },
+        { "partial-html", "full-html" },
+        { "full", "once" },
+        { "full", "error-bag" },
+        { "current", "stale" },
+        { "stale", "current" },
+    };
+
+    [Theory]
+    [MemberData(nameof(SharedCacheVisits))]
+    public async Task A_shared_cache_serves_each_visit_its_own_page(string first, string second)
+    {
+        await using var app = await StartAsync(new ConformanceSetup { Inertia = o => o.Version = "v2" });
+        var cache = new SharedCache(app.Server.CreateHandler());
+        using var shared = new HttpClient(cache) { BaseAddress = app.Server.BaseAddress };
+
+        HttpRequestMessage Visit(string kind)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "/partial");
+            if (!kind.EndsWith("-html", StringComparison.Ordinal)) request.WithHeader(InertiaHeaders.Inertia, "true");
+            request.WithHeader(InertiaHeaders.Version, kind == "stale" ? "v1" : "v2");
+            if (kind.StartsWith("partial", StringComparison.Ordinal))
+            {
+                request.WithHeader(InertiaHeaders.PartialComponent, "Partial");
+                request.WithHeader(InertiaHeaders.PartialData, "d");
+            }
+
+            if (kind == "once") request.WithHeader(InertiaHeaders.ExceptOnceProps, "a");
+            if (kind == "error-bag") request.WithHeader(InertiaHeaders.ErrorBag, "login");
+            return request;
+        }
+
+        // What the origin answers the second visit with, without the cache in between.
+        var direct = await app.CreateClient().SendAsync(Visit(second), TestContext.Current.CancellationToken);
+        var expected = await direct.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+
+        await shared.SendAsync(Visit(first), TestContext.Current.CancellationToken);
+        var served = await shared.SendAsync(Visit(second), TestContext.Current.CancellationToken);
+
+        Assert.Equal(direct.StatusCode, served.StatusCode);
+        Assert.Equal(expected, await served.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+
+        // The same visit again is a hit: the variation does not defeat caching of identical requests.
+        var hits = cache.Hits;
+        await shared.SendAsync(Visit(second), TestContext.Current.CancellationToken);
+        Assert.Equal(hits + 1, cache.Hits);
+    }
+
     [Fact]
     public async Task Version_mismatch_is_a_409_and_the_handler_does_not_run()
     {
@@ -326,7 +412,7 @@ public abstract class ProtocolConformanceTests<THost>
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal($"{Base}/base/page?q=caf%C3%A9&x=1", response.Header(InertiaHeaders.Location));
         Assert.Equal("v2", response.Header(InertiaHeaders.Version));
-        Assert.Equal("X-Inertia", response.Header("Vary"));
+        Assert.Equal(InertiaHeaders.PageVary, response.Header("Vary"));
         Assert.Equal(0, app.Counters.Page);
         Assert.Empty(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
 

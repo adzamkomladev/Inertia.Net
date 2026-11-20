@@ -1,1 +1,5 @@
 #nullable enable
+Inertia.Net.InertiaDevToolsOptions.MaxResponseBytes.get -> int
+Inertia.Net.InertiaDevToolsOptions.MaxResponseBytes.set -> void
+Inertia.Net.InertiaDevToolsOptions.MaxTotalBytes.get -> long
+Inertia.Net.InertiaDevToolsOptions.MaxTotalBytes.set -> void

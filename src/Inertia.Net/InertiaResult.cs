@@ -147,7 +147,11 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         if (devTools is not null)
         {
             devTools.Component = Component;
-            devTools.PageJson = page.WrittenMemory.ToArray();
+            devTools.PageBytes = page.WrittenMemory.Length;
+            if (devTools.PageBytes <= devTools.MaxPageBytes)
+            {
+                devTools.PageJson = page.WrittenMemory.ToArray(); // a larger page is recorded without its body, never copied
+            }
         }
 
         response.StatusCode = _statusCode;
@@ -155,7 +159,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         {
             PreviousUrlCookie.Store(httpContext, request, pageWriter.Options.State, Component);
         }
-        InertiaHeaders.AppendVary(response.Headers);
+        InertiaHeaders.AppendPageVary(response.Headers);
 
         if (request.IsInertia)
         {

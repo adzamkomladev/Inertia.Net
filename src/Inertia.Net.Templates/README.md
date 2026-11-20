@@ -20,7 +20,7 @@ For [live props](https://github.com/adzamkomladev/Inertia.Net#live-props) the ap
 and uncomment `live: signalr()` in `ClientApp/app`. `ClientApp/lib/inertia-live-reload.ts` reloads `Scroll` and `Merge` props, which cannot be live,
 when an event arrives.
 
-With `--auth` the app also has cookie sign-in: a `/login` page (demo@example.com / password) whose form checks fields with
+With `--auth` the app also has cookie sign-in: a `/login` page (demo@example.com / password, in Development only) whose form checks fields with
 Precognition, a protected `/dashboard`, logout, the signed-in user shared as `auth.user`, and a sign-in rate limit that sends the
 form back with a flash message. Inertia visits to a protected page are redirected to the login page (`UseInertiaRedirects()`).
 Replace the in-memory `UserStore` with ASP.NET Core Identity or your user database.

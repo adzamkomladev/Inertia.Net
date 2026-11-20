@@ -7,6 +7,47 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.5] - 2026-11-20
+
+### Security
+
+- `dotnet new inertia --auth`: the demo account (`demo@example.com` / `password`) now signs in only in Development. A generated app
+  run as Production or Staging starts with the demo account switched off, and the login page shows the hint only when it is on.
+  Before, the fixed credential passed the normal password check in every environment and received a real authentication cookie.
+  **Existing apps created with `--auth`:** the template change does not reach them. Either replace `UserStore` with your user database,
+  or gate it the same way: register it as `builder.Services.AddSingleton(new UserStore(builder.Environment.IsDevelopment()))` and have
+  `Find` return null when that flag is false. The login handler now uses `RedirectHttpResult.IsLocalUrl` for `ReturnUrl`.
+- Cached SSR renders are keyed by mount as well as page JSON. Two mounts with different renderers that produced byte-identical page
+  JSON (host-based branches, or a custom URL resolver with matching versions) could serve each other's HTML from the cache, including
+  through a shared fill. Keys now start with `2.`, so entries written by earlier versions in a shared store are never read; they expire
+  on their own.
+- A rendered page (and the version-mismatch `409`) now varies on every request header that selects its content:
+  `X-Inertia-Version`, `X-Inertia-Partial-Component`, `X-Inertia-Partial-Data`, `X-Inertia-Partial-Except`, `X-Inertia-Reset`,
+  `X-Inertia-Except-Once-Props`, `X-Inertia-Error-Bag` and `X-Inertia-Infinite-Scroll-Merge-Intent`, next to `X-Inertia`. With only
+  `Vary: X-Inertia`, a shared cache allowed to store a page could answer a partial reload with the full page, or the reverse, and a
+  stale client with a current page. Existing `Vary` values are kept (case-insensitive) and `Vary: *` is left alone. Responses that are
+  not pages keep `Vary: X-Inertia` only.
+- DevTools recording is bounded by size as well as count and age. A page larger than `InertiaDevToolsOptions.MaxResponseBytes`
+  (default 1 MiB) is no longer copied: its entry keeps the component, request type, status and size (`__meta.responseBytes`), with the
+  response body omitted as `too-large`. Kept entries are limited to `MaxTotalBytes` (default 64 MiB) in all, oldest first, and the
+  list API writes entries one by one instead of buffering a second copy of them.
+
+### Fixed
+
+- Cached props: `RemovePropAsync`, `RemoveByTagAsync`, `ClearPropsAsync`, `ClearSsrAsync` and `SetPropAsync` now wait for this app
+  instance's cache writes already under way and stop older loads from storing or sharing their values. Before, a request arriving
+  after a removal could join a fill that started before it and receive the old value, and a fill or refresh finishing after
+  `SetPropAsync` could overwrite the new value for a full TTL. The request that started the older load still gets its own value.
+  A refresh that timed out and later completes neither stores its value nor releases a newer refresh's claim.
+- Redis store: removing a tag no longer removes an entry that was stored again under other tags after its first version (and its tag
+  index) expired while the old tag's set lived on.
+
+### Changed
+
+- New benchmark `PartialSelectorBenchmarks` measures partial reloads with 1 to 32 selectors (results in `tests/Inertia.Net.Benchmarks/RESULTS.md`).
+  Allocation grows with the list, mostly in header parsing; timings on the measuring host were too noisy to justify changing the
+  matcher, so it is unchanged.
+
 ## [1.9.4] - 2026-11-17
 
 ### Fixed

@@ -199,6 +199,76 @@ public sealed class MountIsolationTests
         Assert.Null(response.Header(InertiaHeaders.Inertia));
     }
 
+    /// <summary>Renders <c>render:{host of the SSR URL}:{call}</c>, after <see cref="Gate"/> opens.</summary>
+    private sealed class MountRenderer : HttpMessageHandler
+    {
+        private int _calls;
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        public TaskCompletionSource Gate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            await Gate.Task.WaitAsync(cancellationToken);
+            var json = $$"""{"head":[],"body":"<div id=\"app\">render:{{request.RequestUri!.Host}}</div>"}""";
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
+        }
+    }
+
+    [Fact]
+    public async Task Cached_renders_stay_in_their_mount_for_identical_page_json()
+    {
+        var renderer = new MountRenderer();
+        var root = Path.Join(Path.GetTempPath(), "inertia-mount-ssr-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Join(root, "app.html"), "<html><body>@inertia</body></html>");
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = root, EnvironmentName = Environments.Production });
+        builder.WebHost.UseTestServer();
+        builder.Services.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => renderer);
+        // Same version, root view and props: only the renderer differs, so both mounts produce byte-identical page JSON.
+        void Configure(InertiaOptions o, string ssr)
+        {
+            o.Version = "1";
+            o.Ssr.Mode = SsrMode.Preferred;
+            o.Ssr.Urls.Add(ssr);
+            o.Ssr.Cache.Duration = TimeSpan.FromMinutes(5);
+        }
+
+        builder.Services.AddInertia(o => Configure(o, "http://default-renderer"));
+        builder.Services.AddInertia("sp", o => Configure(o, "http://sp-renderer"));
+        await using var app = builder.Build();
+        app.MapWhen(http => http.Request.Host.Host == "sp.example", branch =>
+        {
+            branch.UseInertia("sp");
+            branch.Run(http => Render("Home").WithSsrCache(TimeSpan.FromMinutes(5)).ExecuteAsync(http));
+        });
+        app.UseInertia();
+        app.Run(http => Render("Home").WithSsrCache(TimeSpan.FromMinutes(5)).ExecuteAsync(http));
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        var client = app.GetTestClient();
+        Task<string> Visit(string host)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "http://" + host + "/");
+            return client.SendAsync(request, TestContext.Current.CancellationToken).ContinueWith(t => t.Result.Content.ReadAsStringAsync()).Unwrap();
+        }
+
+        // Simultaneous first visits: neither may join the other's fill.
+        var first = new[] { Visit("default.example"), Visit("sp.example"), Visit("default.example"), Visit("sp.example") };
+        renderer.Gate.SetResult();
+        var cold = await Task.WhenAll(first);
+        Assert.All(new[] { cold[0], cold[2] }, html => Assert.Contains("render:default-renderer", html, StringComparison.Ordinal));
+        Assert.All(new[] { cold[1], cold[3] }, html => Assert.Contains("render:sp-renderer", html, StringComparison.Ordinal));
+
+        // Warm: each mount reads its own entry, with no new render.
+        var calls = renderer.Calls;
+        Assert.Contains("render:default-renderer", await Visit("default.example"), StringComparison.Ordinal);
+        Assert.Contains("render:sp-renderer", await Visit("sp.example"), StringComparison.Ordinal);
+        Assert.Equal(calls, renderer.Calls);
+        Assert.InRange(calls, 2, 4); // a visit to the same mount may coalesce with its first fill, never with the other mount's
+    }
+
     [Fact]
     public void Use_inertia_requires_the_mount_registration()
     {
