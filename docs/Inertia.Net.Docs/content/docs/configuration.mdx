@@ -7,6 +7,9 @@ order: 1
 
 Core configuration is passed to `AddInertia`; error page options use `AddInertiaErrorPages`. Options marked “Development only” do nothing in other environments.
 
+`ComponentTransformer` changes runtime component names only. If you use it, register the final client names for TypeScript
+generation too; a build cannot evaluate an arbitrary runtime callback.
+
 ## `AddInertia(o => ...)`: `InertiaOptions`
 
 | Option | Default | Description |
@@ -15,6 +18,7 @@ Core configuration is passed to `AddInertia`; error page options use `AddInertia
 | `RootElementId` | `"app"` | Id of the root element and the `data-page` script. |
 | `Version` | `null` | Asset version. `null` means the Vite manifest hash, or `""` without one. |
 | `VersionResolver` | `null` | `Func<HttpContext, string?>` per-request version; wins over `Version` when non-null. |
+| `ComponentTransformer` | `null` | Changes the component name before rendering/page-file checks; returning null keeps it. |
 | `EncryptHistory` | `false` | Encrypt browser history state of every page. |
 | `WithAllErrors` | `false` | Send every validation message per field instead of the first. |
 | `PreserveBigIntegers` | `false` | Emit integers beyond ±(2^53−1) as `{"$bigint":"..."}`. |
@@ -56,6 +60,7 @@ Core configuration is passed to `AddInertia`; error page options use `AddInertia
 | Option | Default | Description |
 |---|---|---|
 | `Mode` | `Disabled` | `Disabled`, `Preferred` or `Required`. `Disabled` cannot be overridden per response. |
+| `OnRenderFailed` | `null` | Thread-safe `Action<SsrRenderFailed>` called once for the final failed render attempt, before fallback or a Required-mode exception. |
 | `Urls` | empty (`http://127.0.0.1:13714`) | SSR server base URLs. Not used with `UseNodeProcess()`. |
 | `Timeout` | `5 s` | Total deadline per render. `Timeout.InfiniteTimeSpan` disables it. |
 | `MaxResponseBytes` | `16 MiB` | Limit on actual response bytes, including errors and chunked responses. |

@@ -7,6 +7,9 @@ order: 3
 
 You'll run a small todo app, submit a form, and change how C# validates it. The starter sets up ASP.NET Core, your frontend, and Vite for you.
 
+Want to see the bigger picture first? Explore [Kitchen Sink](/docs/kitchen-sink), the official Inertia.js v3 sample app.
+It uses Laravel and Vue. This guide gets the same server-driven page model running on .NET.
+
 ## 1. Create the app
 
 Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) and use Node.js 22.12 or newer with npm for the commands below. Run `dotnet --list-sdks` to check for an installed 10.0 SDK and `node --version` to check Node.
@@ -14,7 +17,7 @@ Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.
 Run these commands in the folder where you want to create `MyApp`.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.5
+dotnet new install Inertia.Net.Templates@1.9.6
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install

@@ -1,18 +1,18 @@
 # Inertia.Net
 
-> Start with the [first-app walkthrough](https://inertia-dotnet.temtem.dev/docs/first-10-minutes) to run a starter and change a C# validation rule. Use this README as a reference for implementation and offline search.
+> Start here. This README covers setup, everyday tasks, and the full server reference. The [docs site](https://inertia-dotnet.temtem.dev) offers the same topics as shorter, searchable guides.
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.9.5** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.6** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
-**Fast.** In a benchmark where the same todo app was built in Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel, Inertia.Net
-served the most requests in every test: a server-rendered first visit to the todo list ran at 3,905 requests per second on Native
-AOT, against 1,294 for TanStack Start, 745 for Nuxt, 364 for Next.js and 337 for Laravel. With every framework's own caching on, it
-served 34,020, more than twice the next best. See [Performance](#performance) and the
-[framework comparison](https://inertia-dotnet.temtem.dev/docs/framework-comparison).
+Your C# endpoint chooses a page component and passes its data as **props** (named values). The first visit returns HTML.
+Later visits fetch a page object as JSON and update the screen without a full reload. You keep ASP.NET Core routing,
+authentication and validation; you do not need a separate API or a client-side router for these pages.
 
-## Implementation tasks
+<a id="implementation-tasks"></a>
+
+## Choose your path
 
 | Task | Reference |
 |---|---|
@@ -23,6 +23,107 @@ served 34,020, more than twice the next best. See [Performance](#performance) an
 | Follow a complete sample | [Minimal API + React](samples/MinimalApi.React/README.md), [MVC + Vue](samples/Mvc.Vue/README.md) or [FastEndpoints + Svelte](samples/FastEndpoints.Svelte/README.md) |
 | Generate contracts, inspect a visit or test a form | [TypeScript declarations](#typescript-types), [typed routes](#typed-routes), [DevTools](#devtools) and [testing](#testing) |
 | Check adapter-specific behavior | [Protocol and deliberate deviations](docs/protocol.md) and the [configuration reference](#configuration-reference) |
+| Check reference-adapter parity | [Conformance map and framework equivalents](docs/adapter-conformance.md) |
+| Work with a coding agent | [For AI agents](#for-ai-agents): files, rules, examples and checks |
+| See Inertia in action | The official [Kitchen Sink demo](https://demo-v3.inertiajs.com), with [source](https://github.com/inertiajs/demo-v3) |
+
+### At a glance
+
+| Question | Answer |
+|---|---|
+| Which Inertia client? | v3: React, Vue or Svelte. v2 is not supported. |
+| Which .NET version? | Libraries target .NET 10 and 11. Repository samples and docs run on .NET 10. |
+| Which server style? | Minimal APIs, MVC or FastEndpoints. |
+| Can I publish Native AOT? | Minimal APIs: yes. FastEndpoints: with its source generator. MVC: no. |
+| Where are the examples? | [Local sample apps](#sample-apps), plus the official Laravel/Vue Kitchen Sink above. |
+| What changed? | [Changelog](CHANGELOG.md). [Performance results](#performance) are separate from setup. |
+| License? | [MIT](LICENSE). |
+
+## First page in five minutes
+
+Install a .NET 10 SDK and Node.js 22.12+ first. In the folder where you want your app, run:
+
+```sh
+dotnet new install Inertia.Net.Templates@1.9.6
+dotnet new inertia -n MyApp --framework react
+cd MyApp
+npm install
+npm run dev
+```
+
+Keep that terminal running. In a second terminal, from `MyApp`, run `dotnet watch`.
+Open **http://localhost:5180/todos**, not the Vite address on port 5173. Try adding a todo with an empty title:
+the error comes from C# validation, without a full page reload.
+
+Use `--framework vue` or `--framework svelte` for another client. For .NET 11, install that SDK and add `--tfm net11.0`.
+For an existing project, follow [Installation](#installation), [Quick start](#quick-start), and [Client setup](#client-setup).
+
+**Check your setup:** the first visit should contain `<script data-page="app" type="application/json">`.
+A later link visit should return JSON with `X-Inertia: true`. If it does not, check the
+[root template](#the-root-template), [client setup](#client-setup), and [troubleshooting](#troubleshooting-and-faq).
+
+## How do I…?
+
+| Task | Guide |
+|---|---|
+| Share the signed-in user | [Shared data](#shared-data) |
+| Submit a form and show errors | [Validation](#validation-and-error-bags) |
+| Show a one-time success message | [Flash data](#flash-data) |
+| Load a slow query after the page opens | [Deferred props](#deferred-props) |
+| Refresh only part of the page | [Partial reloads](#partial-reloads) |
+| Append results without duplicates | [Merging props](#merging-props) |
+| Reuse a value across visits | [Once props](#once-props) |
+| Add numbered pages or a scrolling feed | [Pagination](#pagination), [infinite scroll](#infinite-scroll) |
+| Push a live update | [Live props](#live-props) |
+| Render HTML on the server | [SSR](#server-side-rendering) |
+| Test a page | [Testing](#testing) |
+| Handle a missing page or server error | [Error pages](#error-pages) |
+| Add a CSP nonce or deploy behind a proxy | [CSP](#content-security-policy), [proxy setup](#deploying-behind-a-proxy) |
+| Run several apps or publish AOT | [Mounts](#multiple-apps-and-libraries), [Native AOT](#native-aot) |
+
+## For AI agents
+
+For **building an app**, start with the [template](#start-a-new-app), choose one server/client pair, and follow a matching
+[sample](#sample-apps). Use Inertia `Link`, `router` and `useForm`; pass page data through props rather than adding a second
+JSON API. The docs also have [plain-text indexes](docs/Inertia.Net.Docs/wwwroot/llms.txt) and
+[full text](docs/Inertia.Net.Docs/wwwroot/llms-full.txt).
+
+For **changing this adapter**, read [AGENTS.md](AGENTS.md), then [docs/protocol.md](docs/protocol.md), then the relevant section here.
+Repository rules take precedence. The protocol reference records intentional differences from Laravel; do not silently remove them.
+
+| Change | Start here | Regression tests |
+|---|---|---|
+| Page object or prop resolution | `src/Inertia.Net/InertiaPageWriter.cs`, `PropsWriter.cs`, `InertiaProp.cs` | `PageWriterTests`, `PropsResolverTests`, `ResponseTests`, `AdapterParityTests` |
+| Headers, versions or redirects | `src/Inertia.Net/InertiaMiddleware.cs`, `InertiaBackResult.cs` | `ProtocolConformanceTests`, `MiddlewareCompositionTests` |
+| Shared data, errors or flash | `InertiaOptions.cs`, `InertiaFeature.cs`, `ErrorsResolver.cs`, `InertiaStateStore.cs` under `src/Inertia.Net/` | `PageWriterTests`, `StateStoreTests`, `ValidationNamingTests`, `AdapterParityTests` |
+| SSR | `src/Inertia.Net/SsrGateway.cs`, `SsrNodeProcess.cs`, `SsrEndpoint.cs` | `SsrGatewayTests`, `SsrResilienceTests`, `SsrNodeProcessTests` |
+| Vite or root HTML | `src/Inertia.Net/ViteAssets.cs`, `RootTemplateView.cs` | `ViteAssetsTests`, `RootTemplateTests`, `MvcTests` |
+| DevTools | `src/Inertia.Net/InertiaDevTools.cs` | `DevToolsTests`, `DevToolsRecorderTests` |
+| Testing helpers | `src/Inertia.Net.Testing/` | `tests/Inertia.Net.Testing.Tests/` |
+| Documentation | `README.md`, `docs/Inertia.Net.Docs/content/docs/` | Docs client build; check examples and links |
+
+Unit tests live in `tests/Inertia.Net.Tests/`; HTTP tests in `tests/Inertia.Net.IntegrationTests/`.
+The shared conformance suite runs against Minimal API, MVC and FastEndpoints hosts.
+
+**Keep these rules:** build HTML and JSON from one page-object path; filter before running loaders; preserve existing `Vary`;
+encode empty errors as `{}`; escape embedded JSON so it cannot close its script; never append a second page script after SSR.
+Keep user JSON contracts source-generated for AOT. A page may explicitly override `errors`; do not turn that into a forced merge.
+`OnCompleted` is not status-gated in ASP.NET Core. Do not copy Laravel-specific callback suppression into this adapter.
+
+**Before finishing**, run from the repository root:
+
+```sh
+dotnet build Inertia.Net.slnx -c Release -warnaserror
+dotnet test --solution Inertia.Net.slnx -c Release --no-build
+```
+
+For serialization/AOT changes, also run `bash eng/aot-smoke.sh`. For client changes, follow
+[samples/README.md](samples/README.md) and `.github/workflows/ci.yml`. Redis/MongoDB tests need their service URLs.
+For docs changes, run `bun install --frozen-lockfile` then `bun run build` from `docs/Inertia.Net.Docs`.
+Report actual results and skipped checks. Never invent a passing result or add assistant attribution.
+
+When adding protocol behavior: check the upstream specification, update `docs/protocol.md`, reuse the existing writer/helpers,
+add unit and conformance tests, document the public API, and update `CHANGELOG.md`. Do not change versions unless a release is requested.
 
 ## Contents
 
@@ -125,7 +226,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Install the template once.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.5
+dotnet new install Inertia.Net.Templates@1.9.6
 ```
 
 Run the command for your frontend, then change into the new app directory with `cd MyApp`.
@@ -215,7 +316,7 @@ Read the docs at [inertia-dotnet.temtem.dev](https://inertia-dotnet.temtem.dev).
 
 - [x] Page object: `component`, `props`, `url`, `version`; JSON responses and the initial `<script data-page="app" type="application/json">` payload
 - [x] Asset versioning with a `409` + `X-Inertia-Location` (checked before your handler runs)
-- [x] `Vary: X-Inertia`, 302 to 303 for PUT/PATCH/DELETE, fragment redirects (`X-Inertia-Redirect`), `Location()`, `Back()`, and
+- [x] `Vary: X-Inertia`, 302 to 303 for PUT/PATCH/DELETE/QUERY, fragment redirects (`X-Inertia-Redirect`), `Location()`, `Back()`, and
   redirects to another origin turned into `409` + `X-Inertia-Location`
 - [x] Partial reloads (`only`, `except`, nested dot paths), `Always`, `Optional`, lazy loaders, opt-in parallel loaders
 - [x] Deferred props with groups (`deferredProps`)
@@ -254,17 +355,17 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.5
-dotnet add package Inertia.Net.Mvc --version 1.9.5 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.5 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.5 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.5 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.5 # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.5 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.5 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.6
+dotnet add package Inertia.Net.Mvc --version 1.9.6 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.6 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.6 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.6 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.6 # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.6 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.6 # MongoDB pagination
 ```
 
-Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.5` for all Inertia.Net packages. Inertia.Net 1.9.5 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.6` for all Inertia.Net packages. Inertia.Net 1.9.6 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -477,7 +578,9 @@ Inertia.Net speaks the v3 protocol: the initial page is the `<script data-page="
 | Vue | `vue @vitejs/plugin-vue @inertiajs/vue3@^3` |
 | Svelte | `svelte @sveltejs/vite-plugin-svelte @inertiajs/svelte@^3` |
 
-Add `vite typescript @types/node` as development dependencies using your package manager's command above. `@types/node` provides the types for `node:fs` and `process` used by the Vite config below. The page resolver and `import.meta.glob` types come from `vite/client`, so list it in `tsconfig.json`:
+Add `vite typescript @types/node` as development dependencies using your package manager's command above.
+For React, also add `@types/react @types/react-dom`. `@types/node` provides the types for `node:fs` and `process` used by
+the Vite config below. The page resolver and `import.meta.glob` types come from `vite/client`, so list it in `tsconfig.json`:
 
 ```json
 {
@@ -1101,6 +1204,8 @@ Register `UsersPage` and its value types in your `JsonSerializerContext` (see [N
 **Dot keys.** A top-level key containing dots is unpacked: `["user.name"] = "Ann"` becomes `"user": { "name": "Ann" }`.
 
 **BigInteger safety.** With `o.PreserveBigIntegers = true`, integers beyond ±(2^53 − 1) are written as `{"$bigint":"9007199254740993"}` and the page gets `"preserveBigIntegers": true`.
+The default is false. Use the handler fragment `Render("Orders/Show", props).PreserveBigIntegers()` to opt in for one response,
+or `.PreserveBigIntegers(false)` to opt out. Both props and flash follow that response's setting.
 
 ---
 
@@ -1353,6 +1458,10 @@ Register each closed page type, such as `[JsonSerializable(typeof(Page<PostDto>)
 
 ## Live props
 
+**Broadcast prop definitions:** resolve them with `await BroadcastPropsAsync(http, props)`, then pass the returned
+JSON object to `IInertiaLive.PublishAsync`. Optional, deferred and once values resolve regardless of visit filters;
+rescued values are omitted, dot-path keys stay flat, and no page/DevTools entry is created.
+
 A live prop refreshes itself when the server broadcasts an event. The page response lists which props listen to which events
 (`liveProps`); the client subscribes to the channels, and when an event arrives it reloads those props with a partial reload, or
 applies the values the broadcast carries without a request. Nothing to subscribe or tear down in your components.
@@ -1545,7 +1654,7 @@ app.MapPost("/users", (CreateUserInput input, AppDb db) =>
 app.MapGroup("/admin").WithInertiaValidation().MapPost("/roles", (RoleInput input) => Results.Redirect("/admin/roles"));
 ```
 
-For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
+For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE/QUERY) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
 
 **Why not just rely on `AddValidation()`?** The built-in .NET 10 validation filter is added automatically and always runs outermost: it writes the 400 itself before any filter you add can see it, so it cannot be wrapped. `WithInertiaValidation()` disables it on the endpoint and runs the same source-generated validation itself. Do not combine it with your own `.DisableValidation()` call.
 
@@ -1650,6 +1759,10 @@ const form = useForm({ name: '', email: '' }).withPrecognition('post', '/users')
 
 ## Flash data
 
+To remove messages before rendering or redirecting, use the handler fragment
+`http.Inertia().ForgetFlashed("toast", "user.name")`. Exact dotted keys take precedence over nested paths.
+This works for restored flash too, and does not extend the lifetime of remaining messages.
+
 Flash data is carried across the redirect (and any further redirects) and consumed by the next response that is not a redirect. It appears as `page.flash`, only when there is some.
 
 ```csharp
@@ -1697,11 +1810,11 @@ What `UseInertia()` does for Inertia requests:
 
 | Situation | Result |
 |---|---|
-| 302 for PUT, PATCH or DELETE | changed to **303 See Other**, so the browser follows with a GET |
+| 302 for PUT, PATCH, DELETE or QUERY | changed to **303 See Other**, so the browser follows with a GET |
 | Redirect to another origin (scheme, host or port), and the request is not a prefetch | `409` with `X-Inertia-Location: <url>`: the client makes a full visit instead of following it with XHR, which the browser would block. Turn it off with `o.ConvertExternalRedirects = false`. |
 | Redirect whose `Location` contains `#`, and the request is not a prefetch | `409` with `X-Inertia-Redirect: <url>` (the client performs a full visit that keeps the fragment) |
 | `Location(url)` | `409` with `X-Inertia-Location: <url>` for Inertia requests, a plain `302` otherwise |
-| An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE), using the same previous-URL and app-root fallback as `Back()` |
+| An empty `200` response | redirect back (302, or 303 for PUT/PATCH/DELETE/QUERY), using the same previous-URL and app-root fallback as `Back()` |
 | `Back()` | `302` to the `Referer` when it is an http(s) URL with the request's own host and port, otherwise the opt-in previous URL, then the fallback (default `~/`, the app root including `PathBase`) |
 
 The same-origin rule on `Referer` exists so `Back()` cannot become an open redirect. The scheme is not compared, so it keeps working behind a TLS-terminating proxy. On an HTTPS request an `http` Referer is upgraded to `https`, so going back never downgrades the connection.
@@ -1929,6 +2042,11 @@ When an Inertia **GET** carries a different `X-Inertia-Version`, the server answ
 ---
 
 ## Server-side rendering
+
+**Failure monitoring:** set `o.Ssr.OnRenderFailed = failure => ...` during registration. The thread-safe callback receives
+`SsrRenderFailed` (error, type, hint, timestamp, component, URL and optional renderer details) once for the final failed
+attempt, before fallback or a Required-mode exception. Callback failures are logged, not sent to the browser.
+Policy skips still use logs/metrics. Treat diagnostics as private: they may contain renderer paths or secrets.
 
 SSR renders the first visit on a Node server using your client bundle, so crawlers and slow devices get HTML.
 
@@ -2620,6 +2738,9 @@ Inertia.Net ships an analyzer. INERTIA001 reports two page records that claim on
 
 ## DevTools
 
+The inspector reports absolute request URLs and the application base path. Its read API leaves pending flash/errors untouched.
+Entries are in memory; source-call locations (`renderSource`, `shareSource`, `actionSource`) are not collected.
+
 The [Inertia DevTools](https://inertiajs.com/docs/v3/advanced/devtools) browser extension shows every visit, its props, headers and the
 page state. Inertia.Net implements its server protocol:
 
@@ -2655,6 +2776,13 @@ by default). Outside Development there is no check and no file access.
 ---
 
 ## Testing
+
+**Page files:** construct `AssertableInertia(page, options)` with `InertiaTestingOptions`; set `EnsurePagesExist = true`
+and add your page folders to `PageDirectories`. `Component(name, false)` skips the check; `true` forces it.
+Default extensions include React, Vue and Svelte files. Matching is case-sensitive.
+
+**Large integers:** when the page sets `preserveBigIntegers`, `Where` and `HasFlash` compare markers as integers,
+including nested values, without changing `InertiaPage.Raw`.
 
 The response helpers also parse non-2xx Inertia pages; use `.Status(404)` in an assertion to check an error page’s HTTP status.
 
@@ -2834,6 +2962,7 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `RootElementId` | `"app"` | Id of the root element and the `data-page` script. |
 | `Version` | `null` | Asset version. `null` = hash of the Vite manifest, or `""` without one. |
 | `VersionResolver` | `null` | `Func<HttpContext, string?>` per-request version; wins over `Version` when non-null. |
+| `ComponentTransformer` | `null` | `Func<string, string?>` changes a component name before rendering and page-file checks; null keeps the name. |
 | `EncryptHistory` | `false` | Encrypt browser history state of every page. |
 | `WithAllErrors` | `false` | Send every validation message per field instead of the first. |
 | `PreserveBigIntegers` | `false` | Emit integers beyond ±(2^53−1) as `{"$bigint":"..."}` and set `preserveBigIntegers`. |
@@ -2845,6 +2974,9 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `TypeScript.OutputPath`, `.RoutesOutputPath`, `.Page<T>(component)`, `.Page<TPage>()`, `.PagesFrom(assembly)`, `AddGeneratedPages()`, `.SharedProps<T>()`, `.FlashData<T>()`, `.LiveEvents(...)` | `null` | TypeScript declarations and typed routes, written in Development, with `--inertia-types`, or on build with `InertiaGenerateTypesOnBuild`. |
 | `Share(key, value)` / `Share(key, Func<HttpContext, object?>)` / `Share<T>(key, Func<HttpContext, T>)` | none | Shared props. |
 | `Head.PropName` / `Head.TitleTemplate` | `"head"` / `null` | The prop that carries [server head tags](#head-tags), and the title format. |
+
+`ComponentTransformer` affects runtime rendering only. If you use it, register the final client component names in TypeScript
+configuration too; build-time generation cannot run an arbitrary runtime callback.
 
 ### `o.Pagination`: `PaginationOptions`
 
@@ -2870,6 +3002,8 @@ Most per-request allocation in a real handler is the props you build, not the re
 | `PrefetchConcurrency` | `3` | Chunks `Waterfall` downloads at a time. |
 
 ### `o.Ssr`: `SsrOptions`
+
+`OnRenderFailed` defaults to null. Set a thread-safe `Action<SsrRenderFailed>` to send final failed-render diagnostics to monitoring.
 
 | Option | Default | Description |
 |---|---|---|
@@ -2964,7 +3098,7 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | `Render(component, props?)` / `Render<TPage>(page)` | `InertiaResult`: `.WithHead(h => ...)`, `.WithStatusCode(int)`, `.WithRootView(string)`, `.WithViewData(key, value)`, `.WithSsr(SsrMode)`, `.WithoutSsr()`, `.WithSsrCache(TimeSpan[, staleFor])`. |
 | `Location(url)` | `InertiaLocationResult`. |
 | `Back(fallback = "~/")` | `InertiaBackResult`: `.WithErrors(errors, bag = "default")`, `.WithFlash(key, value)`. |
-| `httpContext.Inertia()` | `InertiaFeature`: `Share`, `Flash`, `WithErrors`, `ClearHistory`, `EncryptHistory(bool = true)`, `PreserveFragment`, `Head`, `PreviousUrl`, `Mount`. |
+| `httpContext.Inertia()` | `InertiaFeature`: `Share`, `Flash`, `ForgetFlashed`, `WithErrors`, `ClearHistory`, `EncryptHistory(bool = true)`, `PreserveFragment`, `Head`, `PreviousUrl`, `Mount`. |
 | `Send.InertiaAsync(component, props?)`, `Send.InertiaAsync(page)`, `Send.InertiaLocationAsync(url)`, `Send.InertiaBackAsync(fallback = "~/")` | FastEndpoints `Send` extensions. |
 
 Extension points: `IInertiaRootView`, `IInertiaStateStore`, `IInertiaCache`, `IInertiaCacheStore`, `IInertiaLive`, `IInertiaPage`, `ILiveChannelAuthorizer`, `ViteAssets`, `InertiaRequest` (the parsed headers), `InertiaHeaders` (header name constants), `InertiaSsrException`, `InertiaSsr.HttpClientName` (the SSR HTTP client), `InertiaDiagnostics` (meter and activity source names).

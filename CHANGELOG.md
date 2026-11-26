@@ -7,6 +7,46 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.6] - 2026-11-26
+
+### Fixed
+
+- Inertia `QUERY` requests now follow redirects with `GET`: both ordinary `302` redirects and empty-`200` redirects become `303`,
+  matching PUT, PATCH and DELETE. This also covers `Back()` and rate-limit redirects.
+- DevTools reads no longer consume pending flash data or validation errors. Entries report absolute request URLs, and discovery
+  reports the base path for apps hosted under a subdirectory.
+- DevTools prop metadata uses boolean `once` and `live` flags, records always/optional types and merge resets, and includes the
+  direction for deep merges. The page's `liveProps` still carries listener details.
+
+### Added
+
+- `HttpContext.Inertia().ForgetFlashed(...)` removes current or restored flash values, including nested paths. Literal dotted
+  keys take precedence; remaining values keep their normal lifetime.
+- `Render(...).PreserveBigIntegers(bool)` overrides the global setting for one response. Props, cached props and flash follow the
+  same choice. Cached numbers can be reused by responses with either setting.
+- `BroadcastPropsAsync(http, props)` resolves prop definitions for `IInertiaLive.PublishAsync`, without visit filters or initial-load
+  exclusions. Rescued values are omitted and dot-path keys stay flat.
+- `Ssr.OnRenderFailed` receives typed diagnostics once before fallback or a Required-mode exception. Callback failures are logged
+  without changing the response. Do not expose renderer diagnostics to end users.
+- `InertiaTestingOptions` enables optional page-file existence checks. Normal prop/flash assertions decode `$bigint` markers only
+  when the page enables preservation; the raw page stays unchanged.
+- `InertiaOptions.ComponentTransformer` optionally transforms component names before rendering and page-file checks.
+
+### Documentation
+
+- A README quick start that works without the site, task-based navigation, and an agent guide with source/test locations and
+  verification commands. Existing feature/reference anchors are preserved.
+- Simpler setup and feature guides, updated plain-text/search indexes, and the `#155dfd` docs accent with readable dark-mode links.
+- The official Inertia.js v3 **Kitchen Sink** demo is linked as the upstream Laravel/Vue learning reference, separately from the
+  runnable .NET samples.
+
+### Compatibility notes
+
+- No framework or package dependencies changed. All packages use version 1.9.6.
+- DevTools consumers must read `once` and `live` as booleans. Listener details remain in the recorded page object's `liveProps`.
+- Native .NET completion callbacks run regardless of HTTP status. Unlike Laravel, no callback-suppression middleware is needed.
+  A version-mismatch response still skips the handler, so its callbacks are never registered.
+
 ## [1.9.5] - 2026-11-20
 
 ### Security

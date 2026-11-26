@@ -1,0 +1,53 @@
+---
+title: Learn from Kitchen Sink
+description: Explore the official Inertia.js v3 demo, then use the same ideas in ASP.NET Core.
+section: Get started
+order: 7
+---
+
+The official Inertia.js v3 sample application is **Kitchen Sink**. It combines a small CRM with pages that show forms,
+navigation, deferred data, prefetching, state, layouts and error handling.
+
+- [Open the live demo](https://demo-v3.inertiajs.com)
+- [Read the source](https://github.com/inertiajs/demo-v3)
+- [Read Inertia's demo guide](https://inertiajs.com/docs/v3/getting-started/demo-application)
+
+Kitchen Sink uses **Laravel and Vue**, not Inertia.Net. Its client-side patterns still apply: the server chooses a page,
+passes props, validates forms and redirects after submissions. Replace the Laravel handler with a C# endpoint.
+The public demo resets its database every midnight; use it respectfully and do not enter private information.
+
+## Pick one flow to learn
+
+| Try this in Kitchen Sink | Then read this .NET guide |
+|---|---|
+| Open a page and follow a link | [Pages and responses](/docs/pages-and-responses) |
+| Submit an invalid form | [Validation and errors](/docs/validation-and-errors) |
+| Show a message after saving | [Flash data](/docs/flash-data) |
+| Load a slow section after the page opens | [Deferred props](/docs/deferred-props) |
+| Refresh only one list | [Partial reloads](/docs/partial-reloads) |
+| Append another page of results | [Infinite scroll](/docs/infinite-scroll) |
+| Show a friendly error page | [Error pages](/docs/error-pages) |
+
+## Translate the server, keep the idea
+
+These are handler fragments, not complete application files:
+
+```php
+// Kitchen Sink's server-side pattern (Laravel)
+return Inertia::render('Contacts/Index', ['contacts' => $contacts]);
+```
+
+```csharp
+// The same pattern in an ASP.NET Core handler
+return Render("Contacts/Index", new InertiaProps { ["contacts"] = contacts });
+```
+
+For a runnable .NET example, use this repository's [sample apps](https://github.com/adzamkomladev/Inertia.Net/tree/main/samples), or create a starter with
+[First 10 minutes](/docs/first-10-minutes). The samples exercise Minimal APIs with React, MVC with Vue,
+and FastEndpoints with Svelte. Kitchen Sink is the upstream learning reference; these samples show the .NET setup.
+
+## Check the whole request, not just the JSON
+
+When you add a feature, check that the first visit works, a link updates the page without reloading the document,
+an invalid form shows errors, a partial reload sends only the selected props plus always props, and an asset-version
+change triggers a full reload. These checks catch problems that a JSON snapshot alone can miss.

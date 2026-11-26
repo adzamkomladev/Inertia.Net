@@ -36,11 +36,11 @@ This cookie is used with both cookie and session state stores. It is **per brows
 
 | Situation | Result |
 |---|---|
-| 302 for PUT, PATCH or DELETE | Changed to **303 See Other**, so the browser follows with a GET |
+| 302 for PUT, PATCH, DELETE or QUERY | Changed to **303 See Other**, so the browser follows with a GET |
 | Redirect to another origin, non-prefetch | `409` with `X-Inertia-Location`: the client makes a full visit instead of an XHR the browser would block |
 | Redirect whose `Location` contains `#`, non-prefetch | `409` with `X-Inertia-Redirect`: the client performs a full visit that keeps the fragment |
 | `Location(url)` | `409` + `X-Inertia-Location` for Inertia requests, a plain `302` otherwise |
-| Empty `200` response | Redirect back (302, or 303 for PUT/PATCH/DELETE), using the same previous-URL and app-root fallback as `Back()` |
+| Empty `200` response | Redirect back (302, or 303 for PUT/PATCH/DELETE/QUERY), using the same previous-URL and app-root fallback as `Back()` |
 | `Vary` | `Vary: X-Inertia` is added to every response through the middleware |
 
 Turn off external redirect conversion with `o.ConvertExternalRedirects = false` if the app intentionally redirects to another origin.

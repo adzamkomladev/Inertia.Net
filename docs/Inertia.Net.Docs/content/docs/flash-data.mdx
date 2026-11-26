@@ -5,6 +5,8 @@ section: Essentials
 order: 5
 ---
 
+Flash data is a message or value for the next page, such as “Contact saved.” Unlike shared props, it is not kept in browser history.
+
 Flash data is carried across the redirect (and any further redirects) and consumed by the next response that is not a redirect. It appears as `page.flash`, only when there is some.
 
 ```csharp
@@ -81,6 +83,12 @@ return Back().WithFlash("old", new InertiaProps { ["email"] = email });
 ```
 
 On the next page, read `flash.old` from the page and use the email to refill the field. Never flash passwords, tokens or other secrets.
+
+## Remove a flash value
+
+In a handler, call `http.Inertia().ForgetFlashed("toast", "user.name")` before rendering or redirecting.
+This removes values set in this request or restored from a previous one. An exact key such as `"user.name"` wins over
+the nested path. If no flash values remain, the page has no `flash` field. The remaining values still expire normally.
 
 ## Where state is kept
 

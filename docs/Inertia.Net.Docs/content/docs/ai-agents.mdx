@@ -7,6 +7,17 @@ order: 6
 
 An Inertia.Net app is a good fit for coding agents. The backend and the frontend live in one project, a feature follows one request path (endpoint, props, page component), and there is no API contract or client router for the agent to keep in sync. The main thing an agent needs is to know the conventions. This page gives you that context in a form you can paste into your project.
 
+## Choose the right reference
+
+- **Building an app?** Start with [First 10 minutes](/docs/first-10-minutes), then read the guide for the feature you need.
+- **Changing the adapter?** Read the repository's `AGENTS.md`, `docs/protocol.md`, and the README's **For AI agents** section.
+  They explain the source files, tests and protocol rules. Do not apply repository-maintenance rules to an unrelated consuming app.
+- **Looking for a complete Inertia example?** Use [Kitchen Sink](/docs/kitchen-sink), the official v3 demo. Its Laravel
+  handlers need to be translated to C#; the client-side Inertia patterns are the reference.
+
+Keep examples honest: name the file being changed, say whether a snippet is a complete file or a fragment, and run the checks
+you report. Do not guess API names from another server adapter.
+
 ## Point the agent at the docs
 
 The documentation is published as plain text for language models:
@@ -35,7 +46,7 @@ This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inerti
   from `Inertia.Net.Inertia`. Write them unqualified.
 - Props: use `Defer(ct => ...)` for slow data, `Optional(() => ...)` for data loaded only on
   partial reloads, `Merge(...)` for paginated lists and `Once(...)` for data the client can keep.
-- Forms: POST/PUT/PATCH/DELETE endpoints validate with `.WithInertiaValidation()` (Minimal API),
+- Forms: POST/PUT/PATCH/DELETE/QUERY endpoints validate with `.WithInertiaValidation()` (Minimal API),
   the MVC filter or `c.ConfigureInertia()` (FastEndpoints), then redirect. On success return a redirect
   or `Back()`. Report custom errors with `Back().WithErrors(...)`. Use `Back().WithFlash(...)` for messages.
 - Keep antiforgery on: `app.UseInertiaAntiforgery()` is required for unsafe requests.
@@ -43,7 +54,8 @@ This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inerti
   `o.TypeScript.Page<T>("Component")` so the TypeScript types stay generated, not hand written.
 - Test pages with `Inertia.Net.Testing`: `client.InertiaGetAsync(url)` then
   `response.AssertInertiaAsync(page => page.Component(...).Has(...))`.
-- Before finishing: `dotnet build`, `dotnet test`, and the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`) (type-checks the client).
+- Before finishing: `dotnet build`, `dotnet test`, and the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`).
+  Check that the script includes type checking; `vite build` alone does not. Run the framework's type-check command separately if needed.
 ````
 
 If you use Vue or Svelte, change the component path and extension.

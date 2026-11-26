@@ -179,6 +179,24 @@ What a broadcaster delivers:
 }
 ```
 
+## Resolve values for a broadcast
+
+Use plain values with `IInertiaLive.PublishAsync` when you already have the data. If you have prop definitions instead,
+resolve them first. This handler fragment assumes `http`, `orders`, `id`, `live`, `orderUpdated` and `ct` are in scope:
+
+```csharp
+var values = await BroadcastPropsAsync(http, new InertiaProps
+{
+    ["order"] = Prop(ct => orders.FindAsync(id, ct)),
+    ["stats.total"] = Defer(() => 42),
+});
+await live.PublishAsync(orderUpdated, values, exceptSocketId: http.InertiaRequest().SocketId, cancellationToken: ct);
+```
+
+Visit filters do not restrict a broadcast. Optional, deferred and once values all resolve; a rescued value is left out.
+Dot-path keys stay flat. No page or DevTools entry is created.
+Only publish values that every subscriber of the channel is allowed to see.
+
 ## On the client
 
 Read a live prop like any other prop. `useProp` exposes its loading state, and the cancelable `live` router event can hold an update back, for example to show a "new posts" button instead:
