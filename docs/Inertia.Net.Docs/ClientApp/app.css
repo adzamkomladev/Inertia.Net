@@ -25,7 +25,8 @@
   --border-strong: oklch(0.84 0.01 286);
   --input: oklch(0.912 0.006 286);
   --ring: #155dfd;
-  --code-bg: oklch(0.982 0.003 286);
+  /* The light syntax palette needs white to keep small keyword text above 4.5:1. */
+  --code-bg: #fff;
   --glue-fill: color-mix(in oklab, var(--primary) 11%, var(--card));
   --glue-stroke: color-mix(in oklab, var(--primary) 45%, var(--border));
   --header-bg: oklch(0.993 0.002 286 / 0.78);

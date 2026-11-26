@@ -66,3 +66,19 @@ This is a behavior map, **not a claim that every upstream test method has a lite
 Run the commands in [AGENTS.md](../AGENTS.md). The release checks include build/test, packaging, Native AOT,
 sample client/browser tests, and the documentation client/SSR build. Redis and MongoDB tests need running services.
 Release notes must report actual results; upstream API parity alone does not prove that the official client accepts a response.
+
+### v1.9.6 release checks (2026-11-26)
+
+| Check | Result |
+|---|---|
+| Release solution build with warnings as errors | Passed; 0 warnings, 0 errors |
+| Solution tests on .NET 10 and 11, with Redis and MongoDB available | 3,694 passed; 0 failed; 0 skipped |
+| Solution packaging with warnings as errors | All 9 expected NuGet packages and symbol packages created |
+| Native AOT publish and protocol smoke | Passed for both net10.0 and net11.0, including the new broadcast/flash/integer path |
+| React browser suite, SSR enabled | 32 passed |
+| Vue browser suite | 15 passed; 17 React-only checks skipped |
+| Svelte browser suite | 15 passed; 17 React-only checks skipped |
+| Docs TypeScript, client bundle and SSR bundle | Passed |
+| README local links and docs page links | No missing local targets found |
+
+These are local Linux checks. The repository CI also verifies Windows, generated templates and its own service-backed jobs.
