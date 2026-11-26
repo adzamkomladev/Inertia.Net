@@ -8,7 +8,7 @@
 #   run.sh [options]                      parity check, then the benchmark
 #   run.sh --dev                          dev-server cold start only
 #
-# Options: --frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel  --modes ssr,spa
+# Options: --frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel,golang  --modes ssr,spa
 #          Any framework id + "-tuned" (e.g. nextjs-tuned) is that app with its own caching on (BENCH_TUNED=1, see the README).
 #          nextjs-cluster, tanstack-cluster, nuxt-cluster: the plain image run as one server process per CPU (shared/cluster.mjs).
 #          --routes home,todos25,todos100,dashboard,new,create,invalid,compute,parallel
@@ -19,8 +19,9 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 DOTNET=${DOTNET:-dotnet}
+GO=${GO:-go}
 
-FRAMEWORKS=inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel
+FRAMEWORKS=inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel,golang
 MODES=ssr,spa
 ROUTES=home,todos25,todos100,dashboard,new,create,invalid,compute,parallel
 DURATION=10 WARMUP=5 CONNECTIONS=16 RATES=50,200 CPUS=2 MEMORY=2g SCALE=1,2,4 PORT=18080
@@ -118,7 +119,7 @@ prepare() { # framework -> the shared components copied in, npm packages install
   log "building $1 on the host"
   if [ -z "${PREPARED[$dir]:-}" ]; then # the JIT and AOT apps share one client build
     case $1 in
-      inertianet*) shared=ClientApp/shared ;; nextjs | nuxt) shared=shared ;; tanstack) shared=src/shared ;; laravel) shared=resources/js/shared ;;
+      inertianet* | golang) shared=ClientApp/shared ;; nextjs | nuxt) shared=shared ;; tanstack) shared=src/shared ;; laravel) shared=resources/js/shared ;;
     esac
     rm -rf "${dir:?}/$shared" && cp -r "$HERE/shared/ts" "$dir/$shared"
     (cd "$dir" && "$NPM" ci --no-audit --no-fund --loglevel=error >&2)
@@ -127,6 +128,7 @@ prepare() { # framework -> the shared components copied in, npm packages install
   fi
   case $1 in
     inertianet) "$DOTNET" publish "$dir" -c Release -p:UseAppHost=false -o "$dir/publish/jit" -v quiet -nologo >&2 ;;
+    golang) (cd "$dir" && CGO_ENABLED=0 GOOS=linux "$GO" build -trimpath -ldflags='-s -w' -o publish/bench . >&2) ;;
     inertianet-aot)
       rm -rf "$dir/publish/aot"
       docker build -q -f "$dir/aot.Dockerfile" --output "type=local,dest=$dir/publish/aot" "$ROOT" >/dev/null ;;
@@ -150,7 +152,7 @@ build() { # framework mode
     case $1 in
       inertianet) target=(--target "jit-$2") ;;
       inertianet-aot) target=(--target "aot-$2") ;;
-      laravel) target=(--target "$2") ;;
+      laravel | golang) target=(--target "$2") ;;
       # Next.js, TanStack Start and Nuxt decide SSR or SPA at build time.
       nextjs | tanstack | nuxt) (cd "$dir" && BENCH_MODE=$2 BENCH_TUNED=$tuned "$NPM" run build >&2) ;;
     esac
@@ -165,6 +167,7 @@ app_env() { # framework mode cpus -> docker run -e arguments, one per line
   printf -- '-e\n%s\n' "BENCH_TUNED=$([[ $1 == *-tuned ]] && echo 1 || echo 0)"
   case $(app_id "$1") in
     inertianet*) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "DATABASE_URL=Host=$PG;Username=bench;Password=bench;Database=bench;Maximum Pool Size=10" "REDIS_URL=$REDIS:6379" ;;
+    golang) printf -- '-e\n%s\n' "BENCH_SSR=$ssr" "GOMAXPROCS=$3" "DATABASE_URL=postgres://bench:bench@$PG/bench?sslmode=disable" "REDIS_URL=redis://$REDIS:6379" ;;
     # Node sizes its worker pool from the host's CPUs, not the container's quota, so the pool gets the CPU limit (rounded up).
     # A -cluster build runs one server per CPU, each with a one-thread pool, so it too has one compute thread per CPU.
     nextjs | tanstack | nuxt)
@@ -233,7 +236,7 @@ route_path() {
 
 route_page() { case $1 in todos*) echo todos ;; parallel) echo compute ;; *) echo "$1" ;; esac; }
 
-is_inertia() { [[ $1 == inertianet* || ${1%-tuned} == laravel ]]; }
+is_inertia() { [[ $1 == inertianet* || ${1%-tuned} == laravel || ${1%-tuned} == golang ]]; }
 
 # --- The new-todo form: POST /todos (Inertia apps: 303 back to the form) or POST /api/todos (Node apps: 201, or 422 with errors) ---
 VALID='{"title":"Buy milk","priority":2,"assignee":"ada","due":"2026-06-01"}'
@@ -358,7 +361,7 @@ name() {
   local n
   case $(app_id "$1") in
     inertianet) n="Inertia.Net (JIT)" ;; inertianet-aot) n="Inertia.Net (Native AOT)" ;; nextjs) n=Next.js ;;
-    tanstack) n="TanStack Start" ;; nuxt) n=Nuxt ;; laravel) n="Laravel (Octane, FrankenPHP)" ;;
+    tanstack) n="TanStack Start" ;; nuxt) n=Nuxt ;; laravel) n="Laravel (Octane, FrankenPHP)" ;; golang) n="Go (Gin, GORM)" ;;
   esac
   [[ $1 == *-cluster ]] && n="$n (cluster)"
   if [[ ${1%-cluster} != *-tuned ]]; then echo "$n"; elif [[ $n == *')' ]]; then echo "${n%)}, tuned)"; else echo "$n (tuned)"; fi
@@ -468,6 +471,7 @@ bench_dev() {
   echo "|---|---|---:|" >>"$WORK/dev.md"
   for fw in ${FRAMEWORKS//,/ }; do
     [ "$fw" = inertianet-aot ] && continue
+    [ "$fw" = golang ] && { log "golang has no dev-server image; skipping"; continue; }
     local cmd ms
     case $fw in
       inertianet) cmd="dotnet watch + vite" ;; nextjs) cmd="next dev" ;; tanstack) cmd="vite dev" ;; nuxt) cmd="nuxt dev" ;; laravel) cmd="php artisan serve + vite" ;;
@@ -480,7 +484,7 @@ bench_dev() {
 
 services_up
 if [ "$DEV" = 1 ]; then
-  for fw in ${FRAMEWORKS//,/ }; do [ "$fw" = inertianet-aot ] || build "$fw" dev; done
+  for fw in ${FRAMEWORKS//,/ }; do [ "$fw" = inertianet-aot ] || [ "$fw" = golang ] || build "$fw" dev; done
   bench_dev
   mkdir -p "$(dirname "$OUT")"
   { echo "## Dev-server cold start"; echo; cat "$WORK/dev.md"; } | tee "$OUT"

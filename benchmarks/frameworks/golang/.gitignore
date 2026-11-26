@@ -1,0 +1,5 @@
+ClientApp/shared/
+node_modules/
+public/
+ssr/
+publish/

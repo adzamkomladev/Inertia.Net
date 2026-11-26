@@ -1,6 +1,6 @@
 # Framework comparison
 
-The same small app, built five ways, measured the same way:
+The same small app, built six ways, measured the same way:
 
 | App | Stack | Folder |
 |---|---|---|
@@ -9,6 +9,7 @@ The same small app, built five ways, measured the same way:
 | TanStack Start | TanStack Start 1.169.5 on Vite 8 with the `nitro/vite` plugin (Node server) | `tanstack/` |
 | Nuxt | Nuxt 4.6.4 (Vue 3.5.45) on Nitro 2.13.6, `node-server` preset | `nuxt/` |
 | Laravel | Laravel 13 (framework 13.42.0) + inertia-laravel 3.7.0 + React, served by Laravel Octane 2.24.0 on FrankenPHP 1.13.5 (worker mode) | `laravel/` |
+| Go | Go 1.26 + Gin 1.12 + GORM 1.31 (pgx driver) + gonertia 3.0 + React, built as one static binary | `golang/` |
 
 Every app shows the same React pages, written in TypeScript (`shared/ts/*Page.tsx`, copied into each app at build time), except Nuxt, which renders Vue ports of those pages (`nuxt/app/components`) with the same markup. Each app
 reads the same Postgres tables (`shared/schema.sql`) through the ORM its community normally uses, caches the dashboard in Redis
@@ -20,19 +21,25 @@ measured.
 
 The aim is that each app looks like what a team would write in that framework, not the fastest code each one could run.
 
-| | Inertia.Net | Laravel | Next.js | TanStack Start | Nuxt |
-|---|---|---|---|---|---|
-| Data access | EF Core 10 (Npgsql provider), paging with `Inertia.Net.EntityFrameworkCore`'s `ToPageAsync` | Eloquent models | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres |
-| Dashboard cache (60 s, Redis) | Inertia.Net's prop cache, `InertiaProp.Cache("dashboard", ...)`, on the `Inertia.Net.Redis` store | `Cache::remember` on the Redis store | A `'use cache: remote'` function with a Redis cache handler (Cache Components) | Nitro's `defineCachedFunction`, with Nitro's storage mounted on Redis (unstorage's Redis driver) by a Nitro plugin | Nitro's `defineCachedFunction`, with Nitro's storage mounted on Redis (unstorage's Redis driver) by a Nitro plugin |
-| Form validation | .NET 10 validation (`AddValidation()`, `IValidatableObject`) with `WithInertiaValidation()` | A Form Request | zod | zod | zod |
-| Form endpoint | `POST /todos`, Inertia redirect back with errors | `POST /todos`, Inertia redirect back with errors | `POST /api/todos` route handler: 201, or 422 with errors | `POST /api/todos` server route: 201, or 422 with errors | `POST /api/todos` Nitro server route: 201, or 422 with errors |
-| Request forgery protection | Antiforgery with the `XSRF-TOKEN` cookie (as in the Inertia.Net template) | CSRF with the `XSRF-TOKEN` cookie, cookie sessions | None by default for route handlers | None by default for server routes | None by default for server routes |
+| | Inertia.Net | Laravel | Next.js | TanStack Start | Nuxt | Go |
+|---|---|---|---|---|---|---|
+| Data access | EF Core 10 (Npgsql provider), paging with `Inertia.Net.EntityFrameworkCore`'s `ToPageAsync` | Eloquent models | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres | Drizzle ORM on node-postgres | GORM 1.31 on the pgx driver |
+| Dashboard cache (60 s, Redis) | Inertia.Net's prop cache, `InertiaProp.Cache("dashboard", ...)`, on the `Inertia.Net.Redis` store | `Cache::remember` on the Redis store | A `'use cache: remote'` function with a Redis cache handler (Cache Components) | Nitro's `defineCachedFunction`, with Nitro's storage mounted on Redis (unstorage's Redis driver) by a Nitro plugin | Nitro's `defineCachedFunction`, with Nitro's storage mounted on Redis (unstorage's Redis driver) by a Nitro plugin | A direct `GET`/`SET bench:dashboard` with go-redis |
+| Form validation | .NET 10 validation (`AddValidation()`, `IValidatableObject`) with `WithInertiaValidation()` | A Form Request | zod | zod | zod | Hand-written rules, the same four messages, stored through gonertia's flash provider |
+| Form endpoint | `POST /todos`, Inertia redirect back with errors | `POST /todos`, Inertia redirect back with errors | `POST /api/todos` route handler: 201, or 422 with errors | `POST /api/todos` server route: 201, or 422 with errors | `POST /api/todos` Nitro server route: 201, or 422 with errors | `POST /todos`, Inertia redirect back with errors |
+| Request forgery protection | Antiforgery with the `XSRF-TOKEN` cookie (as in the Inertia.Net template) | CSRF with the `XSRF-TOKEN` cookie, cookie sessions | None by default for route handlers | None by default for server routes | None by default for server routes | None by default; a session cookie only |
 
 **The Native AOT build uses plain Npgsql, not EF Core.** EF Core 10's `DbContext` is not trim- or AOT-safe (its constructor warns
 IL2026/IL3050), `ToPageAsync` builds its query inside the library where EF's query precompiler cannot see it, and the
 precompiler's interceptors do not compile with the .NET 11 SDK this repository builds with. The csproj switches to an Npgsql data
 layer (`BenchData.Npgsql.cs`, same routes and results) whenever `PublishAot=true`. This is what the Inertia.Net docs recommend for
 Native AOT apps today.
+
+**The Go app uses the stack a Go team would pick**: Gin for routing, GORM for the database, gonertia for Inertia, and go-redis for
+the dashboard cache. gonertia renders the shared React pages through the same `@inertiajs/vite` plugin as Inertia.Net; with
+`BENCH_SSR=1` it posts the page JSON to `ssr/ssr.js`, which `start.sh` runs beside the Go process. The form's four rules are
+written by hand with the same messages, and validation errors are kept in memory keyed by a session cookie until the redirect
+back to the form. gonertia itself has no CSRF protection or SSR cache, so the Go app has neither.
 
 The Next.js, TanStack Start and Nuxt forms post to a JSON route rather than a server action or server function, because a load test needs
 a stable URL to post to; a route handler is a normal way to build a form API in both.
@@ -216,7 +223,7 @@ with Inertia.Net (JIT) and the six Node builds on each route's runner. Requests 
 | `/todos/new` | The new-todo form page. |
 | `POST /todos` (`POST /api/todos` in the Node apps) | The form post: validate title, priority, assignee and due date (rules and messages in `shared/ts/rules.ts`), then insert a row into `submissions`. Measured twice: **valid** (validates and inserts) and **invalid** (fails all four rules, writes nothing). Each run reuses one session, as a user submitting the form repeatedly would. |
 | `/compute?n=20000` | CPU work: 16 batches of n/16 generated records, each sorted, grouped into 64 buckets and hashed with SHA-256; the page shows the final checksum. Same algorithm in C# (`inertianet/Compute.cs`), TypeScript (`shared/ts/compute.ts`) and PHP (`laravel/app/Support/Compute.php`). |
-| `/compute/parallel?n=20000` | The same work split across CPU cores inside one request: `Parallel.For` in C#, a `worker_threads` pool in Node. **PHP has no standard way to run threads inside a request**, so Laravel runs this route sequentially (same result, one core). PHP spreads work across cores by running several requests at once in separate workers instead. |
+| `/compute/parallel?n=20000` | The same work split across CPU cores inside one request: `Parallel.For` in C#, a `worker_threads` pool in Node, goroutines in Go. **PHP has no standard way to run threads inside a request**, so Laravel runs this route sequentially (same result, one core). PHP spreads work across cores by running several requests at once in separate workers instead. |
 
 Each route is measured twice:
 
@@ -231,6 +238,7 @@ Each route is measured twice:
 |---|---|---|
 | Inertia.Net | `BENCH_SSR=1`: the library starts and supervises one Node process (`UseNodeProcess`) that renders first visits. SSR is `Required`, so a render that fails is an error rather than a silent client-rendered page. | SSR off: the HTML holds the page JSON and React renders it in the browser. |
 | Laravel | `BENCH_SSR=1`: inertia-laravel's SSR server (`php artisan inertia:start-ssr`, one Node process). | SSR off (`INERTIA_SSR_ENABLED=0`). |
+| Go | `BENCH_SSR=1`: gonertia posts the page JSON to the Node SSR server (`ssr/ssr.js`) that `start.sh` runs beside the Go process. | SSR off: the HTML holds the page JSON and React renders it in the browser. |
 | Nuxt | The default: pages load their data with `useFetch`, which calls the `/api` routes in-process on the server. | `ssr: false` at build time: the server answers page requests with the SPA shell and the browser fetches the `/api` routes. |
 | TanStack Start | The default: loaders and components run on the server. | Start's SPA mode (`spa: { enabled: true }`) plus `defaultSsr: false`. SPA mode prerenders a shell for static hosts; on the Node server it still rendered every route until SSR was turned off, so the server now answers page requests with the shell and the browser loads the data through server functions. |
 | Next.js | Server components that query the database on every request. | **Next.js has no true SPA mode.** The nearest equivalent is used and labelled "SPA (nearest)": each page is a static shell (prerendered at build time) whose client component fetches its props from the `/api` route handler. |
@@ -271,7 +279,7 @@ Hot-reload timing in a browser is not measured (it needs a scripted browser).
 
 ## Images
 
-Every app is built on the host (`dotnet publish`, `npm ci && npm run build`), and its Dockerfile only copies the output onto an
+Every app is built on the host (`dotnet publish`, `go build`, `npm ci && npm run build`), and its Dockerfile only copies the output onto an
 Alpine runtime image, so each image holds a runtime and the built app, nothing else. Two steps run in Docker instead: the Native
 AOT publish (`inertianet/aot.Dockerfile`, in `mcr.microsoft.com/dotnet/sdk:11.0.100-alpine3.24-aot`, so the binary links against
 musl; run.sh exports the result to `inertianet/publish/aot`), and Laravel's `composer install` (a pinned build stage, as PHP is
@@ -285,32 +293,34 @@ not needed on the host).
 | TanStack Start, SSR / SPA | `node:24.22.3-alpine3.24` | Always (it is the server) |
 | Nuxt, SSR / SPA | `node:24.22.3-alpine3.24` | Always (it is the server) |
 | Laravel, SSR / SPA | `dunglas/frankenphp:1.13.5-php8.5-alpine` | SSR only |
+| Go, SSR / SPA | `alpine:3.24` | SSR only |
 
 **Every image is Alpine, so every app runs on musl libc.** musl's memory allocator can be slower than glibc's for some
 allocation-heavy workloads, so these numbers describe Alpine images; the same apps on Debian or Ubuntu images may measure
 differently.
 
 Node is in an image only when something runs JavaScript on the server: the Next.js and TanStack Start servers, and the SSR renderer
-of the two Inertia apps (Inertia.Net's managed Node process, inertia-laravel's SSR server). The SPA images of the Inertia apps have
-no Node at all. Where Node is added to a .NET or FrankenPHP image, it is Alpine's own musl build (`apk add nodejs=24.22.3-r0`, the
+of the three Inertia apps (Inertia.Net's managed Node process, inertia-laravel's SSR server, and the `ssr/ssr.js` that gonertia's
+Go app starts). The SPA images of the Inertia apps have no Node at all. Where Node is added to a .NET or FrankenPHP image, it is Alpine's own musl build (`apk add nodejs=24.22.3-r0`, the
 same Node version as the `node` images).
 
 The dev-server images (`Dockerfile.dev`, used by `--dev`) are different: they install the full toolchain and dependencies
 themselves, on the Debian-based SDK, `node` and FrankenPHP images, because they measure a developer's machine, not a deployment.
+The Go app has no dev image yet, so `--dev` skips it.
 
 ## How to run it
 
-You need Docker, `jq`, `curl`, the .NET SDK from `global.json`, and Node 24 with npm (the apps are built on the host). From the
+You need Docker, `jq`, `curl`, the .NET SDK from `global.json`, Go 1.26 (the version in `golang/go.mod`), and Node 24 with npm (the apps are built on the host). From the
 repository root:
 
 ```sh
 benchmarks/frameworks/run.sh --check        # parity check only: builds the apps and images, starts each app, compares the answers
 benchmarks/frameworks/run.sh --smoke        # parity check + very short loads: proves everything works, the numbers mean nothing
 benchmarks/frameworks/run.sh                # parity check + the full benchmark, written to artifacts/framework-bench.md
-benchmarks/frameworks/run.sh --dev          # dev-server cold start
+benchmarks/frameworks/run.sh --dev          # dev-server cold start (the Go app has no dev image yet)
 ```
 
-Options: `--frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel` (add `-tuned` or, for the Node apps, `-cluster` to an id), `--modes ssr,spa`,
+Options: `--frameworks inertianet,inertianet-aot,nextjs,tanstack,nuxt,laravel,golang` (add `-tuned` or, for the Node apps, `-cluster` to an id), `--modes ssr,spa`,
 `--routes home,todos25,todos100,dashboard,compute,parallel`, `--seconds 10`, `--warmup 5`, `--connections 16`, `--rates 50,200`,
 `--cpus 2`, `--memory 2g`, `--scale-cpus 1,2,4`, `--port 18080`, `--out <file>`, and `--keep-services` to leave Postgres and Redis
 running for the next run. Everything run.sh creates is named `inertia-bench-fw-*` and removed when it exits.
@@ -333,11 +343,12 @@ CPU each part ran on.
   renders on one thread, so SSR throughput is roughly one core's worth of rendering in every app. The `-cluster` builds run one Node
   server per CPU instead (see [The Node apps in cluster mode](#the-node-apps-in-cluster-mode)). Inertia.Net can run several SSR
   processes (`NodeProcess.Instances`); this benchmark keeps the default of one.
-- **Pools**: .NET and Node use a Postgres pool of at most 10 connections. Laravel runs two Octane workers per CPU, each with its own
+- **Pools**: .NET, Go and Node use a Postgres pool of at most 10 connections. Laravel runs two Octane workers per CPU, each with its own
   connection. Node's worker pool for `/compute/parallel` is sized to the CPU limit (`BENCH_WORKERS`), because Node counts the host's
   CPUs, not the container's; .NET reads the container's CPU limit itself.
 - **Laravel sessions**: the other apps keep no session, so Laravel uses the `array` session driver (nothing stored between requests).
-  Laravel's web middleware (cookies, CSRF token) still runs, as it would in a real app.
+  Laravel's web middleware (cookies, CSRF token) still runs, as it would in a real app. The Go app sets a session cookie, keeps form
+  errors in memory for the redirect, and has no CSRF token, as gonertia itself provides neither.
 - **Next.js renders every page per request** (`await connection()`), like the other apps. Left alone, Next.js would prerender the home
   page at build time, which would measure serving a static file.
 - **TanStack Start's Node deployment uses Nitro 3, which is still a release candidate** (3.0.261103-rc); it is what the TanStack Start
@@ -355,17 +366,17 @@ CPU each part ran on.
 
 What each stack offers out of the box or through its official packages. "Unverified" means not checked for this README.
 
-| Feature | Inertia.Net | Laravel + Inertia | Next.js | TanStack Start |
-|---|---|---|---|---|
-| Server language | C# | PHP | TypeScript | TypeScript |
-| SSR | Yes, Node or Bun process managed by the app | Yes, separate Node SSR server | Yes (React Server Components, streaming) | Yes (streaming, per-route selective SSR) |
-| Client-only (SPA) mode | Yes (SSR off) | Yes (SSR off) | No; static export or client components are the nearest | Yes (SPA mode) |
-| Typed routes in the client | Yes (generated `routes.ts`) | Yes, with Laravel Wayfinder | Yes (`typedRoutes`), unverified here | Yes (core feature) |
-| DevTools | Inertia DevTools extension | Inertia DevTools extension | Next.js dev overlay | TanStack Router Devtools |
-| Precognition (validate a form before submitting) | Yes | Yes (Laravel Precognition) | No built-in equivalent | No built-in equivalent |
-| Live props (props that refresh on a server event) | Yes (SignalR) | Yes (inertia-laravel `LiveProp`, transport unverified) | No built-in equivalent | No built-in equivalent |
-| Native AOT / single binary | Yes (Native AOT) | No (FrankenPHP can embed an app in a static binary; unverified with Octane) | No | No |
-| Hot reload in development | Vite HMR for pages, `dotnet watch` for C# | Vite HMR for pages | Turbopack fast refresh | Vite HMR |
+| Feature | Inertia.Net | Laravel + Inertia | Next.js | TanStack Start | Go + gonertia |
+|---|---|---|---|---|---|
+| Server language | C# | PHP | TypeScript | TypeScript | Go |
+| SSR | Yes, Node or Bun process managed by the app | Yes, separate Node SSR server | Yes (React Server Components, streaming) | Yes (streaming, per-route selective SSR) | Yes, a separate Node SSR server started beside the app |
+| Client-only (SPA) mode | Yes (SSR off) | Yes (SSR off) | No; static export or client components are the nearest | Yes (SPA mode) | Yes (SSR off) |
+| Typed routes in the client | Yes (generated `routes.ts`) | Yes, with Laravel Wayfinder | Yes (`typedRoutes`), unverified here | Yes (core feature) | No |
+| DevTools | Inertia DevTools extension | Inertia DevTools extension | Next.js dev overlay | TanStack Router Devtools | Inertia DevTools extension |
+| Precognition (validate a form before submitting) | Yes | Yes (Laravel Precognition) | No built-in equivalent | No built-in equivalent | No built-in equivalent |
+| Live props (props that refresh on a server event) | Yes (SignalR) | Yes (inertia-laravel `LiveProp`, transport unverified) | No built-in equivalent | No built-in equivalent | No built-in equivalent |
+| Native AOT / single binary | Yes (Native AOT) | No (FrankenPHP can embed an app in a static binary; unverified with Octane) | No | No | Yes (one static Go binary) |
+| Hot reload in development | Vite HMR for pages, `dotnet watch` for C# | Vite HMR for pages | Turbopack fast refresh | Vite HMR | Vite HMR for pages; Go has no built-in hot reload |
 
 ## Versions
 
@@ -373,6 +384,6 @@ Exact versions are pinned everywhere: npm `package.json` files with exact versio
 image tags (runtime: `node:24.22.3-alpine3.24`, `aspnet:10.0.15-alpine3.24`, `runtime-deps:10.0.15-alpine3.24`,
 `dunglas/frankenphp:1.13.5-php8.5-alpine` with Alpine's `nodejs=24.22.3-r0`; build: `sdk:11.0.100-alpine3.24-aot`, `composer:2.11.2`;
 dev: `node:24.22.3-bookworm-slim`, `sdk:11.0.100`, `aspnet:10.0.15-noble`, `dunglas/frankenphp:1.13.5-php8.5-trixie`; services:
-`postgres:18.7-bookworm`, `redis:8.8.4-alpine`). The workflow builds with Node 24.22.3 and the SDK from `global.json`. React is 19.3.1 and
+`postgres:18.7-bookworm`, `redis:8.8.4-alpine`). The workflow builds with Node 24.22.3, the SDK from `global.json` and Go 1.26. Go uses Gin 1.12.0, GORM 1.31.2 (with the pgx 5.10.0 driver), gonertia 3.0.0 and go-redis 9.24.0. React is 19.3.1 and
 `@inertiajs/react` 3.11.0 everywhere except Nuxt, which is Vue 3.5.45 with Nuxt 4.6.4 (Nitro 2.13.6, unstorage 1.17.6, ioredis 5.11.1). The Laravel image starts from the `laravel/laravel` v13.11.0 skeleton and overlays the files in
 `laravel/`; the PHP extensions are pdo_pgsql, phpredis 6.3.0 and pcntl (plus zip in the Composer stage).

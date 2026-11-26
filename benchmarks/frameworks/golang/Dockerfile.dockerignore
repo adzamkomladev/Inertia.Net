@@ -1,0 +1,6 @@
+*
+!publish
+!public/build
+!ssr
+!app.html
+!start.sh
