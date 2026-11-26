@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Neutrals carry a faint violet tint so the .NET accent reads as part of the page. */
+/* Blue is the shared accent for navigation, links, buttons and focus rings. */
 :root {
   --background: oklch(0.993 0.002 286);
   --foreground: oklch(0.21 0.012 286);
@@ -15,17 +15,18 @@
   --muted-foreground: oklch(0.47 0.014 286);
   --accent: oklch(0.955 0.008 286);
   --accent-foreground: oklch(0.21 0.012 286);
-  /* .NET brand purple (#512BD4). */
-  --primary: oklch(0.47 0.24 285);
+  --primary: #155dfd;
+  --primary-readable: #155dfd;
   --primary-foreground: oklch(0.99 0 0);
-  --primary-soft: oklch(0.955 0.028 286);
+  --primary-soft: color-mix(in srgb, #155dfd 8%, white);
   --secondary: oklch(0.962 0.005 286);
   --secondary-foreground: oklch(0.25 0.012 286);
   --border: oklch(0.912 0.006 286);
   --border-strong: oklch(0.84 0.01 286);
   --input: oklch(0.912 0.006 286);
-  --ring: oklch(0.55 0.2 285);
-  --code-bg: oklch(0.982 0.003 286);
+  --ring: #155dfd;
+  /* The light syntax palette needs white to keep small keyword text above 4.5:1. */
+  --code-bg: #fff;
   --glue-fill: color-mix(in oklab, var(--primary) 11%, var(--card));
   --glue-stroke: color-mix(in oklab, var(--primary) 45%, var(--border));
   --header-bg: oklch(0.993 0.002 286 / 0.78);
@@ -51,15 +52,16 @@
   --muted-foreground: oklch(0.72 0.012 286);
   --accent: oklch(0.235 0.014 286);
   --accent-foreground: oklch(0.95 0.004 286);
-  --primary: oklch(0.74 0.14 285);
-  --primary-foreground: oklch(0.16 0.01 286);
-  --primary-soft: oklch(0.25 0.05 286);
+  --primary: #155dfd;
+  --primary-readable: color-mix(in srgb, #155dfd 65%, white);
+  --primary-foreground: #fff;
+  --primary-soft: color-mix(in srgb, #155dfd 18%, #10141c);
   --secondary: oklch(0.215 0.01 286);
   --secondary-foreground: oklch(0.93 0.004 286);
   --border: oklch(0.265 0.012 286);
   --border-strong: oklch(0.34 0.014 286);
   --input: oklch(0.29 0.012 286);
-  --ring: oklch(0.7 0.14 285);
+  --ring: #155dfd;
   --code-bg: oklch(0.175 0.009 286);
   --glue-fill: color-mix(in oklab, var(--primary) 26%, var(--card));
   --glue-stroke: color-mix(in oklab, var(--primary) 70%, var(--card));
@@ -344,7 +346,7 @@ html.dark .shiki span {
   --tw-prose-body: color-mix(in oklab, var(--foreground) 88%, var(--background));
   --tw-prose-headings: var(--foreground);
   --tw-prose-lead: var(--muted-foreground);
-  --tw-prose-links: var(--primary);
+  --tw-prose-links: var(--primary-readable);
   --tw-prose-bold: var(--foreground);
   --tw-prose-counters: var(--muted-foreground);
   --tw-prose-bullets: color-mix(in oklab, var(--muted-foreground) 60%, transparent);

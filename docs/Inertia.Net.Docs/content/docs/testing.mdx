@@ -7,6 +7,23 @@ order: 4
 
 `Inertia.Net.Testing` has Laravel-style fluent assertions over Inertia responses and `HttpClient` helpers. It parses both JSON responses (`X-Inertia: true`) and the first-visit HTML `<script data-page>`, and decodes `$bigint` values. Failures throw `InertiaAssertionException` with a readable message, so it works with any test framework.
 
+## Check page files and large integers
+
+By default, `Component("Users/Index")` checks only the returned name. To also check the file, use this fragment inside a test:
+
+```csharp
+var options = new InertiaTestingOptions { EnsurePagesExist = true };
+options.PageDirectories.Add("ClientApp/pages"); // Use an absolute path if the test runs elsewhere.
+var page = await response.GetInertiaPageAsync();
+new AssertableInertia(page, options).Component("Users/Index");
+```
+
+React, Vue and Svelte extensions are allowed by default. Change `PageExtensions` to narrow that list.
+`Component("Users/Index", false)` skips the file check; `true` forces it.
+
+When the page enables `preserveBigIntegers`, `Where` and `HasFlash` compare `$bigint` markers as integers,
+including nested values. The raw page stays unchanged. Without that flag, markers remain ordinary objects.
+
 ```csharp
 using Inertia.Net.Testing;
 using Microsoft.AspNetCore.Mvc.Testing;

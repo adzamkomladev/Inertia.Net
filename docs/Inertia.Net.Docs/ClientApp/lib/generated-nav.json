@@ -254,6 +254,11 @@
       "order": 6,
       "headings": [
         {
+          "id": "choose-the-right-reference",
+          "text": "Choose the right reference",
+          "depth": 2
+        },
+        {
           "id": "point-the-agent-at-the-docs",
           "text": "Point the agent at the docs",
           "depth": 2
@@ -271,6 +276,31 @@
         {
           "id": "let-the-agent-check-its-own-work",
           "text": "Let the agent check its own work",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "kitchen-sink",
+      "url": "/docs/kitchen-sink",
+      "title": "Learn from Kitchen Sink",
+      "description": "Explore the official Inertia.js v3 demo, then use the same ideas in ASP.NET Core.",
+      "section": "Get started",
+      "order": 7,
+      "headings": [
+        {
+          "id": "pick-one-flow-to-learn",
+          "text": "Pick one flow to learn",
+          "depth": 2
+        },
+        {
+          "id": "translate-the-server-keep-the-idea",
+          "text": "Translate the server, keep the idea",
+          "depth": 2
+        },
+        {
+          "id": "check-the-whole-request-not-just-the-json",
+          "text": "Check the whole request, not just the JSON",
           "depth": 2
         }
       ]
@@ -328,6 +358,16 @@
       "section": "Essentials",
       "order": 2,
       "headings": [
+        {
+          "id": "choose-how-to-load-data",
+          "text": "Choose how to load data",
+          "depth": 2
+        },
+        {
+          "id": "large-integer-ids",
+          "text": "Large integer IDs",
+          "depth": 2
+        },
         {
           "id": "the-prop-factories",
           "text": "The prop factories",
@@ -478,6 +518,11 @@
       "section": "Essentials",
       "order": 5,
       "headings": [
+        {
+          "id": "remove-a-flash-value",
+          "text": "Remove a flash value",
+          "depth": 2
+        },
         {
           "id": "where-state-is-kept",
           "text": "Where state is kept",
@@ -864,6 +909,11 @@
           "depth": 2
         },
         {
+          "id": "resolve-values-for-a-broadcast",
+          "text": "Resolve values for a broadcast",
+          "depth": 2
+        },
+        {
           "id": "on-the-client",
           "text": "On the client",
           "depth": 2
@@ -1067,6 +1117,11 @@
           "id": "5-failures-and-fallbacks",
           "text": "5. Failures and fallbacks",
           "depth": 2
+        },
+        {
+          "id": "send-failures-to-monitoring",
+          "text": "Send failures to monitoring",
+          "depth": 3
         },
         {
           "id": "6-several-servers",
@@ -1578,6 +1633,11 @@
       "section": "Reference",
       "order": 4,
       "headings": [
+        {
+          "id": "check-page-files-and-large-integers",
+          "text": "Check page files and large integers",
+          "depth": 2
+        },
         {
           "id": "test-host-recipe",
           "text": "Test host recipe",

@@ -37,7 +37,7 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     [Microsoft.AspNetCore.Authorization.Authorize]
     public IResult Secret() => Render("Secret");
 
-    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE")]
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE", "QUERY")]
     [Route("/secret")]
     [Microsoft.AspNetCore.Authorization.Authorize]
     public IResult SecretMutation() => Back();
@@ -102,7 +102,7 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
         ["c"] = Defer(() => "c", "other"),
     });
 
-    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE")]
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE", "QUERY")]
     [Route("/form")]
     public IActionResult Form([FromBody] FormInput input)
     {
@@ -115,7 +115,7 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
         return Redirect("/page");
     }
 
-    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE")]
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE", "QUERY")]
     [Route("/redirect")]
     public IActionResult RedirectToPage() => Redirect("/page");
 
@@ -146,7 +146,7 @@ public sealed class ConformanceController(ConformanceCounters counters) : Contro
     [HttpGet("/external")]
     public IResult External() => Location("https://external.example/path");
 
-    [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE")]
+    [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "QUERY")]
     [Route("/empty")]
     public IActionResult EmptyOk() => Ok();
 

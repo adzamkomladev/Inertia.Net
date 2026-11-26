@@ -333,6 +333,24 @@ Use `ssr.ts` as the entry for Vue and Svelte.
 
 ## 5. Failures and fallbacks
 
+### Send failures to monitoring
+
+`Preferred` mode logs a failed render and lets the browser render the page. `Required` mode fails the request before any HTML is sent.
+Set this callback during registration (fragment):
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Ssr.Mode = SsrMode.Preferred;
+    o.Ssr.OnRenderFailed = failure =>
+        Console.Error.WriteLine($"SSR {failure.Type}: {failure.Component} at {failure.Url}");
+});
+```
+
+The callback receives the error, type, hint, timestamp and any available stack/source information. It runs once for the final
+failed attempt, before fallback or a Required-mode exception. Keep it thread-safe. Do not show these details to users:
+renderer diagnostics may contain secrets. Policy skips, such as a missing bundle or an open circuit, use logs and metrics.
+
 In `Preferred` mode every failure logs a warning and the page renders on the client. In `Required` mode it throws `InertiaSsrException` before the first byte is written, so the app's exception handler can still answer.
 
 After enough failures in a row the app stops calling the server for a while, then probes it before trusting it again:

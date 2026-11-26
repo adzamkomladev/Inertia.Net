@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Inertia.Net;
 
@@ -88,6 +90,35 @@ public sealed class InertiaFeature
     {
         ArgumentNullException.ThrowIfNull(key);
         (_flash ??= new(StringComparer.Ordinal))[key] = value;
+        return this;
+    }
+
+    /// <summary>Removes flash values. Literal keys take precedence over nested dot paths. Remaining values keep their normal lifetime.</summary>
+    public InertiaFeature ForgetFlashed(params string[] keys) => ForgetFlashed((IEnumerable<string>)keys);
+
+    /// <summary>Removes flash values, including values restored from the previous request.</summary>
+    public InertiaFeature ForgetFlashed(IEnumerable<string> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        foreach (var key in keys)
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            if (_flash is null || _flash.Remove(key)) continue;
+            var parts = key.Split('.');
+            if (parts.Length < 2 || !_flash.TryGetValue(parts[0], out var value) || value is null) continue;
+            var options = Context is { } context ? InertiaMountServices.PageWriter(context)?.SerializerOptions : null;
+            var node = value is JsonNode json ? json.DeepClone()
+                : JsonSerializer.SerializeToNode(value, (options ?? InertiaJsonContext.Default.Options).GetTypeInfo(value.GetType()));
+            var parent = node;
+            for (var i = 1; i < parts.Length - 1; i++)
+            {
+                parent = parent is JsonObject obj ? obj[parts[i]]
+                    : parent is JsonArray array && int.TryParse(parts[i], out var index) && index >= 0 && index < array.Count ? array[index] : null;
+            }
+            if (parent is JsonObject target) target.Remove(parts[^1]);
+            else if (parent is JsonArray array && int.TryParse(parts[^1], out var index) && index >= 0 && index < array.Count) array[index] = null;
+            if (node is not null) _flash[parts[0]] = node;
+        }
         return this;
     }
 

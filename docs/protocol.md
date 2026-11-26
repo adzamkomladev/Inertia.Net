@@ -65,7 +65,7 @@ The middleware runs in this order:
 2. Run the handler.
 3. If the request is not an Inertia request, return the response unchanged.
 4. If the status is 200 and the body is empty, redirect back (same-host Referer, falling back to the validated previous-URL cookie when `State.RememberPreviousUrl` is on, then the app root `PathBase/`).
-5. If the status is 302 and the method is PUT, PATCH or DELETE, change it to 303.
+5. If the status is 302 and the method is PUT, PATCH, DELETE or QUERY, change it to 303.
 6. If the response is a redirect to another origin (an absolute or protocol-relative http(s) URL whose scheme, host or port differs from the request's), and the request is not a prefetch, replace it with `409` and `X-Inertia-Location: <Location>` (empty body), unless `ConvertExternalRedirects` is off (deliberate deviation 12).
 7. Otherwise, if the response is a redirect, its `Location` contains `#`, and the request is not a prefetch, replace it with `409` and `X-Inertia-Redirect: <Location>` (empty body).
 
@@ -240,7 +240,7 @@ of the protocol; the payload is:
   - a `default` bag exists and the `X-Inertia-Error-Bag` header is present → `{ <headerValue>: defaultBagErrors }`;
   - a `default` bag exists and there is no header → the default bag's errors, flattened;
   - otherwise → `{ bag: errors, ... }`.
-- The flow: validation fails, the server redirects back (303 for PUT/PATCH/DELETE) with the errors stored in the state store, and the next GET renders them.
+- The flow: validation fails, the server redirects back (303 for PUT/PATCH/DELETE/QUERY) with the errors stored in the state store, and the next GET renders them.
 
 ## 7. Flash, clearHistory, preserveFragment
 
@@ -254,6 +254,19 @@ All three (and validation errors) are stored in the state store when a response 
 | encryptHistory | global option, or per request | not persisted |
 
 The state is kept (not consumed) when the response is a version-mismatch 409.
+
+`ForgetFlashed(keys)` removes current or restored flash values before rendering or redirecting. An exact key wins over a dot path.
+Nested removal copies the value rather than mutating the caller's object. Removing the last key omits `flash`; remaining values
+keep their normal one-response lifetime. The DevTools read API bypasses state loading and consumption.
+
+`Render(...).PreserveBigIntegers(bool)` overrides the global option for that response, including props and flash.
+
+`Inertia.BroadcastPropsAsync(context, props)` uses the prop resolver without partial or initial-load exclusions.
+It returns a flat-keyed JSON object for `IInertiaLive.PublishAsync`, omits rescued values, and does not record a page.
+It requires `AddInertia()`; ordinary value publishing remains usable in workers without it.
+
+`Ssr.OnRenderFailed` receives typed diagnostics once after the final failed render attempt, before fallback or a Required-mode
+exception. Policy skips use existing logs/metrics. Callback exceptions are logged without failing the response.
 
 ## 8. SSR
 

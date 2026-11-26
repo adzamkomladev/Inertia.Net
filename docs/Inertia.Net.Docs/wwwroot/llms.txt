@@ -13,6 +13,7 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [Client setup](https://inertia-dotnet.temtem.dev/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
 - [Quick start](https://inertia-dotnet.temtem.dev/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 - [AI agents](https://inertia-dotnet.temtem.dev/docs/ai-agents): Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
+- [Learn from Kitchen Sink](https://inertia-dotnet.temtem.dev/docs/kitchen-sink): Explore the official Inertia.js v3 demo, then use the same ideas in ASP.NET Core.
 
 ## Essentials
 

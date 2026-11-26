@@ -9,6 +9,13 @@ Inertia DevTools lets you see what your browser sent and what ASP.NET Core retur
 
 ## Try it in the starter
 
+DevTools lets you inspect a visit without changing its response. Its read API leaves pending errors and flash messages alone.
+Apps hosted under a path such as `/admin` report that path to the extension. Request URLs are absolute; sensitive query values
+are redacted in the recorded copy, not in your real request.
+
+Entries live in memory and disappear on restart. Source-call locations are not collected, so some “open in editor” links
+are unavailable. Keep the read API private: recorded entries can include user data.
+
 1. Install the browser extension using the [Inertia.js DevTools guide](https://inertiajs.com/docs/v3/advanced/devtools#installation).
 2. Start the app and Vite from [First 10 minutes](/docs/first-10-minutes). Open `http://localhost:5180/todos`, open your browser's developer tools, and select the **Inertia** panel.
 3. Submit an empty todo title. Select the visit in the timeline and look at the request and the resulting page data. The validation message is under `props.errors.title`.

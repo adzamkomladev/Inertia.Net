@@ -103,6 +103,7 @@ function Footer() {
           <li><a href="https://github.com/adzamkomladev/Inertia.Net" target="_blank" rel="noreferrer" className="hover:text-foreground">GitHub</a></li>
           <li><a href="https://www.nuget.org/packages/Inertia.Net" target="_blank" rel="noreferrer" className="hover:text-foreground">NuGet</a></li>
           <li><a href="https://github.com/adzamkomladev/Inertia.Net-Samples" target="_blank" rel="noreferrer" className="hover:text-foreground">Samples</a></li>
+          <li><a href="https://demo-v3.inertiajs.com" target="_blank" rel="noreferrer" className="hover:text-foreground">Inertia Kitchen Sink</a></li>
         </ul>
       </div>
     </footer>

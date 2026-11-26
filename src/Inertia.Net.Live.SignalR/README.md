@@ -12,6 +12,11 @@ dotnet add package Inertia.Net.Live.SignalR
 
 ## Server
 
+If you already have plain values, publish them with `IInertiaLive.PublishAsync`. To reuse prop definitions, resolve
+`await BroadcastPropsAsync(http, props)` first and publish the returned JSON object. This resolves optional,
+deferred and once values without visit filters, keeps dotted keys flat, and omits rescued values. It needs `AddInertia()`.
+Always check that every channel subscriber may see the published values.
+
 ```csharp
 builder.Services.AddInertia();
 builder.Services.AddInertiaLive().AddSignalR(o =>

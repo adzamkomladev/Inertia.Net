@@ -309,6 +309,9 @@ URL: https://inertia-dotnet.temtem.dev/docs/first-10-minutes
 
 You'll run a small todo app, submit a form, and change how C# validates it. The starter sets up ASP.NET Core, your frontend, and Vite for you.
 
+Want to see the bigger picture first? Explore [Kitchen Sink](/docs/kitchen-sink), the official Inertia.js v3 sample app.
+It uses Laravel and Vue. This guide gets the same server-driven page model running on .NET.
+
 ## 1. Create the app
 
 Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) and use Node.js 22.12 or newer with npm for the commands below. Run `dotnet --list-sdks` to check for an installed 10.0 SDK and `node --version` to check Node.
@@ -316,7 +319,7 @@ Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.
 Run these commands in the folder where you want to create `MyApp`.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.5
+dotnet new install Inertia.Net.Templates@1.9.6
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -463,17 +466,17 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.5
-dotnet add package Inertia.Net.Mvc --version 1.9.5            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.5  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.5 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.5        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.5   # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.5          # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.5        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.6
+dotnet add package Inertia.Net.Mvc --version 1.9.6            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.6  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.6 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.6        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.6   # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.6          # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.6        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.5 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.6 implements Inertia.js v3.
 
 ## Requirements
 
@@ -496,7 +499,7 @@ Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.5
+dotnet new install Inertia.Net.Templates@1.9.6
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -1023,9 +1026,20 @@ URL: https://inertia-dotnet.temtem.dev/docs/quick-start
 
 Use this guide to add Inertia to an existing ASP.NET Core app. To create an app with the server and frontend already wired up, follow [First 10 minutes](/docs/first-10-minutes).
 
-Install the core NuGet package and the integration package if you use MVC or FastEndpoints. [Package commands](/docs/installation)
+Run these commands from the existing server project's folder. Everyone needs the core package:
+
+```sh
+dotnet add package Inertia.Net --version 1.9.6
+```
+
+For MVC, also install `Inertia.Net.Mvc`. For FastEndpoints, install `Inertia.Net.FastEndpoints`.
+Use version `1.9.6` for each. You also need Node.js and Vite to build the client. See
+[installation](/docs/installation) for all packages, or [client setup](/docs/client-setup) for the frontend files.
 
 Every app needs the same four things:
+
+The **root template** is your HTML shell. A **page component** is the React, Vue or Svelte file that renders a screen.
+**Props** are the named values your C# handler passes to that component.
 
 <Steps>
   <Step title="Register Inertia and the protocol middleware" />
@@ -1309,6 +1323,17 @@ URL: https://inertia-dotnet.temtem.dev/docs/ai-agents
 
 An Inertia.Net app is a good fit for coding agents. The backend and the frontend live in one project, a feature follows one request path (endpoint, props, page component), and there is no API contract or client router for the agent to keep in sync. The main thing an agent needs is to know the conventions. This page gives you that context in a form you can paste into your project.
 
+## Choose the right reference
+
+- **Building an app?** Start with [First 10 minutes](/docs/first-10-minutes), then read the guide for the feature you need.
+- **Changing the adapter?** Read the repository's `AGENTS.md`, `docs/protocol.md`, and the README's **For AI agents** section.
+  They explain the source files, tests and protocol rules. Do not apply repository-maintenance rules to an unrelated consuming app.
+- **Looking for a complete Inertia example?** Use [Kitchen Sink](/docs/kitchen-sink), the official v3 demo. Its Laravel
+  handlers need to be translated to C#; the client-side Inertia patterns are the reference.
+
+Keep examples honest: name the file being changed, say whether a snippet is a complete file or a fragment, and run the checks
+you report. Do not guess API names from another server adapter.
+
 ## Point the agent at the docs
 
 The documentation is published as plain text for language models:
@@ -1337,7 +1362,7 @@ This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inerti
   from `Inertia.Net.Inertia`. Write them unqualified.
 - Props: use `Defer(ct => ...)` for slow data, `Optional(() => ...)` for data loaded only on
   partial reloads, `Merge(...)` for paginated lists and `Once(...)` for data the client can keep.
-- Forms: POST/PUT/PATCH/DELETE endpoints validate with `.WithInertiaValidation()` (Minimal API),
+- Forms: POST/PUT/PATCH/DELETE/QUERY endpoints validate with `.WithInertiaValidation()` (Minimal API),
   the MVC filter or `c.ConfigureInertia()` (FastEndpoints), then redirect. On success return a redirect
   or `Back()`. Report custom errors with `Back().WithErrors(...)`. Use `Back().WithFlash(...)` for messages.
 - Keep antiforgery on: `app.UseInertiaAntiforgery()` is required for unsafe requests.
@@ -1345,7 +1370,8 @@ This app uses Inertia.Net (Inertia.js v3 for ASP.NET Core). Docs: https://inerti
   `o.TypeScript.Page<T>("Component")` so the TypeScript types stay generated, not hand written.
 - Test pages with `Inertia.Net.Testing`: `client.InertiaGetAsync(url)` then
   `response.AssertInertiaAsync(page => page.Component(...).Has(...))`.
-- Before finishing: `dotnet build`, `dotnet test`, and the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`) (type-checks the client).
+- Before finishing: `dotnet build`, `dotnet test`, and the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`).
+  Check that the script includes type checking; `vite build` alone does not. Run the framework's type-check command separately if needed.
 ````
 
 If you use Vue or Svelte, change the component path and extension.
@@ -1369,6 +1395,61 @@ Agents are most reliable when they can verify a change. Inertia.Net gives them a
 <Callout type="tip" title="Starter template">
 `dotnet new inertia -n MyApp --framework react` creates an app with pages, a validated form, flash messages, CSRF and Vite already set up. Starting an agent from the template gives it working examples of every convention above.
 </Callout>
+
+---
+
+# Learn from Kitchen Sink
+
+URL: https://inertia-dotnet.temtem.dev/docs/kitchen-sink
+
+> Explore the official Inertia.js v3 demo, then use the same ideas in ASP.NET Core.
+
+The official Inertia.js v3 sample application is **Kitchen Sink**. It combines a small CRM with pages that show forms,
+navigation, deferred data, prefetching, state, layouts and error handling.
+
+- [Open the live demo](https://demo-v3.inertiajs.com)
+- [Read the source](https://github.com/inertiajs/demo-v3)
+- [Read Inertia's demo guide](https://inertiajs.com/docs/v3/getting-started/demo-application)
+
+Kitchen Sink uses **Laravel and Vue**, not Inertia.Net. Its client-side patterns still apply: the server chooses a page,
+passes props, validates forms and redirects after submissions. Replace the Laravel handler with a C# endpoint.
+The public demo resets its database every midnight; use it respectfully and do not enter private information.
+
+## Pick one flow to learn
+
+| Try this in Kitchen Sink | Then read this .NET guide |
+|---|---|
+| Open a page and follow a link | [Pages and responses](/docs/pages-and-responses) |
+| Submit an invalid form | [Validation and errors](/docs/validation-and-errors) |
+| Show a message after saving | [Flash data](/docs/flash-data) |
+| Load a slow section after the page opens | [Deferred props](/docs/deferred-props) |
+| Refresh only one list | [Partial reloads](/docs/partial-reloads) |
+| Append another page of results | [Infinite scroll](/docs/infinite-scroll) |
+| Show a friendly error page | [Error pages](/docs/error-pages) |
+
+## Translate the server, keep the idea
+
+These are handler fragments, not complete application files:
+
+```php
+// Kitchen Sink's server-side pattern (Laravel)
+return Inertia::render('Contacts/Index', ['contacts' => $contacts]);
+```
+
+```csharp
+// The same pattern in an ASP.NET Core handler
+return Render("Contacts/Index", new InertiaProps { ["contacts"] = contacts });
+```
+
+For a runnable .NET example, use this repository's [sample apps](https://github.com/adzamkomladev/Inertia.Net/tree/main/samples), or create a starter with
+[First 10 minutes](/docs/first-10-minutes). The samples exercise Minimal APIs with React, MVC with Vue,
+and FastEndpoints with Svelte. Kitchen Sink is the upstream learning reference; these samples show the .NET setup.
+
+## Check the whole request, not just the JSON
+
+When you add a feature, check that the first visit works, a link updates the page without reloading the document,
+an invalid form shows errors, a partial reload sends only the selected props plus always props, and an asset-version
+change triggers a full reload. These checks catch problems that a JSON snapshot alone can miss.
 
 ---
 
@@ -1589,6 +1670,19 @@ URL: https://inertia-dotnet.temtem.dev/docs/props
 Props are the data a page receives. `Render(component, props)` takes an `InertiaProps`, a string-keyed dictionary, or a typed object. Nested `InertiaProps` and dictionaries are walked, so props can be nested at any depth.
 
 Every page has an `errors` prop. Its key order is `errors`, shared props, then page props.
+
+## Choose how to load data
+
+Start with a plain value. Use a lazy loader when the query should run only if the response needs that prop.
+Use `Defer` when the page should open before a slow query finishes. Use `Optional` when the data is needed only on request.
+`Once` keeps a value on the client across visits; `Cache` keeps it on the server. They solve different problems.
+
+## Large integer IDs
+
+JavaScript cannot represent every 64-bit integer exactly. Set `o.PreserveBigIntegers = true` at registration to wrap unsafe
+integers as `$bigint` markers; the v3 client reads them as `BigInt`. The default is false.
+To override that choice for one page, return `Render("Orders/Show", props).PreserveBigIntegers()` or
+`.PreserveBigIntegers(false)`. Props and flash use the same setting. This is a handler fragment.
 
 **C# 15 unions (.NET 11).** A prop whose type is a `union` (for example `public union Subject(User, Team);`) is written as the JSON of its active case, with no wrapper or discriminator, through your source-generated `JsonSerializerContext`; partial reloads select it like any other prop. An `InertiaProp` (`Defer`, `Optional`, ...) stored inside a union case is not resolved: keep lazy props at the page level.
 
@@ -1955,7 +2049,7 @@ app.MapGroup("/admin").WithInertiaValidation()
    .MapPost("/roles", (RoleInput input) => Results.Redirect("/admin/roles"));
 ```
 
-For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
+For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE/QUERY) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
 
 On .NET 11, async validators (`AsyncValidationAttribute`, `IAsyncValidatableObject`) report through `WithInertiaValidation()` and `WithInertiaPrecognition()` like synchronous attributes. A body that cannot be bound (malformed JSON) is still a `400` on both .NET 10 and .NET 11, never a redirect back without errors or a Precognition success.
 
@@ -2107,6 +2201,8 @@ URL: https://inertia-dotnet.temtem.dev/docs/flash-data
 
 > Carry a one-time message, toast or typed value across a redirect.
 
+Flash data is a message or value for the next page, such as “Contact saved.” Unlike shared props, it is not kept in browser history.
+
 Flash data is carried across the redirect (and any further redirects) and consumed by the next response that is not a redirect. It appears as `page.flash`, only when there is some.
 
 ```csharp
@@ -2183,6 +2279,12 @@ return Back().WithFlash("old", new InertiaProps { ["email"] = email });
 ```
 
 On the next page, read `flash.old` from the page and use the email to refill the field. Never flash passwords, tokens or other secrets.
+
+## Remove a flash value
+
+In a handler, call `http.Inertia().ForgetFlashed("toast", "user.name")` before rendering or redirecting.
+This removes values set in this request or restored from a previous one. An exact key such as `"user.name"` wins over
+the nested path. If no flash values remain, the page has no `flash` field. The remaining values still expire normally.
 
 ## Where state is kept
 
@@ -2293,11 +2395,11 @@ This cookie is used with both cookie and session state stores. It is **per brows
 
 | Situation | Result |
 |---|---|
-| 302 for PUT, PATCH or DELETE | Changed to **303 See Other**, so the browser follows with a GET |
+| 302 for PUT, PATCH, DELETE or QUERY | Changed to **303 See Other**, so the browser follows with a GET |
 | Redirect to another origin, non-prefetch | `409` with `X-Inertia-Location`: the client makes a full visit instead of an XHR the browser would block |
 | Redirect whose `Location` contains `#`, non-prefetch | `409` with `X-Inertia-Redirect`: the client performs a full visit that keeps the fragment |
 | `Location(url)` | `409` + `X-Inertia-Location` for Inertia requests, a plain `302` otherwise |
-| Empty `200` response | Redirect back (302, or 303 for PUT/PATCH/DELETE), using the same previous-URL and app-root fallback as `Back()` |
+| Empty `200` response | Redirect back (302, or 303 for PUT/PATCH/DELETE/QUERY), using the same previous-URL and app-root fallback as `Back()` |
 | `Vary` | `Vary: X-Inertia` is added to every response through the middleware |
 
 Turn off external redirect conversion with `o.ConvertExternalRedirects = false` if the app intentionally redirects to another origin.
@@ -2554,7 +2656,7 @@ Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected
 `dotnet new inertia --auth` creates an app with both:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.5
+dotnet new install Inertia.Net.Templates::1.9.6
 dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
 ```
 
@@ -3248,7 +3350,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.5
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.6
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3280,7 +3382,7 @@ The EF Core package is not marked Native AOT compatible. EF Core has its own com
 `Inertia.Net.MongoDB` builds the same `Page<T>` and `CursorPage<T>` values from a `collection.Find(filter)`:
 
 ```sh
-dotnet add package Inertia.Net.MongoDB --version 1.9.5
+dotnet add package Inertia.Net.MongoDB --version 1.9.6
 ```
 
 ```csharp
@@ -3494,6 +3596,24 @@ What a broadcaster delivers:
   }
 }
 ```
+
+## Resolve values for a broadcast
+
+Use plain values with `IInertiaLive.PublishAsync` when you already have the data. If you have prop definitions instead,
+resolve them first. This handler fragment assumes `http`, `orders`, `id`, `live`, `orderUpdated` and `ct` are in scope:
+
+```csharp
+var values = await BroadcastPropsAsync(http, new InertiaProps
+{
+    ["order"] = Prop(ct => orders.FindAsync(id, ct)),
+    ["stats.total"] = Defer(() => 42),
+});
+await live.PublishAsync(orderUpdated, values, exceptSocketId: http.InertiaRequest().SocketId, cancellationToken: ct);
+```
+
+Visit filters do not restrict a broadcast. Optional, deferred and once values all resolve; a rescued value is left out.
+Dot-path keys stay flat. No page or DevTools entry is created.
+Only publish values that every subscriber of the channel is allowed to see.
 
 ## On the client
 
@@ -4691,6 +4811,24 @@ Use `ssr.ts` as the entry for Vue and Svelte.
 
 ## 5. Failures and fallbacks
 
+### Send failures to monitoring
+
+`Preferred` mode logs a failed render and lets the browser render the page. `Required` mode fails the request before any HTML is sent.
+Set this callback during registration (fragment):
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Ssr.Mode = SsrMode.Preferred;
+    o.Ssr.OnRenderFailed = failure =>
+        Console.Error.WriteLine($"SSR {failure.Type}: {failure.Component} at {failure.Url}");
+});
+```
+
+The callback receives the error, type, hint, timestamp and any available stack/source information. It runs once for the final
+failed attempt, before fallback or a Required-mode exception. Keep it thread-safe. Do not show these details to users:
+renderer diagnostics may contain secrets. Policy skips, such as a missing bundle or an open circuit, use logs and metrics.
+
 In `Preferred` mode every failure logs a warning and the page renders on the client. In `Required` mode it throws `InertiaSsrException` before the first byte is written, so the app's exception handler can still answer.
 
 After enough failures in a row the app stops calling the server for a while, then probes it before trusting it again:
@@ -5541,7 +5679,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/redis
 `Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all.
 
 ```sh
-dotnet add package Inertia.Net.Redis --version 1.9.5
+dotnet add package Inertia.Net.Redis --version 1.9.6
 ```
 
 ```csharp
@@ -5857,6 +5995,9 @@ URL: https://inertia-dotnet.temtem.dev/docs/configuration
 
 Core configuration is passed to `AddInertia`; error page options use `AddInertiaErrorPages`. Options marked “Development only” do nothing in other environments.
 
+`ComponentTransformer` changes runtime component names only. If you use it, register the final client names for TypeScript
+generation too; a build cannot evaluate an arbitrary runtime callback.
+
 ## `AddInertia(o => ...)`: `InertiaOptions`
 
 | Option | Default | Description |
@@ -5865,6 +6006,7 @@ Core configuration is passed to `AddInertia`; error page options use `AddInertia
 | `RootElementId` | `"app"` | Id of the root element and the `data-page` script. |
 | `Version` | `null` | Asset version. `null` means the Vite manifest hash, or `""` without one. |
 | `VersionResolver` | `null` | `Func<HttpContext, string?>` per-request version; wins over `Version` when non-null. |
+| `ComponentTransformer` | `null` | Changes the component name before rendering/page-file checks; returning null keeps it. |
 | `EncryptHistory` | `false` | Encrypt browser history state of every page. |
 | `WithAllErrors` | `false` | Send every validation message per field instead of the first. |
 | `PreserveBigIntegers` | `false` | Emit integers beyond ±(2^53−1) as `{"$bigint":"..."}`. |
@@ -5906,6 +6048,7 @@ Core configuration is passed to `AddInertia`; error page options use `AddInertia
 | Option | Default | Description |
 |---|---|---|
 | `Mode` | `Disabled` | `Disabled`, `Preferred` or `Required`. `Disabled` cannot be overridden per response. |
+| `OnRenderFailed` | `null` | Thread-safe `Action<SsrRenderFailed>` called once for the final failed render attempt, before fallback or a Required-mode exception. |
 | `Urls` | empty (`http://127.0.0.1:13714`) | SSR server base URLs. Not used with `UseNodeProcess()`. |
 | `Timeout` | `5 s` | Total deadline per render. `Timeout.InfiniteTimeSpan` disables it. |
 | `MaxResponseBytes` | `16 MiB` | Limit on actual response bytes, including errors and chunked responses. |
@@ -5995,6 +6138,23 @@ URL: https://inertia-dotnet.temtem.dev/docs/testing
 > Fluent assertions over Inertia responses and helpers for partial reloads and deferred props.
 
 `Inertia.Net.Testing` has Laravel-style fluent assertions over Inertia responses and `HttpClient` helpers. It parses both JSON responses (`X-Inertia: true`) and the first-visit HTML `<script data-page>`, and decodes `$bigint` values. Failures throw `InertiaAssertionException` with a readable message, so it works with any test framework.
+
+## Check page files and large integers
+
+By default, `Component("Users/Index")` checks only the returned name. To also check the file, use this fragment inside a test:
+
+```csharp
+var options = new InertiaTestingOptions { EnsurePagesExist = true };
+options.PageDirectories.Add("ClientApp/pages"); // Use an absolute path if the test runs elsewhere.
+var page = await response.GetInertiaPageAsync();
+new AssertableInertia(page, options).Component("Users/Index");
+```
+
+React, Vue and Svelte extensions are allowed by default. Change `PageExtensions` to narrow that list.
+`Component("Users/Index", false)` skips the file check; `true` forces it.
+
+When the page enables `preserveBigIntegers`, `Where` and `HasFlash` compare `$bigint` markers as integers,
+including nested values. The raw page stays unchanged. Without that flag, markers remain ordinary objects.
 
 ```csharp
 using Inertia.Net.Testing;
@@ -6143,6 +6303,13 @@ URL: https://inertia-dotnet.temtem.dev/docs/devtools
 Inertia DevTools lets you see what your browser sent and what ASP.NET Core returned for an Inertia visit.
 
 ## Try it in the starter
+
+DevTools lets you inspect a visit without changing its response. Its read API leaves pending errors and flash messages alone.
+Apps hosted under a path such as `/admin` report that path to the extension. Request URLs are absolute; sensitive query values
+are redacted in the recorded copy, not in your real request.
+
+Entries live in memory and disappear on restart. Source-call locations are not collected, so some “open in editor” links
+are unavailable. Keep the read API private: recorded entries can include user data.
 
 1. Install the browser extension using the [Inertia.js DevTools guide](https://inertiajs.com/docs/v3/advanced/devtools#installation).
 2. Start the app and Vite from [First 10 minutes](/docs/first-10-minutes). Open `http://localhost:5180/todos`, open your browser's developer tools, and select the **Inertia** panel.
@@ -6400,7 +6567,7 @@ Every feature below is here because it shows one idea from Inertia.Net. The righ
 Install the templates once, then create the app. `--auth` adds cookie sign-in, so you do not write that yourself. Use `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below.
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.5
+dotnet new install Inertia.Net.Templates::1.9.6
 dotnet new inertia -n ForgetMeNot --framework react --auth
 cd ForgetMeNot
 bun install
@@ -6726,7 +6893,7 @@ Lists and items must survive a restart, so they need a database. We use **EF Cor
 
 ```sh
 dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version "10.*"
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.5
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.6
 ```
 
 <Callout type="tip" title="On .NET 11?">
@@ -8604,7 +8771,7 @@ Now the line that connects the worker to the page. In `ListsPage` we wrote `.Liv
 Install the SignalR transport. It carries the "something changed" message to the browser:
 
 ```sh
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.5
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.6
 bun add @microsoft/signalr
 ```
 
@@ -8658,7 +8825,7 @@ dotnet new xunit -n ForgetMeNot.Tests
 cd ForgetMeNot.Tests
 dotnet add reference ../ForgetMeNot/ForgetMeNot.csproj
 dotnet add package Microsoft.AspNetCore.Mvc.Testing --version "10.*"
-dotnet add package Inertia.Net.Testing --version 1.9.5
+dotnet add package Inertia.Net.Testing --version 1.9.6
 ```
 
 The test project starts your real app in memory, so add one line at the very end of `Program.cs` of the app:

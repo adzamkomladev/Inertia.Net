@@ -12,6 +12,55 @@ namespace Inertia.Net.IntegrationTests;
 /// <summary><c>UseInertia()</c> combined with other middleware and with a path base.</summary>
 public sealed class MiddlewareCompositionTests
 {
+    [Theory]
+    [InlineData("fragment", 409)]
+    [InlineData("location", 409)]
+    [InlineData("failed", 500)]
+    [InlineData("failed-control", 500)]
+    public async Task Completion_callbacks_are_not_gated_on_http_status(string kind, int expected)
+    {
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var app = await StartAsync(a =>
+        {
+            a.Use(async (context, next) =>
+            {
+                context.Response.OnCompleted(() => { completed.TrySetResult(); return Task.CompletedTask; });
+                await next(context);
+            });
+            a.UseInertia();
+            a.MapGet("/completion", (HttpContext context) =>
+            {
+                if (kind == "location") return Location("https://example.test/");
+                if (kind == "fragment") return Results.Redirect("/page#section");
+                if (kind == "failed-control") context.Response.Headers[InertiaHeaders.Location] = "/page";
+                return Results.StatusCode(500);
+            });
+        });
+        using var response = await app.GetTestClient().InertiaGetAsync("/completion");
+        await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(expected, (int)response.StatusCode);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task A_version_reload_does_not_register_the_handlers_completion_work()
+    {
+        var calls = 0;
+        await using var app = await StartAsync(a =>
+        {
+            a.UseInertia();
+            a.MapGet("/completion", (HttpContext context) =>
+            {
+                context.Response.OnCompleted(() => { Interlocked.Increment(ref calls); return Task.CompletedTask; });
+                return Render("Page");
+            });
+        }, services => services.Configure<InertiaOptions>(options => options.Version = "v2"));
+        using var response = await app.GetTestClient().InertiaGetAsync("/completion", request => request.WithHeader(InertiaHeaders.Version, "v1"));
+        await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(0, calls);
+    }
+
     private static async Task<WebApplication> StartAsync(Action<WebApplication> configure, Action<IServiceCollection>? services = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "inertia-composition-" + Guid.NewGuid().ToString("N"));

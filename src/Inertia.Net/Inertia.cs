@@ -237,6 +237,19 @@ public static class Inertia
     /// <param name="props">An <see cref="InertiaProps"/>/dictionary, or a typed page-props object.</param>
     public static InertiaResult Render(string component, object? props = null) => new(component, props);
 
+    /// <summary>
+    /// Resolves props for a broadcast, ignoring visit filters and initial-load exclusions. Keys stay flat, rescued values are omitted,
+    /// and no page or DevTools entry is created. Pass the result to <c>IInertiaLive.PublishAsync</c>.
+    /// </summary>
+    public static ValueTask<System.Text.Json.JsonElement> BroadcastPropsAsync(Microsoft.AspNetCore.Http.HttpContext context, object props)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(props);
+        var writer = InertiaMountServices.PageWriter(context)
+            ?? throw new InvalidOperationException("Register services.AddInertia() before resolving broadcast props.");
+        return writer.WriteBroadcastAsync(context, props);
+    }
+
     /// <summary>Renders <paramref name="page"/> with the component it names (<see cref="IInertiaPage.Component"/>).</summary>
     /// <param name="page">The typed page props.</param>
     public static InertiaResult Render<TPage>(TPage page) where TPage : IInertiaPage => new(TPage.Component, page);

@@ -116,6 +116,21 @@ public static class InertiaDevToolsExtensions
 /// <summary>Per-request recording state, on <see cref="HttpContext.Features"/> while a request is recorded.</summary>
 internal sealed class DevToolsCapture(string id, long started, int maxPageBytes = int.MaxValue)
 {
+    internal Dictionary<string, Dictionary<string, JsonNode?>> PropMetadata { get; } = new(StringComparer.Ordinal);
+
+    internal void RecordProp(string path, InertiaProp prop, InertiaRequest request)
+    {
+        var type = prop.IsAlways ? "always" : prop.ScrollWrapper is not null ? "scroll"
+            : prop.Load == PropLoad.Deferred ? "defer" : prop.Load == PropLoad.Optional ? "optional"
+            : prop.IsMerge ? "merge" : prop.IsOnce ? "once" : null;
+        var meta = new Dictionary<string, JsonNode?>();
+        if (type is not null) meta["inertiaType"] = type;
+        if (prop.IsOnce) meta["once"] = true;
+        if (prop.LiveSpec is not null) meta["live"] = true;
+        if (prop.IsMerge) meta["reset"] = request.Reset?.Contains(path, StringComparer.Ordinal) == true;
+        PropMetadata[path] = meta;
+    }
+
     /// <summary>Pages up to this size are copied into <see cref="PageJson"/> (<see cref="InertiaDevToolsOptions.MaxResponseBytes"/>).</summary>
     public int MaxPageBytes { get; } = maxPageBytes;
 
@@ -212,6 +227,8 @@ internal sealed partial class DevToolsRecorder
             var (http, capture) = ((HttpContext, DevToolsCapture))state;
             var headers = http.Response.Headers;
             headers["X-Inertia-Devtools-Id"] = capture.Id;
+            if (http.Request.PathBase.HasValue)
+                headers["X-Inertia-Devtools-Base-Path"] = http.Request.PathBase.ToUriComponent();
             // A prefetch must not move the batch cursor, so it answers with its own id.
             var parent = http.Request.Headers["X-Inertia-Devtools-Parent"].ToString();
             headers["X-Inertia-Devtools-Parent-Out"] = parent.Length == 0 || IsPrefetch(http.Request) ? capture.Id : parent;
@@ -239,8 +256,8 @@ internal sealed partial class DevToolsRecorder
     }
 
     /// <summary>The discovery tag for the first HTML response: the entry id as a JSON string.</summary>
-    public static byte[] DiscoveryTag(string id) =>
-        Encoding.UTF8.GetBytes($"<script data-inertia-devtools-id type=\"application/json\">\"{id}\"</script>");
+    public static byte[] DiscoveryTag(string id, string? basePath = null) =>
+        Encoding.UTF8.GetBytes($"<script data-inertia-devtools-id{(string.IsNullOrEmpty(basePath) ? "" : $" data-inertia-devtools-base-path=\"{System.Text.Encodings.Web.HtmlEncoder.Default.Encode(basePath)}\"")} type=\"application/json\">\"{id}\"</script>");
 
     internal Task GetEntryAsync(HttpContext httpContext)
     {
@@ -534,7 +551,7 @@ internal sealed partial class DevToolsRecorder
             writer.WriteStartObject("__meta");
             writer.WriteString("id", capture.Id);
             writer.WriteString("method", request.Method);
-            writer.WriteString("url", RedactUrl(string.Concat(request.PathBase.ToUriComponent(), request.Path.ToUriComponent(), request.QueryString.ToUriComponent())));
+            writer.WriteString("url", RedactUrl(Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(request)));
             writer.WriteNumber("status", status);
             writer.WriteString("requestType", requestType);
             WriteStringOrNull(writer, "component", capture.Component);
@@ -574,7 +591,7 @@ internal sealed partial class DevToolsRecorder
                 : Body.Omitted("non-inertia-response"));
             writer.WriteEndObject();
 
-            WriteProps(writer, page);
+            WriteProps(writer, page, capture);
 
             writer.WriteStartObject("route");
             var endpoint = httpContext.GetEndpoint();
@@ -596,7 +613,7 @@ internal sealed partial class DevToolsRecorder
         response.StatusCode is 301 or 302 or 303 or 307 or 308 or 409 or 204 || response.ContentLength == 0;
 
     // props: metadata per dotted path, from the page object's own lists; propValues: the top-level values, redacted.
-    private void WriteProps(Utf8JsonWriter writer, JsonObject? page)
+    private void WriteProps(Utf8JsonWriter writer, JsonObject? page, DevToolsCapture capture)
     {
         var props = page?["props"] as JsonObject;
         var meta = new Dictionary<string, Dictionary<string, JsonNode?>>(StringComparer.Ordinal);
@@ -640,6 +657,7 @@ internal sealed partial class DevToolsRecorder
             var entry = At(path);
             entry.TryAdd("inertiaType", "merge");
             entry["deepMerge"] = true;
+            entry["mergeDirection"] = "append";
         }
 
         if (page?["scrollProps"] is JsonObject scroll)
@@ -663,7 +681,7 @@ internal sealed partial class DevToolsRecorder
                 {
                     var entry = At(path);
                     entry.TryAdd("inertiaType", "once");
-                    entry["once"] = key;
+                    entry["once"] = true;
                 }
             }
         }
@@ -674,8 +692,7 @@ internal sealed partial class DevToolsRecorder
             foreach (var (path, value) in live)
             {
                 var entry = At(path);
-                entry.TryAdd("inertiaType", "live");
-                entry["live"] = value?.DeepClone();
+                entry["live"] = true;
             }
         }
 
@@ -683,6 +700,9 @@ internal sealed partial class DevToolsRecorder
         {
             At(path)["rescued"] = true;
         }
+
+        foreach (var (path, recorded) in capture.PropMetadata)
+            foreach (var (key, value) in recorded) At(path)[key] = value;
 
         writer.WriteStartObject("props");
         foreach (var (path, entry) in meta)

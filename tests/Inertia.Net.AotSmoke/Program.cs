@@ -164,6 +164,17 @@ app.MapGet("/dictionary-keys", () => Render("DictionaryKeys", new InertiaProps
 
 app.MapGet("/users/create", () => Render("Users/Create"));
 
+app.MapGet("/parity", async (HttpContext context) =>
+{
+    context.Inertia().Flash("remove", "gone").Flash("id", 9007199254740993L).ForgetFlashed("remove");
+    var broadcast = await BroadcastPropsAsync(context, new InertiaProps
+    {
+        ["stats.total"] = Defer(() => 42),
+        ["once"] = Once(() => 1),
+    });
+    return Render("Parity", new InertiaProps { ["id"] = 9007199254740993L, ["broadcast"] = broadcast }).PreserveBigIntegers();
+});
+
 // Replacing and removing cached props.
 app.MapPost("/cache/reset", async (IInertiaCache cache, CancellationToken ct) =>
 {

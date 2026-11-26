@@ -1,4 +1,32 @@
 #nullable enable
+Inertia.Net.InertiaOptions.ComponentTransformer.get -> System.Func<string!, string?>?
+Inertia.Net.InertiaOptions.ComponentTransformer.set -> void
+static Inertia.Net.Inertia.BroadcastPropsAsync(Microsoft.AspNetCore.Http.HttpContext! context, object! props) -> System.Threading.Tasks.ValueTask<System.Text.Json.JsonElement>
+Inertia.Net.InertiaResult.PreserveBigIntegers(bool preserve = true) -> Inertia.Net.InertiaResult!
+Inertia.Net.InertiaFeature.ForgetFlashed(params string![]! keys) -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaFeature.ForgetFlashed(System.Collections.Generic.IEnumerable<string!>! keys) -> Inertia.Net.InertiaFeature!
+Inertia.Net.SsrOptions.OnRenderFailed.get -> System.Action<Inertia.Net.SsrRenderFailed!>?
+Inertia.Net.SsrOptions.OnRenderFailed.set -> void
+Inertia.Net.SsrRenderFailed
+Inertia.Net.SsrRenderFailed.SsrRenderFailed() -> void
+Inertia.Net.SsrRenderFailed.Error.get -> string!
+Inertia.Net.SsrRenderFailed.Error.init -> void
+Inertia.Net.SsrRenderFailed.Type.get -> string!
+Inertia.Net.SsrRenderFailed.Type.init -> void
+Inertia.Net.SsrRenderFailed.Hint.get -> string!
+Inertia.Net.SsrRenderFailed.Hint.init -> void
+Inertia.Net.SsrRenderFailed.Timestamp.get -> System.DateTimeOffset
+Inertia.Net.SsrRenderFailed.Timestamp.init -> void
+Inertia.Net.SsrRenderFailed.Component.get -> string?
+Inertia.Net.SsrRenderFailed.Component.init -> void
+Inertia.Net.SsrRenderFailed.Url.get -> string?
+Inertia.Net.SsrRenderFailed.Url.init -> void
+Inertia.Net.SsrRenderFailed.BrowserApi.get -> System.Text.Json.JsonElement?
+Inertia.Net.SsrRenderFailed.BrowserApi.init -> void
+Inertia.Net.SsrRenderFailed.SourceLocation.get -> System.Text.Json.JsonElement?
+Inertia.Net.SsrRenderFailed.SourceLocation.init -> void
+Inertia.Net.SsrRenderFailed.Stack.get -> string?
+Inertia.Net.SsrRenderFailed.Stack.init -> void
 Inertia.Net.InertiaDevToolsOptions.MaxResponseBytes.get -> int
 Inertia.Net.InertiaDevToolsOptions.MaxResponseBytes.set -> void
 Inertia.Net.InertiaDevToolsOptions.MaxTotalBytes.get -> long

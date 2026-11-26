@@ -54,6 +54,13 @@ has '"deferredProps":{"default":["stats"]}'
 VERSION=$(sed -n 's/.*"version":"\([0-9a-f]*\)".*/\1/p' "$T/b")
 [ ${#VERSION} -eq 32 ] || fail "expected a 32-char manifest hash version, got '$VERSION'"
 
+inertia GET /parity
+status_is 200
+has '"preserveBigIntegers":true'
+has '"id":{"$bigint":"9007199254740993"}'
+has '"broadcast":{"stats.total":42,"once":1}'
+lacks '"remove"'
+
 # Error pages use the ordinary page writer under Native AOT, for JSON and HTML.
 inertia GET /missing
 status_is 404

@@ -14,7 +14,7 @@ namespace Inertia.Net;
 /// <item>An Inertia GET with a stale <c>X-Inertia-Version</c> gets a 409 with <c>X-Inertia-Location</c> before the handler runs; the stored state is kept.</item>
 /// <item>The stored flash/errors/history flags are loaded into <see cref="InertiaFeature"/> (and consumed).</item>
 /// <item>After the handler, an Inertia request answered with an empty 200 is redirected back.</item>
-/// <item>When the response starts: <c>Vary: X-Inertia</c>; for Inertia requests a 302 becomes a 303 for PUT/PATCH/DELETE and a
+/// <item>When the response starts: <c>Vary: X-Inertia</c>; for Inertia requests a 302 becomes a 303 for PUT/PATCH/DELETE/QUERY and a
 /// redirect to a URL with a fragment becomes a 409 with <c>X-Inertia-Redirect</c> (except prefetches); when the response is a redirect,
 /// the state set during the request plus the loaded state not rendered yet is saved, otherwise the loaded state is cleared (consumed).</item>
 /// </list>
@@ -50,6 +50,18 @@ internal sealed class InertiaMiddleware
             httpContext.Inertia().Mount = _mount; // first, so the result, error pages and option readers use this mount
         }
 
+        // Inspector reads are not page visits: they must never consume pending form errors or flash.
+        if (request.Path.StartsWithSegments(InertiaDevToolsExtensions.PathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            response.OnStarting(() =>
+            {
+                InertiaHeaders.AppendVary(response.Headers);
+                return Task.CompletedTask;
+            });
+            await _next(httpContext);
+            return;
+        }
+
         if (isInertia && HttpMethods.IsGet(request.Method) && !_versionProvider.Matches(httpContext))
         {
             // The page's variation: a shared cache must not answer a current client with this 409, or a stale one with a cached page.
@@ -82,7 +94,7 @@ internal sealed class InertiaMiddleware
                 && tracker?.HasWritten != true
                 && response.ContentLength is null or 0)
             {
-                response.StatusCode = IsPutPatchDelete(request.Method) ? StatusCodes.Status303SeeOther : StatusCodes.Status302Found;
+                response.StatusCode = RequiresSeeOther(request.Method) ? StatusCodes.Status303SeeOther : StatusCodes.Status302Found;
                 response.Headers.Location = InertiaBackResult.GetBackUrl(request, "~/", _pageWriter.Options.State);
             }
 
@@ -126,7 +138,8 @@ internal sealed class InertiaMiddleware
 
     private static bool IsInertia(HttpRequest request) => !string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]);
 
-    private static bool IsPutPatchDelete(string method) => HttpMethods.IsPut(method) || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method);
+    private static bool RequiresSeeOther(string method) =>
+        HttpMethods.IsPut(method) || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method) || HttpMethods.IsQuery(method);
 
     // An absolute (or protocol-relative) http(s) URL whose scheme, host or port differs from the request's. Relative URLs are same-origin.
     internal static bool IsOtherOrigin(HttpRequest request, string location)
@@ -161,7 +174,7 @@ internal sealed class InertiaMiddleware
 
         if (IsInertia(httpContext.Request))
         {
-            if (response.StatusCode == StatusCodes.Status302Found && IsPutPatchDelete(httpContext.Request.Method))
+            if (response.StatusCode == StatusCodes.Status302Found && RequiresSeeOther(httpContext.Request.Method))
             {
                 response.StatusCode = StatusCodes.Status303SeeOther;
             }

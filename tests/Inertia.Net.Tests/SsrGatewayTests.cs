@@ -10,6 +10,34 @@ namespace Inertia.Net.Tests;
 
 public sealed class SsrGatewayTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Failure_notification_reports_page_details_once_and_keeps_the_response_policy(bool required)
+    {
+        var events = new List<SsrRenderFailed>();
+        var handler = new FakeHandler((_, _) => Task.FromResult(Json(HttpStatusCode.InternalServerError,
+            """{"error":"window is not defined","type":"browser-api","hint":"Use a lifecycle hook","browserApi":"window","sourceLocation":"Home.tsx:4","stack":"trace"}""")));
+        var harness = Create(handler, options =>
+        {
+            options.Mode = required ? SsrMode.Required : SsrMode.Preferred;
+            options.OnRenderFailed = events.Add;
+        });
+        if (required) await Assert.ThrowsAsync<InertiaSsrException>(() => GetAsync(harness, "/example"));
+        else AssertClientRendered(await GetAsync(harness, "/example"));
+        var failure = Assert.Single(events);
+        Assert.Equal("/example", failure.Url);
+        Assert.NotNull(failure.Component);
+        Assert.Equal("browser-api", failure.Type);
+        Assert.Equal("trace", failure.Stack);
+        Assert.Equal("Home.tsx:4", failure.SourceLocation?.GetString());
+        Assert.NotEqual(default, failure.Timestamp);
+        var minimal = new SsrRenderFailed { Error = "error", Type = "render", Timestamp = DateTimeOffset.UtcNow };
+        var json = System.Text.Json.JsonSerializer.Serialize(minimal, InertiaJsonContext.Default.SsrRenderFailed);
+        Assert.DoesNotContain("sourceLocation", json, StringComparison.Ordinal);
+        Assert.Contains("\"timestamp\":", json, StringComparison.Ordinal);
+    }
+
     private const string SsrBody = "<script data-page=\"app\" type=\"application/json\">{\"component\":\"Home\"}</script><div data-server-rendered=\"true\" id=\"app\"><h1>Hi</h1></div>";
 
     private sealed class FakeHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) : HttpMessageHandler

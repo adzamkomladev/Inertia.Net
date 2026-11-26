@@ -40,7 +40,7 @@ app.MapGroup("/admin").WithInertiaValidation()
    .MapPost("/roles", (RoleInput input) => Results.Redirect("/admin/roles"));
 ```
 
-For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
+For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE/QUERY) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
 
 On .NET 11, async validators (`AsyncValidationAttribute`, `IAsyncValidatableObject`) report through `WithInertiaValidation()` and `WithInertiaPrecognition()` like synchronous attributes. A body that cannot be bound (malformed JSON) is still a `400` on both .NET 10 and .NET 11, never a redirect back without errors or a Precognition success.
 

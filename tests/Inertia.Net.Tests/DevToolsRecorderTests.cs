@@ -9,6 +9,33 @@ namespace Inertia.Net.Tests;
 public sealed class DevToolsRecorderTests
 {
     [Theory]
+    [InlineData("always", "", false)]
+    [InlineData("optional", "", false)]
+    [InlineData("merge", "value", true)]
+    [InlineData("merge", " other, value ", true)]
+    [InlineData("merge", "", false)]
+    public async Task Recorded_prop_kinds_and_reset_flags_match_the_definitions(string kind, string reset, bool isReset)
+    {
+        var harness = Recording();
+        var recorder = harness.Services.GetRequiredService<DevToolsRecorder>();
+        var context = harness.Context().AsInertia();
+        context.Request.Headers[InertiaHeaders.Reset] = reset;
+        var capture = recorder.Begin(context)!;
+        var prop = kind switch
+        {
+            "always" => Inertia.Always(1),
+            "optional" => Inertia.Optional(() => 1),
+            _ => Inertia.Merge(new[] { 1 }),
+        };
+        await Harness.ExecuteAsync(context, Inertia.Render("Page", new InertiaProps { ["value"] = prop }));
+        await recorder.CompleteAsync(context, capture, false);
+        var entry = await ReadEntryAsync(harness, capture.Id);
+        Assert.Equal(kind, (string?)entry["props"]!["value"]!["inertiaType"]);
+        if (kind == "merge") Assert.Equal(isReset, (bool?)entry["props"]!["value"]!["reset"]);
+        Assert.Equal("always", (string?)entry["props"]!["errors"]!["inertiaType"]);
+    }
+
+    [Theory]
     [InlineData("Production", true, false, true)]
     [InlineData("Staging", true, false, true)]
     [InlineData("Development", true, false, false)]

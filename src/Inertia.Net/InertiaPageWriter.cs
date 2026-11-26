@@ -61,6 +61,12 @@ internal sealed class InertiaPageWriter
     private readonly JsonWriterOptions _htmlWriterOptions;
 
     private readonly VersionProvider _versionProvider;
+    private readonly Lazy<InertiaPageWriter> _alternateIntegers;
+
+    internal bool PreserveBigIntegers { get; }
+
+    internal InertiaPageWriter ForBigIntegers(bool? preserve) =>
+        preserve is null || preserve == PreserveBigIntegers ? this : _alternateIntegers.Value;
 
     public InertiaPageWriter(
         IOptions<InertiaOptions> options,
@@ -71,9 +77,13 @@ internal sealed class InertiaPageWriter
         InertiaMetrics metrics,
         InertiaRefreshQueue refreshes,
         InertiaCaching caching,
-        PageComponentCheck pages)
+        PageComponentCheck pages,
+        bool? preserveBigIntegers = null)
     {
         Options = options.Value;
+        PreserveBigIntegers = preserveBigIntegers ?? Options.PreserveBigIntegers;
+        _alternateIntegers = new Lazy<InertiaPageWriter>(() => new InertiaPageWriter(options, jsonOptions, timeProvider, logger,
+            versionProvider, metrics, refreshes, caching, pages, !PreserveBigIntegers));
         TimeProvider = timeProvider;
         Logger = logger;
         Metrics = metrics;
@@ -89,7 +99,7 @@ internal sealed class InertiaPageWriter
                 ? InertiaJsonContext.Default
                 : JsonTypeInfoResolver.Combine(source.TypeInfoResolver, InertiaJsonContext.Default),
         };
-        if (Options.PreserveBigIntegers)
+        if (PreserveBigIntegers)
         {
             BigIntegerConverters.AddTo(serializerOptions.Converters);
         }
@@ -104,7 +114,7 @@ internal sealed class InertiaPageWriter
 
         serializerOptions.MakeReadOnly();
         SerializerOptions = serializerOptions;
-        _generated = Options.PreserveBigIntegers ? null : GeneratedContext(source);
+        _generated = PreserveBigIntegers ? null : GeneratedContext(source);
         _jsonWriterOptions = new JsonWriterOptions { Encoder = source.Encoder, Indented = serializerOptions.WriteIndented };
         _htmlWriterOptions = new JsonWriterOptions { Encoder = HtmlSafeEncoder };
         _propsWriters = new DefaultObjectPool<PropsWriter>(new PropsWriterPolicy(this));
@@ -134,6 +144,53 @@ internal sealed class InertiaPageWriter
     /// <summary>Writer options for JSON responses (the app's encoder and indentation).</summary>
     public JsonWriterOptions JsonWriterOptions => _jsonWriterOptions;
 
+    internal async ValueTask<JsonElement> WriteBroadcastAsync(HttpContext context, object props)
+    {
+        context.RequestAborted.ThrowIfCancellationRequested();
+        using var buffer = new PooledBufferWriter(256);
+        var entries = EntryLists.Get();
+        var resolver = _propsWriters.Get();
+        try
+        {
+            if (props is IEnumerable<KeyValuePair<string, object?>> dictionary)
+            {
+                foreach (var (key, value) in dictionary) entries.Add(new(key, value, typeof(object)));
+            }
+            else
+            {
+                var info = SerializerOptions.GetTypeInfo(props.GetType());
+                if (info.Kind == JsonTypeInfoKind.Dictionary && props is IDictionary typed)
+                {
+                    var keys = DictionaryKeys(typed, info);
+                    var index = 0;
+                    foreach (DictionaryEntry item in typed)
+                        entries.Add(new(keys[index++], item.Value, info.ElementType ?? typeof(object)));
+                }
+                else if (info.Kind == JsonTypeInfoKind.Object)
+                {
+                    info.OnSerializing?.Invoke(props);
+                    var members = RentObjectEntries(props, info, out var count);
+                    try { for (var i = 0; i < count; i++) entries.Add(members[i]); }
+                    finally { ReturnObjectEntries(members, count); }
+                }
+                else
+                    throw new ArgumentException("Broadcast props must be an object or a string-keyed dictionary.", nameof(props));
+            }
+            var writer = resolver.Begin(buffer, false, default, "", false, context.RequestServices, context.RequestAborted, broadcast: true);
+            await resolver.WritePropsAsync(entries);
+            if (props is not IEnumerable<KeyValuePair<string, object?>>)
+                SerializerOptions.GetTypeInfo(props.GetType()).OnSerialized?.Invoke(props);
+            writer.Flush();
+            using var document = JsonDocument.Parse(buffer.WrittenMemory);
+            return document.RootElement.Clone();
+        }
+        finally
+        {
+            _propsWriters.Return(resolver);
+            EntryLists.Return(entries);
+        }
+    }
+
     /// <summary>
     /// Resolves the props and writes the whole page object. With <paramref name="htmlSafe"/> the JSON can be embedded
     /// in a <c>&lt;script&gt;</c> element as-is. The caller disposes the returned buffer.
@@ -158,7 +215,8 @@ internal sealed class InertiaPageWriter
 
             // A component runs the planning walk until a render shows it has no Parallel() props, and again once a render meets one.
             var plan = InertiaProp.ParallelUsed && hints?.UsesParallel != false;
-            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestServices, httpContext.RequestAborted);
+            var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestServices, httpContext.RequestAborted,
+                capture: DevToolsRecorder.Recording ? httpContext.Features.Get<DevToolsCapture>() : null);
 
             writer.WriteStartObject();
             writer.WriteString(ComponentName, component);
@@ -180,7 +238,7 @@ internal sealed class InertiaPageWriter
             writer.WriteString(VersionName, _versionProvider.GetVersion(httpContext));
             propsWriter.WriteMetadata(pooledEntries, Options.ExposeSharedPropKeys ? sharedCount : 0);
 
-            if (Options.PreserveBigIntegers)
+            if (PreserveBigIntegers)
             {
                 writer.WriteBoolean(PreserveBigIntegersName, true);
             }
@@ -807,18 +865,25 @@ internal sealed class InertiaPageWriter
         var scrollLength = CacheEntry.BeginProp(buffer, scroll);
         using (var writer = new Utf8JsonWriter(buffer, _htmlWriterOptions))
         {
-            if (value is null or JsonElement or JsonNode || valueType == typeof(object))
+            if (PreserveBigIntegers)
             {
-                WritePlainValue(writer, value);
+                // Use the preserving converters (also for BigInteger), then cache plain numbers so either response mode can reuse them.
+                using var resolved = new PooledBufferWriter(256);
+                using (var preservingWriter = new Utf8JsonWriter(resolved, _htmlWriterOptions)) WriteValue(preservingWriter);
+                using var document = JsonDocument.Parse(resolved.WrittenMemory);
+                BigIntegerConverters.WriteUnwrapped(writer, document.RootElement);
             }
-            else
-            {
-                JsonSerializer.Serialize(writer, value, TypeEntry(valueType).Info);
-            }
+            else WriteValue(writer);
         }
 
         var (freshUntil, expiresAt) = Caching.Times(caching.Duration, caching.Expiration);
         return CacheEntry.EndProp(buffer, scroll, scrollLength, freshUntil, expiresAt, out prop);
+
+        void WriteValue(Utf8JsonWriter writer)
+        {
+            if (value is null or JsonElement or JsonNode || valueType == typeof(object)) WritePlainValue(writer, value);
+            else JsonSerializer.Serialize(writer, value, TypeEntry(valueType).Info);
+        }
     }
 
     internal readonly record struct RescuedCachedProp(Exception Exception);
@@ -893,13 +958,14 @@ internal sealed class InertiaPageWriter
 
     internal void WriteElement(Utf8JsonWriter writer, JsonElement element)
     {
-        if (Options.PreserveBigIntegers) BigIntegerConverters.WriteElement(writer, element);
+        if (PreserveBigIntegers) BigIntegerConverters.WriteElement(writer, element);
+        else if (Options.PreserveBigIntegers) BigIntegerConverters.WriteUnwrapped(writer, element);
         else element.WriteTo(writer);
     }
 
     internal void WriteNode(Utf8JsonWriter writer, JsonNode node)
     {
-        if (Options.PreserveBigIntegers) BigIntegerConverters.WriteNode(writer, node, SerializerOptions);
+        if (PreserveBigIntegers) BigIntegerConverters.WriteNode(writer, node, SerializerOptions);
         else node.WriteTo(writer, SerializerOptions);
     }
 

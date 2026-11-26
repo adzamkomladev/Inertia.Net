@@ -1,1 +1,9 @@
 #nullable enable
+Inertia.Net.Testing.InertiaTestingOptions
+Inertia.Net.Testing.InertiaTestingOptions.InertiaTestingOptions() -> void
+Inertia.Net.Testing.InertiaTestingOptions.EnsurePagesExist.get -> bool
+Inertia.Net.Testing.InertiaTestingOptions.EnsurePagesExist.set -> void
+Inertia.Net.Testing.InertiaTestingOptions.PageDirectories.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.Testing.InertiaTestingOptions.PageExtensions.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.Testing.AssertableInertia.AssertableInertia(Inertia.Net.Testing.InertiaPage! page, Inertia.Net.Testing.InertiaTestingOptions? options) -> void
+Inertia.Net.Testing.AssertableInertia.Component(string! expected, bool? shouldExist) -> Inertia.Net.Testing.AssertableInertia!
