@@ -111,6 +111,23 @@ Run the commands in [AGENTS.md](../AGENTS.md). The release checks include build/
 sample client/browser tests, and the documentation client/SSR build. Redis and MongoDB tests need running services.
 Release notes must report actual results; upstream API parity alone does not prove that the official client accepts a response.
 
+### v1.9.7 local release checks (2026-11-26)
+
+| Check | Result |
+|---|---|
+| Release solution build with warnings as errors | Passed; 0 warnings, 0 errors |
+| Solution tests on .NET 10 and 11, with Redis and MongoDB available | 3,964 passed; 0 failed; 0 skipped |
+| Solution packaging with warnings as errors | All 9 expected 1.9.7 NuGet packages created |
+| Native AOT publish and protocol smoke | Passed on net10.0 and net11.0, including metadata-only lists and ordinary-response capture |
+| Generated templates: React/Vue/Svelte × net10.0/net11.0 × auth/no-auth | All 12 server builds passed with warnings as errors |
+| React browser suite, SSR enabled | 32 passed, including real SSR hydration |
+| Vue browser suite | 15 passed; 17 React-only checks skipped |
+| Svelte browser suite | 15 passed; 17 React-only checks skipped |
+| Docs TypeScript, client bundle and SSR bundle | Passed |
+| README/conformance/parity-map local links | No missing local targets |
+
+These are local Linux checks; Windows and the full generated-template frontend matrix are verified separately by repository CI.
+
 ### v1.9.6 release checks (2026-11-26)
 
 | Check | Result |
