@@ -11,7 +11,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -361,41 +361,44 @@ func computeBatch(b, m int) string {
 		value := int(next() % 1000000)
 		records[i] = record{value: value, id: b*m + i, group: int(next() % 64)}
 	}
-	sort.Slice(records, func(i, j int) bool {
-		if records[i].value != records[j].value {
-			return records[i].value < records[j].value
+	slices.SortFunc(records, func(left, right record) int {
+		if left.value != right.value {
+			return left.value - right.value
 		}
-		return records[i].id < records[j].id
+		return left.id - right.id
 	})
 
 	var counts [64]int
 	var sums [64]int64
-	var text strings.Builder
-	text.Grow(m*7 + 64*10)
+	text := make([]byte, 0, m*7+64*10)
 	for index, r := range records {
 		counts[r.group]++
 		sums[r.group] += int64(r.value)
 		if index > 0 {
-			text.WriteByte(',')
+			text = append(text, ',')
 		}
-		text.WriteString(strconv.Itoa(r.id))
+		text = strconv.AppendInt(text, int64(r.id), 10)
 	}
-	text.WriteByte('|')
+	text = append(text, '|')
 	for group := 0; group < 64; group++ {
 		if group > 0 {
-			text.WriteByte(';')
+			text = append(text, ';')
 		}
-		text.WriteString(strconv.Itoa(group))
-		text.WriteByte(':')
-		text.WriteString(strconv.Itoa(counts[group]))
-		text.WriteByte(':')
-		text.WriteString(strconv.FormatInt(sums[group], 10))
+		text = strconv.AppendInt(text, int64(group), 10)
+		text = append(text, ':')
+		text = strconv.AppendInt(text, int64(counts[group]), 10)
+		text = append(text, ':')
+		text = strconv.AppendInt(text, sums[group], 10)
 	}
-	return sha256Hex(text.String())
+	return sha256HexBytes(text)
 }
 
 func sha256Hex(value string) string {
-	sum := sha256.Sum256([]byte(value))
+	return sha256HexBytes([]byte(value))
+}
+
+func sha256HexBytes(value []byte) string {
+	sum := sha256.Sum256(value)
 	return hex.EncodeToString(sum[:])
 }
 
