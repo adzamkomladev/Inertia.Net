@@ -180,6 +180,73 @@ with all twelve builds on each route's runner. Requests per second for first vis
 - **Already-cheap routes don't gain**: the home page's JSON (a fixed list) was a little slower in some tuned builds, within the noise of
   one run.
 
+## Go (Gin, GORM) vs Inertia.Net
+
+On 2026-11-26 we ran the comparison again with only the Go and .NET builds (`--frameworks inertianet,inertianet-aot,golang`), split by
+route. No other framework was in that run; Node is used only to build the shared React pages and, in SSR mode, to render them. The
+full report, with every latency percentile and fixed-rate run, is in [results/2026-11-26-golang.md](results/2026-11-26-golang.md).
+
+**Memory, startup and image size**
+
+| App | Memory at rest, SPA / SSR | Cold start, SPA / SSR | Image, SPA / SSR |
+|---|---:|---:|---:|
+| Inertia.Net (JIT) | 27 / 60 MB | 702 / 1562 ms | 57 / 81 MB |
+| Inertia.Net (Native AOT) | 17 / 46 MB | 265 / 705 ms | 16 / 40 MB |
+| Go (Gin, GORM) | 4 / 34 MB | 208 / 211 ms | 16 / 41 MB |
+
+**Requests per second** (16 connections, SSR mode; higher is better)
+
+| Route | Response | Inertia.Net JIT | Inertia.Net AOT | Go |
+|---|---|---:|---:|---:|
+| Home | page | 4,075 | 4,565 | 3,674 |
+| Home, data | json | 12,013 | 12,234 | 19,141 |
+| Todos, 25 rows | page | 1,049 | 2,304 | 1,746 |
+| Todos, 25 rows, data | json | 3,316 | 5,059 | 5,415 |
+| Todos, 100 rows | page | 572 | 1,038 | 796 |
+| Todos, 100 rows, data | json | 3,154 | 4,214 | 2,683 |
+| Dashboard | page | 5,077 | 6,403 | 5,173 |
+| Dashboard, data | json | 15,998 | 15,374 | 22,265 |
+| New todo form | page | 3,488 | 4,270 | 3,803 |
+| New todo form, data | json | 13,890 | 14,819 | 23,125 |
+| Valid post | valid | 2,025 | 4,851 | 6,943 |
+| Invalid post | invalid | 18,650 | 18,571 | 50,061 |
+| Compute | page | 731 | 643 | 595 |
+| Compute, data | json | 999 | 717 | 744 |
+| Compute parallel | page | 945 | 754 | 739 |
+| Compute parallel, data | json | 1,130 | 844 | 950 |
+
+**Using more CPUs** (`/compute/parallel`, JSON, 16 connections)
+
+| App | 1 CPU | 2 CPUs | 4 CPUs |
+|---|---:|---:|---:|
+| Inertia.Net (JIT) | 665 | 1001 | 1591 |
+| Inertia.Net (Native AOT) | 483 | 717 | 1170 |
+| Go (Gin, GORM) | 440 | 782 | 978 |
+
+What stands out:
+
+- **Go used the least memory and started fastest.** The SPA container sat at 4 MB and the SSR container, Node renderer included, at
+  34 MB; Inertia.Net's AOT builds used 17 MB and 46 MB. The images were 16 MB (SPA) and 41 MB (SSR), against 16/40 MB for AOT and
+  57/81 MB for JIT. Go's 208 ms SPA and 211 ms SSR cold starts were close to the AOT SPA build's 265 ms and well ahead of the JIT
+  build's 702/1,562 ms.
+- **Go was much faster on the form.** Invalid posts, which write nothing, reached 50,061 per second against 18,650 for JIT and 18,571
+  for AOT; valid posts reached 6,943 against 2,025 and 4,851. GORM's insert is a single statement and the Go app has no CSRF token,
+  while Inertia.Net validates antiforgery on every post (see [Caveats](#caveats)).
+- **Go won most data-heavy JSON routes.** Home data was 1.6x both .NET builds, the cached dashboard 1.4x, the 25-row list 1.6x over
+  JIT and 1.07x over AOT, and the new-todo form's JSON 1.6x. The 100-row list was the exception: 2,683 against 3,154 (JIT) and
+  4,214 (AOT).
+- **.NET AOT kept the lead on server-rendered first visits.** AOT was 12% to 32% faster on all five pages. Go beat the JIT build on
+  both todo lists and the new-todo form, was within 2% on the dashboard, and was 10% behind on the home page.
+- **CPU-heavy work is close now.** Go's `/compute` JSON reached 744 per second, 4% ahead of the AOT build and 26% behind JIT, and
+  `/compute/parallel` scaled from 440 to 978 per second over 1, 2 and 4 CPUs. Before the app used `slices.SortFunc` and appended
+  integers without allocating a string per id, this route was about 2x slower; that was the Go app's implementation, not a language
+  limit.
+
+The Go app has no CSRF token and does not supervise its Node renderer, so these numbers give it a little less work to do than
+Inertia.Net's antiforgery and managed Node process. The .NET and Go apps otherwise run the same routes, queries, React pages and
+compute algorithm, and the parity check compares their answers byte for byte.
+
+
 ## The Node apps in cluster mode
 
 Node runs one request's JavaScript at a time, so a single Node server uses about one core. The usual fix in production is to run one
@@ -339,10 +406,11 @@ CPU each part ran on.
 
 - **Only numbers from a quiet machine mean anything.** The load client runs on the same machine as the apps and takes CPU too. On a
   4-CPU runner, the 4-CPU scaling step shares the machine with the client and with Postgres.
-- **One Node process renders SSR** in both Inertia apps, and Next.js and TanStack Start render in their one Node server process. Node
+- **One Node process renders SSR** in the three Inertia apps, and Next.js and TanStack Start render in their one Node server process. Node
   renders on one thread, so SSR throughput is roughly one core's worth of rendering in every app. The `-cluster` builds run one Node
   server per CPU instead (see [The Node apps in cluster mode](#the-node-apps-in-cluster-mode)). Inertia.Net can run several SSR
-  processes (`NodeProcess.Instances`); this benchmark keeps the default of one.
+  processes (`NodeProcess.Instances`); this benchmark keeps the default of one. The Go app starts its Node renderer in `start.sh` and does not
+  supervise it; gonertia falls back to client rendering if it stops answering.
 - **Pools**: .NET, Go and Node use a Postgres pool of at most 10 connections. Laravel runs two Octane workers per CPU, each with its own
   connection. Node's worker pool for `/compute/parallel` is sized to the CPU limit (`BENCH_WORKERS`), because Node counts the host's
   CPUs, not the container's; .NET reads the container's CPU limit itself.
@@ -357,8 +425,8 @@ CPU each part ran on.
 - Postgres and Redis are shared by all apps, run one app at a time; Redis is flushed and the `submissions` table emptied before each
   app starts.
 - **Sessions and forgery protection cost something on every page in the Inertia apps.** Inertia.Net issues antiforgery tokens and
-  Laravel writes its encrypted session cookies on each page response, as a real app with forms does. The Node apps' route handlers
-  have no equivalent by default.
+  Laravel writes its encrypted session cookies on each page response, as a real app with forms does. The Go app sets a session cookie
+  but has no CSRF token, and the Node apps' route handlers have no equivalent by default.
 - **Next.js runs with Cache Components on** (needed for `'use cache'`). Each page sets `instant = false`, so pages are still fully
   rendered per request, as in the other apps, instead of streaming a prerendered shell first.
 
