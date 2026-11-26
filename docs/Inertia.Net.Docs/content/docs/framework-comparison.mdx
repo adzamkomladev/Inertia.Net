@@ -1,21 +1,39 @@
 ---
 title: Framework comparison
-description: How Inertia.Net compares with Next.js, TanStack Start, Nuxt and Laravel when they all build the same app, what each framework is good at, and how fast, lean and quick to start each one is.
+description: "Compare complete application stacks: ASP.NET Core with Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel with Inertia. Understand their setup, strengths and measured performance."
 section: Production
 order: 10
 ---
 
-Choosing a full-stack framework is mostly about how you like to build. Speed and cost still matter, though, and they are hard to compare from each project's own claims. So we built the same small app in five frameworks, wrote each one the way that framework's own teams would, and measured them side by side.
+Choosing a stack starts with the language, backend framework and way of building that suit your team. Speed and hosting cost matter too. To make those trade-offs easier to see, we built the same small app with five application stacks and measured their particular setups side by side.
 
 This page explains what was built, introduces each framework and what it is good at, and then walks through the results in plain terms.
 
+<Callout type="info" title="This is a framework-stack comparison, not an adapter comparison">
+The .NET entry is **C# and ASP.NET Core, with Inertia.Net connecting the backend to React pages**. The Laravel entry is PHP and Laravel with Inertia. Next.js, TanStack Start and Nuxt bring their own application structure and rendering tools.
+
+**Inertia.Net does not make .NET faster.** The language, runtime, web framework, database access, rendering and deployment setup all contribute to these results. Inertia.Net provides the page-and-props connection and optional features such as caching; it is not the source of C#'s execution speed or ASP.NET Core's concurrency. These numbers cannot isolate adapter overhead or predict every app's performance.
+</Callout>
+
+## What you gain with each setup
+
+| Stack | How you build it | What you gain |
+|---|---|---|
+| **C# / ASP.NET Core + Inertia.Net** | Keep routing, data access and business logic in .NET. Return React, Vue or Svelte pages and props through Inertia instead of designing a separate page API. | ASP.NET Core's backend tools and .NET's runtime characteristics, plus a modern component frontend. Inertia.Net supplies the connection—not a faster runtime. |
+| **TypeScript / Next.js** | Build around React's App Router, server/client components and Next.js data and rendering conventions. | An integrated React application framework, static and server rendering options, and a broad hosting and tooling ecosystem. |
+| **TypeScript / TanStack Start** | Use React routes, loaders and server functions with TanStack's typed APIs. | A TypeScript-first workflow with closely connected routing and server calls, and explicit control over data loading. |
+| **TypeScript / Nuxt** | Build Vue pages with file-based routing, auto-imports, composables and Nitro server routes. | A cohesive Vue setup with less wiring, modules and integrated server-rendering tools. |
+| **PHP / Laravel + Inertia** | Use Laravel routes, controllers and backend services; return component pages through Inertia. | Laravel's conventions and backend ecosystem, with React, Vue or Svelte pages rather than a separately designed page API. |
+
+For example, choosing .NET with Inertia.Net means keeping your C# services and ASP.NET Core infrastructure while adding a component frontend. Choosing Nuxt means adopting its Vue and TypeScript application model. Neither choice is just a different adapter: it changes where your code lives, which tools you use and how you deploy.
+
 ## The short version
 
-- **Inertia.Net handled the most traffic in every test**, from first page loads to form posts to heavy calculations. Its Native AOT build also used the least memory and started fastest.
+- **The ASP.NET Core + Inertia.Net setup handled the most traffic in the tests shown**, from first page loads to form posts to heavy calculations. Its Native AOT build also used the least memory and started fastest. These are whole-stack results, not gains caused by installing the adapter.
 - **TanStack Start is the leanest JavaScript option.** It used as little memory as Inertia.Net's normal build and started the fastest of all the server-rendered apps.
 - **Nuxt's API is very quick**, but its server-rendered pages were slower than the other JavaScript frameworks except Next.js.
 - **Next.js and Laravel served the fewest requests** in this setup. Both still answered in a few milliseconds at everyday traffic levels.
-- **With every framework's own caching turned on, Inertia.Net was still the fastest**, by 2 to 6 times over the next best on cached first visits.
+- **With caching configured for every stack, the .NET setup was still the fastest in this run**, by 2 to 6 times over the next best on cached first visits. The cache implementations do different work, as explained below.
 - **At normal traffic every framework is fast enough.** The differences matter when traffic spikes, when you pay per server, or when a page does heavy work.
 
 ## What we built
@@ -36,7 +54,7 @@ Before any measuring, a parity check confirms that every app returns exactly the
 
 <Contenders names={['Inertia.Net', 'Next.js', 'TanStack Start', 'Nuxt', 'Laravel']} />
 
-### Inertia.Net
+### ASP.NET Core with Inertia.Net
 
 Inertia.Net lets you write the server in ASP.NET Core and the pages in React, Vue or Svelte, without building a separate API. Controllers or Minimal API handlers return a page name and its data; Inertia's client does the routing in the browser.
 
@@ -45,7 +63,9 @@ Inertia.Net lets you write the server in ASP.NET Core and the pages in React, Vu
 - **JIT**: the normal .NET build, which optimises itself while it runs.
 - **Native AOT**: compiled ahead of time into one small executable. EF Core doesn't support Native AOT yet, so this build reads the database with Npgsql directly. See [Native AOT](/docs/native-aot).
 
-**Strengths**: .NET's speed and its use of every CPU core, a mature type-safe backend (EF Core, Identity, validation, background jobs), small Native AOT images, and a frontend that is still plain React, Vue or Svelte.
+**What comes from .NET and ASP.NET Core**: the C# runtime, concurrent request handling, backend libraries such as EF Core and Identity, and the option of Native AOT.
+
+**What Inertia.Net adds**: returning component pages and props from those endpoints, with Inertia navigation, forms and optional prop/render caching. You keep a .NET backend and a React, Vue or Svelte frontend without building a separate page API. The adapter still does work on each response; it does not accelerate the underlying runtime.
 
 ### Next.js
 
@@ -80,6 +100,8 @@ Laravel is PHP's most popular framework. With Inertia, its controllers return Re
 **Strengths**: a famously productive developer experience, everything built in (auth, queues, mail, scheduling, storage), a huge ecosystem, and the official Inertia adapter that started it all.
 
 ## The results
+
+For brevity, charts and tables label the .NET setup **Inertia.Net** and the PHP setup **Laravel**. Read these as **ASP.NET Core + Inertia.Net** and **Laravel + Inertia**, with the database, frontend and hosting choices described above—not measurements of either adapter alone. The JIT and AOT entries also use different database access libraries, so their difference is not solely a compilation-mode effect.
 
 All six apps ran on GitHub's cloud machines. Each test route got its own machine with every app on it, so the apps in any one row of the tables below shared the same hardware. Each app was limited to 2 CPU cores and 2 GB of memory. Every request succeeded, and every server-rendered page really was rendered on the server.
 
@@ -190,7 +212,7 @@ Node.js runs one request's JavaScript at a time, so a single Node.js server uses
 
 ## Inertia.Net with its caching turned on
 
-All the results above run every framework without page caching, so they compare the frameworks themselves. A real app usually caches what it can. So we ran Inertia.Net once more, next to itself, with its own caching features turned on:
+All the results above run each setup without page caching; the dashboard data is still cached as described earlier. They measure the complete request path, not just the framework or adapter. A real app usually caches what it can. So we ran the .NET app once more, next to itself, with Inertia.Net's optional caching features turned on:
 
 - **The SSR render cache** keeps the HTML of a server-rendered page. When the next visitor gets exactly the same page, Inertia.Net sends that HTML without asking Node to render it again. See [Server-side rendering](/docs/server-side-rendering).
 - **Two Node renderers** instead of one, so rendering can use both CPU cores.
@@ -252,7 +274,7 @@ See [Server-side rendering](/docs/server-side-rendering) for the render cache an
 ## What this means for you
 
 - **Pick the framework your team enjoys and knows.** All five are fast enough for most apps at normal traffic.
-- **Choose Inertia.Net** if you want a .NET backend with a React, Vue or Svelte frontend, if you care about hosting cost and headroom under load, or if your pages do real work on the server.
+- **Choose ASP.NET Core with Inertia.Net** if C# and the .NET backend ecosystem suit your team and you want React, Vue or Svelte pages without a separate page API. Treat the measured headroom as a result of this setup, not a speed boost promised by the adapter.
 - **Choose Native AOT** for the smallest memory, image and startup time, if plain Npgsql or Dapper-style data access suits you.
 - **Choose TanStack Start** for a light, type-safe React stack in TypeScript end to end.
 - **Choose Next.js** for the largest React ecosystem, static and incrementally generated content, or Vercel's platform.

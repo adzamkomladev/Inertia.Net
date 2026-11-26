@@ -1464,10 +1464,15 @@
       "slug": "framework-comparison",
       "url": "/docs/framework-comparison",
       "title": "Framework comparison",
-      "description": "How Inertia.Net compares with Next.js, TanStack Start, Nuxt and Laravel when they all build the same app, what each framework is good at, and how fast, lean and quick to start each one is.",
+      "description": "Compare complete application stacks: ASP.NET Core with Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel with Inertia. Understand their setup, strengths and measured performance.",
       "section": "Production",
       "order": 10,
       "headings": [
+        {
+          "id": "what-you-gain-with-each-setup",
+          "text": "What you gain with each setup",
+          "depth": 2
+        },
         {
           "id": "the-short-version",
           "text": "The short version",
@@ -1484,8 +1489,8 @@
           "depth": 2
         },
         {
-          "id": "inertianet",
-          "text": "Inertia.Net",
+          "id": "aspnet-core-with-inertianet",
+          "text": "ASP.NET Core with Inertia.Net",
           "depth": 3
         },
         {
