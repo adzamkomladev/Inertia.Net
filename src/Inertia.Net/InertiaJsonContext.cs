@@ -37,4 +37,5 @@ namespace Inertia.Net;
 [JsonSerializable(typeof(Dictionary<string, object>))]
 [JsonSerializable(typeof(Dictionary<string, ViteManifestChunk>))]
 [JsonSerializable(typeof(SsrError))]
+[JsonSerializable(typeof(SsrRenderFailed))]
 internal sealed partial class InertiaJsonContext : JsonSerializerContext;

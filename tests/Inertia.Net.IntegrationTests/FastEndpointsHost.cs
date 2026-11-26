@@ -39,7 +39,7 @@ public sealed class FastEndpointsHost : IConformanceHost
 /// <summary>The route contract as FastEndpoints endpoints.</summary>
 public static class FastEndpointsRoutes
 {
-    private static readonly Http[] Mutations = [Http.POST, Http.PUT, Http.PATCH, Http.DELETE];
+    private static readonly string[] Mutations = ["POST", "PUT", "PATCH", "DELETE", "QUERY"];
 
     public sealed class ThrowEndpoint : EndpointWithoutRequest
     {
@@ -300,7 +300,7 @@ public static class FastEndpointsRoutes
     {
         public override void Configure()
         {
-            Verbs(Http.GET, Http.POST, Http.PUT, Http.PATCH, Http.DELETE);
+            Verbs("GET", "POST", "PUT", "PATCH", "DELETE", "QUERY");
             Routes("/empty");
         }
 

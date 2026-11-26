@@ -11,7 +11,7 @@
     <!-- <InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild> -->
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Inertia.Net" Version="1.9.5" />
+    <PackageReference Include="Inertia.Net" Version="1.9.6" />
   </ItemGroup>
   <!-- The client is built with npm (npm run build writes wwwroot/build); dotnet build never needs Node. -->
   <ItemGroup>

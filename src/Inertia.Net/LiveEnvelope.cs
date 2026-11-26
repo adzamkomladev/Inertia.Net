@@ -35,6 +35,7 @@ internal static class LiveEnvelope
             throw new ArgumentException("Published props are plain values keyed by prop path; use a dictionary or an object, not InertiaProps.", nameof(props));
         }
 
+        if (props is JsonElement element && element.ValueKind == JsonValueKind.Object) return;
         if (props is not null && info.Kind is not (JsonTypeInfoKind.Object or JsonTypeInfoKind.Dictionary))
         {
             throw new ArgumentException($"Published props must serialize to a JSON object keyed by prop path, not '{info.Type}'.", nameof(props));

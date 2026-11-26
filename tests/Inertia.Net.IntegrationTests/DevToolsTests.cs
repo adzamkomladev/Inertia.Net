@@ -10,6 +10,61 @@ namespace Inertia.Net.IntegrationTests;
 /// <summary>The Inertia DevTools protocol: discovery, correlation headers, entries and the read API.</summary>
 public sealed class DevToolsTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData("/portal")]
+    public async Task Discovery_reports_the_base_path_only_when_needed(string pathBase)
+    {
+        await using var app = await ConformanceApp.StartAsync<Host>(new ConformanceSetup
+        {
+            PathBase = pathBase.Length == 0 ? null : pathBase,
+            Services = services => services.AddInertiaDevTools(options =>
+            {
+                options.Enabled = true;
+                options.Authorize = _ => true;
+            }),
+        });
+        using var response = await app.CreateClient().GetAsync(pathBase + "/dashboard", TestContext.Current.CancellationToken);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(pathBase.Length == 0 ? null : pathBase, response.Header("X-Inertia-Devtools-Base-Path"));
+        if (pathBase.Length == 0) Assert.DoesNotContain("data-inertia-devtools-base-path=", html, StringComparison.Ordinal);
+        else Assert.Contains($"data-inertia-devtools-base-path=\"{pathBase}\"", html, StringComparison.Ordinal);
+        var id = response.Header("X-Inertia-Devtools-Id");
+        using var read = await app.CreateClient().GetAsync(pathBase + "/_inertia/devtools/entries/" + id, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        var entry = JsonNode.Parse(await read.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!;
+        Assert.EndsWith(pathBase + "/dashboard", (string?)entry["__meta"]!["url"], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Reading_an_entry_between_redirect_and_page_does_not_consume_errors_or_flash()
+    {
+        await using var app = await ConformanceApp.StartAsync<Host>(new ConformanceSetup
+        {
+            Services = services => services.AddInertiaDevTools(options => { options.Enabled = true; options.Authorize = _ => true; }),
+            Middleware = application => application.Use(async (context, next) =>
+            {
+                if (context.Request.Path == "/pending-state")
+                {
+                    context.Inertia().Flash("toast", "saved").WithErrors(new Dictionary<string, string> { ["email"] = "required" });
+                    context.Response.Redirect("/dashboard");
+                    return;
+                }
+                await next(context);
+            }),
+        });
+        using var client = app.CreateClient();
+        using var redirect = await client.InertiaGetAsync("/pending-state");
+        using var entry = await client.GetAsync("/_inertia/devtools/entries/" + redirect.Header("X-Inertia-Devtools-Id"), TestContext.Current.CancellationToken);
+        Assert.Null(entry.Header("Set-Cookie"));
+        var page = await (await client.InertiaGetAsync("/dashboard")).PageAsync();
+        Assert.Equal("saved", (string?)page["flash"]!["toast"]);
+        Assert.Equal("required", (string?)page["props"]!["errors"]!["email"]);
+        var next = await (await client.InertiaGetAsync("/dashboard")).PageAsync();
+        Assert.Null(next["flash"]);
+        Assert.Empty(next["props"]!["errors"]!.AsObject());
+    }
+
     private static Task<ConformanceApp> StartAsync(Action<InertiaDevToolsOptions>? configure = null) =>
         ConformanceApp.StartAsync<Host>(new ConformanceSetup
         {
@@ -45,7 +100,7 @@ public sealed class DevToolsTests
         var meta = entry["__meta"]!;
         Assert.Equal(id, (string?)meta["id"]);
         Assert.Equal("GET", (string?)meta["method"]);
-        Assert.Equal("/dashboard", (string?)meta["url"]);
+        Assert.Equal("http://localhost/dashboard", (string?)meta["url"]);
         Assert.Equal(200, (int?)meta["status"]);
         Assert.Equal("initial", (string?)meta["requestType"]);
         Assert.Equal("Dashboard", (string?)meta["component"]);
@@ -74,9 +129,8 @@ public sealed class DevToolsTests
         Assert.Equal("append", (string?)props["feed"]!["mergeDirection"]);
         Assert.Equal("once", (string?)props["plans"]!["inertiaType"]);
         Assert.Equal("defer", (string?)props["stats"]!["inertiaType"]);
-        Assert.Equal("StatsChanged", (string?)props["stats"]!["live"]!["listeners"]![0]!["events"]![0]);
-        Assert.Equal("live", (string?)props["order"]!["inertiaType"]);
-        Assert.Equal(2000, (int?)props["order"]!["live"]!["throttle"]);
+        Assert.True((bool?)props["stats"]!["live"]);
+        Assert.True((bool?)props["order"]!["live"]);
         Assert.True((bool?)props["appName"]!["shared"]);
 
         var values = entry["propValues"]!;
@@ -221,7 +275,7 @@ public sealed class DevToolsTests
             Assert.DoesNotContain(secret, entry.ToJsonString(), StringComparison.Ordinal);
         }
         Assert.Contains("ok=visible", (string?)entry["__meta"]!["url"], StringComparison.Ordinal);
-        Assert.Equal((string?)entry["__meta"]!["url"], (string?)entry["http"]!["responseBody"]!["value"]!["url"]);
+        Assert.EndsWith((string?)entry["http"]!["responseBody"]!["value"]!["url"], (string?)entry["__meta"]!["url"], StringComparison.Ordinal);
         Assert.EndsWith("#kept", (string?)entry["http"]!["requestHeaders"]!["referer"], StringComparison.Ordinal);
     }
 
@@ -306,7 +360,7 @@ public sealed class DevToolsTests
         await recorder.CompleteAsync(http, capture, failed: false);
         var entry = JsonNode.Parse(await app.CreateClient().GetStringAsync("/_inertia/devtools/entries/" + capture.Id, TestContext.Current.CancellationToken))!;
         Assert.DoesNotContain("encoded-secret", entry.ToJsonString(), StringComparison.Ordinal);
-        Assert.StartsWith("/base/dashboard?", (string?)entry["__meta"]!["url"], StringComparison.Ordinal);
+        Assert.Contains("/base/dashboard?", (string?)entry["__meta"]!["url"], StringComparison.Ordinal);
         var recordedUrl = (string?)entry["http"]!["responseBody"]!["value"]!["url"];
         Assert.StartsWith("https://example.test/base/dashboard?", recordedUrl, StringComparison.Ordinal);
         Assert.Contains("ok=visible", recordedUrl, StringComparison.Ordinal);

@@ -174,6 +174,26 @@ public class LivePropsTests
     }
 
     [Fact]
+    public async Task Resolved_prop_definitions_publish_with_the_existing_envelope()
+    {
+        var broadcaster = new RecordingBroadcaster();
+        var harness = new Harness(configureServices: services =>
+        {
+            services.AddInertiaLive();
+            services.AddSingleton<IInertiaLiveBroadcaster>(broadcaster);
+        });
+        var values = await Inertia.BroadcastPropsAsync(harness.Context(), new InertiaProps
+        {
+            ["auth.user"] = Inertia.Optional(() => "Ada"),
+            ["count"] = Inertia.Defer(() => 2),
+        });
+        await harness.Services.GetRequiredService<IInertiaLive>().PublishAsync(OrderUpdated, values, "socket-1", Ct);
+        var message = Assert.Single(broadcaster.Messages);
+        Assert.Equal("""{"__inertia":{"event":"OrderUpdated","props":{"auth.user":"Ada","count":2}}}""", message.Payload.GetRawText());
+        Assert.Equal("socket-1", message.ExceptSocketId);
+    }
+
+    [Fact]
     public async Task Published_values_must_be_plain_objects()
     {
         var (live, _) = Live();

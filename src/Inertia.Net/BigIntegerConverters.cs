@@ -61,6 +61,34 @@ internal static class BigIntegerConverters
         }
     }
 
+    internal static void WriteUnwrapped(Utf8JsonWriter writer, JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.GetPropertyCount() == 1 && element.TryGetProperty("$bigint", out var marker)
+                && marker.ValueKind == JsonValueKind.String
+                && BigInteger.TryParse(marker.GetString(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var number))
+            {
+                writer.WriteRawValue(number.ToString(CultureInfo.InvariantCulture));
+                return;
+            }
+            writer.WriteStartObject();
+            foreach (var property in element.EnumerateObject())
+            {
+                writer.WritePropertyName(property.Name);
+                WriteUnwrapped(writer, property.Value);
+            }
+            writer.WriteEndObject();
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            writer.WriteStartArray();
+            foreach (var value in element.EnumerateArray()) WriteUnwrapped(writer, value);
+            writer.WriteEndArray();
+        }
+        else element.WriteTo(writer);
+    }
+
     // Whether WriteElement writes the value as it is: anything but an object, an array or an integer beyond ±(2^53−1).
     private static bool IsVerbatim(JsonElement element) => element.ValueKind switch
     {

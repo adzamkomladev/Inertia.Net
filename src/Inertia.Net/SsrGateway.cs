@@ -53,7 +53,8 @@ internal sealed record SsrError(
     [property: JsonPropertyName("type")] string? Type,
     [property: JsonPropertyName("hint")] string? Hint,
     [property: JsonPropertyName("browserApi")] JsonElement? BrowserApi,
-    [property: JsonPropertyName("sourceLocation")] JsonElement? SourceLocation);
+    [property: JsonPropertyName("sourceLocation")] JsonElement? SourceLocation,
+    [property: JsonPropertyName("stack")] string? Stack = null);
 
 /// <summary>
 /// Renders pages on the Inertia SSR servers (or the Vite dev server) and falls back to client-side rendering on failure: policy, then
@@ -274,7 +275,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             {
                 if (previous is { } last)
                 {
-                    return Complete(mode, activity, started, last); // no other server can take the render
+                    return Complete(mode, activity, started, last, pageJson); // no other server can take the render
                 }
 
                 Complete(activity, started, null, notReady ? SsrFailure.NotReady : SsrFailure.CircuitOpen);
@@ -304,7 +305,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
                 continue;
             }
 
-            return Complete(mode, activity, started, attempt);
+            return Complete(mode, activity, started, attempt, pageJson);
         }
     }
 
@@ -356,9 +357,32 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         }
     }
 
-    private SsrRender? Complete(SsrMode mode, Activity? activity, long started, Attempt attempt)
+    private SsrRender? Complete(SsrMode mode, Activity? activity, long started, Attempt attempt, ReadOnlyMemory<byte> pageJson)
     {
         Complete(activity, started, null, attempt.Failure);
+        if (_ssr.OnRenderFailed is { } notify)
+        {
+            try
+            {
+                using var page = JsonDocument.Parse(pageJson);
+                notify(new SsrRenderFailed
+                {
+                    Error = Truncate(attempt.Message)!,
+                    Type = Truncate(attempt.Type)!,
+                    Hint = Truncate(attempt.Hint) ?? "",
+                    Timestamp = _timeProvider.GetUtcNow(),
+                    Component = page.RootElement.TryGetProperty("component", out var component) ? component.GetString() : null,
+                    Url = page.RootElement.TryGetProperty("url", out var url) ? url.GetString() : null,
+                    BrowserApi = attempt.Details?.BrowserApi?.Clone(),
+                    SourceLocation = attempt.Details?.SourceLocation?.Clone(),
+                    Stack = Truncate(attempt.Details?.Stack),
+                });
+            }
+            catch (Exception exception)
+            {
+                LogFailure(_logger, exception, "notification", "The SSR failure callback failed.", null, null, null);
+            }
+        }
         if (attempt.Failure == SsrFailure.Overloaded)
         {
             return Skip(mode, SsrFailure.Overloaded, attempt.Message);

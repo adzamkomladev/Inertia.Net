@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.IntegrationTests;
@@ -455,6 +457,7 @@ public abstract class ProtocolConformanceTests<THost>
     [InlineData("PUT", HttpStatusCode.SeeOther)]
     [InlineData("PATCH", HttpStatusCode.SeeOther)]
     [InlineData("DELETE", HttpStatusCode.SeeOther)]
+    [InlineData("QUERY", HttpStatusCode.SeeOther)]
     [InlineData("POST", HttpStatusCode.Found)]
     public async Task Redirects_after_put_patch_delete_become_303(string method, HttpStatusCode expected)
     {
@@ -512,6 +515,7 @@ public abstract class ProtocolConformanceTests<THost>
     [InlineData("PUT", HttpStatusCode.SeeOther)]
     [InlineData("PATCH", HttpStatusCode.SeeOther)]
     [InlineData("DELETE", HttpStatusCode.SeeOther)]
+    [InlineData("QUERY", HttpStatusCode.SeeOther)]
     public async Task An_empty_response_to_an_inertia_request_redirects_back(string method, HttpStatusCode expected)
     {
         await using var app = await StartAsync();
@@ -604,6 +608,34 @@ public abstract class ProtocolConformanceTests<THost>
         Assert.Equal("Saved Bob", (string?)page["flash"]!["success"]);
     }
 
+    [Theory]
+    [InlineData("empty")]
+    [InlineData("location")]
+    [InlineData("fragment")]
+    public async Task Newly_set_flash_survives_client_redirects_and_empty_responses(string kind)
+    {
+        await using var app = await StartAsync(new ConformanceSetup
+        {
+            Middleware = application => application.Use(async (context, next) =>
+            {
+                if (context.Request.Path == "/flash-control")
+                {
+                    context.Inertia().Flash("toast", "saved");
+                    if (kind == "location") await Location("/page").ExecuteAsync(context);
+                    else if (kind == "fragment") context.Response.Redirect("/page#saved");
+                    return;
+                }
+                await next(context);
+            }),
+        });
+        using var client = app.CreateClient();
+        using var redirect = await client.InertiaGetAsync("/flash-control");
+        Assert.Equal(kind == "empty" ? HttpStatusCode.Found : HttpStatusCode.Conflict, redirect.StatusCode);
+        var page = await (await client.InertiaGetAsync("/page")).PageAsync();
+        Assert.Equal("saved", (string?)page["flash"]!["toast"]);
+        JsonAssert.Missing(await (await client.InertiaGetAsync("/page")).PageAsync(), "flash");
+    }
+
     // Laravel re-flashes on every redirect (Middleware::reflash) and keeps clearHistory/preserveFragment in the session until a
     // page renders, so e.g. Back() to a URL that itself redirects still shows the flash.
     [Fact]
@@ -642,6 +674,56 @@ public abstract class ProtocolConformanceTests<THost>
             Assert.Contains("expires=", other.Header("Set-Cookie"), StringComparison.OrdinalIgnoreCase);
         }
 
+        JsonAssert.Missing(await (await client.InertiaGetAsync("/page")).PageAsync(), "flash");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Forgetting_restored_flash_preserves_remaining_values_only_until_the_next_page(bool redirectAgain)
+    {
+        await using var app = await StartAsync(new ConformanceSetup
+        {
+            Middleware = application => application.Use(async (context, next) =>
+            {
+                if (context.Request.Path == "/forget-flash")
+                {
+                    context.Inertia().ForgetFlashed("success").Flash("remaining", "kept");
+                    if (redirectAgain) context.Response.Redirect("/page");
+                    else await Render("Page").ExecuteAsync(context);
+                    return;
+                }
+                await next(context);
+            }),
+        });
+        using var client = app.CreateClient();
+        using var submit = await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
+        using var response = await client.InertiaGetAsync("/forget-flash");
+        var page = redirectAgain ? await (await client.InertiaGetAsync("/page")).PageAsync() : await response.PageAsync();
+        JsonAssert.Equal("""{"remaining":"kept"}""", page["flash"]);
+        JsonAssert.Missing(await (await client.InertiaGetAsync("/page")).PageAsync(), "flash");
+    }
+
+    [Fact]
+    public async Task A_successful_response_with_a_location_header_consumes_flash_instead_of_reflashing()
+    {
+        await using var app = await StartAsync(new ConformanceSetup
+        {
+            Middleware = application => application.Use(async (context, next) =>
+            {
+                if (context.Request.Path == "/success-location")
+                {
+                    context.Response.Headers.Location = "/page";
+                    await context.Response.WriteAsync("ok");
+                    return;
+                }
+                await next(context);
+            }),
+        });
+        using var client = app.CreateClient();
+        using var submit = await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
+        using var response = await client.InertiaGetAsync("/success-location");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         JsonAssert.Missing(await (await client.InertiaGetAsync("/page")).PageAsync(), "flash");
     }
 

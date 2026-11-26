@@ -7,6 +7,17 @@ namespace Inertia.Net.Testing;
 /// <summary>JSON helpers shared by the assertion and page types.</summary>
 internal static class Json
 {
+    internal static JsonNode? DecodeBigIntegers(JsonNode? node) => node switch
+    {
+        JsonObject obj when obj.Count == 1 && obj["$bigint"] is JsonValue value
+            && value.TryGetValue<string>(out var digits)
+            && System.Numerics.BigInteger.TryParse(digits, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var integer)
+            => JsonNode.Parse(integer.ToString(CultureInfo.InvariantCulture)),
+        JsonObject obj => new JsonObject(obj.Select(item => KeyValuePair.Create(item.Key, DecodeBigIntegers(item.Value)))),
+        JsonArray array => new JsonArray(array.Select(DecodeBigIntegers).ToArray()),
+        _ => node?.DeepClone(),
+    };
+
     /// <summary>Resolves a dot path (object keys and array indexes) under <paramref name="root"/>.</summary>
     public static bool TryGet(JsonNode? root, string path, out JsonNode? value)
     {
@@ -28,6 +39,7 @@ internal static class Json
     {
         null => null,
         JsonNode n => n,
+        System.Numerics.BigInteger integer => JsonNode.Parse(integer.ToString(CultureInfo.InvariantCulture)),
         _ => JsonSerializer.SerializeToNode(o), // reflection serialization: fine for tests
     };
 

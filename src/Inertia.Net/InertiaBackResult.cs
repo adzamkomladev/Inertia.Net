@@ -6,7 +6,7 @@ namespace Inertia.Net;
 
 /// <summary>
 /// Redirects back to the <c>Referer</c> (only when it has the request's own host, so it cannot become an open redirect),
-/// otherwise to the opt-in previous-URL cookie or the fallback. A 302; <c>UseInertia()</c> turns it into a 303 for PUT/PATCH/DELETE and carries the errors
+/// otherwise to the opt-in previous-URL cookie or the fallback. A 302; <c>UseInertia()</c> turns it into a 303 for PUT/PATCH/DELETE/QUERY and carries the errors
 /// and flash data to the next request.
 /// </summary>
 public sealed class InertiaBackResult : IResult, IStatusCodeHttpResult

@@ -25,6 +25,13 @@ var only = await page.ReloadOnlyAsync(client, "users");
 
 For form redirects, keep cookies and disable automatic redirects on the client. This example uses the sample's contact form:
 
+Optional file checks use `new AssertableInertia(page, options)`: set `InertiaTestingOptions.EnsurePagesExist = true` and add
+the page folders to `PageDirectories`. The default extensions cover React, Vue and Svelte. `Component(name, false)` skips
+the check; `true` forces it. Without test options, component assertions check names only.
+
+When a response sets `preserveBigIntegers`, ordinary `Where` and `HasFlash` assertions compare `$bigint` markers as integers.
+The raw page remains unchanged; without the flag, an app-authored marker remains an ordinary object.
+
 ```csharp
 client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
 using var form = await client.GetAsync("/contacts/create");

@@ -6,9 +6,15 @@ namespace Inertia.Net.Testing;
 public sealed class AssertableInertia : AssertableJsonBase<AssertableInertia>
 {
     private readonly InertiaPage _page;
+    private readonly InertiaTestingOptions? _options;
 
     /// <summary>Creates assertions for <paramref name="page"/>.</summary>
-    public AssertableInertia(InertiaPage page) : base(page.Props, "") => _page = page;
+    public AssertableInertia(InertiaPage page) : this(page, null) { }
+
+    /// <summary>Creates assertions with optional component-file checks.</summary>
+    public AssertableInertia(InertiaPage page, InertiaTestingOptions? options)
+        : base(page.PreserveBigIntegers ? Json.DecodeBigIntegers(page.Props) : page.Props, "") =>
+        (_page, _options) = (page, options);
 
     private static void Fail(string message) => throw new InertiaAssertionException(message);
 
@@ -21,8 +27,20 @@ public sealed class AssertableInertia : AssertableJsonBase<AssertableInertia>
 
     /// <summary>Asserts the page component.</summary>
     public AssertableInertia Component(string expected)
+        => Component(expected, null);
+
+    /// <summary>Asserts the component name and optionally its page file. An explicit flag overrides the test options.</summary>
+    public AssertableInertia Component(string expected, bool? shouldExist)
     {
         if (_page.Component != expected) Fail($"Unexpected Inertia page component: expected [{expected}] but was [{_page.Component}].");
+        if (shouldExist ?? _options?.EnsurePagesExist ?? false)
+        {
+            if (_options is null || !_options.PageDirectories.Any(directory => Directory.Exists(directory)
+                && Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Any(file =>
+                    _options.PageExtensions.Contains(Path.GetExtension(file), StringComparer.Ordinal)
+                    && string.Equals(Path.ChangeExtension(Path.GetRelativePath(directory, file), null).Replace('\\', '/'), expected, StringComparison.Ordinal))))
+                Fail($"Inertia page component file [{expected}] was not found in the configured page directories [{string.Join(", ", _options?.PageDirectories ?? [])}].");
+        }
         return this;
     }
 
@@ -114,7 +132,7 @@ public sealed class AssertableInertia : AssertableJsonBase<AssertableInertia>
     {
         HasFlash(key);
         Json.TryGet(_page.Flash, key, out var actual);
-        if (!JsonNode.DeepEquals(actual, Json.ToNode(expected)))
+        if (!JsonNode.DeepEquals(_page.PreserveBigIntegers ? Json.DecodeBigIntegers(actual) : actual, Json.ToNode(expected)))
             Fail($"Inertia Flash Data [{key}] expected to be {Json.Show(Json.ToNode(expected))} but was {Json.Show(actual)}.");
         return this;
     }

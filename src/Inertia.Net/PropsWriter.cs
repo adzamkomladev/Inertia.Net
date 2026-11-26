@@ -35,6 +35,8 @@ internal sealed partial class PropsWriter
     private Utf8JsonWriter? _htmlWriter;
     private InertiaRequest _request;
     private bool _isPartial;
+    private bool _broadcast;
+    private DevToolsCapture? _capture;
     private bool _plan;
     private CancellationToken _cancellationToken;
     private char[] _path = ArrayPool<char>.Shared.Rent(128);
@@ -64,7 +66,7 @@ internal sealed partial class PropsWriter
     /// Starts a render into <paramref name="buffer"/> and returns its JSON writer, kept for the next render with the same options. With
     /// <paramref name="plan"/> the walk starts the <see cref="InertiaProp.Parallel"/> loaders first.
     /// </summary>
-    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, bool plan, IServiceProvider services, CancellationToken cancellationToken)
+    public Utf8JsonWriter Begin(IBufferWriter<byte> buffer, bool htmlSafe, InertiaRequest request, string component, bool plan, IServiceProvider services, CancellationToken cancellationToken, bool broadcast = false, DevToolsCapture? capture = null)
     {
         var writer = htmlSafe
             ? _htmlWriter ??= new Utf8JsonWriter(buffer, _owner.HtmlWriterOptions)
@@ -74,6 +76,8 @@ internal sealed partial class PropsWriter
         _request = request;
         _services = services;
         _isPartial = string.Equals(request.PartialComponent, component, StringComparison.Ordinal);
+        _broadcast = broadcast;
+        _capture = capture;
         _cancellationToken = cancellationToken;
         _plan = plan;
         SawParallel = false;
@@ -86,6 +90,7 @@ internal sealed partial class PropsWriter
     public void Clear()
     {
         _request = default;
+        _capture = null;
         _services = null;
         _cancellationToken = default;
         _mergeProps = _prependProps = _deepMergeProps = _matchPropsOn = null;
@@ -515,6 +520,8 @@ internal sealed partial class PropsWriter
                 return;
             }
 
+            if (p is not null) _capture?.RecordProp(new string(Path), p, _request);
+
             // Before any loader runs, so excluded and rescued live props keep their listeners (deviation 13).
             if (p?.LiveSpec is not null)
             {
@@ -552,12 +559,13 @@ internal sealed partial class PropsWriter
                 if (value is InertiaProp inner)
                 {
                     p = inner;
+                    _capture?.RecordProp(new string(Path), p, _request);
                     if (p.LiveSpec is not null)
                     {
                         CollectLive(p, parentWasResolved);
                     }
 
-                    if (!_isPartial && IsExcludedFromInitialResponse(p))
+                    if (!_broadcast && !_isPartial && IsExcludedFromInitialResponse(p))
                     {
                         CollectExcludedMetadata(p);
                         if (key is null) _writer.WriteNullValue();
@@ -635,7 +643,12 @@ internal sealed partial class PropsWriter
             _writer.WritePropertyName(key);
         }
 
-        _writer.WriteRawValue(cached.Json.Span, skipInputValidation: true);
+        if (_owner.PreserveBigIntegers || _owner.Options.PreserveBigIntegers)
+        {
+            using var document = JsonDocument.Parse(cached.Json);
+            _owner.WriteElement(_writer, document.RootElement);
+        }
+        else _writer.WriteRawValue(cached.Json.Span, skipInputValidation: true);
     }
 
     /// <summary>
@@ -891,6 +904,7 @@ internal sealed partial class PropsWriter
     // so the parallel planner and the writer agree on which loaders run.
     private Inclusion Decide(InertiaProp? p, object? prop, Type declaredType, bool parentWasResolved, JsonTypeInfo? serializer = null)
     {
+        if (_broadcast) return Inclusion.Resolved;
         // Always props and the children of resolved values bypass partial filtering.
         if (_isPartial && !parentWasResolved && p is not { IsAlways: true })
         {
@@ -953,6 +967,7 @@ internal sealed partial class PropsWriter
 
     private void CollectMetadata(InertiaProp prop, object? value)
     {
+        if (_broadcast) return;
         if (prop.IsMerge)
         {
             CollectMergeable(prop);

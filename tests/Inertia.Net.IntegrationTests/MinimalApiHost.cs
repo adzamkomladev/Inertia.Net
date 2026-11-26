@@ -12,7 +12,7 @@ namespace Inertia.Net.IntegrationTests;
 /// </summary>
 public sealed class MinimalApiHost : IConformanceHost
 {
-    private static readonly string[] Mutations = [HttpMethods.Post, HttpMethods.Put, HttpMethods.Patch, HttpMethods.Delete];
+    private static readonly string[] Mutations = [HttpMethods.Post, HttpMethods.Put, HttpMethods.Patch, HttpMethods.Delete, HttpMethods.Query];
 
     public static void ConfigureServices(IServiceCollection services) => services.AddValidation();
 

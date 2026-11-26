@@ -19,6 +19,14 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     private SsrMode? _ssrMode;
     private SsrCaching? _ssrCache; // one reference, set only by WithSsrCache()
     private InertiaHead? _head;
+    private bool? _preserveBigIntegers;
+
+    /// <summary>Overrides big-integer preservation for this response, including its props and flash data.</summary>
+    public InertiaResult PreserveBigIntegers(bool preserve = true)
+    {
+        _preserveBigIntegers = preserve;
+        return this;
+    }
 
     internal InertiaResult(string component, object? props)
     {
@@ -132,21 +140,23 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         var services = httpContext.RequestServices;
         var pageWriter = InertiaMountServices.PageWriter(httpContext)
             ?? throw new InvalidOperationException("Inertia.Net services are not registered. Call services.AddInertia() at startup.");
+        pageWriter = pageWriter.ForBigIntegers(_preserveBigIntegers);
+        var component = pageWriter.Options.ComponentTransformer?.Invoke(Component) ?? Component;
         var metrics = services.GetService<InertiaMetrics>();
         var started = metrics?.PageDurationEnabled == true ? Stopwatch.GetTimestamp() : 0;
         var request = new InertiaRequest(httpContext.Request.Headers);
         var response = httpContext.Response;
-        pageWriter.Pages?.EnsureExists(Component);
+        pageWriter.Pages?.EnsureExists(component);
         using var activity = InertiaDiagnostics.ActivitySource.StartActivity("inertia.render");
-        activity?.SetTag("inertia.component", Component);
+        activity?.SetTag("inertia.component", component);
 
         // The page is fully buffered first, so a failing loader never produces a partial 200.
-        using var page = await pageWriter.WritePageAsync(httpContext, Component, Props, request, htmlSafe: !request.IsInertia);
-        var partial = string.Equals(request.PartialComponent, Component, StringComparison.Ordinal);
+        using var page = await pageWriter.WritePageAsync(httpContext, component, Props, request, htmlSafe: !request.IsInertia);
+        var partial = string.Equals(request.PartialComponent, component, StringComparison.Ordinal);
         var devTools = DevToolsRecorder.Recording ? httpContext.Features.Get<DevToolsCapture>() : null;
         if (devTools is not null)
         {
-            devTools.Component = Component;
+            devTools.Component = component;
             devTools.PageBytes = page.WrittenMemory.Length;
             if (devTools.PageBytes <= devTools.MaxPageBytes)
             {
@@ -157,7 +167,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         response.StatusCode = _statusCode;
         if (_statusCode == StatusCodes.Status200OK && pageWriter.Options.State.RememberPreviousUrl)
         {
-            PreviousUrlCookie.Store(httpContext, request, pageWriter.Options.State, Component);
+            PreviousUrlCookie.Store(httpContext, request, pageWriter.Options.State, component);
         }
         InertiaHeaders.AppendPageVary(response.Headers);
 
@@ -181,7 +191,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         var rootView = InertiaMountServices.RootView(httpContext);
         await rootView.RenderAsync(new InertiaRootViewContext(
             httpContext,
-            Component,
+            component,
             _rootView ?? pageWriter.Options.RootView,
             _viewData ?? (IReadOnlyDictionary<string, object?>)InertiaRootViewContext.EmptyViewData,
             page.WrittenMemory,
@@ -192,7 +202,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         if (devTools is not null)
         {
             // The extension reads the first page's entry id from this tag; after the document is fine for a script data block.
-            await response.BodyWriter.WriteAsync(DevToolsRecorder.DiscoveryTag(devTools.Id), httpContext.RequestAborted);
+            await response.BodyWriter.WriteAsync(DevToolsRecorder.DiscoveryTag(devTools.Id, httpContext.Request.PathBase.ToUriComponent()), httpContext.RequestAborted);
         }
 
         metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: false, partial, pageWriter.Options.Mount);

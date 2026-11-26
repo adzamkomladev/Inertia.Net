@@ -5,6 +5,9 @@ namespace Inertia.Net;
 /// <summary>Inertia.Net configuration, set with <see cref="InertiaServiceCollectionExtensions.AddInertia(Microsoft.Extensions.DependencyInjection.IServiceCollection, string, Action{InertiaOptions})"/>.</summary>
 public sealed class InertiaOptions
 {
+    /// <summary>Optionally transforms a component name before rendering and page-file checks. Returning null keeps the original name.</summary>
+    public Func<string, string?>? ComponentTransformer { get; set; }
+
     internal Dictionary<string, object?> SharedProps { get; } = new(StringComparer.Ordinal);
 
     // The value types of typed factory shares, for the TypeScript declarations.
@@ -177,6 +180,12 @@ public enum SsrMode : byte // a byte keeps InertiaResult and InertiaRootViewCont
 /// <summary>Server-side rendering settings. Read once at startup; changes after the app starts are ignored.</summary>
 public sealed class SsrOptions
 {
+    /// <summary>
+    /// Receives failed render diagnostics before fallback or a Required-mode exception. Keep this callback thread-safe.
+    /// Callback failures are logged and do not change the page response. Details may contain secrets.
+    /// </summary>
+    public Action<SsrRenderFailed>? OnRenderFailed { get; set; }
+
     /// <summary>The default SSR server URL, used when <see cref="Urls"/> is empty.</summary>
     public const string DefaultUrl = "http://127.0.0.1:13714";
 

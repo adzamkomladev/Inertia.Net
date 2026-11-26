@@ -44,13 +44,19 @@ public abstract class RateLimitingTests<THost>
         return await client.InertiaAsync(HttpMethod.Post, "/typed", new { id = 1 }, configure);
     }
 
-    [Fact]
-    public async Task A_rejected_inertia_submission_goes_back_with_a_flash()
+    [Theory]
+    [InlineData("POST", HttpStatusCode.Found)]
+    [InlineData("QUERY", HttpStatusCode.SeeOther)]
+    public async Task A_rejected_inertia_submission_goes_back_with_a_flash(string method, HttpStatusCode expected)
     {
         await using var app = await StartAsync();
         var client = app.CreateClient();
-        var rejected = await SubmitTwiceAsync(client, r => r.Headers.Referrer = new Uri("http://localhost/typed/7"));
-        Assert.Equal(HttpStatusCode.Found, rejected.StatusCode);
+        var rejected = await SubmitTwiceAsync(client, r =>
+        {
+            r.Method = new HttpMethod(method);
+            r.Headers.Referrer = new Uri("http://localhost/typed/7");
+        });
+        Assert.Equal(expected, rejected.StatusCode);
         Assert.Equal("/typed/7", rejected.Headers.Location?.PathAndQuery);
         Assert.Equal("3600", rejected.Header("Retry-After"));
 
