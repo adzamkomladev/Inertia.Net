@@ -9,6 +9,50 @@ a requirement for a .NET API with the same name.
 The official v3 example is [Kitchen Sink](https://demo-v3.inertiajs.com), with [source](https://github.com/inertiajs/demo-v3).
 It uses Laravel and Vue. Use it to learn the request flows; use [our samples](../samples/README.md) for runnable .NET integrations.
 
+## v1.9.7 audit and regressions
+
+The reference snapshot is [`inertia-laravel` 3.x, `c62b763`](https://github.com/inertiajs/inertia-laravel/tree/c62b763b87d8daa9f8f90789dd29ffdf21f33fc6/tests):
+45 suites and 718 declared test methods (722 invocations after expanding four two-row providers, before inline scenarios).
+Test counts are not a parity percentage: .NET theories and consolidated tests cover multiple upstream methods, and PHP framework
+APIs do not translate literally.
+The [suite-by-suite coverage map](laravel-test-parity.md) records every upstream suite and the supported .NET counterparts.
+
+| Audit finding | Resolution and regression coverage |
+|---|---|
+| Body-bearing external/fragment redirects | Suppress converted response bytes through both stream and pipe paths; `EndpointAndRedirectTests`, including Kestrel |
+| Full entries returned by the list endpoint | Metadata-only list; detail remains full; `DevToolsTests`, AOT smoke |
+| Raw response inspection | Bounded text/JSON capture, binary/stream/oversize omission and safe malformed-body handling; `DevToolsTests`, `DevToolsParityTests` |
+| Upload metadata and render locations | Summarize parsed forms without reading files; capture symbol-backed callsites; `DevToolsParityTests`, `DevToolsTests` |
+| Redirect metadata | Inertia header precedence and status-aware ordinary Location; `DevToolsParityTests` |
+| Prop classification | Explicit false/nulls, deferred delivery/group, reset, owning merge path/direction and match-on; `DevToolsParityTests`, `DevToolsTests` |
+| Recorder isolation and boundaries | Throwing input stream, original body position, multi-value headers, exact size limits; `DevToolsParityTests` |
+| Broadcast during a page capture | Existing capture remains untouched by broadcast-only props; `DevToolsParityTests` |
+| Entry retention/read API edge cases | Age/global/per-tab/byte limits, deterministic ties, malformed pagination/IDs; recorder and integration tests |
+| Shared/once partial behavior | Loaded shared-once metadata and no-filter partial reloads; `AdapterParityTests` |
+| Previous URL eligibility | Non-Inertia AJAX exclusion and opt-in partial storage; `PreviousUrlTests` |
+| Clearing/omitting shared props | Request-local `FlushShared` and error-page `IncludeSharedProps`; adapter parity/error-page tests |
+| SSR diagnostic contract | Exact values and generated JSON metadata, including absent optional fields; `SsrGatewayTests` |
+| Assertion page-file lookup | Search later directories and retain extension/explicit-override checks; testing `ParityTests` |
+
+### Tooling and ecosystem boundaries
+
+Malformed JSON and invalid UTF-8 are deliberately omitted rather than exposed as unredactable raw text. Uploads are summarized
+only when the application has already parsed the form; the recorder never spools arbitrary uploads solely to match PHP's eager
+request parsing. Source locations depend on retained symbols. Body/retention limits are configurable and need not equal Laravel's
+constants. These choices preserve the existing security and bounded-memory guarantees.
+
+PHP provider interfaces that receive Laravel's response-factory context are not reproduced as .NET interfaces; compose
+application-owned shared values in typed/scoped delegates instead. Redirect flash assertions follow the redirect and inspect
+the final page rather than exposing encrypted cookie contents on a bare `302`. Per-dictionary-key source inference, share
+declaration locations and route-action source discovery are not promised; recorded render callsites and component paths are
+best-effort symbol-backed diagnostics. These are optional ecosystem interfaces, not additional page-protocol requirements.
+
+Artisan commands, Blade compiler caching, PHP callable-name ambiguity, facade identity, PHP conversion interfaces, reflection-based
+broadcast event discovery and Laravel HTTP-client configuration callbacks are ecosystem APIs rather than required .NET surfaces.
+Their meaningful outcomes are covered through managed SSR, Razor/templates, typed serialization, scoped delegates, explicit live
+listeners and ASP.NET request isolation. The thirteen page-protocol deviations remain documented in [protocol.md](protocol.md).
+No claim of byte-for-byte PHP API or assertion parity is implied.
+
 ## v1.9.6 changes
 
 | Area | Implementation | Regression coverage |
@@ -29,7 +73,7 @@ It uses Laravel and Vue. Use it to learn the request flows; use [our samples](..
 | Laravel concern | .NET choice |
 |---|---|
 | `shareOnce` | `o.Share("plans", Once(...))`; no extra helper needed. |
-| `flushShared` | No process-global mutable response factory. Startup options and request feature state have separate lifetimes. |
+| `flushShared` | `context.Inertia().FlushShared()` clears shares for one request; startup options and other requests are unchanged. |
 | Previous route name | Not stored. `State.RememberPreviousUrl` stores a validated local URL; use ASP.NET routing metadata in application code. |
 | `handleExceptionsUsing` | `AddInertiaErrorPages`/`UseInertiaErrorPages` render configured errors. Custom redirects and handler selection use ASP.NET `IExceptionHandler`. |
 | Explicit middleware replay on error | Not replayed. Startup shares and request shares already collected are available; keep required shared data before throwing middleware. |

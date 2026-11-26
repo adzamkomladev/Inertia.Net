@@ -4,33 +4,40 @@ using Microsoft.AspNetCore.Http.Features;
 namespace Inertia.Net;
 
 // HasStarted and Content-Length do not indicate whether buffering middleware has received a body.
-internal sealed class ResponseWriteTracker(IHttpResponseBodyFeature inner) : IHttpResponseBodyFeature
+internal sealed class ResponseWriteTracker(IHttpResponseBodyFeature inner, DevToolsCapture? capture = null) : IHttpResponseBodyFeature
 {
+    private static readonly OperationCanceledException ScopeEnded = new("Response writer scope ended.");
     private Stream? _stream;
     private PipeWriter? _writer;
     internal bool HasWritten { get; private set; }
+    internal bool SuppressBody { get; set; }
+    private void Record(ReadOnlySpan<byte> bytes) => capture?.RecordResponse(bytes);
     public Stream Stream => _stream ??= new TrackingStream(inner.Stream, this);
-    public PipeWriter Writer => _writer ??= new TrackingWriter(inner.Writer, this);
-    public void DisableBuffering() => inner.DisableBuffering();
-    public Task StartAsync(CancellationToken cancellationToken = default) => inner.StartAsync(cancellationToken);
-    public Task CompleteAsync() => inner.CompleteAsync();
-    public Task SendFileAsync(string path, long offset, long? count, CancellationToken cancellationToken = default)
+    public PipeWriter Writer => _writer ??= PipeWriter.Create(Stream, new StreamPipeWriterOptions(leaveOpen: true));
+    public void DisableBuffering()
     {
-        HasWritten |= (count ?? new FileInfo(path).Length - offset) > 0;
-        return inner.SendFileAsync(path, offset, count, cancellationToken);
+        if (capture is not null) capture.ResponseStreamed = true;
+        inner.DisableBuffering();
     }
-
-    private sealed class TrackingWriter(PipeWriter inner, ResponseWriteTracker owner) : PipeWriter
+    public Task StartAsync(CancellationToken cancellationToken = default) => inner.StartAsync(cancellationToken);
+    internal async Task DrainAsync(CancellationToken cancellationToken = default)
     {
-        public override void Advance(int bytes) { inner.Advance(bytes); owner.HasWritten |= bytes > 0; }
-        public override Memory<byte> GetMemory(int sizeHint = 0) => inner.GetMemory(sizeHint);
-        public override Span<byte> GetSpan(int sizeHint = 0) => inner.GetSpan(sizeHint);
-        public override void CancelPendingFlush() => inner.CancelPendingFlush();
-        public override void Complete(Exception? exception = null) => inner.Complete(exception);
-        public override ValueTask CompleteAsync(Exception? exception = null) => inner.CompleteAsync(exception);
-        public override ValueTask<FlushResult> FlushAsync(CancellationToken cancellationToken = default) => inner.FlushAsync(cancellationToken);
-        public override bool CanGetUnflushedBytes => inner.CanGetUnflushedBytes;
-        public override long UnflushedBytes => inner.UnflushedBytes;
+        if (_writer is { UnflushedBytes: > 0 }) await _writer.FlushAsync(cancellationToken);
+    }
+    // Return the wrapper's pooled pipe buffers without closing the server-owned response stream.
+    internal ValueTask ReleaseAsync() => _writer?.CompleteAsync(ScopeEnded) ?? ValueTask.CompletedTask;
+    public async Task CompleteAsync()
+    {
+        await DrainAsync();
+        await inner.CompleteAsync();
+    }
+    public async Task SendFileAsync(string path, long offset, long? count, CancellationToken cancellationToken = default)
+    {
+        await inner.StartAsync(cancellationToken);
+        if (SuppressBody) return;
+        if (capture is not null) capture.ResponseStreamed = true;
+        HasWritten |= (count ?? new FileInfo(path).Length - offset) > 0;
+        await inner.SendFileAsync(path, offset, count, cancellationToken);
     }
 
     private sealed class TrackingStream(Stream inner, ResponseWriteTracker owner) : Stream
@@ -45,13 +52,23 @@ internal sealed class ResponseWriteTracker(IHttpResponseBodyFeature inner) : IHt
         public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
         public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
         public override void SetLength(long value) => inner.SetLength(value);
-        public override void Write(byte[] buffer, int offset, int count) { inner.Write(buffer, offset, count); owner.HasWritten |= count > 0; }
-        public override void Write(ReadOnlySpan<byte> buffer) { inner.Write(buffer); owner.HasWritten |= buffer.Length > 0; }
+        public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            owner.StartAsync().GetAwaiter().GetResult();
+            if (owner.SuppressBody) return;
+            inner.Write(buffer);
+            owner.HasWritten |= buffer.Length > 0;
+            owner.Record(buffer);
+        }
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
         public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
+            await owner.StartAsync(cancellationToken);
+            if (owner.SuppressBody) return;
             await inner.WriteAsync(buffer, cancellationToken);
             owner.HasWritten |= buffer.Length > 0;
+            owner.Record(buffer.Span);
         }
     }
 }

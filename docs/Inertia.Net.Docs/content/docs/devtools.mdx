@@ -30,6 +30,16 @@ app.UseInertia();
 app.MapInertiaDevTools();                // GET /_inertia/devtools/entries/{id} and /entries
 ```
 
+The list endpoint returns metadata summaries; fetch `/entries/{id}` for props, HTTP bodies and route details.
+Ordinary textual and JSON responses are captured up to `MaxResponseBytes`; binary, explicitly streamed and oversized
+responses are omitted. Parsed multipart forms include file names, sizes and MIME types, never file contents.
+Unparsed uploads are not read just for recording. Render source locations are included when debug symbols are available;
+published or Native AOT applications may not retain them. Malformed structured bodies and invalid UTF-8 are omitted rather
+than risking an unredacted secret in a raw-text fallback.
+
+Use `o.ExcludePaths.Add("/health")` or `o.ExcludePaths.Add("/assets/*")` in `AddInertiaDevTools(o => ...)` to exclude paths.
+Untagged requests use the global entry/byte/age limits; `MaxEntriesPerTab` applies only when a browser tab ID is supplied.
+
 Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry in memory (per browser tab, at most `MaxEntriesPerTab` and `MaxEntries`, for `MaxAge`): request type, timings, headers, bodies, the page object and its props metadata.
 
 The first page carries the discovery tag the extension reads. Values of names containing `password`, `secret`, `token`, `authorization`, `cookie` or `api_key` are replaced with `[REDACTED]` in props, bodies and headers. Add names with `RedactedKeys`. Nothing leaves the app.

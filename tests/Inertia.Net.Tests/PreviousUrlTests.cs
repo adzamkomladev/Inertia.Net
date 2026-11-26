@@ -9,6 +9,31 @@ public class PreviousUrlTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Ajax_only_remembers_the_url_when_it_is_an_inertia_visit(bool inertia)
+    {
+        var harness = new Harness(o => o.State.RememberPreviousUrl = true);
+        var context = harness.Context("/users");
+        context.Request.Headers.Cookie = ".Inertia.Previous=%2Finitial";
+        context.WithHeader("X-Requested-With", "XMLHttpRequest");
+        if (inertia) context.AsInertia();
+        await Harness.ExecuteAsync(context, Inertia.Render("Users"));
+        Assert.Equal(inertia ? 1 : 0, context.Response.Headers.SetCookie.Count);
+        if (inertia) Assert.Contains("%2Fusers", context.Response.Headers.SetCookie.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Partial_url_storage_can_be_enabled_explicitly(bool remember)
+    {
+        var harness = new Harness(o => { o.State.RememberPreviousUrl = true; o.State.RememberPartialReloads = remember; });
+        var context = harness.Context("/users?page=2").AsPartial(component: "Users");
+        await Harness.ExecuteAsync(context, Inertia.Render("Users"));
+        Assert.Equal(remember ? 1 : 0, context.Response.Headers.SetCookie.Count);
+    }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Successful_page_remembers_the_encoded_relative_url(bool inertia)
     {
         var harness = new Harness(o => o.State.RememberPreviousUrl = true);

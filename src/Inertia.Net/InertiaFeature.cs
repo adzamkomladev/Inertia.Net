@@ -35,6 +35,8 @@ public sealed class InertiaFeature
     private bool _preserveFragment;
 
     internal Dictionary<string, object?>? SharedProps { get; private set; }
+    internal bool SharedDefaultsCleared { get; private set; }
+    internal bool OmitSharedData { get; set; }
 
     private InertiaHead? _head;
 
@@ -82,6 +84,14 @@ public sealed class InertiaFeature
     {
         ArgumentNullException.ThrowIfNull(key);
         (SharedProps ??= new(StringComparer.Ordinal))[key] = value;
+        return this;
+    }
+
+    /// <summary>Clears configured and request shared props for this request only. Validation errors remain; subsequent <see cref="Share"/> calls add new request shares.</summary>
+    public InertiaFeature FlushShared()
+    {
+        SharedDefaultsCleared = true;
+        SharedProps = null;
         return this;
     }
 

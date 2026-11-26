@@ -32,6 +32,9 @@ Create the named components in your client pages directory. Each receives `statu
 shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
 responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.
 
+Set `o.IncludeSharedProps = false` to omit configured/request shared props and shared head tags from these error pages.
+The `errors` prop and explicit error-page props (including `status`) remain available.
+
 For example, `ClientApp/pages/Error.tsx` (`Error.vue` for Vue, `Error.svelte` for Svelte):
 
 <Tabs>

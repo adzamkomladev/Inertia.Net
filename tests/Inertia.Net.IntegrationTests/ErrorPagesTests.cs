@@ -13,6 +13,20 @@ namespace Inertia.Net.IntegrationTests;
 public abstract class ErrorPagesTests<THost> where THost : IConformanceHost
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Error_pages_can_omit_shared_data_without_omitting_status_or_errors(bool include)
+    {
+        await using var app = await StartAsync(configure: options => options.IncludeSharedProps = include);
+        using var client = app.GetTestClient();
+        using var response = await SendAsync(client, "/missing", true);
+        var page = await response.PageAsync();
+        Assert.Equal(404, (int?)page["props"]!["status"]);
+        Assert.NotNull(page["props"]!["errors"]);
+        Assert.Equal(include ? "shared" : null, (string?)page["props"]!["app"]);
+        Assert.Equal(include ? "request" : null, (string?)page["props"]!["requestShared"]);
+    }
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task Missing_page_renders_status_and_shared_props(bool inertia)
@@ -177,6 +191,40 @@ public abstract class ErrorPagesTests<THost> where THost : IConformanceHost
     }
 
     [Fact]
+    public async Task An_earlier_exception_handler_can_redirect_instead_of_rendering_an_error_page()
+    {
+        await using var app = await StartAsync(existingHandler: true);
+        using var client = app.GetTestClient();
+        using var response = await SendAsync(client, "/api/redirect", true);
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Equal("/login", response.Headers.Location!.OriginalString);
+        Assert.Null(response.Header(InertiaHeaders.Inertia));
+        Assert.Empty(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Standard_exception_responses_are_untouched_without_error_page_registration()
+    {
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
+        builder.WebHost.UseTestServer();
+        builder.Services.AddInertia();
+        await using var app = builder.Build();
+        app.UseExceptionHandler(branch => branch.Run(async http =>
+        {
+            http.Response.StatusCode = 500;
+            await http.Response.WriteAsync("standard", http.RequestAborted);
+        }));
+        app.UseInertia();
+        app.MapGet("/throw", (Func<IResult>)(() => throw new InvalidOperationException("failure")));
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        using var client = app.GetTestClient();
+        using var response = await SendAsync(client, "/throw", true);
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Null(response.Header(InertiaHeaders.Inertia));
+        Assert.Equal("standard", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Exception_status_selector_is_respected()
     {
         await using var app = await StartAsync(existingHandler: true, statusSelector: true);
@@ -290,6 +338,7 @@ public abstract class ErrorPagesTests<THost> where THost : IConformanceHost
         app.MapGet("/own-error", () => Render("CustomError").WithStatusCode(404));
         app.MapGet("/flash-error", () => Back("/missing").WithFlash("message", "hello"));
         app.MapGet("/api/throw", (Func<IResult>)(() => throw new InvalidOperationException("api failed")));
+        app.MapGet("/api/redirect", (Func<IResult>)(() => throw new InvalidOperationException("redirect")));
         await app.StartAsync(TestContext.Current.CancellationToken);
         return app;
     }
@@ -305,6 +354,11 @@ public sealed class ApiExceptionHandler : IExceptionHandler
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken cancellationToken)
     {
         if (!context.Request.Path.StartsWithSegments("/api")) return false;
+        if (context.Request.Path == "/api/redirect")
+        {
+            context.Response.Redirect("/login");
+            return true;
+        }
         context.Response.StatusCode = 502;
         await context.Response.WriteAsync("api error", cancellationToken);
         return true;

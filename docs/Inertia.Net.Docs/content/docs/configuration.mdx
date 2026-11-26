@@ -92,6 +92,7 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`. The full SSR o
 |---|---|---|
 | `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
 | `RememberPreviousUrl` | `false` | Remember successful page GET URLs for `Back()` when Referer is unavailable. |
+| `RememberPartialReloads` | `false` | Also remember same-component partial reload URLs when previous-URL tracking is enabled. Non-Inertia AJAX, prefetch and Precognition requests remain excluded. |
 | `PreviousUrlCookieName` | `".Inertia.Previous"` | Plain previous-URL cookie, with either state store; non-empty and different from `CookieName`. |
 | `CookieSecurePolicy` | `SameAsRequest` | When state and previous-URL cookies are `Secure`. |
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. |

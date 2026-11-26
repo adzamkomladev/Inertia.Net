@@ -90,6 +90,20 @@ public class ResultTests
         Assert.Equal("*", wildcard.Response.Headers.Vary);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Empty_vary_fields_and_tokens_are_removed(bool page)
+    {
+        IHeaderDictionary headers = new HeaderDictionary { ["Vary"] = new Microsoft.Extensions.Primitives.StringValues(["", "  ", "Accept-Encoding, ,"]) };
+        if (page) InertiaHeaders.AppendPageVary(headers);
+        else InertiaHeaders.AppendVary(headers);
+        var tokens = headers.Vary.ToString().Split(',').Select(value => value.Trim()).ToArray();
+        Assert.DoesNotContain("", tokens);
+        Assert.Contains("Accept-Encoding", tokens);
+        Assert.Equal(1, tokens.Count(value => value == "X-Inertia"));
+    }
+
     [Fact]
     public async Task Root_view_receives_the_view_name_view_data_and_page()
     {

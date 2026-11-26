@@ -38,7 +38,7 @@ Every feature below is here because it shows one idea from Inertia.Net. The righ
 Install the templates once, then create the app. `--auth` adds cookie sign-in, so you do not write that yourself. Use `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below.
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.6
+dotnet new install Inertia.Net.Templates::1.9.7
 dotnet new inertia -n ForgetMeNot --framework react --auth
 cd ForgetMeNot
 bun install
@@ -364,7 +364,7 @@ Lists and items must survive a restart, so they need a database. We use **EF Cor
 
 ```sh
 dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version "10.*"
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.6
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.7
 ```
 
 <Callout type="tip" title="On .NET 11?">
@@ -2242,7 +2242,7 @@ Now the line that connects the worker to the page. In `ListsPage` we wrote `.Liv
 Install the SignalR transport. It carries the "something changed" message to the browser:
 
 ```sh
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.6
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.7
 bun add @microsoft/signalr
 ```
 
@@ -2296,7 +2296,7 @@ dotnet new xunit -n ForgetMeNot.Tests
 cd ForgetMeNot.Tests
 dotnet add reference ../ForgetMeNot/ForgetMeNot.csproj
 dotnet add package Microsoft.AspNetCore.Mvc.Testing --version "10.*"
-dotnet add package Inertia.Net.Testing --version 1.9.6
+dotnet add package Inertia.Net.Testing --version 1.9.7
 ```
 
 The test project starts your real app in memory, so add one line at the very end of `Program.cs` of the app:

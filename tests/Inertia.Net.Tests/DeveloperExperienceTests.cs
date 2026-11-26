@@ -52,6 +52,19 @@ public sealed class DeveloperExperienceTests : IDisposable
         await Harness.ExecuteAsync(harness.Context().AsInertia(), Render("Home"));
     }
 
+    [Fact]
+    public async Task Component_existence_checks_use_the_transformed_name_not_the_original()
+    {
+        _root.Write("ClientApp/pages/Pages/Home.tsx", "export default () => null");
+        Harness Transformed() => new(options => { options.ComponentTransformer = name => "Pages/" + name; options.Pages.Directory = "ClientApp/pages"; },
+            contentRoot: _root.Path, environment: "Development");
+        var page = await Transformed().PageAsync(null, context => context.AsInertia(), component: "Home");
+        Assert.Equal("Pages/Home", (string?)page["component"]);
+        File.Delete(Path.Combine(_root.Path, "ClientApp/pages/Pages/Home.tsx"));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Transformed().PageAsync(null, component: "Home"));
+        Assert.Contains("Pages/Home", error.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("Users/Indx", "Users/Index")]
     [InlineData("users/index", "Users/Index")]

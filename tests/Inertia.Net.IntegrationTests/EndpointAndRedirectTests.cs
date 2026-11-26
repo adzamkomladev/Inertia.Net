@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.IntegrationTests;
@@ -8,6 +9,82 @@ namespace Inertia.Net.IntegrationTests;
 /// <summary><c>MapInertia</c>, external redirects, <see cref="InertiaOptions.UrlResolver"/> and shared once props.</summary>
 public sealed class EndpointAndRedirectTests
 {
+    [Theory]
+    [InlineData("POST")]
+    [InlineData("PUT")]
+    [InlineData("PATCH")]
+    [InlineData("DELETE")]
+    [InlineData("QUERY")]
+    public async Task Converted_mutation_redirects_discard_their_body(string method)
+    {
+        await using var app = await ConformanceApp.StartAsync<Host>();
+        using var client = app.CreateClient();
+        using var response = await client.InertiaAsync(new HttpMethod(method), "/body-redirect?status=302&pipe=true&to=%2Fnext%23section");
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("/next#section", response.Header(InertiaHeaders.Redirect));
+        Assert.Null(response.Headers.Location);
+        Assert.Empty(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+    }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Kestrel_converted_redirect_has_no_body_or_content_type(bool pipe)
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddInertia();
+        await using var app = builder.Build();
+        app.UseInertia();
+        Host.MapRoutes(app);
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(Assert.Single(app.Urls)) };
+        using var response = await client.InertiaGetAsync($"/body-redirect?status=302&pipe={pipe}&to=https%3A%2F%2Fexample.test%2F");
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(0, response.Content.Headers.ContentLength);
+        Assert.Null(response.Content.Headers.ContentType);
+        Assert.Empty(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+    }
+    [Theory]
+    [InlineData(301)]
+    [InlineData(302)]
+    [InlineData(303)]
+    [InlineData(307)]
+    [InlineData(308)]
+    public async Task Converted_redirects_discard_bodies_from_streams_and_pipes(int status)
+    {
+        await using var app = await ConformanceApp.StartAsync<Host>();
+        using var client = app.CreateClient();
+        foreach (var target in new[] { "https://example.test/next", "/next#section" })
+        foreach (var pipe in new[] { false, true })
+        {
+            using var response = await client.InertiaGetAsync($"/body-redirect?status={status}&pipe={pipe}&to={Uri.EscapeDataString(target)}");
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            Assert.Equal(target, response.Header(target.StartsWith("https", StringComparison.Ordinal) ? InertiaHeaders.Location : InertiaHeaders.Redirect));
+            Assert.Null(response.Headers.Location);
+            Assert.Equal(0, response.Content.Headers.ContentLength);
+            Assert.Null(response.Content.Headers.ContentType);
+            Assert.Empty(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Unconverted_redirects_keep_their_body(bool inertia, bool prefetch)
+    {
+        await using var app = await ConformanceApp.StartAsync<Host>(new ConformanceSetup
+        {
+            Inertia = options => options.ConvertExternalRedirects = prefetch,
+        });
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/body-redirect?status=302&pipe=false&to=https://example.test/next");
+        if (inertia) request.WithHeader(InertiaHeaders.Inertia, "true");
+        if (prefetch) request.WithHeader(InertiaHeaders.Purpose, "prefetch");
+        using var response = await app.CreateClient().SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Equal("redirect body", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+    }
+
     [Fact]
     public async Task Map_inertia_renders_the_component_for_get_and_head()
     {
@@ -112,6 +189,15 @@ public sealed class EndpointAndRedirectTests
 
         public static void MapRoutes(WebApplication app)
         {
+            app.MapMethods("/body-redirect", ["GET", "POST", "PUT", "PATCH", "DELETE", "QUERY"], async (HttpContext http, int status, bool pipe, string to) =>
+            {
+                http.Response.StatusCode = status;
+                http.Response.Headers.Location = to;
+                http.Response.ContentType = "text/plain";
+                http.Response.ContentLength = 12;
+                if (pipe) await http.Response.BodyWriter.WriteAsync("redirect body"u8.ToArray(), http.RequestAborted);
+                else await http.Response.WriteAsync("redirect body", http.RequestAborted);
+            });
             app.MapInertia("/about", "About", new InertiaProps { ["name"] = "Inertia.Net" });
             app.MapGet("/go", (HttpContext http, string to, string? flash) =>
             {

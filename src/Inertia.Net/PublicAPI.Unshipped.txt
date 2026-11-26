@@ -1,4 +1,10 @@
 #nullable enable
+Inertia.Net.InertiaFeature.FlushShared() -> Inertia.Net.InertiaFeature!
+Inertia.Net.InertiaErrorPagesOptions.IncludeSharedProps.get -> bool
+Inertia.Net.InertiaErrorPagesOptions.IncludeSharedProps.set -> void
+Inertia.Net.InertiaDevToolsOptions.ExcludePaths.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.InertiaStateOptions.RememberPartialReloads.get -> bool
+Inertia.Net.InertiaStateOptions.RememberPartialReloads.set -> void
 Inertia.Net.InertiaOptions.ComponentTransformer.get -> System.Func<string!, string?>?
 Inertia.Net.InertiaOptions.ComponentTransformer.set -> void
 static Inertia.Net.Inertia.BroadcastPropsAsync(Microsoft.AspNetCore.Http.HttpContext! context, object! props) -> System.Threading.Tasks.ValueTask<System.Text.Json.JsonElement>

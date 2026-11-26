@@ -6,6 +6,9 @@ namespace Inertia.Net;
 /// <summary>Controls rendering of Inertia pages for exceptions and empty error responses.</summary>
 public sealed class InertiaErrorPagesOptions
 {
+    /// <summary>Include configured and request shared props on error pages. Default true. When false, validation errors and error-page props still render.</summary>
+    public bool IncludeSharedProps { get; set; } = true;
+
     /// <summary>The fallback error page component. Defaults to <c>Error</c>.</summary>
     public string Component { get; set; } = "Error";
 

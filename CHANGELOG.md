@@ -7,6 +7,42 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.7] - 2026-11-26
+
+### Fixed
+
+- External and fragment redirects converted to Inertia `409` responses now discard the original body, content length and content
+  type. Stream and pipe writes follow the same rule, including on Kestrel; unconverted redirects keep their bodies.
+- DevTools list responses now contain metadata summaries rather than full entries. Fetch an entry by ID for its details.
+- DevTools redirect metadata prefers Inertia control headers and no longer treats a successful response's ordinary `Location`
+  header as a redirect.
+- DevTools prop metadata normalizes null/false fields, retains deferred-delivery groups, classifies reset on ordinary values, and
+  reports nested merge direction and match-on/deep-merge flags on the owning prop rather than its child values.
+- Previous-URL tracking no longer replaces the remembered URL for a non-Inertia AJAX render.
+- Cyclic or excessively deep literal props now fail safely during parallel planning instead of overflowing the process stack.
+  Manual page JSON writers also respect the configured serializer depth limit.
+- Empty `Vary` fields/tokens are discarded. DevTools full navigations no longer inherit an incoming batch ID; untagged entries use
+  global rather than per-tab retention, and equal-timestamp entries retain completion order.
+
+### Added
+
+- Bounded DevTools capture for ordinary text/JSON responses, metadata-only summaries of already-parsed multipart uploads, and
+  render source locations when symbols are available. Recording never reads file contents just for inspection. Malformed structured
+  bodies and invalid UTF-8 remain omitted to prevent raw-text fallbacks from bypassing secret redaction.
+- `State.RememberPartialReloads` optionally remembers same-component partial reload URLs; the default remains false.
+- `HttpContext.Inertia().FlushShared()` clears configured/request shares for one request without mutating application defaults.
+  `InertiaErrorPagesOptions.IncludeSharedProps = false` omits shared data on error pages while retaining validation errors and status.
+- `InertiaDevToolsOptions.ExcludePaths` excludes exact paths or trailing-`*` prefixes from recording.
+- Regression coverage for upstream-equivalent classifier branches, request-type precedence, body limits, redaction, recorder failure
+  isolation, broadcast capture isolation, storage expiration/pruning, pagination, shared/once metadata and SSR diagnostics.
+
+### Compatibility notes
+
+- All packages use version 1.9.7; framework and dependency versions are unchanged.
+- Custom DevTools consumers must read list items as metadata objects, not full entries. The detail endpoint is unchanged.
+- Upload capture uses the application's parsed form without buffering uploads solely for recording. Configurable body/memory limits,
+  authorization, redaction and the documented protocol deviations remain in force.
+
 ## [1.9.6] - 2026-11-26
 
 ### Fixed

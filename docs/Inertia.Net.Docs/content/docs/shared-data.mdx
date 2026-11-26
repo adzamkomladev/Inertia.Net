@@ -36,6 +36,10 @@ o.Share("plans", Once(() => plans.All()));   // like Laravel's shareOnce
 
 `plans` is resolved once and kept by the client across visits.
 
+`context.Inertia().FlushShared()` clears configured and request shared props for the current request only. It does not mutate
+application defaults or other requests, and validation errors remain available. Call `Share(...)` afterwards to add replacement
+request shares. To omit shared data specifically on error pages, set `InertiaErrorPagesOptions.IncludeSharedProps = false`.
+
 ## The shared prop key list
 
 The top-level shared keys are listed in the page object so the client can keep them across navigations:

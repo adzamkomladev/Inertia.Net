@@ -11,6 +11,59 @@ namespace Inertia.Net.IntegrationTests;
 public sealed class DevToolsTests
 {
     [Theory]
+    [InlineData("json", "present", null)]
+    [InlineData("malformed", "omitted", "unserializable")]
+    [InlineData("binary", "omitted", "binary")]
+    [InlineData("streamed", "omitted", "streamed")]
+    [InlineData("large", "omitted", "too-large")]
+    [InlineData("empty", "empty", null)]
+    public async Task Raw_response_capture_preserves_the_browser_response(string kind, string status, string? reason)
+    {
+        await using var app = await StartAsync(options => options.MaxResponseBytes = 256);
+        using var client = app.CreateClient();
+        using var response = await client.GetAsync("/raw/" + kind, TestContext.Current.CancellationToken);
+        var actual = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var entry = await EntryAsync(client, response);
+        var body = entry["http"]!["responseBody"]!;
+        Assert.Equal(status, (string?)body["status"]);
+        Assert.Equal(reason, (string?)body["reason"]);
+        if (kind is "json" or "malformed")
+        {
+            Assert.Contains("private-value", actual, StringComparison.Ordinal);
+            Assert.DoesNotContain("private-value", entry.ToJsonString(), StringComparison.Ordinal);
+        }
+        if (kind == "json") Assert.Equal("Ann", (string?)body["value"]!["name"]);
+        if (kind == "large") Assert.Equal(257, actual.Length);
+        if (kind == "streamed") Assert.Equal("stream", actual);
+    }
+
+    [Fact]
+    public async Task Deferred_delivery_and_nested_merges_are_classified_on_the_owning_prop()
+    {
+        await using var app = await StartAsync();
+        using var client = app.CreateClient();
+        var response = await client.InertiaGetAsync("/classification", request =>
+        {
+            request.WithHeader(InertiaHeaders.PartialComponent, "Classification");
+            request.WithHeader(InertiaHeaders.PartialData, "stats,items");
+            request.WithHeader("X-Inertia-Devtools-Deferred", "1");
+        });
+        var props = (await EntryAsync(client, response))["props"]!;
+        Assert.Equal("defer", (string?)props["stats"]!["inertiaType"]);
+        Assert.Equal("sidebar", (string?)props["stats"]!["deferGroup"]);
+        Assert.Equal("prepend", (string?)props["items"]!["mergeDirection"]);
+        Assert.Null(props["items.rows"]?["mergeDirection"]);
+        Assert.False((bool?)props["items.rows"]?["deepMerge"] ?? false);
+        var manual = await client.InertiaGetAsync("/classification", request =>
+        {
+            request.WithHeader(InertiaHeaders.PartialComponent, "Classification");
+            request.WithHeader(InertiaHeaders.PartialData, "stats");
+        });
+        var regular = (await EntryAsync(client, manual))["props"]!["stats"]!;
+        Assert.Null(regular["inertiaType"]);
+        Assert.Null(regular["deferGroup"]);
+    }
+    [Theory]
     [InlineData("")]
     [InlineData("/portal")]
     public async Task Discovery_reports_the_base_path_only_when_needed(string pathBase)
@@ -41,6 +94,7 @@ public sealed class DevToolsTests
     {
         await using var app = await ConformanceApp.StartAsync<Host>(new ConformanceSetup
         {
+            Inertia = options => options.State.RememberPreviousUrl = true,
             Services = services => services.AddInertiaDevTools(options => { options.Enabled = true; options.Authorize = _ => true; }),
             Middleware = application => application.Use(async (context, next) =>
             {
@@ -54,6 +108,7 @@ public sealed class DevToolsTests
             }),
         });
         using var client = app.CreateClient();
+        using var initial = await client.InertiaGetAsync("/dashboard");
         using var redirect = await client.InertiaGetAsync("/pending-state");
         using var entry = await client.GetAsync("/_inertia/devtools/entries/" + redirect.Header("X-Inertia-Devtools-Id"), TestContext.Current.CancellationToken);
         Assert.Null(entry.Header("Set-Cookie"));
@@ -111,7 +166,8 @@ public sealed class DevToolsTests
         Assert.Equal("/dashboard", (string?)entry["route"]!["uri"]);
         Assert.Equal("present", (string?)entry["http"]!["responseBody"]!["status"]);
         Assert.Equal("Dashboard", (string?)entry["http"]!["responseBody"]!["value"]!["component"]);
-        Assert.Null(entry["renderSource"]);
+        Assert.EndsWith("DevToolsTests.cs", (string?)entry["renderSource"]?["file"], StringComparison.Ordinal);
+        Assert.True((int?)entry["renderSource"]?["line"] > 0);
         Assert.Null(entry["componentPath"]);
     }
 
@@ -176,8 +232,8 @@ public sealed class DevToolsTests
         var http = await EntryAsync(client, plain);
         Assert.Equal("http", (string?)http["__meta"]!["requestType"]);
         Assert.Null(http["__meta"]!["component"]);
-        Assert.Equal("omitted", (string?)http["http"]!["responseBody"]!["status"]);
-        Assert.Equal("non-inertia-response", (string?)http["http"]!["responseBody"]!["reason"]);
+        Assert.Equal("present", (string?)http["http"]!["responseBody"]!["status"]);
+        Assert.Equal("plain", (string?)http["http"]!["responseBody"]!["value"]);
     }
 
     [Theory]
@@ -226,7 +282,14 @@ public sealed class DevToolsTests
 
         var all = await ListAsync();
         Assert.Equal(4, all.Count); // three kept for tab "a", one without a tab; the read API is never recorded
-        Assert.Equal("http", (string?)all[0]!["__meta"]!["requestType"]);
+        Assert.Equal("http", (string?)all[0]!["requestType"]);
+        Assert.All(all, entry =>
+        {
+            Assert.NotNull(entry!["id"]);
+            Assert.Null(entry["__meta"]);
+            Assert.Null(entry["http"]);
+            Assert.Null(entry["propValues"]);
+        });
         Assert.Equal(3, (await ListAsync("?component=Dashboard")).Count);
         Assert.Single(await ListAsync("?type=http"));
         Assert.Equal(3, (await ListAsync("?exclude=http")).Count);
@@ -420,6 +483,27 @@ public sealed class DevToolsTests
         public static void MapRoutes(WebApplication app)
         {
             app.MapInertiaDevTools();
+            app.MapGet("/classification", () => Render("Classification", new InertiaProps
+            {
+                ["stats"] = Defer(() => 1, "sidebar"),
+                ["items"] = Merge(new InertiaProps { ["rows"] = new[] { 1 } }).Prepend("rows"),
+            }));
+            app.MapGet("/raw/{kind}", async (HttpContext http, string kind) =>
+            {
+                if (kind == "empty") { http.Response.StatusCode = 204; return; }
+                http.Response.ContentType = kind is "json" or "malformed" ? "application/json"
+                    : kind == "binary" ? "application/octet-stream" : "text/plain";
+                if (kind == "streamed") http.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>()!.DisableBuffering();
+                var body = kind switch
+                {
+                    "json" => """{"name":"Ann","password":"private-value"}""",
+                    "malformed" => """{"password":"private-value",""",
+                    "large" => new string('x', 257),
+                    "streamed" => "stream",
+                    _ => "binary",
+                };
+                await http.Response.BodyWriter.WriteAsync(Encoding.UTF8.GetBytes(body), http.RequestAborted);
+            });
             app.MapGet("/dashboard", () => Render("Dashboard", new InertiaProps
             {
                 ["user"] = new InertiaProps { ["name"] = "Ann", ["apiToken"] = "t0k3n" },

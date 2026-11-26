@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,9 @@ public sealed class InertiaDevToolsOptions
 {
     /// <summary>Whether requests are recorded. Null (the default) records in Development only.</summary>
     public bool? Enabled { get; set; }
+
+    /// <summary>Paths not to record, matched exactly or by a trailing <c>*</c> prefix wildcard.</summary>
+    public IList<string> ExcludePaths { get; } = new List<string>();
 
     /// <summary>
     /// Who may read the recorded entries. Null (the default) allows requests from this machine (a loopback connection to a loopback host
@@ -47,7 +51,7 @@ public sealed class InertiaDevToolsOptions
     public int MaxBodyBytes { get; set; } = 64 * 1024;
 
     /// <summary>
-    /// Pages larger than this are not copied for recording: the entry keeps the component, request type, status and size
+    /// Pages or ordinary response bodies larger than this are not copied for recording: page entries keep the component, request type, status and size
     /// (<c>__meta.responseBytes</c>), and its response body is omitted (reason <c>too-large</c>). The browser still receives the whole
     /// page. Default 1 MiB.
     /// </summary>
@@ -117,18 +121,47 @@ public static class InertiaDevToolsExtensions
 internal sealed class DevToolsCapture(string id, long started, int maxPageBytes = int.MaxValue)
 {
     internal Dictionary<string, Dictionary<string, JsonNode?>> PropMetadata { get; } = new(StringComparer.Ordinal);
+    internal bool DeferredRequest { get; init; }
 
-    internal void RecordProp(string path, InertiaProp prop, InertiaRequest request)
+    internal void RecordProp(string path, InertiaProp? prop, InertiaRequest request)
     {
-        var type = prop.IsAlways ? "always" : prop.ScrollWrapper is not null ? "scroll"
-            : prop.Load == PropLoad.Deferred ? "defer" : prop.Load == PropLoad.Optional ? "optional"
-            : prop.IsMerge ? "merge" : prop.IsOnce ? "once" : null;
-        var meta = new Dictionary<string, JsonNode?>();
-        if (type is not null) meta["inertiaType"] = type;
-        if (prop.IsOnce) meta["once"] = true;
-        if (prop.LiveSpec is not null) meta["live"] = true;
-        if (prop.IsMerge) meta["reset"] = request.Reset?.Contains(path, StringComparer.Ordinal) == true;
+        var type = prop?.IsAlways == true ? "always" : prop?.ScrollWrapper is not null ? "scroll"
+            : prop?.Load == PropLoad.Deferred ? DeferredRequest ? "defer" : null
+            : prop?.Load == PropLoad.Optional ? "optional"
+            : prop?.IsMerge == true ? "merge" : prop?.IsOnce == true ? "once" : null;
+        var prepend = prop is { IsMerge: true, AppendAtRoot: false, AppendPaths: null }
+            || prop is { IsMerge: true, PrependPaths.Count: > 0 } && prop.AppendPaths is null;
+        if (prop?.ScrollWrapper is not null)
+            prepend = request.MergeIntentPrepend && prop.AppendPaths is not { Count: > 0 };
+        var meta = new Dictionary<string, JsonNode?>
+        {
+            ["inertiaType"] = type is null ? null : JsonValue.Create(type),
+            ["deferGroup"] = prop?.Load == PropLoad.Deferred && DeferredRequest ? JsonValue.Create(prop.Group) : null,
+            ["once"] = prop?.IsOnce == true,
+            ["live"] = prop?.LiveSpec is not null,
+            ["reset"] = request.Reset?.Contains(path, StringComparer.Ordinal) == true,
+            ["mergeDirection"] = prop?.IsMerge == true ? JsonValue.Create(prepend ? "prepend" : "append") : null,
+            ["deepMerge"] = prop?.IsMerge == true && (prop.IsDeepMerge || prop.MatchOnKeys is { Count: > 0 }),
+        };
         PropMetadata[path] = meta;
+    }
+
+    private ArrayBufferWriter<byte>? _response;
+    internal bool ResponseStreamed { get; set; }
+    internal bool ResponseTooLarge { get; private set; }
+    internal ReadOnlyMemory<byte> ResponseBytes => _response?.WrittenMemory ?? ReadOnlyMemory<byte>.Empty;
+    internal (string File, int Line)? RenderSource { get; set; }
+
+    internal void RecordResponse(ReadOnlySpan<byte> bytes)
+    {
+        if (PageBytes > 0 || ResponseStreamed || ResponseTooLarge) return;
+        if (bytes.Length > MaxPageBytes - (_response?.WrittenCount ?? 0))
+        {
+            ResponseTooLarge = true;
+            _response = null;
+            return;
+        }
+        (_response ??= new ArrayBufferWriter<byte>()).Write(bytes);
     }
 
     /// <summary>Pages up to this size are copied into <see cref="PageJson"/> (<see cref="InertiaDevToolsOptions.MaxResponseBytes"/>).</summary>
@@ -149,6 +182,7 @@ internal sealed class DevToolsCapture(string id, long started, int maxPageBytes 
 /// <summary>Records entries and serves them (docs: inertiajs.com/docs/v3/advanced/devtools-protocol).</summary>
 internal sealed partial class DevToolsRecorder
 {
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly string[] SensitiveFragments = ["password", "secret", "token", "authorization", "cookie", "apikey", "api_key", "api-key"];
     private const string Redacted = "[REDACTED]";
 
@@ -161,7 +195,8 @@ internal sealed partial class DevToolsRecorder
     private readonly Lock _lock = new();
     private readonly Dictionary<string, Stored> _byId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, LinkedList<Stored>> _byTab = new(StringComparer.Ordinal);
-    private long _bytes; // the Json lengths of the entries in _byId
+    private long _bytes; // full entry and summary lengths in _byId
+    private long _sequence;
 
     public DevToolsRecorder(IOptions<InertiaDevToolsOptions> options, IHostEnvironment environment, TimeProvider time, PageComponentCheck pages, ILogger<DevToolsRecorder> logger)
     {
@@ -209,12 +244,16 @@ internal sealed partial class DevToolsRecorder
     public DevToolsCapture? Begin(HttpContext httpContext)
     {
         var request = httpContext.Request;
-        if (!_enabled || request.Path.StartsWithSegments(InertiaDevToolsExtensions.PathPrefix, StringComparison.OrdinalIgnoreCase))
+        if (!_enabled || request.Path.StartsWithSegments(InertiaDevToolsExtensions.PathPrefix, StringComparison.OrdinalIgnoreCase)
+            || SsrGateway.IsExcluded(_options.ExcludePaths, request.Path.Value))
         {
             return null;
         }
 
-        var capture = new DevToolsCapture(Guid.CreateVersion7().ToString("N"), Stopwatch.GetTimestamp(), _options.MaxResponseBytes);
+        var capture = new DevToolsCapture(Guid.CreateVersion7().ToString("N"), Stopwatch.GetTimestamp(), _options.MaxResponseBytes)
+        {
+            DeferredRequest = !StringValues.IsNullOrEmpty(request.Headers["X-Inertia-Devtools-Deferred"]),
+        };
         httpContext.Features.Set(capture);
         if (!string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]) && IsTextBody(request)
             && request.ContentLength is > 0 && request.ContentLength <= _options.MaxBodyBytes)
@@ -247,7 +286,7 @@ internal sealed partial class DevToolsRecorder
             var tab = Header(httpContext.Request, "X-Inertia-Devtools-Tab");
             var requestType = RequestType(httpContext.Request, capture.PageBytes > 0);
             var json = Write(httpContext, capture, requestBody, requestType, tab, now, failed);
-            Add(new Stored(capture.Id, tab ?? "", capture.Component, requestType, now, json));
+            Add(new Stored(capture.Id, tab ?? "", capture.Component, requestType, now, json, Interlocked.Increment(ref _sequence)));
         }
         catch (Exception ex)
         {
@@ -299,10 +338,10 @@ internal sealed partial class DevToolsRecorder
                     && (types.Length == 0 || types.Contains(e.RequestType))
                     && !excluded.Contains(e.RequestType))
                 .OrderByDescending(e => e.At)
-                .ThenByDescending(e => e.Id, StringComparer.Ordinal)
+                .ThenByDescending(e => e.Sequence)
                 .Skip(offset)
                 .Take(limit)
-                .Select(e => e.Json)];
+                .Select(e => e.Summary)];
         }
 
         return WriteListAsync(httpContext, selected);
@@ -361,7 +400,7 @@ internal sealed partial class DevToolsRecorder
 
     private void Add(Stored entry)
     {
-        if (entry.Json.Length > _options.MaxTotalBytes)
+        if (entry.Size > _options.MaxTotalBytes)
         {
             return; // larger than the whole budget: never kept
         }
@@ -376,8 +415,8 @@ internal sealed partial class DevToolsRecorder
 
             list.AddLast(entry);
             _byId[entry.Id] = entry;
-            _bytes += entry.Json.Length;
-            if (list.Count > _options.MaxEntriesPerTab)
+            _bytes += entry.Size;
+            if (entry.Tab.Length > 0 && list.Count > _options.MaxEntriesPerTab)
             {
                 Remove(list.First!.Value);
             }
@@ -385,7 +424,7 @@ internal sealed partial class DevToolsRecorder
             // The oldest entry of all, which is the first of some tab.
             while (_byId.Count > _options.MaxEntries || _bytes > _options.MaxTotalBytes)
             {
-                Remove(_byTab.Values.Select(l => l.First!.Value).MinBy(e => e.At)!);
+                Remove(_byTab.Values.Select(l => l.First!.Value).MinBy(e => (e.At, e.Sequence))!);
             }
         }
     }
@@ -396,7 +435,7 @@ internal sealed partial class DevToolsRecorder
         var cutoff = _time.GetUtcNow() - _options.MaxAge;
         foreach (var list in _byTab.Values.ToList())
         {
-            while (list.First is { } first && first.Value.At < cutoff)
+            while (list.First is { } first && first.Value.At <= cutoff)
             {
                 Remove(first.Value);
             }
@@ -407,7 +446,7 @@ internal sealed partial class DevToolsRecorder
     {
         if (_byId.Remove(entry.Id))
         {
-            _bytes -= entry.Json.Length;
+            _bytes -= entry.Size;
         }
 
         if (_byTab.TryGetValue(entry.Tab, out var list))
@@ -424,7 +463,7 @@ internal sealed partial class DevToolsRecorder
     internal static string RequestType(HttpRequest request, bool pageRendered)
     {
         var headers = request.Headers;
-        if (headers.ContainsKey(InertiaPrecognition.Header))
+        if (!StringValues.IsNullOrEmpty(headers[InertiaPrecognition.Header]))
         {
             return "precognition";
         }
@@ -434,9 +473,9 @@ internal sealed partial class DevToolsRecorder
             return pageRendered ? "initial" : "http";
         }
 
-        return headers.ContainsKey("X-Inertia-Devtools-Deferred") ? "deferred"
-            : headers.ContainsKey("X-Inertia-Devtools-Poll") ? "poll"
-            : headers.ContainsKey(InertiaHeaders.PartialComponent) ? "partial"
+        return !StringValues.IsNullOrEmpty(headers["X-Inertia-Devtools-Deferred"]) ? "deferred"
+            : !StringValues.IsNullOrEmpty(headers["X-Inertia-Devtools-Poll"]) ? "poll"
+            : !StringValues.IsNullOrEmpty(headers[InertiaHeaders.PartialComponent]) ? "partial"
             : IsPrefetch(request) ? "prefetch"
             : "navigate";
     }
@@ -480,6 +519,30 @@ internal sealed partial class DevToolsRecorder
             return Body.Omitted("non-inertia-request");
         }
 
+        if (request.HasFormContentType && request.ContentType!.StartsWith("multipart/", StringComparison.OrdinalIgnoreCase))
+        {
+            var form = request.HttpContext.Features.Get<IFormFeature>()?.Form;
+            if (form is null)
+            {
+                if (request.ContentLength > _options.MaxBodyBytes) return Body.Omitted("too-large");
+                // Never consume or buffer a file upload merely for inspection.
+                return Body.Omitted("streamed");
+            }
+            var summary = new JsonObject();
+            foreach (var (key, values) in form) summary[key] = values.ToString();
+            foreach (var files in form.Files.GroupBy(file => file.Name))
+            {
+                var values = files.Select(file => (JsonNode)new JsonObject
+                {
+                    ["name"] = file.FileName,
+                    ["size"] = file.Length >= 0 ? JsonValue.Create(file.Length) : null,
+                    ["mimeType"] = file.ContentType,
+                }).ToArray();
+                summary[files.Key] = values.Length == 1 ? values[0] : new JsonArray(values);
+            }
+            return Body.Json(summary);
+        }
+
         if (!IsTextBody(request))
         {
             return Body.Omitted(request.HasFormContentType ? "binary" : "non-textual");
@@ -495,41 +558,50 @@ internal sealed partial class DevToolsRecorder
             return Body.Omitted("streamed");
         }
 
-        request.Body.Position = 0;
-        var buffer = new byte[_options.MaxBodyBytes + 1];
-        var read = 0;
-        while (read < buffer.Length && await request.Body.ReadAsync(buffer.AsMemory(read)) is var n and > 0)
+        var position = request.Body.Position;
+        try
         {
-            read += n;
-        }
-
-        request.Body.Position = 0;
-        if (read > _options.MaxBodyBytes)
-        {
-            return Body.Omitted("too-large");
-        }
-
-        var text = Encoding.UTF8.GetString(buffer, 0, read);
-        if (request.ContentType!.Contains("json", StringComparison.OrdinalIgnoreCase))
-        {
-            try
+            request.Body.Position = 0;
+            var buffer = new byte[_options.MaxBodyBytes + 1];
+            var read = 0;
+            while (read < buffer.Length && await request.Body.ReadAsync(buffer.AsMemory(read), request.HttpContext.RequestAborted) is var n and > 0)
             {
-                return Body.Json(JsonNode.Parse(text));
+                read += n;
             }
-            catch (JsonException)
+
+            if (read > _options.MaxBodyBytes)
             {
-                return Body.Omitted("unserializable");
+                return Body.Omitted("too-large");
             }
-        }
 
-        // A form: decoded into an object so its fields can be redacted.
-        var form = new JsonObject();
-        foreach (var (key, value) in QueryHelpers.ParseQuery(text))
+            string text;
+            try { text = StrictUtf8.GetString(buffer, 0, read); }
+            catch (DecoderFallbackException) { return Body.Omitted("unserializable"); }
+            if (request.ContentType!.Contains("json", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    return Body.Json(JsonNode.Parse(text));
+                }
+                catch (JsonException)
+                {
+                    return Body.Omitted("unserializable");
+                }
+            }
+
+            // A form: decoded into an object so its fields can be redacted.
+            var form = new JsonObject();
+            foreach (var (key, value) in QueryHelpers.ParseQuery(text))
+            {
+                form[key] = value.ToString();
+            }
+
+            return Body.Json(form);
+        }
+        finally
         {
-            form[key] = value.ToString();
+            request.Body.Position = position;
         }
-
-        return Body.Json(form);
     }
 
     private byte[] Write(HttpContext httpContext, DevToolsCapture capture, Body requestBody, string requestType, string? tab, DateTimeOffset now, bool failed)
@@ -558,17 +630,16 @@ internal sealed partial class DevToolsRecorder
             writer.WriteString("timestamp", now.ToString("O", CultureInfo.InvariantCulture));
             writer.WriteNumber("utime", now.ToUnixTimeMilliseconds() / 1000.0);
             WriteStringOrNull(writer, "tabUuid", tab);
-            WriteStringOrNull(writer, "batchId", Header(request, "X-Inertia-Devtools-Parent"));
+            WriteStringOrNull(writer, "batchId", string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]) ? null : Header(request, "X-Inertia-Devtools-Parent"));
             if (capture.PageBytes > 0)
             {
                 writer.WriteNumber("responseBytes", capture.PageBytes);
             }
 
             writer.WriteNumber("serverTimingMs", Math.Round(Stopwatch.GetElapsedTime(capture.Started).TotalMilliseconds, 2));
-            // A redirect, Location() or a fragment redirect.
-            var location = new[] { response.Headers.Location, response.Headers[InertiaHeaders.Location], response.Headers[InertiaHeaders.Redirect] }
-                .Select(value => value.ToString())
-                .FirstOrDefault(value => value.Length > 0);
+            var location = HeaderValue(response.Headers[InertiaHeaders.Location])
+                ?? HeaderValue(response.Headers[InertiaHeaders.Redirect])
+                ?? (status is >= 300 and < 400 ? HeaderValue(response.Headers.Location) : null);
             if (location is not null)
             {
                 writer.WriteString("redirectLocation", RedactUrl(location));
@@ -587,8 +658,7 @@ internal sealed partial class DevToolsRecorder
             WriteBody(writer, "requestBody", requestBody);
             WriteBody(writer, "responseBody", page is not null ? Body.Json(page.DeepClone())
                 : capture.PageBytes > capture.MaxPageBytes ? Body.Omitted("too-large")
-                : IsRedirectOrEmpty(response) ? Body.Empty
-                : Body.Omitted("non-inertia-response"));
+                : ReadResponseBody(response, capture));
             writer.WriteEndObject();
 
             WriteProps(writer, page, capture);
@@ -601,7 +671,15 @@ internal sealed partial class DevToolsRecorder
             WriteStringOrNull(writer, "action", endpoint?.DisplayName);
             writer.WriteEndObject();
 
-            writer.WriteNull("renderSource");
+            writer.WritePropertyName("renderSource");
+            if (capture.RenderSource is { } source)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("file", source.File);
+                writer.WriteNumber("line", source.Line);
+                writer.WriteEndObject();
+            }
+            else writer.WriteNullValue();
             WriteStringOrNull(writer, "componentPath", capture.Component is { } component ? _pages.Find(component) : null);
             writer.WriteEndObject();
         }
@@ -609,8 +687,35 @@ internal sealed partial class DevToolsRecorder
         return buffer.WrittenSpan.ToArray();
     }
 
-    private static bool IsRedirectOrEmpty(HttpResponse response) =>
-        response.StatusCode is 301 or 302 or 303 or 307 or 308 or 409 or 204 || response.ContentLength == 0;
+    private static string? HeaderValue(StringValues value) => value.ToString() is { Length: > 0 } text ? text : null;
+
+    private static Body ReadResponseBody(HttpResponse response, DevToolsCapture capture)
+    {
+        if (capture.ResponseStreamed) return Body.Omitted("streamed");
+        if (capture.ResponseTooLarge || response.ContentLength > capture.MaxPageBytes) return Body.Omitted("too-large");
+        if (capture.ResponseBytes.IsEmpty) return Body.Empty;
+        var type = response.ContentType ?? "";
+        if (type.Length > 0 && !type.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
+            && !type.Contains("json", StringComparison.OrdinalIgnoreCase)
+            && !type.Contains("xml", StringComparison.OrdinalIgnoreCase))
+            return Body.Omitted("binary");
+        string text;
+        try { text = StrictUtf8.GetString(capture.ResponseBytes.Span); }
+        catch (DecoderFallbackException) { return Body.Omitted("unserializable"); }
+        if (type.Contains("json", StringComparison.OrdinalIgnoreCase))
+        {
+            try { return Body.Json(JsonNode.Parse(text)); }
+            // Malformed structured data cannot be safely redacted by field name.
+            catch (JsonException) { return Body.Omitted("unserializable"); }
+        }
+        // Echoed structured input must not bypass field redaction by using a text content type.
+        if (text.AsSpan().TrimStart().StartsWith("{") || text.AsSpan().TrimStart().StartsWith("["))
+        {
+            try { return Body.Json(JsonNode.Parse(text)); }
+            catch (JsonException) { return Body.Omitted("unserializable"); }
+        }
+        return Body.Json(JsonValue.Create(text));
+    }
 
     // props: metadata per dotted path, from the page object's own lists; propValues: the top-level values, redacted.
     private void WriteProps(Utf8JsonWriter writer, JsonObject? page, DevToolsCapture capture)
@@ -618,6 +723,11 @@ internal sealed partial class DevToolsRecorder
         var props = page?["props"] as JsonObject;
         var meta = new Dictionary<string, Dictionary<string, JsonNode?>>(StringComparer.Ordinal);
         Dictionary<string, JsonNode?> At(string path) => meta.TryGetValue(path, out var entry) ? entry : meta[path] = [];
+        string MergeOwner(string path) => capture.PropMetadata
+            .Where(pair => pair.Value.GetValueOrDefault("mergeDirection") is not null
+                && (path == pair.Key || path.StartsWith(pair.Key + ".", StringComparison.Ordinal)))
+            .OrderByDescending(pair => pair.Key.Length)
+            .Select(pair => pair.Key).FirstOrDefault() ?? path;
 
         foreach (var (key, _) in props ?? [])
         {
@@ -646,7 +756,7 @@ internal sealed partial class DevToolsRecorder
         {
             foreach (var path in Strings(page?[list]))
             {
-                var entry = At(path);
+                var entry = At(MergeOwner(path));
                 entry.TryAdd("inertiaType", "merge");
                 entry["mergeDirection"] = direction;
             }
@@ -704,6 +814,21 @@ internal sealed partial class DevToolsRecorder
         foreach (var (path, recorded) in capture.PropMetadata)
             foreach (var (key, value) in recorded) At(path)[key] = value;
 
+        // Initial scheduled props have not been delivered yet; resolved deferred deliveries use the recorded group.
+        if (page?["deferredProps"] is JsonObject scheduled)
+            foreach (var (group, paths) in scheduled)
+                foreach (var path in Strings(paths))
+                {
+                    At(path)["inertiaType"] = "defer";
+                    At(path)["deferGroup"] = group;
+                }
+
+        foreach (var entry in meta.Values)
+        {
+            foreach (var name in new[] { "inertiaType", "deferGroup", "mergeDirection" }) entry.TryAdd(name, null);
+            foreach (var name in new[] { "reset", "once", "live", "deepMerge", "shared", "rescued" }) entry.TryAdd(name, JsonValue.Create(false));
+        }
+
         writer.WriteStartObject("props");
         foreach (var (path, entry) in meta)
         {
@@ -731,6 +856,7 @@ internal sealed partial class DevToolsRecorder
 
         static IEnumerable<string> Strings(JsonNode? node) =>
             node is JsonArray array ? array.Select(item => item?.GetValue<string>()).OfType<string>() : [];
+
     }
 
     private void WriteHeaders(Utf8JsonWriter writer, string name, IHeaderDictionary headers)
@@ -879,7 +1005,11 @@ internal sealed partial class DevToolsRecorder
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inertia DevTools could not record the request to {Path}.")]
     private static partial void LogRecordingFailed(ILogger logger, Exception exception, PathString path);
 
-    private sealed record Stored(string Id, string Tab, string? Component, string RequestType, DateTimeOffset At, byte[] Json);
+    private sealed record Stored(string Id, string Tab, string? Component, string RequestType, DateTimeOffset At, byte[] Json, long Sequence)
+    {
+        internal byte[] Summary { get; } = Encoding.UTF8.GetBytes(JsonNode.Parse(Json)!["__meta"]!.ToJsonString());
+        internal long Size => Json.LongLength + Summary.LongLength;
+    }
 
     private readonly record struct Body(string Status, string? Reason = null, JsonNode? Node = null)
     {

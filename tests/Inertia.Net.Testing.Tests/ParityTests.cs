@@ -35,6 +35,7 @@ public sealed class ParityTests
             using var response = ParsingTests.JsonResponse("""{"component":"Users/Index","props":{},"url":"/"}""");
             var page = await response.GetInertiaPageAsync();
             var options = new InertiaTestingOptions { EnsurePagesExist = true };
+            options.PageDirectories.Add(Path.Combine(directory, "missing-first"));
             options.PageDirectories.Add(directory);
             new AssertableInertia(page, options).Component("Users/Index");
             options.PageExtensions.Clear();

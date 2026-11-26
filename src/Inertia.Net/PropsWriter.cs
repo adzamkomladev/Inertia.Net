@@ -175,8 +175,12 @@ internal sealed partial class PropsWriter
         _planner?.Start();
     }
 
-    private void PlanEntry(string key, object? value, Type declaredType)
+    private void PlanEntry(string key, object? value, Type declaredType, int depth = 0)
     {
+        // Planning runs before the JSON writer can enforce depth. Bound this walk as well, including cyclic dictionaries.
+        var maxDepth = _owner.SerializerOptions.MaxDepth;
+        if (depth >= (maxDepth == 0 ? 64 : maxDepth))
+            throw new JsonException("The prop graph contains a cycle or exceeds the configured maximum JSON depth.");
         var mark = Push(key);
         try
         {
@@ -213,21 +217,21 @@ internal sealed partial class PropsWriter
                 case Dictionary<string, object?> dictionary:
                     foreach (var (childKey, child) in dictionary)
                     {
-                        PlanEntry(childKey, child, typeof(object));
+                        PlanEntry(childKey, child, typeof(object), depth + 1);
                     }
 
                     break;
                 case IReadOnlyDictionary<string, object?> dictionary:
                     foreach (var (childKey, child) in dictionary)
                     {
-                        PlanEntry(childKey, child, typeof(object));
+                        PlanEntry(childKey, child, typeof(object), depth + 1);
                     }
 
                     break;
                 case IDictionary<string, object?> dictionary:
                     foreach (var (childKey, child) in dictionary)
                     {
-                        PlanEntry(childKey, child, typeof(object));
+                        PlanEntry(childKey, child, typeof(object), depth + 1);
                     }
 
                     break;
@@ -461,6 +465,7 @@ internal sealed partial class PropsWriter
             _cancellationToken.ThrowIfCancellationRequested();
             ThrowIfPlanFailed();
             if (Decide(null, entry.Value, entry.Type, parentWasResolved, entry.Serializer) == Inclusion.Filtered) return default;
+            _capture?.RecordProp(new string(Path), null, _request);
             _writer.WritePropertyName(entry.Key);
             JsonSerializer.Serialize(_writer, entry.Value, entry.Serializer);
             return default;
@@ -493,6 +498,7 @@ internal sealed partial class PropsWriter
             _cancellationToken.ThrowIfCancellationRequested();
             ThrowIfPlanFailed();
             if (Decide(null, prop, declaredType, parentWasResolved) == Inclusion.Filtered) return default;
+            _capture?.RecordProp(new string(Path), null, _request);
             if (key is not null) _writer.WritePropertyName(key);
             JsonSerializer.Serialize(_writer, prop, info);
             return default;
@@ -520,7 +526,7 @@ internal sealed partial class PropsWriter
                 return;
             }
 
-            if (p is not null) _capture?.RecordProp(new string(Path), p, _request);
+            _capture?.RecordProp(new string(Path), p, _request);
 
             // Before any loader runs, so excluded and rescued live props keep their listeners (deviation 13).
             if (p?.LiveSpec is not null)

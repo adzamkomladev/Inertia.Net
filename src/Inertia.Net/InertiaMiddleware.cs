@@ -82,11 +82,19 @@ internal sealed class InertiaMiddleware
         response.OnStarting(_onStarting, httpContext);
 
         var originalBody = httpContext.Features.Get<IHttpResponseBodyFeature>();
-        var tracker = isInertia && originalBody is not null ? new ResponseWriteTracker(originalBody) : null;
-        if (tracker is not null) httpContext.Features.Set<IHttpResponseBodyFeature>(tracker);
+        var capture = httpContext.Features.Get<DevToolsCapture>();
+        var tracker = (isInertia || capture is not null) && originalBody is not null
+            ? new ResponseWriteTracker(originalBody, capture) : null;
+        var previousTracker = httpContext.Features.Get<ResponseWriteTracker>();
+        if (tracker is not null)
+        {
+            httpContext.Features.Set<IHttpResponseBodyFeature>(tracker);
+            httpContext.Features.Set(tracker);
+        }
         try
         {
             await _next(httpContext);
+            if (tracker is not null) await tracker.DrainAsync(httpContext.RequestAborted);
 
             if (isInertia
                 && response.StatusCode == StatusCodes.Status200OK
@@ -106,6 +114,8 @@ internal sealed class InertiaMiddleware
         }
         finally
         {
+            if (tracker is not null) await tracker.ReleaseAsync();
+            if (tracker is not null) httpContext.Features.Set(previousTracker);
             if (tracker is not null && ReferenceEquals(httpContext.Features.Get<IHttpResponseBodyFeature>(), tracker))
                 httpContext.Features.Set(originalBody);
         }
@@ -189,12 +199,14 @@ internal sealed class InertiaMiddleware
                     response.StatusCode = StatusCodes.Status409Conflict;
                     headers.Location = default;
                     headers[InertiaHeaders.Location] = location;
+                    SuppressRedirectBody(httpContext);
                 }
                 else if (location.Contains('#', StringComparison.Ordinal))
                 {
                     response.StatusCode = StatusCodes.Status409Conflict;
                     headers.Location = default;
                     headers[InertiaHeaders.Redirect] = location;
+                    SuppressRedirectBody(httpContext);
                 }
             }
         }
@@ -218,6 +230,14 @@ internal sealed class InertiaMiddleware
         {
             await _store.ClearAsync(httpContext);
         }
+    }
+
+    private static void SuppressRedirectBody(HttpContext httpContext)
+    {
+        httpContext.Response.ContentLength = 0;
+        httpContext.Response.ContentType = null;
+        if (httpContext.Features.Get<ResponseWriteTracker>() is { } tracker)
+            tracker.SuppressBody = true;
     }
 }
 

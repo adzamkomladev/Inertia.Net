@@ -7,6 +7,152 @@ namespace Inertia.Net.Tests;
 
 public sealed class AdapterParityTests
 {
+    [Fact]
+    public async Task Flushing_shares_is_request_local_and_new_shares_can_be_added()
+    {
+        var calls = 0;
+        var harness = new Harness(options => options.Share("global", _ => { calls++; return "configured"; }));
+        var http = harness.Context().AsInertia();
+        http.Inertia().Share("request", "before").FlushShared().Share("after", "new")
+            .WithErrors(new Dictionary<string, string> { ["email"] = "required" });
+        var page = Harness.ParsePage(await Harness.ExecuteAsync(http, Inertia.Render("Page")));
+        Assert.Null(page["props"]!["global"]);
+        Assert.Null(page["props"]!["request"]);
+        Assert.Equal("new", (string?)page["props"]!["after"]);
+        Assert.Equal("required", (string?)page["props"]!["errors"]!["email"]);
+        Assert.Equal(0, calls);
+        var next = await harness.PageAsync(null);
+        Assert.Equal("configured", (string?)next["props"]!["global"]);
+        Assert.Null(next["props"]!["after"]);
+        Assert.Equal(1, calls);
+    }
+    [Fact]
+    public async Task Live_channel_event_products_keep_order_and_literal_channel_names()
+    {
+        var harness = new Harness();
+        var page = await harness.PageAsync(new InertiaProps
+        {
+            ["order"] = Inertia.Prop(() => 1)
+                .Live(LiveChannel.Public("private-orders.1"), "A", "B")
+                .Live(LiveChannel.Private("b"), "A", "B"),
+            ["always"] = Inertia.Always(2).Live(LiveChannel.Public("a"), "Changed"),
+            ["feed"] = Inertia.Merge(new[] { 1 }),
+        });
+        JsonAssert.Equal("""["feed"]""", page["mergeProps"]);
+        JsonAssert.Equal("""
+            {"order":{"listeners":[{"channel":{"name":"private-orders.1","type":"public"},"events":["A","B"]},
+                                  {"channel":{"name":"b","type":"private"},"events":["A","B"]}]},
+             "always":{"listeners":[{"channel":{"name":"a","type":"public"},"events":["Changed"]}]}}
+            """, page["liveProps"]);
+        Assert.Equal(2, (int?)page["props"]!["always"]);
+    }
+
+    [Theory]
+    [InlineData("page")]
+    [InlineData("request")]
+    [InlineData("global")]
+    public async Task Explicit_errors_override_the_empty_default(string source)
+    {
+        var errors = Inertia.Always(new InertiaProps { ["custom"] = "message" });
+        var harness = new Harness(options =>
+        {
+            if (source == "global") options.Share("errors", errors);
+        });
+        var http = harness.Context().AsInertia();
+        if (source == "request") http.Inertia().Share("errors", errors);
+        var page = Harness.ParsePage(await Harness.ExecuteAsync(http, Inertia.Render("Page",
+            source == "page" ? new InertiaProps { ["errors"] = errors } : null)));
+        JsonAssert.Equal("""{"custom":"message"}""", page["props"]!["errors"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Big_integer_preservation_keeps_numeric_objects_and_serializer_shapes(bool preserve)
+    {
+        var harness = new Harness(options => options.PreserveBigIntegers = preserve);
+        var date = DateTime.Parse("2026-11-26T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
+        var id = Guid.Parse("01234567-89ab-cdef-0123-456789abcdef");
+        var shared = new SharedNumber(9007199254740993L);
+        var page = await harness.PageAsync(new InertiaProps
+        {
+            ["first"] = shared,
+            ["nested"] = new InertiaProps { ["second"] = shared },
+            ["numbers"] = new InertiaProps { ["0"] = 9007199254740993L, ["1"] = -9007199254740993L },
+            ["empty"] = new InertiaProps(),
+            ["date"] = date,
+            ["id"] = id,
+            ["collection"] = new[] { 1, 2 },
+        });
+        var expected = preserve ? """{"$bigint":"9007199254740993"}""" : "9007199254740993";
+        JsonAssert.Equal(expected, page["props"]!["first"]!["large"]);
+        JsonAssert.Equal(expected, page["props"]!["nested"]!["second"]!["large"]);
+        Assert.Equal(9007199254740993L, shared.Large);
+        Assert.IsType<System.Text.Json.Nodes.JsonObject>(page["props"]!["numbers"]);
+        JsonAssert.Equal(expected, page["props"]!["numbers"]!["0"]);
+        JsonAssert.Equal(preserve ? """{"$bigint":"-9007199254740993"}""" : "-9007199254740993", page["props"]!["numbers"]!["1"]);
+        JsonAssert.Equal("{}", page["props"]!["empty"]);
+        JsonAssert.Equal(System.Text.Json.JsonSerializer.Serialize(date), page["props"]!["date"]);
+        JsonAssert.Equal(System.Text.Json.JsonSerializer.Serialize(id), page["props"]!["id"]);
+        JsonAssert.Equal("[1,2]", page["props"]!["collection"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cyclic_literal_props_fail_before_output_and_do_not_poison_the_writer_pool(bool preserve)
+    {
+        var harness = new Harness(options => options.PreserveBigIntegers = preserve);
+        var cyclic = new InertiaProps();
+        cyclic["self"] = cyclic;
+        var http = harness.Context().AsInertia();
+        await Assert.ThrowsAnyAsync<Exception>(() => Harness.ExecuteAsync(http, Inertia.Render("Page", cyclic)));
+        Assert.Empty(Harness.Body(http));
+        var node = new CyclicNode();
+        node.Next = node;
+        var typed = harness.Context().AsInertia();
+        await Assert.ThrowsAnyAsync<Exception>(() => Harness.ExecuteAsync(typed, Inertia.Render("Page", new InertiaProps { ["node"] = node })));
+        Assert.Empty(Harness.Body(typed));
+        var valid = await harness.PageAsync(new InertiaProps { ["ok"] = 1 });
+        Assert.Equal(1, (int?)valid["props"]!["ok"]);
+    }
+
+    private sealed class CyclicNode
+    {
+        public CyclicNode? Next { get; set; }
+    }
+
+    private sealed record SharedNumber(long Large);
+    [Fact]
+    public async Task Loaded_once_props_are_resolved_on_unfiltered_partial_reloads()
+    {
+        var harness = new Harness();
+        var loads = 0;
+        var page = await harness.PageAsync(new InertiaProps { ["settings"] = Inertia.Once(() => ++loads) },
+            context => context.AsPartial().WithHeader(InertiaHeaders.ExceptOnceProps, "settings"));
+        Assert.Equal(1, loads);
+        Assert.Equal(1, (int?)page["props"]!["settings"]);
+        Assert.Equal("settings", (string?)page["onceProps"]!["settings"]!["prop"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Loaded_shared_once_values_keep_shared_and_once_metadata(bool global)
+    {
+        var loads = 0;
+        var harness = new Harness(options =>
+        {
+            if (global) options.Share("settings", Inertia.Once(() => ++loads));
+        });
+        var context = harness.Context().AsInertia().WithHeader(InertiaHeaders.ExceptOnceProps, "settings");
+        if (!global) context.Inertia().Share("settings", Inertia.Once(() => ++loads));
+        var page = Harness.ParsePage(await Harness.ExecuteAsync(context, Inertia.Render("Page")));
+        Assert.Equal(0, loads);
+        Assert.Null(page["props"]!["settings"]);
+        Assert.Contains("settings", page["sharedProps"]!.AsArray().Select(value => (string?)value));
+        Assert.Equal("settings", (string?)page["onceProps"]!["settings"]!["prop"]);
+    }
     [Theory]
     [InlineData(true, "Pages/Home")]
     [InlineData(false, "Home")]

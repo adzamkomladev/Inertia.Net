@@ -61,7 +61,7 @@ public static class InertiaHeaders
     /// <summary>Adds <c>X-Inertia</c> to <c>Vary</c> unless it (or <c>*</c>) is already listed.</summary>
     internal static void AppendVary(IHeaderDictionary headers)
     {
-        var vary = headers.Vary;
+        var vary = CleanVary(headers);
         if (!Lists(vary, Inertia) && !Lists(vary, "*"))
         {
             headers.Vary = StringValues.Concat(vary, Inertia);
@@ -74,7 +74,7 @@ public static class InertiaHeaders
     /// </summary>
     internal static void AppendPageVary(IHeaderDictionary headers)
     {
-        var vary = headers.Vary;
+        var vary = CleanVary(headers);
         if (vary.Count == 0)
         {
             headers.Vary = PageVary;
@@ -91,6 +91,24 @@ public static class InertiaHeaders
         {
             headers.Vary = StringValues.Concat(vary, missing.Count == PageVaryHeaders.Length ? PageVary : string.Join(", ", missing));
         }
+    }
+
+    private static StringValues CleanVary(IHeaderDictionary headers)
+    {
+        var vary = headers.Vary;
+        // Leave well-formed existing header formatting alone; drop empty field values/tokens when present.
+        foreach (var value in vary)
+        {
+            foreach (var range in value.AsSpan().Split(','))
+            {
+                if (!value.AsSpan()[range].Trim().IsEmpty) continue;
+                var tokens = vary.SelectMany(item => (item ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                headers.Vary = new StringValues(tokens);
+                return headers.Vary;
+            }
+        }
+        return vary;
     }
 
     private static bool Lists(StringValues vary, string token)

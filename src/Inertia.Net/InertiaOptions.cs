@@ -401,6 +401,9 @@ public sealed class InertiaStateOptions
     /// <summary>Remembers successful page GET URLs in a cookie for redirects when Referer is unavailable. Default false.</summary>
     public bool RememberPreviousUrl { get; set; }
 
+    /// <summary>Also update the previous URL on same-component partial reloads. Default false; requires <see cref="RememberPreviousUrl"/>.</summary>
+    public bool RememberPartialReloads { get; set; }
+
     /// <summary>The previous-URL session cookie name, used with either state store. Default <c>.Inertia.Previous</c> (<c>.Inertia.Previous.{mount}</c> for a named mount).</summary>
     public string PreviousUrlCookieName { get; set; } = DefaultPreviousUrlCookieName;
 

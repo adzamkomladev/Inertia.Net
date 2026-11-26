@@ -46,7 +46,17 @@ internal static class InertiaErrorPages
             foreach (var (key, value) in extra) props[key] = value;
         }
 
-        await Inertia.Render(component, props).WithStatusCode(status).ExecuteAsync(context);
+        var feature = context.Inertia();
+        var omitted = feature.OmitSharedData;
+        try
+        {
+            feature.OmitSharedData = omitted || !options.IncludeSharedProps;
+            await Inertia.Render(component, props).WithStatusCode(status).ExecuteAsync(context);
+        }
+        finally
+        {
+            feature.OmitSharedData = omitted;
+        }
         Rendered(services.GetRequiredService<ILoggerFactory>().CreateLogger("Inertia.Net.InertiaErrorPages"), component, status, null);
         return true;
     }

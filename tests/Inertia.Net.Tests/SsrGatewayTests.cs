@@ -11,6 +11,31 @@ namespace Inertia.Net.Tests;
 public sealed class SsrGatewayTests
 {
     [Theory]
+    [InlineData("http://renderer.test:13714")]
+    [InlineData("http://renderer.test:13714/")]
+    public async Task Production_urls_and_named_client_customizations_survive_rendering(string url)
+    {
+        var seen = 0;
+        var handler = new FakeHandler((request, _) =>
+        {
+            Assert.Equal("http://renderer.test:13714/render", request.RequestUri!.AbsoluteUri);
+            Assert.Equal("custom", Assert.Single(request.Headers.GetValues("X-Renderer")));
+            Interlocked.Increment(ref seen);
+            return Task.FromResult(Json(HttpStatusCode.OK, $$"""{"head":[],"body":{{SsrBodyJson}}}"""));
+        });
+        var harness = new Harness(options =>
+        {
+            options.Ssr.Mode = SsrMode.Preferred;
+            options.Ssr.Urls.Add(url);
+        }, configureServices: services => services.AddHttpClient(InertiaSsr.HttpClientName, client => client.DefaultRequestHeaders.Add("X-Renderer", "custom"))
+            .ConfigurePrimaryHttpMessageHandler(() => handler));
+        Assert.Contains("data-server-rendered", await GetAsync(harness), StringComparison.Ordinal);
+        Assert.Equal(1, seen);
+        var sent = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, sent.Method);
+        Assert.Equal("Home", (string?)System.Text.Json.Nodes.JsonNode.Parse(sent.Body)!["component"]);
+    }
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Failure_notification_reports_page_details_once_and_keeps_the_response_policy(bool required)
@@ -27,15 +52,29 @@ public sealed class SsrGatewayTests
         else AssertClientRendered(await GetAsync(harness, "/example"));
         var failure = Assert.Single(events);
         Assert.Equal("/example", failure.Url);
-        Assert.NotNull(failure.Component);
+        Assert.Equal("Home", failure.Component);
+        Assert.Equal("window is not defined", failure.Error);
+        Assert.Equal("Use a lifecycle hook", failure.Hint);
+        Assert.Equal("window", failure.BrowserApi?.GetString());
         Assert.Equal("browser-api", failure.Type);
         Assert.Equal("trace", failure.Stack);
         Assert.Equal("Home.tsx:4", failure.SourceLocation?.GetString());
         Assert.NotEqual(default, failure.Timestamp);
+        var populated = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(failure, InertiaJsonContext.Default.SsrRenderFailed))!;
+        Assert.Equal("Home", (string?)populated["component"]);
+        Assert.Equal("/example", (string?)populated["url"]);
+        Assert.Equal("browser-api", (string?)populated["type"]);
+        Assert.Equal("window is not defined", (string?)populated["error"]);
+        Assert.Equal("Use a lifecycle hook", (string?)populated["hint"]);
+        Assert.Equal("window", (string?)populated["browserApi"]);
+        Assert.Equal("trace", (string?)populated["stack"]);
+        Assert.Equal("Home.tsx:4", (string?)populated["sourceLocation"]);
         var minimal = new SsrRenderFailed { Error = "error", Type = "render", Timestamp = DateTimeOffset.UtcNow };
         var json = System.Text.Json.JsonSerializer.Serialize(minimal, InertiaJsonContext.Default.SsrRenderFailed);
         Assert.DoesNotContain("sourceLocation", json, StringComparison.Ordinal);
         Assert.Contains("\"timestamp\":", json, StringComparison.Ordinal);
+        foreach (var key in new[] { "component", "url", "browserApi", "stack" })
+            Assert.DoesNotContain("\"" + key + "\"", json, StringComparison.Ordinal);
     }
 
     private const string SsrBody = "<script data-page=\"app\" type=\"application/json\">{\"component\":\"Home\"}</script><div data-server-rendered=\"true\" id=\"app\"><h1>Hi</h1></div>";

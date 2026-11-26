@@ -20,6 +20,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
     private SsrCaching? _ssrCache; // one reference, set only by WithSsrCache()
     private InertiaHead? _head;
     private bool? _preserveBigIntegers;
+    private readonly (string File, int Line)? _renderSource;
 
     /// <summary>Overrides big-integer preservation for this response, including its props and flash data.</summary>
     public InertiaResult PreserveBigIntegers(bool preserve = true)
@@ -33,6 +34,18 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         ArgumentNullException.ThrowIfNull(component);
         Component = component;
         Props = props;
+        if (DevToolsRecorder.Recording)
+        {
+            foreach (var frame in new StackTrace(true).GetFrames())
+            {
+                var method = DiagnosticMethodInfo.Create(frame);
+                var assembly = method?.DeclaringAssemblyName?.Split(',')[0].Trim();
+                if (assembly is "Inertia.Net" or "Inertia.Net.Mvc" or "Inertia.Net.FastEndpoints"
+                    || frame.GetFileName() is not { } file || frame.GetFileLineNumber() <= 0) continue;
+                _renderSource = (file, frame.GetFileLineNumber());
+                break;
+            }
+        }
     }
 
     /// <summary>The client-side page component.</summary>
@@ -157,6 +170,7 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
         if (devTools is not null)
         {
             devTools.Component = component;
+            devTools.RenderSource = _renderSource;
             devTools.PageBytes = page.WrittenMemory.Length;
             if (devTools.PageBytes <= devTools.MaxPageBytes)
             {

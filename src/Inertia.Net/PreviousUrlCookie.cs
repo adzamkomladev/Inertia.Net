@@ -28,7 +28,8 @@ internal static class PreviousUrlCookie
     internal static void Store(HttpContext context, InertiaRequest request, InertiaStateOptions options, string component)
     {
         if (!HttpMethods.IsGet(context.Request.Method) || request.IsPrefetch || request.IsPrecognition
-            || string.Equals(request.PartialComponent, component, StringComparison.Ordinal)) return;
+            || (!request.IsInertia && string.Equals(context.Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+            || (!options.RememberPartialReloads && string.Equals(request.PartialComponent, component, StringComparison.Ordinal))) return;
 
         var url = context.Request.PathBase.ToUriComponent() + context.Request.Path.ToUriComponent() + context.Request.QueryString.ToUriComponent();
         // Validate on write as well: unusual paths must never replace a usable back URL.

@@ -115,8 +115,9 @@ internal sealed class InertiaPageWriter
         serializerOptions.MakeReadOnly();
         SerializerOptions = serializerOptions;
         _generated = PreserveBigIntegers ? null : GeneratedContext(source);
-        _jsonWriterOptions = new JsonWriterOptions { Encoder = source.Encoder, Indented = serializerOptions.WriteIndented };
-        _htmlWriterOptions = new JsonWriterOptions { Encoder = HtmlSafeEncoder };
+        var maxDepth = serializerOptions.MaxDepth == 0 ? 64 : serializerOptions.MaxDepth;
+        _jsonWriterOptions = new JsonWriterOptions { Encoder = source.Encoder, Indented = serializerOptions.WriteIndented, MaxDepth = maxDepth };
+        _htmlWriterOptions = new JsonWriterOptions { Encoder = HtmlSafeEncoder, MaxDepth = maxDepth };
         _propsWriters = new DefaultObjectPool<PropsWriter>(new PropsWriterPolicy(this));
     }
 
@@ -626,16 +627,22 @@ internal sealed class InertiaPageWriter
 
         Set("errors", NoErrors, typeof(object), shared: true);
 
-        foreach (var (key, value) in Options.SharedProps)
+        feature = httpContext.Features.Get<InertiaFeature>();
+        if (feature is { OmitSharedData: true }) feature.HeadHtml = null;
+        if (feature is not { SharedDefaultsCleared: true } and not { OmitSharedData: true })
         {
-            httpContext.RequestAborted.ThrowIfCancellationRequested();
-            Set(key, value is Func<HttpContext, object?> factory ? factory(httpContext) : value, typeof(object), shared: true);
+            foreach (var (key, value) in Options.SharedProps)
+            {
+                httpContext.RequestAborted.ThrowIfCancellationRequested();
+                Set(key, value is Func<HttpContext, object?> factory ? factory(httpContext) : value, typeof(object), shared: true);
+            }
         }
 
+        // A configured factory can create request shares or errors while it runs.
         feature = httpContext.Features.Get<InertiaFeature>();
         if (ReferenceEquals(entries[0].Value, NoErrors) && feature?.Errors is { Count: > 0 } bags)
             Set("errors", Inertia.Always(ErrorsResolver.Resolve(bags, Options.WithAllErrors, request.ErrorBag)), typeof(object), shared: true);
-        if (feature?.SharedProps is { } requestShared)
+        if (feature is not { OmitSharedData: true } && feature?.SharedProps is { } requestShared)
         {
             foreach (var (key, value) in requestShared)
             {
@@ -643,7 +650,7 @@ internal sealed class InertiaPageWriter
             }
         }
 
-        if (feature?.HeadOrNull is { IsEmpty: false } head)
+        if (feature is not { OmitSharedData: true } && feature?.HeadOrNull is { IsEmpty: false } head)
         {
             feature.HeadHtml = head.ToHtml(Options.Head.TitleTemplate);
             Set(Options.Head.PropName, Inertia.Always(feature.HeadHtml), typeof(object), shared: true);

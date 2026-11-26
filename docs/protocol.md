@@ -261,6 +261,14 @@ keep their normal one-response lifetime. The DevTools read API bypasses state lo
 
 `Render(...).PreserveBigIntegers(bool)` overrides the global option for that response, including props and flash.
 
+Previous-URL tracking ignores non-Inertia AJAX, prefetch and Precognition requests. Same-component partial reloads are
+ignored by default; `State.RememberPartialReloads` opts them in when `State.RememberPreviousUrl` is enabled.
+
+`HttpContext.Inertia().FlushShared()` clears configured and request shares for this request without mutating startup options.
+Default/validation `errors` remain; subsequent `Share` calls add new request shares. Error pages include shared data by default;
+`InertiaErrorPagesOptions.IncludeSharedProps = false` omits configured/request shares and shared head tags while retaining
+validation errors and the error-page props.
+
 `Inertia.BroadcastPropsAsync(context, props)` uses the prop resolver without partial or initial-load exclusions.
 It returns a flat-keyed JSON object for `IInertiaLive.PublishAsync`, omits rescued values, and does not record a page.
 It requires `AddInertia()`; ordinary value publishing remains usable in workers without it.

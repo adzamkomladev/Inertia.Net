@@ -302,6 +302,18 @@ has '"requestType":"navigate"'
 has '"tabUuid":"smoke-tab"'
 has '"component":"About"'
 
+req GET "/_inertia/devtools/entries?component=About&limit=1"
+status_is 200
+has '"requestType":"navigate"'
+lacks '"__meta"'
+lacks '"propValues"'
+lacks '"http"'
+req GET /healthz
+ID=$(tr -d '\r' <"$T/h" | sed -n 's/^X-Inertia-Devtools-Id: //Ip')
+req GET "/_inertia/devtools/entries/$ID"
+status_is 200
+has '"responseBody":{"status":"present","value":"ok"}'
+
 # 16. Live props: page metadata, then the SignalR hub with a long-polling client made of curl calls (records end with 0x1E).
 inertia GET /dashboard
 has '"liveProps":{"live":{"listeners":[{"channel":{"name":"stats","type":"public"},"events":["StatsChanged"]}],"throttle":250}}'

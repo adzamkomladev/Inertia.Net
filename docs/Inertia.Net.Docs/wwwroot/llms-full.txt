@@ -319,7 +319,7 @@ Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.
 Run these commands in the folder where you want to create `MyApp`.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.6
+dotnet new install Inertia.Net.Templates@1.9.7
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -466,17 +466,17 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.6
-dotnet add package Inertia.Net.Mvc --version 1.9.6            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.6  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.6 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.6        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.6   # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.6          # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.6        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.7
+dotnet add package Inertia.Net.Mvc --version 1.9.7            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.7  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.7 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.7        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.7   # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.7          # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.7        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.6 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.7 implements Inertia.js v3.
 
 ## Requirements
 
@@ -499,7 +499,7 @@ Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.6
+dotnet new install Inertia.Net.Templates@1.9.7
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -1029,11 +1029,11 @@ Use this guide to add Inertia to an existing ASP.NET Core app. To create an app 
 Run these commands from the existing server project's folder. Everyone needs the core package:
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.6
+dotnet add package Inertia.Net --version 1.9.7
 ```
 
 For MVC, also install `Inertia.Net.Mvc`. For FastEndpoints, install `Inertia.Net.FastEndpoints`.
-Use version `1.9.6` for each. You also need Node.js and Vite to build the client. See
+Use version `1.9.7` for each. You also need Node.js and Vite to build the client. See
 [installation](/docs/installation) for all packages, or [client setup](/docs/client-setup) for the frontend files.
 
 Every app needs the same four things:
@@ -1970,6 +1970,10 @@ o.Share("plans", Once(() => plans.All()));   // like Laravel's shareOnce
 
 `plans` is resolved once and kept by the client across visits.
 
+`context.Inertia().FlushShared()` clears configured and request shared props for the current request only. It does not mutate
+application defaults or other requests, and validation errors remain available. Call `Share(...)` afterwards to add replacement
+request shares. To omit shared data specifically on error pages, set `InertiaErrorPagesOptions.IncludeSharedProps = false`.
+
 ## The shared prop key list
 
 The top-level shared keys are listed in the page object so the client can keep them across navigations:
@@ -2492,6 +2496,9 @@ Create the named components in your client pages directory. Each receives `statu
 shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
 responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.
 
+Set `o.IncludeSharedProps = false` to omit configured/request shared props and shared head tags from these error pages.
+The `errors` prop and explicit error-page props (including `status`) remain available.
+
 For example, `ClientApp/pages/Error.tsx` (`Error.vue` for Vue, `Error.svelte` for Svelte):
 
 <Tabs>
@@ -2656,7 +2663,7 @@ Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected
 `dotnet new inertia --auth` creates an app with both:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.6
+dotnet new install Inertia.Net.Templates::1.9.7
 dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
 ```
 
@@ -3350,7 +3357,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.6
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.7
 ```
 
 The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3382,7 +3389,7 @@ The EF Core package is not marked Native AOT compatible. EF Core has its own com
 `Inertia.Net.MongoDB` builds the same `Page<T>` and `CursorPage<T>` values from a `collection.Find(filter)`:
 
 ```sh
-dotnet add package Inertia.Net.MongoDB --version 1.9.6
+dotnet add package Inertia.Net.MongoDB --version 1.9.7
 ```
 
 ```csharp
@@ -5679,7 +5686,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/redis
 `Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all.
 
 ```sh
-dotnet add package Inertia.Net.Redis --version 1.9.6
+dotnet add package Inertia.Net.Redis --version 1.9.7
 ```
 
 ```csharp
@@ -6102,6 +6109,7 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`. The full SSR o
 |---|---|---|
 | `CookieName` | `".Inertia.State"` | Cookie name (cookie store) or session key (session store). |
 | `RememberPreviousUrl` | `false` | Remember successful page GET URLs for `Back()` when Referer is unavailable. |
+| `RememberPartialReloads` | `false` | Also remember same-component partial reload URLs when previous-URL tracking is enabled. Non-Inertia AJAX, prefetch and Precognition requests remain excluded. |
 | `PreviousUrlCookieName` | `".Inertia.Previous"` | Plain previous-URL cookie, with either state store; non-empty and different from `CookieName`. |
 | `CookieSecurePolicy` | `SameAsRequest` | When state and previous-URL cookies are `Secure`. |
 | `UseSession()` | off | Use `ISession` instead of the encrypted cookie. |
@@ -6347,6 +6355,16 @@ app.UseInertia();
 app.MapInertiaDevTools();                // GET /_inertia/devtools/entries/{id} and /entries
 ```
 
+The list endpoint returns metadata summaries; fetch `/entries/{id}` for props, HTTP bodies and route details.
+Ordinary textual and JSON responses are captured up to `MaxResponseBytes`; binary, explicitly streamed and oversized
+responses are omitted. Parsed multipart forms include file names, sizes and MIME types, never file contents.
+Unparsed uploads are not read just for recording. Render source locations are included when debug symbols are available;
+published or Native AOT applications may not retain them. Malformed structured bodies and invalid UTF-8 are omitted rather
+than risking an unredacted secret in a raw-text fallback.
+
+Use `o.ExcludePaths.Add("/health")` or `o.ExcludePaths.Add("/assets/*")` in `AddInertiaDevTools(o => ...)` to exclude paths.
+Untagged requests use the global entry/byte/age limits; `MaxEntriesPerTab` applies only when a browser tab ID is supplied.
+
 Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry in memory (per browser tab, at most `MaxEntriesPerTab` and `MaxEntries`, for `MaxAge`): request type, timings, headers, bodies, the page object and its props metadata.
 
 The first page carries the discovery tag the extension reads. Values of names containing `password`, `secret`, `token`, `authorization`, `cookie` or `api_key` are replaced with `[REDACTED]` in props, bodies and headers. Add names with `RedactedKeys`. Nothing leaves the app.
@@ -6589,7 +6607,7 @@ Every feature below is here because it shows one idea from Inertia.Net. The righ
 Install the templates once, then create the app. `--auth` adds cookie sign-in, so you do not write that yourself. Use `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below.
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.6
+dotnet new install Inertia.Net.Templates::1.9.7
 dotnet new inertia -n ForgetMeNot --framework react --auth
 cd ForgetMeNot
 bun install
@@ -6915,7 +6933,7 @@ Lists and items must survive a restart, so they need a database. We use **EF Cor
 
 ```sh
 dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version "10.*"
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.6
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.7
 ```
 
 <Callout type="tip" title="On .NET 11?">
@@ -8793,7 +8811,7 @@ Now the line that connects the worker to the page. In `ListsPage` we wrote `.Liv
 Install the SignalR transport. It carries the "something changed" message to the browser:
 
 ```sh
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.6
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.7
 bun add @microsoft/signalr
 ```
 
@@ -8847,7 +8865,7 @@ dotnet new xunit -n ForgetMeNot.Tests
 cd ForgetMeNot.Tests
 dotnet add reference ../ForgetMeNot/ForgetMeNot.csproj
 dotnet add package Microsoft.AspNetCore.Mvc.Testing --version "10.*"
-dotnet add package Inertia.Net.Testing --version 1.9.6
+dotnet add package Inertia.Net.Testing --version 1.9.7
 ```
 
 The test project starts your real app in memory, so add one line at the very end of `Program.cs` of the app:
