@@ -56,6 +56,29 @@ public sealed class CachedPropsTests
     }
 
     [Fact]
+    public async Task A_byte_cap_keeps_props_in_a_bounded_cache_of_their_own_and_evicts_past_it()
+    {
+        using var memory = new MemoryCache(new MemoryCacheOptions());
+        var options = new InertiaOptions();
+        options.Props.CacheMaxBytes = 10;
+        using var store = new MemoryInertiaCacheStore(memory, Options.Create(options), TimeProvider.System);
+        var entry = new InertiaCacheEntryOptions(TimeSpan.FromMinutes(1), ["tag"]);
+        var kept = new InertiaCacheKey(InertiaCacheEntryKind.Prop, "kept");
+        var refused = new InertiaCacheKey(InertiaCacheEntryKind.Prop, "refused");
+        await store.SetAsync(kept, new byte[6], entry, TestContext.Current.CancellationToken);
+        await store.SetAsync(refused, new byte[6], entry, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, memory.Count); // not in the app's cache
+        Assert.NotNull(await store.GetAsync(kept, TestContext.Current.CancellationToken));
+        Assert.Null(await store.GetAsync(refused, TestContext.Current.CancellationToken)); // past the cap
+        await store.RemoveByTagAsync("tag", TestContext.Current.CancellationToken);
+        Assert.Null(await store.GetAsync(kept, TestContext.Current.CancellationToken));
+
+        options.Props.CacheMaxBytes = 0;
+        Assert.Contains("Props.CacheMaxBytes must be positive.", new InertiaOptionsValidator().Validate(null, options).Failures!);
+    }
+
+    [Fact]
     public async Task The_loader_runs_once_and_the_json_is_reused()
     {
         var first = await _harness.PageAsync(new InertiaProps { ["stats"] = Stats() });
@@ -710,6 +733,92 @@ public sealed class CachedPropsTests
         Assert.Equal(mutation == "remove" ? 2 : 1, _loads);
     }
 
+    [Theory]
+    [InlineData("other key", 1)]
+    [InlineData("other tag", 1)]
+    [InlineData("clear ssr", 1)]
+    [InlineData("own tag", 2)]
+    [InlineData("clear props", 2)]
+    public async Task A_mutation_discards_only_the_loads_of_its_own_key_or_tag(string mutation, int loads)
+    {
+        var cache = _harness.Services.GetRequiredService<IInertiaCache>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        InertiaProps Page() => new()
+        {
+            ["orders"] = Prop(async ct =>
+            {
+                var load = ++_loads;
+                started.TrySetResult();
+                await release.Task.WaitAsync(ct);
+                return $"orders {load}";
+            }).Cache("orders", TimeSpan.FromMinutes(5), tags: ["user:1"]),
+        };
+
+        var filling = _harness.PageAsync(Page());
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await (mutation switch
+        {
+            "other key" => cache.RemovePropAsync("customers", TestContext.Current.CancellationToken),
+            "other tag" => cache.RemoveByTagAsync("user:2", TestContext.Current.CancellationToken),
+            "clear ssr" => cache.ClearSsrAsync(TestContext.Current.CancellationToken),
+            "own tag" => cache.RemoveByTagAsync("user:1", TestContext.Current.CancellationToken),
+            _ => cache.ClearPropsAsync(TestContext.Current.CancellationToken),
+        });
+
+        // Joins the fill that is still loading unless the mutation reached it; then it loads afresh.
+        var reader = _harness.PageAsync(Page());
+        release.SetResult();
+        Assert.Equal("orders 1", (string?)(await filling)["props"]!["orders"]);
+        Assert.Equal($"orders {loads}", (string?)(await reader)["props"]!["orders"]);
+        Assert.Equal($"orders {loads}", (string?)(await _harness.PageAsync(Page()))["props"]!["orders"]); // what the store kept
+        Assert.Equal(loads, _loads);
+    }
+
+    [Fact]
+    public async Task A_store_that_does_not_answer_at_once_gets_a_pages_reads_together_and_loaders_still_run_in_turn()
+    {
+        var store = new RecordingStore { ReadDelay = TimeSpan.FromMilliseconds(50) };
+        var harness = new Harness(configureServices: s => s.AddSingleton<IInertiaCacheStore>(store));
+        var running = 0;
+        var overlapped = false;
+        InertiaProp Cached(string key) => Prop(async ct =>
+        {
+            overlapped |= Interlocked.Increment(ref running) > 1;
+            await Task.Yield();
+            Interlocked.Decrement(ref running);
+            return $"{key} {++_loads}";
+        }).Cache(key, TimeSpan.FromMinutes(5));
+        InertiaProps Page() => new() { ["a"] = Cached("a"), ["b"] = Cached("b"), ["nested"] = new Dictionary<string, object?> { ["c"] = Cached("c") } };
+
+        // The first render finds out that the store is not local (unless a Parallel() prop already made renders plan).
+        var first = await harness.PageAsync(Page());
+        Assert.Equal("a 1", (string?)first["props"]!["a"]);
+        Assert.Equal("b 2", (string?)first["props"]!["b"]);
+        Assert.Equal("c 3", (string?)first["props"]!["nested"]!["c"]);
+
+        store.MaxReadsInFlight = 0;
+        var hits = await harness.PageAsync(Page());
+        Assert.Equal(3, store.MaxReadsInFlight);
+        Assert.Equal(first["props"]!.ToJsonString(), hits["props"]!.ToJsonString());
+        Assert.Equal(3, _loads);
+
+        // Misses: the reads still go out together, and each loader runs when the walk reaches its prop.
+        store.Values.Clear();
+        var misses = await harness.PageAsync(Page());
+        Assert.Equal("a 4", (string?)misses["props"]!["a"]);
+        Assert.Equal("b 5", (string?)misses["props"]!["b"]);
+        Assert.Equal("c 6", (string?)misses["props"]!["nested"]!["c"]);
+        Assert.False(overlapped);
+
+        // A partial reload only reads what it returns.
+        store.MaxReadsInFlight = 0;
+        var partial = await harness.PageAsync(Page(), c => c.AsPartial(only: "b"));
+        Assert.Equal(1, store.MaxReadsInFlight);
+        Assert.Equal("b 5", (string?)partial["props"]!["b"]);
+        Assert.Null(partial["props"]!["a"]);
+    }
+
     [Fact]
     public async Task A_custom_store_gets_prefixed_keys_and_the_tags()
     {
@@ -863,10 +972,27 @@ public sealed class CachedPropsTests
 
         public Func<Task>? AfterFirstWrite { get; init; }
 
+        public int MaxReadsInFlight { get; set; }
+
+        /// <summary>How long a read takes: long enough that reads started together are in flight together.</summary>
+        public TimeSpan ReadDelay { get; init; }
+
+        private int _readsInFlight;
+
         public async ValueTask<byte[]?> GetAsync(InertiaCacheKey key, CancellationToken cancellationToken)
         {
-            await Pause();
-            return Values.GetValueOrDefault(key);
+            // Reads start one after another on the caller's thread; they finish on pool threads.
+            MaxReadsInFlight = Math.Max(MaxReadsInFlight, Interlocked.Increment(ref _readsInFlight));
+            try
+            {
+                await Pause();
+                if (ReadDelay > TimeSpan.Zero) await Task.Delay(ReadDelay, cancellationToken);
+                return Values.GetValueOrDefault(key);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _readsInFlight);
+            }
         }
 
         public async ValueTask SetAsync(InertiaCacheKey key, byte[] value, InertiaCacheEntryOptions options, CancellationToken cancellationToken)

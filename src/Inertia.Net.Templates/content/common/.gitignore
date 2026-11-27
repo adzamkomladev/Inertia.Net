@@ -1,5 +1,6 @@
 bin/
 obj/
 node_modules/
+.svelte-check/
 wwwroot/build/
 wwwroot/hot

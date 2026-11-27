@@ -14,6 +14,16 @@ internal sealed class ResponseWriteTracker(IHttpResponseBodyFeature inner, DevTo
     private void Record(ReadOnlySpan<byte> bytes) => capture?.RecordResponse(bytes);
     public Stream Stream => _stream ??= new TrackingStream(inner.Stream, this);
     public PipeWriter Writer => _writer ??= PipeWriter.Create(Stream, new StreamPipeWriterOptions(leaveOpen: true));
+    // A rendered page is never a redirect whose body is dropped, so it skips the tracking stream and its second buffer.
+    // A stream writer that was already handed out is reused, so earlier writes stay in order.
+    internal PipeWriter PageWriter
+    {
+        get
+        {
+            HasWritten = true;
+            return _writer ?? inner.Writer;
+        }
+    }
     public void DisableBuffering()
     {
         if (capture is not null) capture.ResponseStreamed = true;

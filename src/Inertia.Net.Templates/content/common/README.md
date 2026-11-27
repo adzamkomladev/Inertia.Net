@@ -22,6 +22,9 @@ dotnet watch       # http://localhost:5180
 While Vite runs it writes `wwwroot/hot`, and the app serves the pages through it. For production, run the build command from
 your row to write `wwwroot/build`, then publish with `dotnet publish -c Release`.
 
+The build script type-checks before it bundles. Three more scripts check the client: `lint` runs [oxlint](https://oxc.rs),
+`format` runs oxfmt (its settings are in `.oxfmtrc.json`) and `format:check` only reports.
+
 <!--#if (auth) -->
 ## Sign-in
 

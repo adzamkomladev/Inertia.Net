@@ -7,6 +7,38 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.8] - 2026-11-28
+
+### Fixed
+
+- An Inertia page response no longer passes through a second buffer. 1.9.7 routed every Inertia XHR response through a stream
+  writer so converted redirects could drop their body; page JSON now goes straight to the server's writer again. On a 475 B page
+  this is 1,184 B allocated per request instead of 1,480 B. Redirect bodies are still dropped.
+- `IInertiaCache` removals and replacements only discard the loads in flight of their own key or tag. Before, any mutation
+  discarded every load in flight on the app instance, so an app that invalidated per-user entries under load stored and shared few
+  of its loads. `ClearPropsAsync` no longer discards SSR renders in flight, nor `ClearSsrAsync` prop loads.
+- A previous-URL cookie with non-ASCII characters is ignored. `Back()` used to answer `500` on Kestrel for such a hand-made cookie.
+- A cursor whose string key holds U+0000 is ignored (the first page is returned), as other malformed cursors are. PostgreSQL
+  rejects that character in a text parameter.
+
+### Changed
+
+- The version-mismatch `409` sends the request's path and query in `X-Inertia-Location`, not the absolute URL, so it no longer
+  reflects the `Host` header or an unforwarded `http` scheme. The Inertia client resolves it against the page's origin. A path that
+  starts with `//` keeps the absolute form. See deliberate deviation 14 in `docs/protocol.md`.
+- With a cache store that does not answer at once (Redis), the store reads of a page's cached props start together instead of one
+  round trip after another: 20 cached props on a local Redis took about 20 ms and now take about 2 ms. Loaders still run in turn
+  unless marked `Parallel()`. A cached prop is therefore read before the loaders of the props ahead of it have run.
+
+### Added
+
+- `Props.CacheMaxBytes`: a byte cap for cached props in the default store. When set, they are kept in a private cache whose least
+  recently used entries are evicted, as SSR renders are. The default (`null`) keeps them in the app's `IMemoryCache`.
+- `Pagination.MaxPage`: the last numbered page a bound `PageRequest` may fetch. A page beyond it is empty and runs no query or count.
+- Starter templates: `lint` ([oxlint](https://oxc.rs)), `format` and `format:check` (oxfmt) scripts. React type-checks with TypeScript 7,
+  Svelte with TypeScript 7 through `svelte-check --tsgo`, and Vue with TypeScript 6 (was 5.9). Outside Development the starter
+  redirects to HTTPS and sends HSTS.
+
 ## [1.9.7] - 2026-11-26
 
 ### Fixed

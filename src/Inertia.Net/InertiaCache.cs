@@ -191,9 +191,10 @@ internal sealed partial class InertiaCaching
     private readonly ConcurrentDictionary<InertiaCacheKey, long> _refreshing = new(); // the claim id of each key's refresh
     private readonly ConcurrentDictionary<TaskCompletionSource, byte> _storing = new(); // stores that passed the stamp check
     private long _refreshClaims;
-    private readonly ConcurrentDictionary<InertiaCacheKey, TaskCompletionSource<byte[]?>> _filling = new();
+    private readonly ConcurrentDictionary<InertiaCacheKey, (TaskCompletionSource<byte[]?> Completion, string[] Tags)> _filling = new();
     private int _refreshCount;
-    private long _invalidations;
+    // Removals and replacements, counted per key and per tag in a fixed table: two names that share a slot only cost a spare reload.
+    private readonly long[] _invalidations = new long[1024];
     private long _nextFailureLog;
     private int _suppressedFailures;
 
@@ -205,6 +206,9 @@ internal sealed partial class InertiaCaching
     }
 
     public IInertiaCacheStore Store { get; }
+
+    /// <summary>A cached prop's read did not complete at once: the store is not local, so renders plan their reads (see <c>PropsWriter</c>).</summary>
+    public volatile bool SawPendingRead;
 
     /// <summary>
     /// The key of a render: <c>2.</c> and the SHA-256, in hex, of the mount and the page JSON. Mounts can use different renderers, so
@@ -273,40 +277,88 @@ internal sealed partial class InertiaCaching
     }
 
     /// <summary>Claims a missing entry, or returns the current fill whose successful bytes are shared even if storage fails.</summary>
-    public bool TryBeginFill(InertiaCacheKey key, out TaskCompletionSource<byte[]?> completion)
+    public bool TryBeginFill(InertiaCacheKey key, string[] tags, out TaskCompletionSource<byte[]?> completion)
     {
-        if (_filling.TryGetValue(key, out completion!)) return false;
+        if (_filling.TryGetValue(key, out var fill))
+        {
+            completion = fill.Completion;
+            return false;
+        }
+
         var candidate = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        completion = _filling.GetOrAdd(key, candidate);
+        completion = _filling.GetOrAdd(key, (candidate, tags)).Completion;
         return ReferenceEquals(completion, candidate);
     }
 
     /// <summary>Releases this fill's claim (not a newer fill's of the same key) and ends its waiters with nothing, unless it published.</summary>
     public void EndFill(InertiaCacheKey key, TaskCompletionSource<byte[]?> completion)
     {
-        _filling.TryRemove(new KeyValuePair<InertiaCacheKey, TaskCompletionSource<byte[]?>>(key, completion));
+        if (_filling.TryGetValue(key, out var fill) && ReferenceEquals(fill.Completion, completion))
+        {
+            _filling.TryRemove(new KeyValuePair<InertiaCacheKey, (TaskCompletionSource<byte[]?>, string[])>(key, fill));
+        }
+
         completion.TrySetResult(null);
     }
 
     /// <summary>
-    /// Counts the removals and replacements made through <see cref="IInertiaCache"/>. A fill or refresh reads it before its loader runs
-    /// and passes it to <see cref="SetAsync"/>, so a value loaded before a mutation is neither stored nor shared after it.
+    /// The removals and replacements made through <see cref="IInertiaCache"/> that reach an entry: those of its key and of each of its
+    /// tags. A fill or refresh reads it before its loader runs and passes it to <see cref="SetAsync"/>, so a value loaded before such a
+    /// mutation is neither stored nor shared after it. A mutation of another key or tag leaves it unchanged.
     /// </summary>
-    public long InvalidationStamp => Volatile.Read(ref _invalidations);
-
-    /// <summary>
-    /// Begins a removal or replacement on this app instance. Fills that started before it no longer take new waiters (a later request
-    /// loads afresh), stores that start after it are skipped, and it returns once the stores already under way have finished, so the
-    /// mutation that follows lands after them and later readers see its result.
-    /// </summary>
-    public async ValueTask BeginMutationAsync()
+    public long InvalidationStamp(InertiaCacheKey key, string[] tags)
     {
-        Interlocked.Increment(ref _invalidations);
-        foreach (var fill in _filling)
+        // The counts only grow, so the sum changes exactly when one of them does.
+        var stamp = Volatile.Read(ref _invalidations[Slot(key)]);
+        foreach (var tag in tags)
         {
-            _filling.TryRemove(fill);
+            stamp += Volatile.Read(ref _invalidations[Slot(tag, 0)]);
         }
 
+        return stamp;
+    }
+
+    private int Slot(InertiaCacheKey key) => Slot(key.Value, (uint)key.Kind + 1);
+
+    // FNV-1a, not string.GetHashCode: that one changes with every process, so two names would share a slot in one run and not the next.
+    private int Slot(string name, uint seed)
+    {
+        var hash = 2166136261 ^ seed;
+        foreach (var character in name)
+        {
+            hash = (hash ^ character) * 16777619;
+        }
+
+        return (int)((hash ^ (hash >> 16)) % (uint)_invalidations.Length);
+    }
+
+    /// <summary>
+    /// Begins a removal or replacement of one entry on this app instance. A fill of it that started before no longer takes new waiters
+    /// (a later request loads afresh), a store of it that starts after is skipped, and it returns once the stores already under way
+    /// have finished, so the mutation that follows lands after them and later readers see its result.
+    /// </summary>
+    public ValueTask BeginMutationAsync(InertiaCacheKey key)
+    {
+        Interlocked.Increment(ref _invalidations[Slot(key)]);
+        _filling.TryRemove(key, out _);
+        return StoresUnderWayAsync();
+    }
+
+    /// <summary>As <see cref="BeginMutationAsync(InertiaCacheKey)"/>, for every entry that is loaded with <paramref name="tag"/>.</summary>
+    public ValueTask BeginMutationAsync(string tag)
+    {
+        Interlocked.Increment(ref _invalidations[Slot(tag, 0)]);
+        foreach (var fill in _filling)
+        {
+            if (Array.IndexOf(fill.Value.Tags, tag) >= 0) _filling.TryRemove(fill);
+        }
+
+        return StoresUnderWayAsync();
+    }
+
+    // Every store, not only the mutated entry's: they are short, and waiting for one too many is harmless.
+    private async ValueTask StoresUnderWayAsync()
+    {
         if (!_storing.IsEmpty)
         {
             await Task.WhenAll(_storing.Keys.Select(store => store.Task));
@@ -315,9 +367,9 @@ internal sealed partial class InertiaCaching
 
     /// <summary>
     /// Stores an entry while rendering: a failing store is logged and the page is still written. With a <paramref name="stamp"/> from
-    /// <see cref="InvalidationStamp"/>, a mutation since then skips the store; a cancelled token (a request gone, a refresh past its deadline)
-    /// skips it too. Returns whether the value is still current, that is, no mutation began since <paramref name="stamp"/>: only then may a
-    /// fill share it with its waiters.
+    /// <see cref="InvalidationStamp"/>, a mutation of this key or of one of these tags since then skips the store; a cancelled token (a
+    /// request gone, a refresh past its deadline) skips it too. Returns whether the value is still current, that is, no such mutation
+    /// began since <paramref name="stamp"/>: only then may a fill share it with its waiters.
     /// </summary>
     public async ValueTask<bool> SetAsync(InertiaCacheKey key, byte[] value, TimeSpan expiration, string[] tags, CancellationToken cancellationToken, long? stamp = null)
     {
@@ -326,7 +378,7 @@ internal sealed partial class InertiaCaching
         _storing.TryAdd(storing, 0);
         try
         {
-            if ((stamp is { } before && before != InvalidationStamp) || cancellationToken.IsCancellationRequested) return Current();
+            if ((stamp is { } before && before != InvalidationStamp(key, tags)) || cancellationToken.IsCancellationRequested) return Current();
             await Store.SetAsync(key, value, new InertiaCacheEntryOptions(expiration, tags), cancellationToken);
         }
         catch (Exception ex) when (!IsCancellation(ex, cancellationToken))
@@ -341,7 +393,7 @@ internal sealed partial class InertiaCaching
 
         return Current();
 
-        bool Current() => stamp is not { } loaded || loaded == InvalidationStamp;
+        bool Current() => stamp is not { } loaded || loaded == InvalidationStamp(key, tags);
     }
 
     /// <summary>Whether a refresh of the entry is in flight.</summary>
@@ -631,26 +683,27 @@ internal sealed class InertiaCache(InertiaCaching caching, InertiaPageWriter pag
     public async ValueTask RemovePropAsync(string key, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
-        await caching.BeginMutationAsync();
-        await caching.Store.RemoveAsync(new InertiaCacheKey(InertiaCacheEntryKind.Prop, key), cancellationToken);
+        var storeKey = new InertiaCacheKey(InertiaCacheEntryKind.Prop, key);
+        await caching.BeginMutationAsync(storeKey);
+        await caching.Store.RemoveAsync(storeKey, cancellationToken);
     }
 
     public async ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(tag);
-        await caching.BeginMutationAsync();
+        await caching.BeginMutationAsync(tag);
         await caching.Store.RemoveByTagAsync(tag, cancellationToken);
     }
 
     public async ValueTask ClearPropsAsync(CancellationToken cancellationToken = default)
     {
-        await caching.BeginMutationAsync();
+        await caching.BeginMutationAsync(InertiaCacheTags.Props);
         await caching.Store.RemoveByTagAsync(InertiaCacheTags.Props, cancellationToken);
     }
 
     public async ValueTask ClearSsrAsync(CancellationToken cancellationToken = default)
     {
-        await caching.BeginMutationAsync();
+        await caching.BeginMutationAsync(InertiaCacheTags.Ssr);
         await caching.Store.RemoveByTagAsync(InertiaCacheTags.Ssr, cancellationToken);
     }
 
@@ -659,7 +712,7 @@ internal sealed class InertiaCache(InertiaCaching caching, InertiaPageWriter pag
         var settings = PropCaching.Create(key, duration, staleFor, tags);
         var entry = pages.CreateCacheEntry(typeof(T), value, (value as IProvidesScrollMetadata)?.GetScrollMetadata(), settings, key, out _);
         // A mutation like a removal: an older fill or refresh completing later must not overwrite this value or share its own.
-        await caching.BeginMutationAsync();
+        await caching.BeginMutationAsync(settings.StoreKey);
         await caching.Store.SetAsync(settings.StoreKey, entry, new InertiaCacheEntryOptions(settings.Expiration, settings.Tags), cancellationToken);
     }
 }

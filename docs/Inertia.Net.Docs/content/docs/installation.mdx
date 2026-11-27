@@ -20,17 +20,17 @@ Inertia.Net is split into small packages. Install the core package and one optio
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: start a complete app |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.7
-dotnet add package Inertia.Net.Mvc --version 1.9.7            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.7  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.7 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.7        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.7   # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.7          # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.7        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.8
+dotnet add package Inertia.Net.Mvc --version 1.9.8            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.8  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.8 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.8        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.8   # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.8          # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.8        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.7 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.8 implements Inertia.js v3.
 
 ## Requirements
 
@@ -53,12 +53,12 @@ Every package ships `net10.0` and `net11.0` assemblies, and NuGet picks the one 
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.7
+dotnet new install Inertia.Net.Templates@1.9.8
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
 
-Choose `--framework vue` or `--framework svelte` for another client, and add `--auth` for cookie sign-in (see [Authentication](/docs/authentication)). The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
+Choose `--framework vue` or `--framework svelte` for another client, and add `--auth` for cookie sign-in (see [Authentication](/docs/authentication)). The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. Its client has `lint` (oxlint), `format` and `format:check` (oxfmt) scripts, and the `build` script type-checks first. Outside Development the app redirects to HTTPS and sends HSTS. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
 
 Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
 

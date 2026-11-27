@@ -20,11 +20,17 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button onClick={() => router.visit(routes.logout())}>Log out</button>
             </>
           ) : (
-            <Link href={routes.login()} style={{ marginLeft: 'auto' }}>Log in</Link>
+            <Link href={routes.login()} style={{ marginLeft: 'auto' }}>
+              Log in
+            </Link>
           )}
         </nav>
         {flash.success && <p style={{ color: 'green' }}>{flash.success}</p>}
-        {flash.error && <p role="alert" style={{ color: 'crimson' }}>{flash.error}</p>}
+        {flash.error && (
+          <p role="alert" style={{ color: 'crimson' }}>
+            {flash.error}
+          </p>
+        )}
       </header>
       <main>{children}</main>
     </div>

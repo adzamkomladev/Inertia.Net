@@ -111,6 +111,25 @@ Run the commands in [AGENTS.md](../AGENTS.md). The release checks include build/
 sample client/browser tests, and the documentation client/SSR build. Redis and MongoDB tests need running services.
 Release notes must report actual results; upstream API parity alone does not prove that the official client accepts a response.
 
+### v1.9.8 local release checks (2026-11-28)
+
+| Check | Result |
+|---|---|
+| Release solution build with warnings as errors | Passed; 0 warnings, 0 errors |
+| Solution tests on .NET 10 and 11, with Redis 8.2 and MongoDB 8.0 available | 4,004 passed; 0 failed; 0 skipped |
+| Solution packaging with warnings as errors | All 9 expected 1.9.8 NuGet packages created |
+| Native AOT publish and protocol smoke | Passed on net10.0 and net11.0, including the relative version-mismatch `X-Inertia-Location` |
+| Generated templates: React/Vue/Svelte × net10.0/net11.0 × auth/no-auth | All 12 server builds passed with warnings as errors; generated types current |
+| Generated template clients: React/Vue/Svelte × auth/no-auth | `build`, `lint` and `format:check` passed in all 6 |
+| Template sign-in browser cases (React, auth) | 3 passed, including Production over plain HTTP |
+| React browser suite, SSR enabled | 32 passed, including the version-bump reload and real SSR hydration |
+| Vue browser suite | 15 passed; 17 React-only checks skipped |
+| Svelte browser suite | 15 passed; 17 React-only checks skipped |
+| Docs client bundle and SSR bundle | Passed |
+| Cached-prop reads on Redis 8.2, 20 props, all hits | About 20 ms before, about 2 ms after (loopback, medians of 1,000 requests) |
+
+These are local Linux checks; Windows and the full generated-template frontend matrix are verified separately by repository CI.
+
 ### v1.9.7 local release checks (2026-11-26)
 
 | Check | Result |

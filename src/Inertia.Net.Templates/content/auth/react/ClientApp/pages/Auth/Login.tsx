@@ -20,19 +20,43 @@ export default function Login({ returnUrl, demoAccount }: InertiaPages['Auth/Log
       <form onSubmit={submit} style={{ display: 'grid', gap: 12, maxWidth: 320 }}>
         <label>
           Email
-          <input type="email" name="email" autoComplete="username" value={form.data.email}
-            onChange={(e) => form.setData('email', e.target.value)} onBlur={() => form.validate('email')}
-            aria-invalid={Boolean(form.errors.email)} style={{ display: 'block', width: '100%' }} />
+          <input
+            type="email"
+            name="email"
+            autoComplete="username"
+            value={form.data.email}
+            onChange={(e) => form.setData('email', e.target.value)}
+            onBlur={() => form.validate('email')}
+            aria-invalid={Boolean(form.errors.email)}
+            style={{ display: 'block', width: '100%' }}
+          />
         </label>
-        {form.errors.email && <div role="alert" style={{ color: 'crimson' }}>{form.errors.email}</div>}
+        {form.errors.email && (
+          <div role="alert" style={{ color: 'crimson' }}>
+            {form.errors.email}
+          </div>
+        )}
         <label>
           Password
-          <input type="password" name="password" autoComplete="current-password" value={form.data.password}
-            onChange={(e) => form.setData('password', e.target.value)} onBlur={() => form.validate('password')}
-            aria-invalid={Boolean(form.errors.password)} style={{ display: 'block', width: '100%' }} />
+          <input
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            value={form.data.password}
+            onChange={(e) => form.setData('password', e.target.value)}
+            onBlur={() => form.validate('password')}
+            aria-invalid={Boolean(form.errors.password)}
+            style={{ display: 'block', width: '100%' }}
+          />
         </label>
-        {form.errors.password && <div role="alert" style={{ color: 'crimson' }}>{form.errors.password}</div>}
-        <button type="submit" disabled={form.processing}>Log in</button>
+        {form.errors.password && (
+          <div role="alert" style={{ color: 'crimson' }}>
+            {form.errors.password}
+          </div>
+        )}
+        <button type="submit" disabled={form.processing}>
+          Log in
+        </button>
       </form>
     </Layout>
   )

@@ -412,7 +412,8 @@ public abstract class ProtocolConformanceTests<THost>
         var response = await app.CreateClient().InertiaGetAsync("/base/page?q=caf%C3%A9&x=1", r => r.WithHeader(InertiaHeaders.Version, "v1"));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal($"{Base}/base/page?q=caf%C3%A9&x=1", response.Header(InertiaHeaders.Location));
+        // Relative: the Host header and the scheme the server saw are not reflected.
+        Assert.Equal("/base/page?q=caf%C3%A9&x=1", response.Header(InertiaHeaders.Location));
         Assert.Equal("v2", response.Header(InertiaHeaders.Version));
         Assert.Equal(InertiaHeaders.PageVary, response.Header("Vary"));
         Assert.Equal(0, app.Counters.Page);
@@ -422,6 +423,16 @@ public abstract class ProtocolConformanceTests<THost>
         Assert.Equal(HttpStatusCode.OK, matching.StatusCode);
         Assert.Equal("v2", (string?)(await matching.PageAsync())["version"]);
         Assert.Equal(1, app.Counters.Page);
+    }
+
+    [Fact]
+    public async Task Version_mismatch_keeps_the_absolute_url_for_a_path_that_reads_as_another_host()
+    {
+        await using var app = await StartAsync(new ConformanceSetup { Inertia = o => o.Version = "v2" });
+        var response = await app.CreateClient().InertiaGetAsync($"{Base}//evil.example/page", r => r.WithHeader(InertiaHeaders.Version, "v1"));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal($"{Base}//evil.example/page", response.Header(InertiaHeaders.Location));
     }
 
     [Fact]

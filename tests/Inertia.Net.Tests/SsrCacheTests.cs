@@ -258,7 +258,7 @@ public sealed class SsrCacheTests
         }, configureServices: s => s.AddHttpClient(SsrGateway.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
         var cache = harness.Services.GetRequiredService<InertiaCaching>();
         var key = InertiaCaching.SsrKey(null, "{}"u8);
-        Assert.True(cache.TryBeginFill(key, out var completion));
+        Assert.True(cache.TryBeginFill(key, InertiaCaching.SsrTags, out var completion));
         var renderer = harness.Services.GetRequiredService<IInertiaSsrRenderer>();
         var context = new InertiaRootViewContext(harness.Context(), "Home", "app.html", new Dictionary<string, object?>(), "{}"u8.ToArray(), "app");
         try
@@ -423,6 +423,33 @@ public sealed class SsrCacheTests
             release.TrySetResult();
             foreach (var service in services.Reverse()) await service.StopAsync(CancellationToken.None);
         }
+    }
+
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 2)]
+    public async Task Clearing_props_keeps_a_render_in_flight_and_clearing_renders_discards_it(bool clearSsr, int calls)
+    {
+        var (harness, handler) = Create(c => c.Duration = TimeSpan.FromMinutes(1));
+        var cache = harness.Services.GetRequiredService<IInertiaCache>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        handler.BeforeSend = (call, ct) =>
+        {
+            if (call > 1) return Task.CompletedTask;
+            started.TrySetResult();
+            return release.Task.WaitAsync(ct);
+        };
+
+        var filling = RenderAsync(harness);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        if (clearSsr) await cache.ClearSsrAsync(TestContext.Current.CancellationToken);
+        else await cache.ClearPropsAsync(TestContext.Current.CancellationToken);
+        release.SetResult();
+        Assert.Contains("render 1", await filling, StringComparison.Ordinal);
+
+        Assert.Contains($"render {calls}", await RenderAsync(harness), StringComparison.Ordinal);
+        Assert.Equal(calls, handler.Calls);
     }
 
     [Fact]

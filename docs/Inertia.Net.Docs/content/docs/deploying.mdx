@@ -5,7 +5,7 @@ section: Production
 order: 5
 ---
 
-Behind a load balancer or reverse proxy that terminates TLS, Kestrel sees plain HTTP unless the scheme is forwarded. Without it, the state and `XSRF-TOKEN` cookies are not marked `Secure`, and the version-mismatch `409` sends an `http://` `X-Inertia-Location`.
+Behind a load balancer or reverse proxy that terminates TLS, Kestrel sees plain HTTP unless the scheme is forwarded. Without it, the state and `XSRF-TOKEN` cookies are not marked `Secure`.
 
 ## Forwarded headers
 
@@ -97,4 +97,4 @@ The SSR health check is covered in [Server-side rendering](/docs/server-side-ren
 
 ## Hosts and SSR failures
 
-Keep `AllowedHosts` configured: an asset-version mismatch response includes the request URL. `Ssr.ConnectTimeout` bounds connection establishment (five seconds by default). In `SsrMode.Required`, the exception message is generic; diagnostic properties may contain private renderer details and should stay in trusted logs.
+Keep `AllowedHosts` configured. `Ssr.ConnectTimeout` bounds connection establishment (five seconds by default). In `SsrMode.Required`, the exception message is generic; diagnostic properties may contain private renderer details and should stay in trusted logs.

@@ -77,6 +77,14 @@ public class CursorTests
     }
 
     [Fact]
+    public void String_with_a_nul_character_is_ignored()
+    {
+        var encoded = Convert.ToBase64String("[\"a\",\"x\\u0000y\"]"u8).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        Assert.Null(CursorCodec.Decode<string>(encoded));
+        Assert.NotNull(CursorCodec.Decode<string>(Convert.ToBase64String("[\"a\",\"xy\"]"u8).TrimEnd('=').Replace('+', '-').Replace('/', '_')));
+    }
+
+    [Fact]
     public void Unsupported_type_errors_name_the_type()
     {
         Assert.Contains("System.Single", Assert.Throws<NotSupportedException>(() => CursorCodec.Encode(new Cursor<float>(CursorDirection.After, 1))).Message);

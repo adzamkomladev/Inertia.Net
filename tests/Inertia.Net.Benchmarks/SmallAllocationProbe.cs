@@ -28,7 +28,7 @@ public sealed class SmallAllocationBenchmarks
         _services = (ServiceProvider)BenchApp.CreateServices(configureServices: services => services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, SmallAllocationJsonContext.Default)));
         _caching = _services.GetRequiredService<InertiaCaching>();
-        if (!_caching.TryBeginFill(_fillKey, out _fill)) throw new InvalidOperationException("The contention fixture needs its own fill.");
+        if (!_caching.TryBeginFill(_fillKey, [], out _fill)) throw new InvalidOperationException("The contention fixture needs its own fill.");
         _append = Context();
         _prepend = Context();
         _prepend.Request.Headers[InertiaHeaders.InfiniteScrollMergeIntent] = "prepend";
@@ -93,7 +93,7 @@ public sealed class SmallAllocationBenchmarks
     /// <summary>A waiter attempts to claim a key whose fill remains owned by another request.</summary>
     public void ContendedFillAttempt()
     {
-        if (_caching.TryBeginFill(_fillKey, out var completion) || !ReferenceEquals(completion, _fill))
+        if (_caching.TryBeginFill(_fillKey, [], out var completion) || !ReferenceEquals(completion, _fill))
             throw new InvalidOperationException("A waiter acquired an already-owned fill.");
     }
 

@@ -37,3 +37,7 @@ Inertia.Net.InertiaDevToolsOptions.MaxResponseBytes.get -> int
 Inertia.Net.InertiaDevToolsOptions.MaxResponseBytes.set -> void
 Inertia.Net.InertiaDevToolsOptions.MaxTotalBytes.get -> long
 Inertia.Net.InertiaDevToolsOptions.MaxTotalBytes.set -> void
+Inertia.Net.InertiaPropsOptions.CacheMaxBytes.get -> long?
+Inertia.Net.InertiaPropsOptions.CacheMaxBytes.set -> void
+Inertia.Net.PaginationOptions.MaxPage.get -> int?
+Inertia.Net.PaginationOptions.MaxPage.set -> void

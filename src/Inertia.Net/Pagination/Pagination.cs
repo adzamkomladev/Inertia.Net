@@ -10,20 +10,21 @@ public static class Pagination
         ArgumentNullException.ThrowIfNull(request);
         Validate(request.Page, request.PerPage);
         var skip = (long)(request.Page - 1) * request.PerPage;
-        var length = skip >= source.Count ? 0 : (int)Math.Min(request.PerPage, source.Count - skip);
+        var length = skip >= source.Count || request.IsBeyondMaxPage ? 0 : (int)Math.Min(request.PerPage, source.Count - skip);
         var data = new T[length];
         for (var i = 0; i < length; i++)
         {
             data[i] = source[(int)skip + i];
         }
 
-        return new Page<T>(data, request.Page, request.PerPage, source.Count, skip + length < source.Count, pageName ?? request.PageName);
+        return new Page<T>(data, request.Page, request.PerPage, source.Count, !request.IsBeyondMaxPage && skip + length < source.Count, pageName ?? request.PageName);
     }
 
     /// <summary>Pages data fetched by a delegate, optionally including a total count.</summary>
     /// <remarks>
     /// The count runs only when the page does not already give the total: it is skipped on a first page with no more rows and on a
     /// last page that has rows. Offsets above <c>int.MaxValue</c> return an empty page without fetching; the optional count still runs.
+    /// A page beyond <see cref="PaginationOptions.MaxPage"/> is empty too, and its count does not run (the total is null).
     /// </remarks>
     public static async Task<Page<T>> PaginateAsync<T>(PageRequest request,
         Func<int, int, CancellationToken, Task<IReadOnlyList<T>>> fetch,
@@ -34,6 +35,11 @@ public static class Pagination
         Validate(request.Page, request.PerPage);
         var skip = (long)(request.Page - 1) * request.PerPage;
         ct.ThrowIfCancellationRequested();
+        if (request.IsBeyondMaxPage)
+        {
+            return new Page<T>([], request.Page, request.PerPage, null, false, pageName ?? request.PageName);
+        }
+
         var rows = skip > int.MaxValue
             ? Array.Empty<T>()
             : await fetch((int)skip, request.PerPage + 1, ct).ConfigureAwait(false);

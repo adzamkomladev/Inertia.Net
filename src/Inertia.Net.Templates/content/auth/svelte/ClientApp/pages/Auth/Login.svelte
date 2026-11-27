@@ -22,16 +22,30 @@
   <form onsubmit={submit} style="display: grid; gap: 12px; max-width: 320px">
     <label>
       Email
-      <input type="email" name="email" autocomplete="username" bind:value={form.email} onblur={() => form.validate('email')}
-        aria-invalid={Boolean(form.errors.email)} style="display: block; width: 100%" />
+      <input
+        type="email"
+        name="email"
+        autocomplete="username"
+        bind:value={form.email}
+        onblur={() => form.validate('email')}
+        aria-invalid={Boolean(form.errors.email)}
+        style="display: block; width: 100%"
+      />
     </label>
     {#if form.errors.email}
       <div role="alert" style="color: crimson">{form.errors.email}</div>
     {/if}
     <label>
       Password
-      <input type="password" name="password" autocomplete="current-password" bind:value={form.password}
-        onblur={() => form.validate('password')} aria-invalid={Boolean(form.errors.password)} style="display: block; width: 100%" />
+      <input
+        type="password"
+        name="password"
+        autocomplete="current-password"
+        bind:value={form.password}
+        onblur={() => form.validate('password')}
+        aria-invalid={Boolean(form.errors.password)}
+        style="display: block; width: 100%"
+      />
     </label>
     {#if form.errors.password}
       <div role="alert" style="color: crimson">{form.errors.password}</div>

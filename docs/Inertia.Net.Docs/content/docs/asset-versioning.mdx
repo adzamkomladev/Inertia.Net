@@ -19,7 +19,7 @@ o.VersionResolver = ctx => ctx.Request.Headers["X-Tenant"].ToString();   // per 
 
 ## How the client checks it
 
-When an Inertia **GET** carries a different `X-Inertia-Version`, the server answers `409` with `X-Inertia-Location` (the absolute request URL) and `X-Inertia-Version`, and the client performs a full page reload.
+When an Inertia **GET** carries a different `X-Inertia-Version`, the server answers `409` with `X-Inertia-Location` (the request's path and query) and `X-Inertia-Version`, and the client performs a full page reload.
 
 The check runs **before your handler**, so no work is wasted rendering a page that will be thrown away. Other methods never get this `409`.
 

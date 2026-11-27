@@ -211,7 +211,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         deadline.CancelAfter(_ssr.Timeout);
         try
         {
-            if (!_caching.TryBeginFill(key, out var completion))
+            if (!_caching.TryBeginFill(key, InertiaCaching.SsrTags, out var completion))
             {
                 var shared = await completion.Task.WaitAsync(deadline.Token);
                 if (shared is not null && CacheEntry.TryReadRender(shared, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds(), out var filled)) return Cached(filled);
@@ -253,7 +253,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
                 if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
             }
 
-            var stamp = _caching.InvalidationStamp;
+            var stamp = _caching.InvalidationStamp(key, InertiaCaching.SsrTags);
             var render = await RenderOnServersAsync(mode, context.PageJson, _endpoints, _managed, http.RequestAborted, remaining);
             return render is null ? null : await StoreAsync(key, duration, staleFor, render, http.RequestAborted, fill, stamp);
         }
@@ -341,7 +341,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             }
 
             // Preferred: a failed refresh is logged like any fallback, and the stale render stays until it expires.
-            var stamp = _caching.InvalidationStamp;
+            var stamp = _caching.InvalidationStamp(key, InertiaCaching.SsrTags);
             if (await RenderOnServersAsync(SsrMode.Preferred, pageJson, _endpoints, _managed, cancellationToken) is { } render)
             {
                 (await StoreAsync(key, duration, staleFor, render, cancellationToken, stamp: stamp)).Dispose();

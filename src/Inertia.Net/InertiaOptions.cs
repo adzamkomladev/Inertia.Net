@@ -434,4 +434,11 @@ public sealed class InertiaPropsOptions
     /// Props that are not marked parallel are resolved one after another.
     /// </summary>
     public int MaxConcurrency { get; set; } = 4;
+
+    /// <summary>
+    /// The most bytes of cached props the default cache store keeps, per app instance. When set, cached props go in a private cache
+    /// whose least recently used entries are evicted first, as SSR renders do (<see cref="SsrCacheOptions.MaxBytes"/>). The default,
+    /// <c>null</c>, keeps them in the app's <c>IMemoryCache</c> with no bound of their own. Must be positive; other stores ignore it.
+    /// </summary>
+    public long? CacheMaxBytes { get; set; }
 }

@@ -38,6 +38,7 @@ internal sealed partial class PropsWriter
     private bool _broadcast;
     private DevToolsCapture? _capture;
     private bool _plan;
+    private bool _localStore; // a cached prop's store answered at once while planning: its reads are not started early
     private CancellationToken _cancellationToken;
     private char[] _path = ArrayPool<char>.Shared.Rent(128);
     private int _pathLength;
@@ -57,7 +58,10 @@ internal sealed partial class PropsWriter
 
     public PropsWriter(InertiaPageWriter owner) => _owner = owner;
 
-    /// <summary>Whether this render met a <see cref="InertiaProp.Parallel"/> prop (planned or not).</summary>
+    /// <summary>
+    /// Whether this render met something the next one should plan for: a <see cref="InertiaProp.Parallel"/> prop (planned or not), or
+    /// a cached prop whose store did not answer at once.
+    /// </summary>
     public bool SawParallel { get; private set; }
 
     private ReadOnlySpan<char> Path => _path.AsSpan(0, _pathLength);
@@ -80,6 +84,7 @@ internal sealed partial class PropsWriter
         _capture = capture;
         _cancellationToken = cancellationToken;
         _plan = plan;
+        _localStore = false;
         SawParallel = false;
         _pathLength = 0;
         _arrayPathLength = 0;
@@ -187,9 +192,11 @@ internal sealed partial class PropsWriter
             if (value is InertiaProp prop)
             {
                 SawParallel |= prop.IsParallel;
-                if (prop.IsParallel && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
+                if ((prop.IsParallel || (prop.Caching is not null && !_localStore))
+                    && Decide(prop, prop, declaredType, parentWasResolved: false) == Inclusion.Resolved)
                 {
-                    PlanLoad(prop, key);
+                    if (prop.IsParallel) PlanLoad(prop, key);
+                    else PlanLookup(prop);
                 }
 
                 return;
@@ -263,6 +270,46 @@ internal sealed partial class PropsWriter
         }
 
         Prefetch(prop, key, lookup: null);
+    }
+
+    // A cached prop that is not Parallel(): only its store read starts here, so a page's reads of a remote store travel together
+    // instead of one round trip after another. Its loader still runs in turn, on a miss.
+    private void PlanLookup(InertiaProp prop)
+    {
+        var lookup = _owner.Caching.GetPropAsync(prop.Caching!, _cancellationToken);
+        if (lookup.IsCompleted)
+        {
+            _localStore = true; // nothing to gain: the walk asks again when it gets there
+            return;
+        }
+
+        SawParallel = true; // keeps the component planning
+        ((_uncommon ??= new()).Lookups ??= []).Add((prop, lookup.AsTask()));
+    }
+
+    // The read the plan started for this prop, or one made now.
+    private ValueTask<CachedProp?> LookupAsync(InertiaProp prop)
+    {
+        if (_uncommon?.Lookups is { } lookups)
+        {
+            for (var i = 0; i < lookups.Count; i++)
+            {
+                if (ReferenceEquals(lookups[i].Prop, prop))
+                {
+                    var started = lookups[i].Lookup;
+                    lookups.RemoveAt(i);
+                    return new(started);
+                }
+            }
+        }
+
+        var lookup = _owner.Caching.GetPropAsync(prop.Caching!, _cancellationToken);
+        if (!lookup.IsCompleted)
+        {
+            SawParallel = _owner.Caching.SawPendingRead = true;
+        }
+
+        return lookup;
     }
 
     private void Prefetch(InertiaProp prop, string key, Task<CachedProp?>? lookup) =>
@@ -613,7 +660,7 @@ internal sealed partial class PropsWriter
     private async ValueTask<(bool Resolved, object? Value)> WriteCachedAsync(string? key, InertiaProp prop, bool parentWasResolved)
     {
         var caching = prop.Caching!;
-        var hit = _planner is not null && _planner.IsPlanned(prop) ? null : await _owner.Caching.GetPropAsync(caching, _cancellationToken);
+        var hit = _planner is not null && _planner.IsPlanned(prop) ? null : await LookupAsync(prop);
         if (hit is null)
         {
             var (resolved, value) = await ResolveAsync(prop, cached: true);
@@ -681,6 +728,8 @@ internal sealed partial class PropsWriter
         public List<string>? Rescued;
 
         public PropRefreshes? Refreshes;
+
+        public List<(InertiaProp Prop, Task<CachedProp?> Lookup)>? Lookups; // store reads the plan started, until the walk takes them
     }
 
     private async ValueTask WriteValueAsync(object? value, Type declaredType, bool parentWasResolved)
@@ -1280,7 +1329,7 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
                     continue;
                 }
 
-                var stamp = owner.Caching.InvalidationStamp;
+                var stamp = owner.Caching.InvalidationStamp(caching.StoreKey, caching.Tags);
                 object? value;
                 if (prop.UsesServices)
                 {

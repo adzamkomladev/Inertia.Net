@@ -10,7 +10,9 @@ internal sealed class InertiaOptionsValidator : IValidateOptions<InertiaOptions>
         List<string>? failures = null;
         Check(options.Pagination.DefaultPerPage >= 1 && options.Pagination.DefaultPerPage <= options.Pagination.MaxPerPage, "Pagination requires 1 <= DefaultPerPage <= MaxPerPage.");
         Check(options.Pagination.MaxPerPage < int.MaxValue, "Pagination.MaxPerPage must be less than Int32.MaxValue to allow over-fetching.");
+        Check(options.Pagination.MaxPage is null or > 0, "Pagination.MaxPage must be positive.");
         Check(options.Props.MaxConcurrency > 0, "Props.MaxConcurrency must be positive.");
+        Check(options.Props.CacheMaxBytes is null or > 0, "Props.CacheMaxBytes must be positive.");
         Check(!string.IsNullOrEmpty(options.Head.PropName), "Head.PropName must not be empty.");
         Check(options.Head.TitleTemplate is null || options.Head.TitleTemplate.Contains("{0}", StringComparison.Ordinal), "Head.TitleTemplate must contain {0}.");
         Check(options.Vite.PrefetchConcurrency > 0, "Vite.PrefetchConcurrency must be positive.");

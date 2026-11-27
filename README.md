@@ -4,7 +4,7 @@
 
 Build React, Vue or Svelte apps with ASP.NET Core, using your server's routes and controllers instead of a separate frontend API.
 
-Inertia.Net **1.9.7** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.8** is a .NET 10 and .NET 11 server adapter for the **Inertia.js v3** protocol. It supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT; FastEndpoints apps also need its source generator. MVC itself does not support Native AOT.
 
 Your C# endpoint chooses a page component and passes its data as **props** (named values). The first visit returns HTML.
 Later visits fetch a page object as JSON and update the screen without a full reload. You keep ASP.NET Core routing,
@@ -44,7 +44,7 @@ authentication and validation; you do not need a separate API or a client-side r
 Install a .NET 10 SDK and Node.js 22.12+ first. In the folder where you want your app, run:
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.7
+dotnet new install Inertia.Net.Templates@1.9.8
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -226,7 +226,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Install the template once.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.7
+dotnet new install Inertia.Net.Templates@1.9.8
 ```
 
 Run the command for your frontend, then change into the new app directory with `cd MyApp`.
@@ -238,6 +238,8 @@ Run the command for your frontend, then change into the new app directory with `
 | Svelte | `dotnet new inertia -n MyApp --framework svelte` |
 
 Each template uses Minimal APIs and includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+The client has `lint` (oxlint), `format` and `format:check` (oxfmt) scripts, and its `build` script type-checks first: TypeScript 7 for
+React and Svelte, TypeScript 6 for Vue. Outside Development the app redirects to HTTPS and sends HSTS.
 The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11. Add `--auth` for cookie sign-in: a login page with
 Precognition and a demo user, a protected dashboard, logout, a shared `auth.user` and a sign-in rate limit. Every app also generates typed
 `ClientApp/types/inertia.d.ts` and `routes.ts`, and wires up error pages and DevTools.
@@ -355,17 +357,17 @@ No v2 protocol compatibility. MVC TempData storage is available through `AddIner
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.7
-dotnet add package Inertia.Net.Mvc --version 1.9.7 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.7 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.7 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.7 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.7 # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.7 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.7 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.8
+dotnet add package Inertia.Net.Mvc --version 1.9.8 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.8 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.8 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.8 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.8 # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.8 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.8 # MongoDB pagination
 ```
 
-Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.7` for all Inertia.Net packages. Inertia.Net 1.9.7 uses the Inertia.js v3 protocol; these are separate version numbers.
+Requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`), plus JavaScript build tools with npm, Bun, pnpm or Yarn for the frontend. Use version `1.9.8` for all Inertia.Net packages. Inertia.Net 1.9.8 uses the Inertia.js v3 protocol; these are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -1017,9 +1019,13 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 `ClearPropsAsync()` removes every cached prop and `ClearSsrAsync()` every [cached render](#6-response-cache). `SetPropAsync` serializes
 the value as a prop of its type would be (a scroll value's paging metadata comes from `IProvidesScrollMetadata`), and takes the same
 `staleFor` and `tags`. With the default store a removal frees the entries at once. A removal or `SetPropAsync` waits for this app
-instance's cache writes already under way, and a load or refresh that started before it neither stores nor shares its value
-afterwards: later requests see the new value, or load again. The guarantee is per app instance; with a shared store (Redis, MongoDB),
-another instance's load that finishes after the removal can still store a value it read before it.
+instance's cache writes already under way, and a load or refresh of that key (or of a prop with that tag) that started before it
+neither stores nor shares its value afterwards: later requests see the new value, or load again. Loads of other keys and tags are
+not affected. The guarantee is per app instance; with a shared store (Redis, MongoDB), another instance's load that finishes after
+the removal can still store a value it read before it.
+
+The default store keeps cached props in the app's `IMemoryCache`, with no size limit of their own. Set `o.Props.CacheMaxBytes` to
+cap them: they then go in a private cache, and the least recently used are evicted past the cap.
 
 **Stale-while-revalidate.** `staleFor` keeps serving a value once its `duration` has passed. The first request that reads a stale
 value gets it at once, and the loader runs after that response has been sent, to store a fresh value; requests in the meantime get the
@@ -1053,7 +1059,8 @@ on deploy.
 ### Redis
 
 `Inertia.Net.Redis` keeps cached props and SSR renders in Redis, so every app instance shares them and one instance's
-`RemoveByTagAsync` clears them for all:
+`RemoveByTagAsync` clears them for all. A page's cached props are read from Redis together, not one round trip after another;
+their loaders still run in turn unless marked `Parallel()`:
 
 ```csharp
 builder.Services.AddInertiaRedisCache(o =>
@@ -2037,7 +2044,7 @@ o.Version = typeof(Program).Assembly.GetName().Version!.ToString();   // or a bu
 o.VersionResolver = ctx => ctx.Request.Headers["X-Tenant"].ToString();   // per request
 ```
 
-When an Inertia **GET** carries a different `X-Inertia-Version`, the server answers `409` with `X-Inertia-Location` (the absolute request URL) and `X-Inertia-Version`, and the client does a full page reload. The check runs **before your handler**, so no work is wasted rendering a page that is thrown away. Other methods never get this 409.
+When an Inertia **GET** carries a different `X-Inertia-Version`, the server answers `409` with `X-Inertia-Location` (the request's path and query) and `X-Inertia-Version`, and the client does a full page reload. The check runs **before your handler**, so no work is wasted rendering a page that is thrown away. Other methods never get this 409.
 
 ---
 
@@ -2446,7 +2453,7 @@ Prefer `UseInertiaAntiforgery()`.
 ## Deploying behind a proxy
 
 Behind a load balancer or reverse proxy that terminates TLS, Kestrel sees plain HTTP unless the scheme is forwarded. Without it:
-the state and `XSRF-TOKEN` cookies are not marked `Secure`, and the version-mismatch `409` sends an `http://` `X-Inertia-Location`.
+the state and `XSRF-TOKEN` cookies are not marked `Secure`.
 
 ```csharp
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
@@ -2984,6 +2991,7 @@ configuration too; build-time generation cannot run an arbitrary runtime callbac
 |---|---|---|
 | `DefaultPerPage` | `20` | Default page size. |
 | `MaxPerPage` | `100` | Maximum page size, below `int.MaxValue` to allow over-fetching; the default must be between 1 and this value. |
+| `MaxPage` | `null` | The last numbered page a bound `PageRequest` may fetch; a page beyond it is empty and runs no query or count. `null` means no ceiling. |
 | `PageName` | `"page"` | Numbered-page query parameter. |
 | `PerPageName` | `"perPage"` | Page-size query parameter. |
 | `CursorName` | `"cursor"` | Cursor query parameter. |
@@ -3050,6 +3058,7 @@ Per response: `Render(...).WithSsr(SsrMode)` and `.WithoutSsr()`.
 | Option | Default | Description |
 |---|---|---|
 | `MaxConcurrency` | `4` | Loaders marked `.Parallel()` that run at once per render. Must be positive. |
+| `CacheMaxBytes` | `null` | Size of the default store's cached props. When set, they go in a private cache and the least recently used are evicted; `null` keeps them in the app's `IMemoryCache` without a bound of their own. |
 
 ### `o.State`: `InertiaStateOptions`
 
