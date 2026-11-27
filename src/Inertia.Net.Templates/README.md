@@ -15,6 +15,11 @@ The app is a Minimal API with a typed Todos page: validation that redirects back
 generated TypeScript types for the pages and shared props, CSRF protection, compression, immutable caching of the Vite assets,
 chunk prefetching and the Inertia DevTools in Development. Use your package manager to install dependencies, run the `dev` script in another terminal, and run the `build` script for production. npm, Bun, pnpm and Yarn are supported. See the [starter README](content/common/README.md) for commands.
 
+The client is linted with [oxlint](https://oxc.rs) and formatted with oxfmt (`lint`, `format` and `format:check` scripts). The
+React starter type-checks with TypeScript 7 (`tsc`). Svelte type-checks with TypeScript 7 through `svelte-check --tsgo`, which also
+needs TypeScript 6 installed for its own use. Vue (`vue-tsc`) uses TypeScript 6. Outside
+Development the app redirects to HTTPS and sends HSTS.
+
 For [live props](https://github.com/adzamkomladev/Inertia.Net#live-props) the app ships the SignalR client transport
 (`ClientApp/lib/inertia-signalr.ts`): add `Inertia.Net.Live.SignalR`, call `AddInertiaLive().AddSignalR()` and `MapInertiaLiveHub()`,
 and uncomment `live: signalr()` in `ClientApp/app`. `ClientApp/lib/inertia-live-reload.ts` reloads `Scroll` and `Merge` props, which cannot be live,

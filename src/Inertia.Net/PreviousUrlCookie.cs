@@ -13,7 +13,9 @@ internal static class PreviousUrlCookie
 
     private static bool IsLocalPath(string? value) => value is ['/', ..]
         && (value.Length == 1 || (value[1] != '/' && value[1] != '\\'))
-        && !ContainsControl(value);
+        && !ContainsControl(value)
+        // The app only writes percent-encoded values, and Kestrel refuses a non-ASCII Location header.
+        && System.Text.Ascii.IsValid(value);
 
     private static bool ContainsControl(string value)
     {

@@ -59,14 +59,9 @@ export function signalr({ url = '/inertia-live', idleTimeout, configure, onConne
     (starting ??= (async () => {
       if (!connection) {
         const signalR = await import('@microsoft/signalr')
-        const builder = new signalR.HubConnectionBuilder()
-          .withUrl(url)
-          .withAutomaticReconnect()
-          .configureLogging(signalR.LogLevel.Warning)
+        const builder = new signalR.HubConnectionBuilder().withUrl(url).withAutomaticReconnect().configureLogging(signalR.LogLevel.Warning)
         connection = (configure ? configure(builder) : builder).build()
-        connection.on('inertia', (key: string, payload: unknown) =>
-          subscriptions.get(key)?.handlers.forEach((handler) => handler(payload)),
-        )
+        connection.on('inertia', (key: string, payload: unknown) => subscriptions.get(key)?.handlers.forEach((handler) => handler(payload)))
         connection.onreconnecting(() => status?.(false))
         connection.onreconnected(async () => {
           await joinAll()

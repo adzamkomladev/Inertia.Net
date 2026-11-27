@@ -187,7 +187,7 @@ has '"url":"/dashboard?page=2"'
 # 7. Stale asset version: 409 with X-Inertia-Location, before the handler.
 req GET /dashboard -H 'X-Inertia: true' -H 'X-Inertia-Version: stale'
 status_is 409
-header_is X-Inertia-Location "$BASE/dashboard"
+header_is X-Inertia-Location /dashboard # relative: the Host and scheme are not reflected
 
 # 8. PUT redirect becomes 303.
 inertia PUT /users/1

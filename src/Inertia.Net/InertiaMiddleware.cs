@@ -11,7 +11,7 @@ namespace Inertia.Net;
 /// <summary>
 /// The Inertia protocol middleware (protocol §3):
 /// <list type="number">
-/// <item>An Inertia GET with a stale <c>X-Inertia-Version</c> gets a 409 with <c>X-Inertia-Location</c> before the handler runs; the stored state is kept.</item>
+/// <item>An Inertia GET with a stale <c>X-Inertia-Version</c> gets a 409 with <c>X-Inertia-Location</c> (the request's path and query) before the handler runs; the stored state is kept.</item>
 /// <item>The stored flash/errors/history flags are loaded into <see cref="InertiaFeature"/> (and consumed).</item>
 /// <item>After the handler, an Inertia request answered with an empty 200 is redirected back.</item>
 /// <item>When the response starts: <c>Vary: X-Inertia</c>; for Inertia requests a 302 becomes a 303 for PUT/PATCH/DELETE/QUERY and a
@@ -67,7 +67,9 @@ internal sealed class InertiaMiddleware
             // The page's variation: a shared cache must not answer a current client with this 409, or a stale one with a cached page.
             InertiaHeaders.AppendPageVary(response.Headers);
             response.StatusCode = StatusCodes.Status409Conflict;
-            response.Headers[InertiaHeaders.Location] = request.GetEncodedUrl();
+            // Relative, so a wrong Host or an unforwarded scheme never reaches the client. "//host" would be read as another origin.
+            var location = request.GetEncodedPathAndQuery();
+            response.Headers[InertiaHeaders.Location] = location.StartsWith("//", StringComparison.Ordinal) ? request.GetEncodedUrl() : location;
             response.Headers[InertiaHeaders.Version] = _versionProvider.GetVersion(httpContext);
             return;
         }

@@ -77,6 +77,13 @@ builder.Services.AddInertiaDevTools(); // the Inertia DevTools browser extension
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+    // Behind a proxy that terminates TLS, forward the scheme first (Inertia.Net README, "Deploying behind a proxy").
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+
 app.UseResponseCompression();
 app.UseStaticFiles(new StaticFileOptions
 {

@@ -18,14 +18,28 @@ const submit = () => form.submit(routes.login.store(), { onFinish: () => form.re
     <form @submit.prevent="submit" style="display: grid; gap: 12px; max-width: 320px">
       <label>
         Email
-        <input v-model="form.email" type="email" name="email" autocomplete="username" @blur="form.validate('email')"
-          :aria-invalid="Boolean(form.errors.email)" style="display: block; width: 100%" />
+        <input
+          v-model="form.email"
+          type="email"
+          name="email"
+          autocomplete="username"
+          @blur="form.validate('email')"
+          :aria-invalid="Boolean(form.errors.email)"
+          style="display: block; width: 100%"
+        />
       </label>
       <div v-if="form.errors.email" role="alert" style="color: crimson">{{ form.errors.email }}</div>
       <label>
         Password
-        <input v-model="form.password" type="password" name="password" autocomplete="current-password" @blur="form.validate('password')"
-          :aria-invalid="Boolean(form.errors.password)" style="display: block; width: 100%" />
+        <input
+          v-model="form.password"
+          type="password"
+          name="password"
+          autocomplete="current-password"
+          @blur="form.validate('password')"
+          :aria-invalid="Boolean(form.errors.password)"
+          style="display: block; width: 100%"
+        />
       </label>
       <div v-if="form.errors.password" role="alert" style="color: crimson">{{ form.errors.password }}</div>
       <button type="submit" :disabled="form.processing">Log in</button>

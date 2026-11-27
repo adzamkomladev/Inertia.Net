@@ -27,7 +27,9 @@ export default function Index({ todos, stats }: InertiaPages['Todos/Index']) {
       </ul>
       <form onSubmit={submit}>
         <input placeholder="What needs doing?" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
-        <button type="submit" disabled={form.processing}>Add</button>
+        <button type="submit" disabled={form.processing}>
+          Add
+        </button>
         {form.errors.title && <div style={{ color: 'crimson' }}>{form.errors.title}</div>}
       </form>
       <Deferred data="stats" fallback={<p>Counting...</p>}>

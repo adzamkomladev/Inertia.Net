@@ -4,6 +4,45 @@ public sealed class PaginationTests
 {
     private static readonly int[] Items = Enumerable.Range(1, 25).ToArray();
 
+    [Fact]
+    public async Task A_page_beyond_the_configured_ceiling_is_empty_and_runs_no_query()
+    {
+        var harness = new Harness(o => o.Pagination.MaxPage = 2);
+        var within = (await PageRequest.BindAsync(harness.Context("/?page=2&perPage=10")))!;
+        var beyond = (await PageRequest.BindAsync(harness.Context("/?page=3&perPage=10")))!;
+        var calls = 0;
+        Task<IReadOnlyList<int>> Fetch(int skip, int take, CancellationToken ct)
+        {
+            calls++;
+            return Task.FromResult<IReadOnlyList<int>>(Items.Skip(skip).Take(take).ToArray());
+        }
+
+        Task<long> Count(CancellationToken ct)
+        {
+            calls++;
+            return Task.FromResult((long)Items.Length);
+        }
+
+        var last = await Pagination.PaginateAsync(within, Fetch, Count, ct: TestContext.Current.CancellationToken);
+        Assert.Equal(10, last.Data.Count);
+        Assert.True(last.HasMore);
+        calls = 0;
+        var page = await Pagination.PaginateAsync(beyond, Fetch, Count, ct: TestContext.Current.CancellationToken);
+        Assert.Empty(page.Data);
+        Assert.False(page.HasMore);
+        Assert.Null(page.Total);
+        Assert.Equal(0, calls);
+
+        var materialized = Pagination.Paginate(Items, beyond);
+        Assert.Empty(materialized.Data);
+        Assert.False(materialized.HasMore);
+        Assert.Equal(10, Pagination.Paginate(Items, within).Data.Count);
+
+        var options = new InertiaOptions();
+        options.Pagination.MaxPage = 0;
+        Assert.Contains("Pagination.MaxPage must be positive.", new InertiaOptionsValidator().Validate(null, options).Failures!);
+    }
+
     [Theory]
     [InlineData(1, 1, 10, true)]
     [InlineData(2, 11, 10, true)]

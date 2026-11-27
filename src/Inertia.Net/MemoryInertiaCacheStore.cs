@@ -5,7 +5,8 @@ namespace Inertia.Net;
 
 /// <summary>
 /// The default <see cref="IInertiaCacheStore"/>. Props go in the app's <see cref="IMemoryCache"/>, in a key space of their own and sized
-/// by their bytes (so a cache with a <c>SizeLimit</c> accepts them); renders go in a private cache bounded by
+/// by their bytes (so a cache with a <c>SizeLimit</c> accepts them), or in a private cache bounded by
+/// <see cref="InertiaPropsOptions.CacheMaxBytes"/> when that is set; renders go in a private cache bounded by
 /// <see cref="SsrCacheOptions.MaxBytes"/>, whose least recently used entries are evicted first. Tags are kept in an index next to the
 /// entries, so removing a tag frees its entries at once; a hit never reads the index.
 /// </summary>
@@ -16,6 +17,7 @@ internal sealed class MemoryInertiaCacheStore : IInertiaCacheStore, IDisposable
 
     private readonly IMemoryCache _props;
     private readonly MemoryCache _renders;
+    private readonly MemoryCache? _boundedProps;
     private readonly PostEvictionDelegate _evicted;
     private readonly Lock _lock = new();
 
@@ -24,8 +26,13 @@ internal sealed class MemoryInertiaCacheStore : IInertiaCacheStore, IDisposable
 
     public MemoryInertiaCacheStore(IMemoryCache memoryCache, IOptions<InertiaOptions> options, TimeProvider timeProvider)
     {
-        _props = memoryCache;
         _renders = new MemoryCache(new MemoryCacheOptions { SizeLimit = options.Value.Ssr.Cache.MaxBytes, Clock = new CacheClock(timeProvider) });
+        if (options.Value.Props.CacheMaxBytes is { } maxBytes)
+        {
+            _boundedProps = new MemoryCache(new MemoryCacheOptions { SizeLimit = maxBytes, Clock = new CacheClock(timeProvider) });
+        }
+
+        _props = _boundedProps ?? memoryCache;
         _evicted = OnEvicted;
     }
 
@@ -110,7 +117,11 @@ internal sealed class MemoryInertiaCacheStore : IInertiaCacheStore, IDisposable
         return default;
     }
 
-    public void Dispose() => _renders.Dispose();
+    public void Dispose()
+    {
+        _renders.Dispose();
+        _boundedProps?.Dispose();
+    }
 
     private IMemoryCache Cache(InertiaCacheKey key) => key.Kind == InertiaCacheEntryKind.Ssr ? _renders : _props;
 

@@ -13,7 +13,9 @@ export default function Error({ status }: { status: number }) {
   return (
     <Layout>
       <Head title={`${status}: ${title}`} />
-      <h1><span>{status}</span>: {title}</h1>
+      <h1>
+        <span>{status}</span>: {title}
+      </h1>
       <p>{description}</p>
       <Link href="/">Return home</Link>
     </Layout>

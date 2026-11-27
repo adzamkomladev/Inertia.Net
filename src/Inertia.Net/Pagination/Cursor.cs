@@ -156,7 +156,8 @@ internal static class CursorCodec
         if (typeof(T) == typeof(int)) { var value = reader.GetInt32(); return Unsafe.As<int, T>(ref value); }
         if (typeof(T) == typeof(long)) { var value = reader.GetInt64(); return Unsafe.As<long, T>(ref value); }
         if (typeof(T) == typeof(Guid)) { var value = reader.GetGuid(); return Unsafe.As<Guid, T>(ref value); }
-        if (typeof(T) == typeof(string)) { var value = reader.GetString() ?? throw new FormatException(); return Unsafe.As<string, T>(ref value); }
+        // PostgreSQL rejects U+0000 in a text parameter: such a cursor answers the first page, not a 500.
+        if (typeof(T) == typeof(string)) { var value = reader.GetString() ?? throw new FormatException(); if (value.Contains('\0')) throw new FormatException(); return Unsafe.As<string, T>(ref value); }
         if (typeof(T) == typeof(DateTime)) { var value = reader.GetDateTime(); return Unsafe.As<DateTime, T>(ref value); }
         if (typeof(T) == typeof(DateTimeOffset)) { var value = reader.GetDateTimeOffset(); return Unsafe.As<DateTimeOffset, T>(ref value); }
         if (typeof(T) == typeof(decimal)) { var value = reader.GetDecimal(); return Unsafe.As<decimal, T>(ref value); }

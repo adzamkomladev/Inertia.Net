@@ -35,6 +35,19 @@ public sealed class CoverageGapTests
     }
 
     [Fact]
+    public void A_page_writes_to_the_server_writer_unless_the_stream_writer_is_already_in_use()
+    {
+        using var body = new MemoryStream();
+        var inner = new StreamResponseBodyFeature(body);
+        var tracker = new ResponseWriteTracker(inner);
+        Assert.Same(inner.Writer, tracker.PageWriter);
+        Assert.True(tracker.HasWritten);
+
+        var used = new ResponseWriteTracker(inner);
+        Assert.Same(used.Writer, used.PageWriter);
+    }
+
+    [Fact]
     public async Task Sent_files_count_unless_the_range_is_empty()
     {
         var path = Path.GetTempFileName();

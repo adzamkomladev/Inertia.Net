@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -192,9 +193,11 @@ public sealed class InertiaResult : IResult, IStatusCodeHttpResult, IContentType
             response.ContentLength = page.WrittenMemory.Length;
             // In slices, so a large page waits for the client instead of Kestrel copying all of it while this buffer is still held.
             var body = page.WrittenMemory;
+            // Only when the tracker is the current body feature: a wrapper added after it (compression) must still see the page.
+            var writer = httpContext.Features.Get<IHttpResponseBodyFeature>() is ResponseWriteTracker tracker ? tracker.PageWriter : response.BodyWriter;
             for (var offset = 0; offset < body.Length; offset += MaxWriteSlice)
             {
-                await response.BodyWriter.WriteAsync(body.Slice(offset, Math.Min(MaxWriteSlice, body.Length - offset)), httpContext.RequestAborted);
+                await writer.WriteAsync(body.Slice(offset, Math.Min(MaxWriteSlice, body.Length - offset)), httpContext.RequestAborted);
             }
 
             metrics?.RecordPage(started == 0 ? 0 : Stopwatch.GetElapsedTime(started).TotalSeconds, page.WrittenMemory.Length, json: true, partial, pageWriter.Options.Mount);

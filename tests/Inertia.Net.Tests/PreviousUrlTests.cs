@@ -85,6 +85,7 @@ public class PreviousUrlTests
     [InlineData("/users\nother", null, true, "/fallback")]
     [InlineData("/users\rother", null, true, "/fallback")]
     [InlineData("/users\0other", null, true, "/fallback")]
+    [InlineData("/caf\u00e9", null, true, "/fallback")]
     [InlineData("https://evil.example", null, true, "/fallback")]
     [InlineData("", null, true, "/fallback")]
     [InlineData("/users", null, false, "/fallback")]

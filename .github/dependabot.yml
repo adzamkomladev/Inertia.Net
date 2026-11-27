@@ -16,10 +16,23 @@ updates:
       - /samples/Mvc.Vue
       - /samples/FastEndpoints.Svelte
       - /tests/e2e
+      # No lockfile here: these ranges reach every generated app.
+      - /src/Inertia.Net.Templates/content/react
+      - /src/Inertia.Net.Templates/content/vue
+      - /src/Inertia.Net.Templates/content/svelte
     schedule:
       interval: weekly
     groups:
       npm-minor-patch:
+        update-types: [minor, patch]
+
+  # The deployed documentation site; it installs with Bun.
+  - package-ecosystem: bun
+    directory: /docs/Inertia.Net.Docs
+    schedule:
+      interval: weekly
+    groups:
+      docs-minor-patch:
         update-types: [minor, patch]
 
   # Workflow actions are pinned to commit SHAs with the version in a comment; Dependabot updates both.

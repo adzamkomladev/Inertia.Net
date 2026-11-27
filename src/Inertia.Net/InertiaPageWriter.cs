@@ -214,8 +214,9 @@ internal sealed class InertiaPageWriter
                 entries = UnpackDotProps(entries);
             }
 
-            // A component runs the planning walk until a render shows it has no Parallel() props, and again once a render meets one.
-            var plan = InertiaProp.ParallelUsed && hints?.UsesParallel != false;
+            // A component runs the planning walk until a render shows it has no Parallel() props and no cached props on a store that
+            // answers later, and again once a render meets one.
+            var plan = (InertiaProp.ParallelUsed || Caching.SawPendingRead) && hints?.UsesParallel != false;
             var writer = propsWriter.Begin(buffer, htmlSafe, request, component, plan, httpContext.RequestServices, httpContext.RequestAborted,
                 capture: DevToolsRecorder.Recording ? httpContext.Features.Get<DevToolsCapture>() : null);
 
@@ -899,7 +900,7 @@ internal sealed class InertiaPageWriter
     internal async ValueTask<object?> LoadCachedPropAsync(InertiaProp prop, IServiceProvider? services, CancellationToken cancellationToken)
     {
         var caching = prop.Caching!;
-        if (!Caching.TryBeginFill(caching.StoreKey, out var completion))
+        if (!Caching.TryBeginFill(caching.StoreKey, caching.Tags, out var completion))
         {
             var shared = await completion.Task.WaitAsync(cancellationToken);
             if (shared is not null && CacheEntry.TryReadProp(shared, TimeProvider.GetUtcNow().ToUnixTimeMilliseconds(), out var filled)) return filled;
@@ -925,7 +926,7 @@ internal sealed class InertiaPageWriter
     {
         var caching = prop.Caching!;
         cancellationToken.ThrowIfCancellationRequested();
-        var stamp = Caching.InvalidationStamp;
+        var stamp = Caching.InvalidationStamp(caching.StoreKey, caching.Tags);
         object? value;
         try
         {

@@ -9,6 +9,11 @@ public sealed record PageRequest(int Page = 1, int PerPage = 20)
 {
     internal string PageName { get; init; } = "page";
 
+    // PaginationOptions.MaxPage of the request this was bound from.
+    internal int? MaxPage { get; init; }
+
+    internal bool IsBeyondMaxPage => Page > MaxPage;
+
     /// <summary>Reads and clamps paging parameters from a query string.</summary>
     public static PageRequest From(IQueryCollection query, int defaultPerPage = 20, int maxPerPage = 100, string pageName = "page", string perPageName = "perPage")
     {
@@ -30,6 +35,7 @@ public sealed record PageRequest(int Page = 1, int PerPage = 20)
     public static ValueTask<PageRequest?> BindAsync(HttpContext context)
     {
         var options = (InertiaMountServices.Options(context) ?? context.RequestServices.GetRequiredService<IOptions<InertiaOptions>>().Value).Pagination;
-        return ValueTask.FromResult<PageRequest?>(From(context.Request.Query, options.DefaultPerPage, options.MaxPerPage, options.PageName, options.PerPageName));
+        return ValueTask.FromResult<PageRequest?>(
+            From(context.Request.Query, options.DefaultPerPage, options.MaxPerPage, options.PageName, options.PerPageName) with { MaxPage = options.MaxPage });
     }
 }

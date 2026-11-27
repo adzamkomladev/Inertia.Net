@@ -195,11 +195,13 @@ jobs:
           dotnet build -warnaserror -p:InertiaGenerateTypesOnBuild=true
           TYPES=src/Inertia.Net.Templates/content/${{ matrix.auth && 'auth/common' || 'common' }}/ClientApp/types
           git diff --no-index --exit-code "$GITHUB_WORKSPACE/$TYPES" ClientApp/types
-      - name: Build the client
+      - name: Build, lint and format-check the client
         working-directory: ${{ runner.temp }}/Starter
         run: |
           npm install --no-audit --no-fund
           npm run build
+          npm run lint
+          npm run format:check
       - name: Sign-in smoke test
         if: matrix.auth && matrix.tfm == 'net10.0'
         working-directory: tests/e2e
