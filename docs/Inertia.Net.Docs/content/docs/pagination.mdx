@@ -20,7 +20,7 @@ app.MapGet("/posts", (PageRequest request) => Render("Posts/Index", new InertiaP
 }));
 ```
 
-Visiting `/posts?page=2&perPage=5` returns the second group in `posts.data`. The default page size is 20 and the maximum is 100; configure both in [Pagination options](/docs/configuration#opagination-paginationoptions). For infinite scroll, wrap that value in `Scroll(...)` and render it with `InfiniteScroll` as shown in [Infinite scroll](/docs/infinite-scroll).
+Visiting `/posts?page=2&perPage=5` returns the second group in `posts.data`. The default page size is 20 and the maximum is 100; configure both in [Pagination options](/docs/configuration#opagination-paginationoptions). Set `MaxPage` there to stop at a last page: a page beyond it is empty and runs no query or count. For infinite scroll, wrap that value in `Scroll(...)` and render it with `InfiniteScroll` as shown in [Infinite scroll](/docs/infinite-scroll).
 
 `Pagination` creates page values; `Scroll` adds infinite-scroll metadata and merging. Use a page directly for a classic pager.
 

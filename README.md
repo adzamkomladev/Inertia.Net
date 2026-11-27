@@ -238,6 +238,8 @@ Run the command for your frontend, then change into the new app directory with `
 | Svelte | `dotnet new inertia -n MyApp --framework svelte` |
 
 Each template uses Minimal APIs and includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration.
+The client has `lint` (oxlint), `format` and `format:check` (oxfmt) scripts, and its `build` script type-checks first: TypeScript 7 for
+React and Svelte, TypeScript 6 for Vue. Outside Development the app redirects to HTTPS and sends HSTS.
 The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11. Add `--auth` for cookie sign-in: a login page with
 Precognition and a demo user, a protected dashboard, logout, a shared `auth.user` and a sign-in rate limit. Every app also generates typed
 `ClientApp/types/inertia.d.ts` and `routes.ts`, and wires up error pages and DevTools.
@@ -1017,9 +1019,13 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 `ClearPropsAsync()` removes every cached prop and `ClearSsrAsync()` every [cached render](#6-response-cache). `SetPropAsync` serializes
 the value as a prop of its type would be (a scroll value's paging metadata comes from `IProvidesScrollMetadata`), and takes the same
 `staleFor` and `tags`. With the default store a removal frees the entries at once. A removal or `SetPropAsync` waits for this app
-instance's cache writes already under way, and a load or refresh that started before it neither stores nor shares its value
-afterwards: later requests see the new value, or load again. The guarantee is per app instance; with a shared store (Redis, MongoDB),
-another instance's load that finishes after the removal can still store a value it read before it.
+instance's cache writes already under way, and a load or refresh of that key (or of a prop with that tag) that started before it
+neither stores nor shares its value afterwards: later requests see the new value, or load again. Loads of other keys and tags are
+not affected. The guarantee is per app instance; with a shared store (Redis, MongoDB), another instance's load that finishes after
+the removal can still store a value it read before it.
+
+The default store keeps cached props in the app's `IMemoryCache`, with no size limit of their own. Set `o.Props.CacheMaxBytes` to
+cap them: they then go in a private cache, and the least recently used are evicted past the cap.
 
 **Stale-while-revalidate.** `staleFor` keeps serving a value once its `duration` has passed. The first request that reads a stale
 value gets it at once, and the loader runs after that response has been sent, to store a fresh value; requests in the meantime get the
@@ -1053,7 +1059,8 @@ on deploy.
 ### Redis
 
 `Inertia.Net.Redis` keeps cached props and SSR renders in Redis, so every app instance shares them and one instance's
-`RemoveByTagAsync` clears them for all:
+`RemoveByTagAsync` clears them for all. A page's cached props are read from Redis together, not one round trip after another;
+their loaders still run in turn unless marked `Parallel()`:
 
 ```csharp
 builder.Services.AddInertiaRedisCache(o =>

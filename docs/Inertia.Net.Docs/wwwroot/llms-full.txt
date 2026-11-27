@@ -504,7 +504,7 @@ dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
 
-Choose `--framework vue` or `--framework svelte` for another client, and add `--auth` for cookie sign-in (see [Authentication](/docs/authentication)). The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
+Choose `--framework vue` or `--framework svelte` for another client, and add `--auth` for cookie sign-in (see [Authentication](/docs/authentication)). The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. Its client has `lint` (oxlint), `format` and `format:check` (oxfmt) scripts, and the `build` script type-checks first. Outside Development the app redirects to HTTPS and sends HSTS. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
 
 Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
 
@@ -1871,12 +1871,14 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 
 `ClearPropsAsync()` removes every cached prop and `ClearSsrAsync()` every cached render. `SetPropAsync` serializes the value as a prop of its type would, and takes the same `staleFor` and `tags`.
 
+The default store keeps cached props in the app's `IMemoryCache`, with no size limit of their own. Set `o.Props.CacheMaxBytes` to cap them: they then go in a private cache, and the least recently used are evicted past the cap.
+
 **Stale-while-revalidate.** `staleFor` keeps serving a value after its duration. The first request that reads a stale value gets it at once, and the loader runs after the response has been sent. Past `duration + staleFor` the loader runs during the request again.
 
 - Response completion enqueues refreshes on a bounded background worker; it does not wait for the loader. Loaders using `staleFor` must use singleton dependencies or create an independent scope inside the loader with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`. Do not capture request-scoped services or `HttpContext`.
 - The worker accepts 64 pending refreshes, runs up to 4 at a time, cancels each one after 30 seconds and cancels them all on host shutdown. A full queue drops the refresh and logs a warning, leaving the stale value at its existing expiration. Monitor `inertia.cache.refresh.dropped`, tagged with `inertia.cache.kind=prop|ssr`.
 - One refresh runs per key and app instance at a time. A refresh that finds the value fresh again skips its loader.
-- A fill or refresh whose loader started before an `IInertiaCache` removal (`RemovePropAsync`, `RemoveByTagAsync`, `ClearPropsAsync`) on the same app instance does not store its value; the request still gets it.
+- A fill or refresh whose loader started before an `IInertiaCache` removal of its key or of one of its tags (`RemovePropAsync`, `RemoveByTagAsync`, `ClearPropsAsync`) on the same app instance does not store its value; the request still gets it. Removing another key or tag leaves it alone.
 - A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
 
 **Another store.** Props and SSR renders live in an `IInertiaCacheStore`. Register your own singleton before or after `AddInertia()`:
@@ -3238,7 +3240,7 @@ app.MapGet("/posts", (PageRequest request) => Render("Posts/Index", new InertiaP
 }));
 ```
 
-Visiting `/posts?page=2&perPage=5` returns the second group in `posts.data`. The default page size is 20 and the maximum is 100; configure both in [Pagination options](/docs/configuration#opagination-paginationoptions). For infinite scroll, wrap that value in `Scroll(...)` and render it with `InfiniteScroll` as shown in [Infinite scroll](/docs/infinite-scroll).
+Visiting `/posts?page=2&perPage=5` returns the second group in `posts.data`. The default page size is 20 and the maximum is 100; configure both in [Pagination options](/docs/configuration#opagination-paginationoptions). Set `MaxPage` there to stop at a last page: a page beyond it is empty and runs no query or count. For infinite scroll, wrap that value in `Scroll(...)` and render it with `InfiniteScroll` as shown in [Infinite scroll](/docs/infinite-scroll).
 
 `Pagination` creates page values; `Scroll` adds infinite-scroll metadata and merging. Use a page directly for a classic pager.
 
@@ -5683,7 +5685,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/redis
 
 > Share cached props and SSR renders between app instances with the Inertia.Net.Redis cache store.
 
-`Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all.
+`Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all. A page's cached props are read from Redis together, not one round trip after another; their loaders still run in turn unless marked `Parallel()`.
 
 ```sh
 dotnet add package Inertia.Net.Redis --version 1.9.8

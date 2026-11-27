@@ -58,7 +58,7 @@ dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
 
-Choose `--framework vue` or `--framework svelte` for another client, and add `--auth` for cookie sign-in (see [Authentication](/docs/authentication)). The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
+Choose `--framework vue` or `--framework svelte` for another client, and add `--auth` for cookie sign-in (see [Authentication](/docs/authentication)). The template includes working pages, a Todos form, validation, flash messages, CSRF protection and Vite configuration. Its client has `lint` (oxlint), `format` and `format:check` (oxfmt) scripts, and the `build` script type-checks first. Outside Development the app redirects to HTTPS and sends HSTS. The app targets .NET 10 (LTS) by default; add `--tfm net11.0` to target .NET 11.
 
 Install dependencies, then start Vite using the package manager chosen for your app. All four are supported:
 
