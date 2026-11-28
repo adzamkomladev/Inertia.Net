@@ -202,6 +202,12 @@ jobs:
           npm run build
           npm run lint
           npm run format:check
+      - name: Check the published Vite manifest
+        if: matrix.framework == 'react' && matrix.tfm == 'net10.0' && !matrix.auth
+        working-directory: ${{ runner.temp }}/Starter
+        run: |
+          dotnet publish -c Release --no-restore -o "$RUNNER_TEMP/published" -warnaserror
+          test -f "$RUNNER_TEMP/published/wwwroot/build/.vite/manifest.json"
       - name: Sign-in smoke test
         if: matrix.auth && matrix.tfm == 'net10.0'
         working-directory: tests/e2e

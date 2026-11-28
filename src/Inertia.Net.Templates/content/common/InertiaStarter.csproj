@@ -17,6 +17,8 @@
   <ItemGroup>
     <Content Remove="node_modules\**;ClientApp\**;package*.json;tsconfig*.json" />
     <None Remove="node_modules\**;ClientApp\**;app.html" />
+    <Content Include="wwwroot\build\.vite\manifest.json" Condition="Exists('wwwroot\build\.vite\manifest.json')"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

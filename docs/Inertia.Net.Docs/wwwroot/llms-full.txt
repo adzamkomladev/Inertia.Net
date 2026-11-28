@@ -5412,6 +5412,16 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
 
 The first probe checks the local build directory for the entry and the files reachable through both static and dynamic imports. An unhealthy result identifies a missing manifest key or file. The result is kept for the lifetime of the host, so publish assets before starting it and restart after replacing them. Use `mount: "admin"` to check a named mount. For CDN deployments, run the check on the staged local files before uploading them.
 
+The starter template includes the hidden manifest in publish output. If an existing project omits it, add this to its project file and build the frontend before publishing:
+
+```xml
+<ItemGroup>
+  <Content Include="wwwroot/build/.vite/manifest.json"
+           Condition="Exists('wwwroot/build/.vite/manifest.json')"
+           CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
 ---
 
 # Native AOT
