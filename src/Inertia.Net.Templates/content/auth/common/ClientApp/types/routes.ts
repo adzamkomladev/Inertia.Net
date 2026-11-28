@@ -67,11 +67,11 @@ const r0 = Object.assign(
 
 const r1_url = (options?: RouteOptions): string => build([], [], undefined, options)
 const r1 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r1_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r1_url(options), method: 'get', component: 'Home' }),
   {
     url: r1_url,
     definition: { methods: ['get'] as const, url: '/' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r1_url(options), method: 'get' }),
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r1_url(options), method: 'get', component: 'Home' }),
   },
 )
 

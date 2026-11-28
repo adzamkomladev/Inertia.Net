@@ -10,7 +10,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <header>
         <strong data-testid="app-name">{props.appName}</strong>
         <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 12, margin: '8px 0' }}>
-          <Link href={routes.home()} instant data-testid="nav-home">Home</Link>
+          <Link href={routes.home()} data-testid="nav-home">Home</Link>
           <Link href={routes.users.index()} data-testid="nav-users">Users</Link>
           <Link href={routes.contacts.create()} data-testid="nav-contacts">Contacts</Link>
           <Link href={routes.feed.index()} data-testid="nav-feed">Feed</Link>

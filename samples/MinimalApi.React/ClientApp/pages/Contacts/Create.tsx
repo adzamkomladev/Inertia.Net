@@ -1,6 +1,7 @@
-import { useForm } from '@inertiajs/react'
+import { Link, useForm } from '@inertiajs/react'
 import type { FormEvent } from 'react'
 import Layout from '../../Layout'
+import { routes } from '../../types/routes'
 
 export default function Create() {
   const contact = useForm({ name: '', email: '' })
@@ -18,6 +19,7 @@ export default function Create() {
   return (
     <Layout>
       <h1>New contact</h1>
+      <Link href={routes.home()} instant>Back to home</Link>
       <form onSubmit={submitContact}>
         <input data-testid="name" placeholder="Name" value={contact.data.name} onChange={(e) => contact.setData('name', e.target.value)} />
         <div data-testid="error-name">{contact.errors.name}</div>

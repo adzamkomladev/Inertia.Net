@@ -3,9 +3,9 @@ import { expect, test } from '@playwright/test'
 test('a generated route can open its destination before the server responds', async ({ page }) => {
   test.skip((process.env.SAMPLE ?? 'react') !== 'react', 'The React sample uses an instant home link.')
 
-  const response = await page.goto('/users')
-  expect(await response?.text()).toMatch(/<link rel="modulepreload"[^>]+href="\/build\/assets\/Index-[^"]+\.js">/)
-  await expect(page.getByTestId('nav-home')).toBeVisible()
+  const response = await page.goto('/contacts/create')
+  expect(await response?.text()).toMatch(/<link rel="modulepreload"[^>]+href="\/build\/assets\/Create-[^"]+\.js">/)
+  await expect(page.getByRole('link', { name: 'Back to home' })).toBeVisible()
 
   const { promise: waitForRelease, resolve: release } = Promise.withResolvers<void>()
   const { promise: requested, resolve: markRequested } = Promise.withResolvers<void>()
@@ -15,8 +15,10 @@ test('a generated route can open its destination before the server responds', as
     await route.continue()
   })
 
+  const finalResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/' && response.request().headers()['x-inertia'] === 'true')
+
   try {
-    await page.getByTestId('nav-home').click()
+    await page.getByRole('link', { name: 'Back to home' }).click()
     await requested
     await expect(page.getByTestId('home-title')).toBeVisible()
     await expect(page.getByTestId('app-name')).toHaveText('Inertia.Net Sample')
@@ -24,5 +26,6 @@ test('a generated route can open its destination before the server responds', as
     release()
   }
 
+  expect((await finalResponse).ok()).toBe(true)
   await expect(page).toHaveURL(/\/$/)
 })
