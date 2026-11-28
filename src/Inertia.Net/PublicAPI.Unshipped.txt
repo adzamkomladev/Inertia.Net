@@ -49,3 +49,19 @@ static Inertia.Net.InertiaViteHealthChecksBuilderExtensions.AddInertiaVite(this 
 Inertia.Net.InertiaProp.Timeout(System.TimeSpan timeout) -> Inertia.Net.InertiaProp!
 Inertia.Net.ViteOptions.StartDevServer.get -> bool
 Inertia.Net.ViteOptions.StartDevServer.set -> void
+Inertia.Net.IInertiaLive.CreateMessage(Inertia.Net.LiveEvent! event, string? exceptSocketId = null) -> Inertia.Net.LiveMessage!
+Inertia.Net.IInertiaLive.CreateMessage<TProps>(Inertia.Net.LiveEvent! event, TProps props, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TProps>! propsTypeInfo, string? exceptSocketId = null) -> Inertia.Net.LiveMessage!
+Inertia.Net.IInertiaLive.CreateMessage<TProps>(Inertia.Net.LiveEvent! event, TProps props, string? exceptSocketId = null) -> Inertia.Net.LiveMessage!
+Inertia.Net.IInertiaLiveBackplane
+Inertia.Net.IInertiaLiveBackplane.MaxMessageBytes.get -> int?
+Inertia.Net.IInertiaLiveBackplane.PublishAsync(Inertia.Net.LiveChannel channel, System.ReadOnlyMemory<byte> message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaLiveBackplane.SubscribeAsync(System.Func<System.ReadOnlyMemory<byte>, System.Threading.Tasks.ValueTask>! deliver, System.Action! missed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.IAsyncDisposable!>
+Inertia.Net.IInertiaLiveLocalTransport
+Inertia.Net.IInertiaLiveLocalTransport.DeliverAsync(Inertia.Net.LiveMessage! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.IInertiaLiveLocalTransport.ResyncAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.LiveWire
+const Inertia.Net.LiveWire.MaxMessageBytes = 1048576 -> int
+const Inertia.Net.LiveWire.Version = 1 -> int
+static Inertia.Net.LiveWire.TryRead(System.ReadOnlySpan<byte> utf8, out Inertia.Net.LiveMessage? message, out string? origin, out long? reference) -> bool
+static Inertia.Net.LiveWire.WithoutValues(Inertia.Net.LiveMessage! message) -> Inertia.Net.LiveMessage!
+static Inertia.Net.LiveWire.Write(Inertia.Net.LiveMessage! message, string? origin = null, long? reference = null) -> byte[]!

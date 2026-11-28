@@ -139,7 +139,7 @@
       "slug": "installation",
       "url": "/docs/installation",
       "title": "Installation",
-      "description": "Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.",
+      "description": "Install Inertia.Net, the optional MVC, FastEndpoints, SSE, SignalR, Redis, PostgreSQL or MongoDB package, and the testing helpers.",
       "section": "Get started",
       "order": 4,
       "headings": [
@@ -954,13 +954,23 @@
           "depth": 2
         },
         {
+          "id": "choose-a-transport",
+          "text": "Choose a transport",
+          "depth": 2
+        },
+        {
+          "id": "notify-after-commit",
+          "text": "Notify after commit",
+          "depth": 2
+        },
+        {
           "id": "reloading-scroll-and-merge-props",
           "text": "Reloading scroll and merge props",
           "depth": 2
         },
         {
-          "id": "custom-transports",
-          "text": "Custom transports",
+          "id": "custom-transports-and-backplanes",
+          "text": "Custom transports and backplanes",
           "depth": 2
         },
         {
@@ -1502,6 +1512,11 @@
           "id": "native-aot",
           "text": "Native AOT",
           "depth": 2
+        },
+        {
+          "id": "live-backplane",
+          "text": "Live backplane",
+          "depth": 2
         }
       ]
     },
@@ -1611,6 +1626,156 @@
         {
           "id": "run-it-yourself",
           "text": "Run it yourself",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "live-props-at-scale",
+      "url": "/docs/live-props-at-scale",
+      "title": "Live props at scale",
+      "description": "Live props across every app instance and every job, on the Redis or PostgreSQL you already run.",
+      "section": "Production",
+      "order": 11,
+      "headings": [
+        {
+          "id": "which-setup-do-i-need",
+          "text": "Which setup do I need?",
+          "depth": 2
+        },
+        {
+          "id": "install",
+          "text": "Install",
+          "depth": 2
+        },
+        {
+          "id": "set-it-up",
+          "text": "Set it up",
+          "depth": 2
+        },
+        {
+          "id": "bind-from-appsettingsjson",
+          "text": "Bind from appsettings.json",
+          "depth": 3
+        },
+        {
+          "id": "options",
+          "text": "Options",
+          "depth": 2
+        },
+        {
+          "id": "redis-backplane-inertiaredisbackplaneoptions",
+          "text": "Redis backplane (InertiaRedisBackplaneOptions)",
+          "depth": 3
+        },
+        {
+          "id": "postgresql-backplane-inertiapostgresbackplaneoptions",
+          "text": "PostgreSQL backplane (InertiaPostgresBackplaneOptions)",
+          "depth": 3
+        },
+        {
+          "id": "sse-transport-inertialivesseoptions",
+          "text": "SSE transport (InertiaLiveSseOptions)",
+          "depth": 3
+        },
+        {
+          "id": "signalr-transport-inertialivesignalroptions",
+          "text": "SignalR transport (InertiaLiveSignalROptions)",
+          "depth": 3
+        },
+        {
+          "id": "publish-on-commit",
+          "text": "Publish on commit",
+          "depth": 2
+        },
+        {
+          "id": "postgresql-schema-and-permissions",
+          "text": "PostgreSQL schema and permissions",
+          "depth": 2
+        },
+        {
+          "id": "when-something-fails",
+          "text": "When something fails",
+          "depth": 2
+        },
+        {
+          "id": "limits-and-sizing",
+          "text": "Limits and sizing",
+          "depth": 2
+        },
+        {
+          "id": "troubleshooting",
+          "text": "Troubleshooting",
+          "depth": 2
+        },
+        {
+          "id": "metrics-and-logs",
+          "text": "Metrics and logs",
+          "depth": 2
+        },
+        {
+          "id": "security",
+          "text": "Security",
+          "depth": 2
+        },
+        {
+          "id": "migrating-from-19",
+          "text": "Migrating from 1.9",
+          "depth": 2
+        },
+        {
+          "id": "moving-from-signalrs-redis-backplane",
+          "text": "Moving from SignalR's Redis backplane",
+          "depth": 3
+        },
+        {
+          "id": "testing-your-app",
+          "text": "Testing your app",
+          "depth": 2
+        },
+        {
+          "id": "try-it",
+          "text": "Try it",
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "slug": "background-jobs",
+      "url": "/docs/background-jobs",
+      "title": "Background jobs",
+      "description": "Publish live props from Runwick, Hangfire, Quartz and BackgroundService, in the web process or in a separate worker.",
+      "section": "Production",
+      "order": 12,
+      "headings": [
+        {
+          "id": "runwick",
+          "text": "Runwick",
+          "depth": 2
+        },
+        {
+          "id": "hangfire",
+          "text": "Hangfire",
+          "depth": 2
+        },
+        {
+          "id": "quartz",
+          "text": "Quartz",
+          "depth": 2
+        },
+        {
+          "id": "backgroundservice",
+          "text": "BackgroundService",
+          "depth": 2
+        },
+        {
+          "id": "failures-and-retries",
+          "text": "Failures and retries",
+          "depth": 2
+        },
+        {
+          "id": "try-it",
+          "text": "Try it",
           "depth": 2
         }
       ]

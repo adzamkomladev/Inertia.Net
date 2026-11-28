@@ -21,7 +21,7 @@ Live props need `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte` 3.1
   caption="Figure: an event published on the server refreshes only the props that listen to it."
   actors={[
     { name: 'Your code', sub: 'IInertiaLive.Publish' },
-    { name: 'Live transport', sub: 'SignalR or your own' },
+    { name: 'Live transport', sub: 'SSE, SignalR or your own' },
     { name: 'Browser', sub: 'Inertia client' },
   ]}
   messages={[
@@ -343,8 +343,8 @@ For rules that need services, implement `ILiveChannelAuthorizer` and register it
 
 The hub answers requests from other origins with 403. Add trusted origins to `o.AllowedOrigins`. The origin check takes the place of antiforgery tokens on the hub. Connections close when their authentication expires.
 
-<Callout type="warning" title="More than one server">
-SignalR groups exist on one server only. When you run several instances, add a Redis backplane (`AddSignalR().AddStackExchangeRedis(...)`) or Azure SignalR Service. Without one of these, a publish reaches only the clients connected to the instance that sent it.
+<Callout type="info" title="More than one server">
+SignalR groups exist on one server only. When you run several instances, or publish from a worker, add an Inertia backplane on the Redis or PostgreSQL you already run: `AddSignalR().AddRedisBackplane(...)` or `.AddPostgresBackplane(...)`. See [Live props at scale](/docs/live-props-at-scale). Do not also register SignalR's own Redis backplane or Azure SignalR for the same hub: every event would arrive twice, so startup fails to tell you.
 </Callout>
 
 The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.SignalR/README.md) lists the client options, how channels map to SignalR groups, and the security notes.
@@ -383,11 +383,47 @@ The channel rules and the `ILiveChannelAuthorizer` are the same as for SignalR. 
 - A stream ends when its sign-in expires. The client reconnects, and its channels are authorized again.
 - A client too slow to keep up is disconnected. It reloads its live props when it reconnects.
 
-<Callout type="warning" title="One instance only">
-There is no backplane for Server-Sent Events. A publish reaches only the clients connected to the instance that sent it. When you run several instances, use SignalR with a backplane.
+<Callout type="info" title="One instance, or any number with a backplane">
+Without a backplane, a publish reaches only the clients connected to the instance that sent it. With several instances, or a separate worker, add `.AddRedisBackplane(...)` or `.AddPostgresBackplane(...)` and every instance delivers every event. SSE needs no sticky sessions. See [Live props at scale](/docs/live-props-at-scale).
 </Callout>
 
 The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.Sse/README.md) lists the options and the wire format.
+
+## Choose a transport
+
+| | SSE | SSE + backplane | SignalR | SignalR + backplane | Polling |
+|---|---|---|---|---|---|
+| Client library | none | none | `@microsoft/signalr` | `@microsoft/signalr` | none |
+| Several web instances | no | yes | no | yes | yes |
+| Publish from another process | no | yes | no | yes | n/a |
+| Publish on commit | no | with PostgreSQL | no | with PostgreSQL | n/a |
+| Extra infrastructure | none | Redis, or the PostgreSQL you run | none | Redis, or the PostgreSQL you run | none |
+| Client-to-server messages | no | no | yes | yes | n/a |
+| Latency | push | push | push | push | up to the interval |
+
+Packages on NuGet: [Inertia.Net.Live.Sse](https://www.nuget.org/packages/Inertia.Net.Live.Sse), [Inertia.Net.Live.SignalR](https://www.nuget.org/packages/Inertia.Net.Live.SignalR), [Inertia.Net.Redis](https://www.nuget.org/packages/Inertia.Net.Redis) and [Inertia.Net.Postgres](https://www.nuget.org/packages/Inertia.Net.Postgres) for the backplanes.
+
+## Notify after commit
+
+With the PostgreSQL backplane, publish inside your database transaction: the event goes out only if the transaction commits.
+
+```csharp
+await using var tx = await db.Database.BeginTransactionAsync(ct);
+order.Status = OrderStatus.Shipped;
+await db.SaveChangesAsync(ct);
+await postgres.PublishAsync(live.CreateMessage(OrderEvents.Updated(order.Id)), db.Database.GetDbConnection(), tx.GetDbTransaction(), ct);
+await tx.CommitAsync(ct);   // delivered now
+```
+
+If anything throws before `CommitAsync`, the transaction rolls back and no client hears about a change that never happened:
+
+```csharp
+await using var tx = await db.Database.BeginTransactionAsync(ct);
+await postgres.PublishAsync(live.CreateMessage(OrderEvents.Updated(order.Id)), db.Database.GetDbConnection(), tx.GetDbTransaction(), ct);
+await tx.RollbackAsync(ct); // nothing is delivered, to any instance
+```
+
+`postgres` is the `PostgresLiveBackplane` that `AddPostgresBackplane()` registers; inject it like any service. See [Publish on commit](/docs/live-props-at-scale#publish-on-commit) for the details.
 
 ## Reloading scroll and merge props
 
@@ -451,7 +487,9 @@ onUnmounted(() => stop?.())
 
 `reset` replaces the prop instead of merging it, so the reload brings no duplicates. The SignalR and Server-Sent Events client transports deliver a channel's events to every subscriber. See [Typed routes](/docs/typed-routes) for `routes.ts`.
 
-## Custom transports
+## Custom transports and backplanes
+
+To scale a transport of your own across instances, implement `IInertiaLiveLocalTransport` (deliver to this instance's clients, and resync them after a gap) instead of `IInertiaLiveBroadcaster`; any backplane then carries its events. To use another store as the backplane, implement `IInertiaLiveBackplane`: it only moves the bytes Inertia.Net writes (`LiveWire`), and reports a gap with `missed`. See [docs/protocol.md](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/protocol.md#live-backplane-wire-format) for the wire format.
 
 The page metadata and the payload do not depend on SignalR, so any transport works:
 

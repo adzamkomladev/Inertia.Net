@@ -39,6 +39,8 @@ builder.Services.AddDataProtection()
 
 If you use the session store, sessions must be shared too, for example with Redis. The default cookie store only needs shared Data Protection keys.
 
+Live props need a backplane on several instances, or the clients of one instance miss events published on another. See [Live props at scale](/docs/live-props-at-scale).
+
 Keep the SSR server on loopback on each instance. See [Server-side rendering](/docs/server-side-rendering).
 
 ## Compression

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net.Postgres</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <Description>A PostgreSQL LISTEN/NOTIFY backplane for Inertia.Net live props: SSE and SignalR across app instances and workers, with publish on commit (Native AOT compatible).</Description>
+    <PackageTags>$(PackageTags) postgres postgresql npgsql listen notify backplane realtime live-props</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Inertia.Net/Inertia.Net.csproj" />
+    <PackageReference Include="Npgsql" />
+    <InternalsVisibleTo Include="Inertia.Net.Postgres.Tests" />
+  </ItemGroup>
+</Project>

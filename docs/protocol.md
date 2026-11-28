@@ -215,6 +215,31 @@ of the protocol; the payload is:
 - **Every subscriber of the channel receives the same values.** Only publish values that every client allowed on the channel may see.
 - `X-Socket-Id` lets the publisher leave its own connection out (`toOthers`).
 
+### Live backplane wire format
+
+Not part of the Inertia protocol: how Inertia.Net instances carry a published message to each other through a backplane
+(`IInertiaLiveBackplane`; Redis pub/sub or PostgreSQL `NOTIFY`). `LiveWire` writes and reads it. Version 1 is one UTF-8 JSON object:
+
+```json
+{"v":1,"from":"9f2c…","event":"OrderUpdated","channel":"private:orders.1","except":"sock-1","payload":{"__inertia":{"event":"OrderUpdated"}}}
+```
+
+- `v` is `1`. A message with another version, a missing or wrong-typed member, an unknown channel type, a payload without
+  `__inertia` (or whose `__inertia.event` differs from `event`, or whose `props` is not an object), trailing data, or more than 1 MiB is dropped and counted as `inertia.live.backplane.errors` (`error.type=malformed`).
+  Unknown members are ignored, so later versions can add some.
+- `from` is a diagnostic id of at most 64 characters: the publishing instance's random id, or a unique id per transactional
+  publish (so PostgreSQL does not fold identical notifications). Every instance, the publisher included, delivers every message it
+  receives, so all instances follow the store's order.
+- `channel` is `type:name` (`public`, `private`, `presence`, `encrypted-private`). `except` is the excluded socket id, if any.
+- `payload` is the broadcast payload above, written byte for byte.
+- A message still over the store's limit once its values are removed fails the publish.
+- `ref` (PostgreSQL only) replaces a message too large for `NOTIFY`: the payload holds no values and `ref` is the row id in the
+  large-message table. The receiver reads the row; when the row is gone, it delivers the message without values.
+
+**Gaps.** Pub/sub and `NOTIFY` keep no history. When a backplane's subscription drops, it reports a gap, and every local
+transport resyncs: SSE closes every stream and SignalR aborts every connection. The clients reconnect and reload their live
+props, so a missed event costs one reload instead of a stale page.
+
 ## 5. Initial HTML (v3)
 
 ```html

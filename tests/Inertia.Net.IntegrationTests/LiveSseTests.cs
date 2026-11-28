@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Inertia.Net.Live.Sse;
+using Inertia.Net.Live.SignalR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -134,5 +135,41 @@ public sealed class LiveSseTests
         Assert.True(connection.Queue.Reader.Completion.IsCompleted || connection.Queue.Reader.Count == 1);
         Assert.True(connection.Queue.Reader.TryRead(out _));
         await connection.Queue.Reader.Completion.WaitAsync(Ct);
+    }
+
+    [Fact]
+    public async Task A_closed_stream_that_does_not_end_is_aborted_and_one_that_ends_is_not()
+    {
+        var stalled = new SseConnection("stalled", ["public:stats"], 1) { AbortAfter = TimeSpan.FromMilliseconds(50) };
+        var aborted = new TaskCompletionSource();
+        stalled.Abort = () => aborted.TrySetResult();
+        stalled.Close();
+        await aborted.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+
+        var finished = new SseConnection("finished", ["public:stats"], 1) { AbortAfter = TimeSpan.FromMilliseconds(50) };
+        var abortedToo = false;
+        finished.Abort = () => abortedToo = true;
+        finished.Close();
+        finished.Ended();
+        await Task.Delay(200, Ct);
+        Assert.False(abortedToo);
+    }
+
+    [Fact]
+    public async Task With_SignalR_registered_first_SSE_still_uses_its_own_authorizer()
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddInertia();
+        builder.Services.AddInertiaLive()
+            .AddSignalR(o => o.Authorize((_, _, _) => ValueTask.FromResult(true)))   // permissive
+            .AddSse(o => o.Authorize((_, channel, _) => ValueTask.FromResult(channel == OrderUpdated.Channel)));
+        await using var app = builder.Build();
+        app.MapInertiaLiveSse();
+        await app.StartAsync(Ct);
+
+        await using var stream = await OpenAsync(app, "?channel=private:orders.1&channel=private:orders.2");
+        var connected = JsonNode.Parse((await stream.NextAsync()).Data)!;
+        Assert.Equal(["private:orders.2"], connected["refused"]!.AsArray().Select(n => n!.GetValue<string>()));
     }
 }

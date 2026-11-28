@@ -71,6 +71,23 @@ both transports.
 | `POST /__e2e/live/posts?count=N` | n/a | Adds N posts (default 1), publishing `PostCreated` for each. |
 | `POST /__e2e/live/inbox` | n/a | Increments `unread` and publishes `InboxChanged` on `users.1`. |
 
+### Live props on several instances
+
+With `LIVE_BACKPLANE=redis` (and `REDIS_URL`) or `LIVE_BACKPLANE=postgres` (and `POSTGRES_URL`) the sample adds the matching
+backplane, so two instances share live events. Start two, publish on one and watch `/live` on the other:
+
+```sh
+docker run -d --rm -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:18-alpine
+export LIVE_BACKPLANE=postgres POSTGRES_URL="Host=localhost;Username=postgres;Password=postgres"
+dotnet run --project samples/MinimalApi.React --urls http://localhost:5100 &
+dotnet run --project samples/MinimalApi.React --urls http://localhost:5200 &
+curl -X POST http://localhost:5100/__e2e/live/increment-with-value   # with E2E=1; the counter on :5200/live goes up
+```
+
+`POST /__e2e/live/backplane-gap` (with `E2E=1`) cuts the backplane's subscription connection (Redis `CLIENT KILL TYPE pubsub`,
+PostgreSQL `pg_terminate_backend` on the `LISTEN` connection), so every client reconnects and reloads. `specs/live-scale.spec.ts`
+runs both instances in CI for SSE with Redis, SSE with PostgreSQL and SignalR with PostgreSQL.
+
 When the page sets `window.__e2e = true` before the app starts (the spec does, with `addInitScript`), the app exposes its hub
 connection as `window.__inertiaLive`, so the spec can stop it and check that missed events are caught up on reconnect.
 

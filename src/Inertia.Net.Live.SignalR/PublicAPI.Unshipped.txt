@@ -1,1 +1,5 @@
 #nullable enable
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.AllowExternalHubLifetimeManager.get -> bool
+Inertia.Net.Live.SignalR.InertiaLiveSignalROptions.AllowExternalHubLifetimeManager.set -> void
+override Inertia.Net.Live.SignalR.InertiaLiveHub.OnConnectedAsync() -> System.Threading.Tasks.Task!
+override Inertia.Net.Live.SignalR.InertiaLiveHub.OnDisconnectedAsync(System.Exception? exception) -> System.Threading.Tasks.Task!

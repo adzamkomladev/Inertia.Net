@@ -11,3 +11,15 @@ Inertia.Net.Testing.InertiaPrecognitionExtensions
 static Inertia.Net.Testing.InertiaPrecognitionExtensions.AssertPrecognitionErrorAsync(this System.Net.Http.HttpResponseMessage! response, string! field, string? message = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage!>!
 static Inertia.Net.Testing.InertiaPrecognitionExtensions.AssertSuccessfulPrecognition(this System.Net.Http.HttpResponseMessage! response) -> System.Net.Http.HttpResponseMessage!
 static Inertia.Net.Testing.InertiaPrecognitionExtensions.WithPrecognition(this System.Net.Http.HttpRequestMessage! request, params string![]! fields) -> System.Net.Http.HttpRequestMessage!
+Inertia.Net.Testing.FakeBackplane
+Inertia.Net.Testing.FakeBackplane.FakeBackplane() -> void
+Inertia.Net.Testing.FakeBackplane.InjectAsync(System.ReadOnlyMemory<byte> message) -> System.Threading.Tasks.ValueTask
+Inertia.Net.Testing.FakeBackplane.MaxMessageBytes.get -> int?
+Inertia.Net.Testing.FakeBackplane.MaxMessageBytes.set -> void
+Inertia.Net.Testing.FakeBackplane.PublishAsync(Inertia.Net.LiveChannel channel, System.ReadOnlyMemory<byte> message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.Testing.FakeBackplane.PublishFailure.get -> System.Exception?
+Inertia.Net.Testing.FakeBackplane.PublishFailure.set -> void
+Inertia.Net.Testing.FakeBackplane.Published.get -> System.Collections.Generic.IReadOnlyList<byte[]!>!
+Inertia.Net.Testing.FakeBackplane.SimulateGap(int? index = null) -> void
+Inertia.Net.Testing.FakeBackplane.SubscribeAsync(System.Func<System.ReadOnlyMemory<byte>, System.Threading.Tasks.ValueTask>! deliver, System.Action! missed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.IAsyncDisposable!>
+Inertia.Net.Testing.FakeBackplane.SubscriberCount.get -> int

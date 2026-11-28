@@ -44,7 +44,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack Inertia.Net.slnx -c Release --no-build -warnaserror -o artifacts
 
-  # Every test project on net10.0 with Redis and MongoDB servers (build-test skips those tests: no REDIS_URL / MONGODB_URI there),
+  # Every test project on net10.0 with Redis, MongoDB and PostgreSQL servers (build-test skips those tests: no REDIS_URL / MONGODB_URI / POSTGRES_URL there),
   # measuring line coverage of the libraries. MIN is the 1.9.0 level minus two points, so coverage cannot fall silently.
   data-stores:
     runs-on: ubuntu-latest
@@ -55,9 +55,17 @@ jobs:
       mongo:
         image: mongo:8.0
         ports: ["27017:27017"]
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 20
     env:
       REDIS_URL: localhost:6379
       MONGODB_URI: mongodb://localhost:27017
+      POSTGRES_URL: Host=localhost;Username=postgres;Password=postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -79,6 +87,19 @@ jobs:
       fail-fast: false
       matrix:
         tfm: [net10.0, net11.0]
+        # The smoke app adds the live backplane whose URL is set, so the native binary connects, subscribes and publishes.
+        backplane: [postgres, redis]
+    services:
+      redis:
+        image: redis:8.2-alpine
+        ports: ["6379:6379"]
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -89,6 +110,8 @@ jobs:
       - run: bash eng/aot-smoke.sh
         env:
           TFM: ${{ matrix.tfm }}
+          POSTGRES_URL: ${{ matrix.backplane == 'postgres' && 'Host=localhost;Username=postgres;Password=postgres' || '' }}
+          REDIS_URL: ${{ matrix.backplane == 'redis' && 'localhost:6379' || '' }}
 
   # Playwright E2E: the same spec suite runs against every sample (tests/e2e, contract in samples/README.md).
   e2e:
@@ -96,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sample: [react, vue, svelte, react-sse]
+        sample: [react, vue, svelte, react-sse, react-sse-redis, react-sse-postgres, react-signalr-postgres]
         include:
           - sample: react
             dir: MinimalApi.React
@@ -111,11 +134,43 @@ jobs:
             dir: MinimalApi.React
             live: sse
             specs: specs/live.spec.ts
+          # Two instances of the React sample on one backplane (live-scale.spec.ts), per transport and store.
+          - sample: react-sse-redis
+            app: react
+            dir: MinimalApi.React
+            live: sse
+            backplane: redis
+            specs: specs/live-scale.spec.ts
+          - sample: react-sse-postgres
+            app: react
+            dir: MinimalApi.React
+            live: sse
+            backplane: postgres
+            specs: specs/live-scale.spec.ts
+          - sample: react-signalr-postgres
+            app: react
+            dir: MinimalApi.React
+            backplane: postgres
+            specs: specs/live-scale.spec.ts
+    services:
+      redis:
+        image: redis:8.2-alpine
+        ports: ["6379:6379"]
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 20
     env:
       SAMPLE: ${{ matrix.app || matrix.sample }}
       INERTIA_SSR: ${{ matrix.ssr }}
       LIVE_TRANSPORT: ${{ matrix.live }}
       VITE_LIVE_TRANSPORT: ${{ matrix.live }}
+      LIVE_BACKPLANE: ${{ matrix.backplane }}
+      REDIS_URL: localhost:6379
+      POSTGRES_URL: Host=localhost;Username=postgres;Password=postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -130,6 +185,10 @@ jobs:
         run: |
           npm ci
           npm run build
+      # Two instances run the same build (--no-build), so they do not build the project at once.
+      - name: Build the sample app
+        if: matrix.backplane
+        run: dotnet build samples/${{ matrix.dir }} -c Release
       - name: Install Playwright
         working-directory: tests/e2e
         run: |

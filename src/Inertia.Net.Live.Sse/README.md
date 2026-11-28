@@ -6,9 +6,11 @@ The Server-Sent Events transport for [Inertia.Net](https://github.com/adzamkomla
 `text/event-stream` endpoint, and the browser reads it with its built-in `EventSource`. There is no client library to install and no
 hub. Native AOT compatible.
 
-**One instance only.** A publish reaches the clients connected to the instance that publishes it, and there is no backplane. For
-several instances behind a load balancer, use [Inertia.Net.Live.SignalR](https://www.nuget.org/packages/Inertia.Net.Live.SignalR)
-with a backplane.
+**Several instances.** On its own, a publish reaches the clients connected to the instance that publishes it. Add a backplane and
+every instance delivers every event, including events published by a worker, with no sticky sessions:
+`AddSse().AddRedisBackplane(...)` ([Inertia.Net.Redis](https://www.nuget.org/packages/Inertia.Net.Redis)) or
+`AddSse().AddPostgresBackplane(...)` ([Inertia.Net.Postgres](https://www.nuget.org/packages/Inertia.Net.Postgres)). When the
+backplane loses messages, every stream closes and the clients reconnect and reload. See [Live props at scale](https://inertia-dotnet.temtem.dev/docs/live-props-at-scale).
 
 ```sh
 dotnet add package Inertia.Net.Live.Sse

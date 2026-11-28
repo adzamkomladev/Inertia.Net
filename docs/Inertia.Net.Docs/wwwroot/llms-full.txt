@@ -85,6 +85,9 @@ Your .NET app still handles the request. The adapter adds the protocol middlewar
   <Card title="Production concerns included" icon="shield" href="/docs/csrf-and-antiforgery">
     CSRF cookies, encrypted state, asset versioning, proxy support and SSR supervision.
   </Card>
+  <Card title="Live props on the database you already run" icon="gauge" href="/docs/live-props-at-scale">
+    SSE or SignalR across every instance and every job, over Redis or PostgreSQL, with publish on commit.
+  </Card>
   <Card title="AOT-friendly by design" icon="rocket" href="/docs/native-aot">
     Props are written through System.Text.Json metadata. Inertia.Net does not use reflection over your page objects.
   </Card>
@@ -319,7 +322,7 @@ Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.
 Run these commands in the folder where you want to create `MyApp`.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.11
+dotnet new install Inertia.Net.Templates@1.10.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -445,36 +448,40 @@ const submit = () => form.submit(routes.todos.store(), { onSuccess: () => form.r
 
 URL: https://inertia-dotnet.temtem.dev/docs/installation
 
-> Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.
+> Install Inertia.Net, the optional MVC, FastEndpoints, SSE, SignalR, Redis, PostgreSQL or MongoDB package, and the testing helpers.
 
 Inertia.Net is split into small packages. Install the core package and one optional backend integration.
 
+Every package is on [NuGet](https://www.nuget.org/profiles/adzamkomladev); the names below link to their NuGet pages.
+
 | Package | Install when |
 |---|---|
-| `Inertia.Net` | always. The core adapter, Minimal API support, Vite, server-side rendering (SSR), state store and antiforgery |
-| `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` filter, Razor root view and tag helpers |
-| `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
-| `Inertia.Net.Live.SignalR` | you deliver [live props](/docs/live-props) over SignalR: hub, channel authorization and broadcaster |
-| `Inertia.Net.Live.Sse` | you deliver [live props](/docs/live-props#server-sent-events) over Server-Sent Events from one app instance |
-| `Inertia.Net.EntityFrameworkCore` | you page EF Core queries with numbered or cursor pagination |
-| `Inertia.Net.Redis` | you share [cached props](/docs/props#cached-props) and SSR renders between app instances through Redis |
-| `Inertia.Net.MongoDB` | you page MongoDB finds with numbered or cursor [pagination](/docs/pagination#with-mongodb) |
-| `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
-| `Inertia.Net.Templates` | you want to start from a complete app. Install it with `dotnet new install Inertia.Net.Templates`. It also adds pages with `dotnet new inertia-page` |
+| [`Inertia.Net`](https://www.nuget.org/packages/Inertia.Net) | always. The core adapter, Minimal API support, Vite, server-side rendering (SSR), state store and antiforgery |
+| [`Inertia.Net.Mvc`](https://www.nuget.org/packages/Inertia.Net.Mvc) | you use MVC controllers: `ModelState` filter, Razor root view and tag helpers |
+| [`Inertia.Net.FastEndpoints`](https://www.nuget.org/packages/Inertia.Net.FastEndpoints) | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
+| [`Inertia.Net.Live.SignalR`](https://www.nuget.org/packages/Inertia.Net.Live.SignalR) | you deliver [live props](/docs/live-props) over SignalR: hub, channel authorization and local transport |
+| [`Inertia.Net.Live.Sse`](https://www.nuget.org/packages/Inertia.Net.Live.Sse) | you deliver [live props](/docs/live-props#server-sent-events) over Server-Sent Events, with no client library |
+| [`Inertia.Net.Redis`](https://www.nuget.org/packages/Inertia.Net.Redis) | you share [cached props](/docs/props#cached-props) and SSR renders, or carry [live props across instances](/docs/live-props-at-scale), through Redis |
+| [`Inertia.Net.Postgres`](https://www.nuget.org/packages/Inertia.Net.Postgres) | you carry [live props across instances](/docs/live-props-at-scale) and workers over PostgreSQL `LISTEN`/`NOTIFY`, with publish on commit |
+| [`Inertia.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Inertia.Net.EntityFrameworkCore) | you page EF Core queries with numbered or cursor pagination |
+| [`Inertia.Net.MongoDB`](https://www.nuget.org/packages/Inertia.Net.MongoDB) | you page MongoDB finds with numbered or cursor [pagination](/docs/pagination#with-mongodb) |
+| [`Inertia.Net.Testing`](https://www.nuget.org/packages/Inertia.Net.Testing) | in your test project: fluent assertions over Inertia responses, and `FakeBackplane` for multi-instance live tests |
+| [`Inertia.Net.Templates`](https://www.nuget.org/packages/Inertia.Net.Templates) | you want to start from a complete app. Install it with `dotnet new install Inertia.Net.Templates`. It also adds pages with `dotnet new inertia-page` |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.11
-dotnet add package Inertia.Net.Mvc --version 1.9.11            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.11  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.11 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.11        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.11   # live props over SignalR
-dotnet add package Inertia.Net.Live.Sse --version 1.9.11        # live props over Server-Sent Events
-dotnet add package Inertia.Net.Redis --version 1.9.11          # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.11        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.10.0
+dotnet add package Inertia.Net.Mvc --version 1.10.0            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.10.0  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.10.0        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.10.0   # live props over SignalR
+dotnet add package Inertia.Net.Live.Sse --version 1.10.0        # live props over Server-Sent Events
+dotnet add package Inertia.Net.Redis --version 1.10.0          # Redis cache store and live backplane
+dotnet add package Inertia.Net.Postgres --version 1.10.0       # PostgreSQL live backplane
+dotnet add package Inertia.Net.MongoDB --version 1.10.0        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.11 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.10.0 implements Inertia.js v3.
 
 ## Requirements
 
@@ -497,7 +504,7 @@ Every package ships `net10.0` and `net11.0` assemblies. NuGet picks the one that
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.11
+dotnet new install Inertia.Net.Templates@1.10.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -1046,11 +1053,11 @@ Use this guide to add Inertia to an existing ASP.NET Core app. To create a new a
 Run these commands from the folder of your existing server project. Every app needs the core package:
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.11
+dotnet add package Inertia.Net --version 1.10.0
 ```
 
 For MVC, also install `Inertia.Net.Mvc`. For FastEndpoints, install `Inertia.Net.FastEndpoints`.
-Use version `1.9.11` for each. You also need Node.js and Vite to build the client. See
+Use version `1.10.0` for each. You also need Node.js and Vite to build the client. See
 [installation](/docs/installation) for all packages, or [client setup](/docs/client-setup) for the frontend files.
 
 The **root template** is your HTML shell. A **page component** is the React, Vue or Svelte file that renders a screen.
@@ -2764,7 +2771,7 @@ Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected
 `dotnet new inertia --auth` creates an app with both:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.11
+dotnet new install Inertia.Net.Templates::1.10.0
 dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
 ```
 
@@ -3464,7 +3471,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.11
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0
 ```
 
 The following example uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3496,7 +3503,7 @@ The EF Core package is not marked Native AOT compatible. EF Core has its own com
 `Inertia.Net.MongoDB` builds the same `Page<T>` and `CursorPage<T>` values from a `collection.Find(filter)`:
 
 ```sh
-dotnet add package Inertia.Net.MongoDB --version 1.9.11
+dotnet add package Inertia.Net.MongoDB --version 1.10.0
 ```
 
 ```csharp
@@ -3564,7 +3571,7 @@ Live props need `@inertiajs/react`, `@inertiajs/vue3` or `@inertiajs/svelte` 3.1
   caption="Figure: an event published on the server refreshes only the props that listen to it."
   actors={[
     { name: 'Your code', sub: 'IInertiaLive.Publish' },
-    { name: 'Live transport', sub: 'SignalR or your own' },
+    { name: 'Live transport', sub: 'SSE, SignalR or your own' },
     { name: 'Browser', sub: 'Inertia client' },
   ]}
   messages={[
@@ -3886,8 +3893,8 @@ For rules that need services, implement `ILiveChannelAuthorizer` and register it
 
 The hub answers requests from other origins with 403. Add trusted origins to `o.AllowedOrigins`. The origin check takes the place of antiforgery tokens on the hub. Connections close when their authentication expires.
 
-<Callout type="warning" title="More than one server">
-SignalR groups exist on one server only. When you run several instances, add a Redis backplane (`AddSignalR().AddStackExchangeRedis(...)`) or Azure SignalR Service. Without one of these, a publish reaches only the clients connected to the instance that sent it.
+<Callout type="info" title="More than one server">
+SignalR groups exist on one server only. When you run several instances, or publish from a worker, add an Inertia backplane on the Redis or PostgreSQL you already run: `AddSignalR().AddRedisBackplane(...)` or `.AddPostgresBackplane(...)`. See [Live props at scale](/docs/live-props-at-scale). Do not also register SignalR's own Redis backplane or Azure SignalR for the same hub: every event would arrive twice, so startup fails to tell you.
 </Callout>
 
 The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.SignalR/README.md) lists the client options, how channels map to SignalR groups, and the security notes.
@@ -3926,11 +3933,47 @@ The channel rules and the `ILiveChannelAuthorizer` are the same as for SignalR. 
 - A stream ends when its sign-in expires. The client reconnects, and its channels are authorized again.
 - A client too slow to keep up is disconnected. It reloads its live props when it reconnects.
 
-<Callout type="warning" title="One instance only">
-There is no backplane for Server-Sent Events. A publish reaches only the clients connected to the instance that sent it. When you run several instances, use SignalR with a backplane.
+<Callout type="info" title="One instance, or any number with a backplane">
+Without a backplane, a publish reaches only the clients connected to the instance that sent it. With several instances, or a separate worker, add `.AddRedisBackplane(...)` or `.AddPostgresBackplane(...)` and every instance delivers every event. SSE needs no sticky sessions. See [Live props at scale](/docs/live-props-at-scale).
 </Callout>
 
 The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.Sse/README.md) lists the options and the wire format.
+
+## Choose a transport
+
+| | SSE | SSE + backplane | SignalR | SignalR + backplane | Polling |
+|---|---|---|---|---|---|
+| Client library | none | none | `@microsoft/signalr` | `@microsoft/signalr` | none |
+| Several web instances | no | yes | no | yes | yes |
+| Publish from another process | no | yes | no | yes | n/a |
+| Publish on commit | no | with PostgreSQL | no | with PostgreSQL | n/a |
+| Extra infrastructure | none | Redis, or the PostgreSQL you run | none | Redis, or the PostgreSQL you run | none |
+| Client-to-server messages | no | no | yes | yes | n/a |
+| Latency | push | push | push | push | up to the interval |
+
+Packages on NuGet: [Inertia.Net.Live.Sse](https://www.nuget.org/packages/Inertia.Net.Live.Sse), [Inertia.Net.Live.SignalR](https://www.nuget.org/packages/Inertia.Net.Live.SignalR), [Inertia.Net.Redis](https://www.nuget.org/packages/Inertia.Net.Redis) and [Inertia.Net.Postgres](https://www.nuget.org/packages/Inertia.Net.Postgres) for the backplanes.
+
+## Notify after commit
+
+With the PostgreSQL backplane, publish inside your database transaction: the event goes out only if the transaction commits.
+
+```csharp
+await using var tx = await db.Database.BeginTransactionAsync(ct);
+order.Status = OrderStatus.Shipped;
+await db.SaveChangesAsync(ct);
+await postgres.PublishAsync(live.CreateMessage(OrderEvents.Updated(order.Id)), db.Database.GetDbConnection(), tx.GetDbTransaction(), ct);
+await tx.CommitAsync(ct);   // delivered now
+```
+
+If anything throws before `CommitAsync`, the transaction rolls back and no client hears about a change that never happened:
+
+```csharp
+await using var tx = await db.Database.BeginTransactionAsync(ct);
+await postgres.PublishAsync(live.CreateMessage(OrderEvents.Updated(order.Id)), db.Database.GetDbConnection(), tx.GetDbTransaction(), ct);
+await tx.RollbackAsync(ct); // nothing is delivered, to any instance
+```
+
+`postgres` is the `PostgresLiveBackplane` that `AddPostgresBackplane()` registers; inject it like any service. See [Publish on commit](/docs/live-props-at-scale#publish-on-commit) for the details.
 
 ## Reloading scroll and merge props
 
@@ -3994,7 +4037,9 @@ onUnmounted(() => stop?.())
 
 `reset` replaces the prop instead of merging it, so the reload brings no duplicates. The SignalR and Server-Sent Events client transports deliver a channel's events to every subscriber. See [Typed routes](/docs/typed-routes) for `routes.ts`.
 
-## Custom transports
+## Custom transports and backplanes
+
+To scale a transport of your own across instances, implement `IInertiaLiveLocalTransport` (deliver to this instance's clients, and resync them after a gap) instead of `IInertiaLiveBroadcaster`; any backplane then carries its events. To use another store as the backplane, implement `IInertiaLiveBackplane`: it only moves the bytes Inertia.Net writes (`LiveWire`), and reports a gap with `missed`. See [docs/protocol.md](https://github.com/adzamkomladev/Inertia.Net/blob/main/docs/protocol.md#live-backplane-wire-format) for the wire format.
 
 The page metadata and the payload do not depend on SignalR, so any transport works:
 
@@ -5438,6 +5483,8 @@ builder.Services.AddDataProtection()
 
 If you use the session store, sessions must be shared too, for example with Redis. The default cookie store only needs shared Data Protection keys.
 
+Live props need a backplane on several instances, or the clients of one instance miss events published on another. See [Live props at scale](/docs/live-props-at-scale).
+
 Keep the SSR server on loopback on each instance. See [Server-side rendering](/docs/server-side-rendering).
 
 ## Compression
@@ -5533,7 +5580,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/native-aot
 
 > Publish a Native AOT Inertia.Net app with source-generated JSON metadata.
 
-You can publish an Inertia.Net app with Native AOT. `Inertia.Net`, `Inertia.Net.FastEndpoints` and `Inertia.Net.Live.SignalR` are annotated `IsAotCompatible`. CI publishes a real app with Native AOT (`tests/Inertia.Net.AotSmoke`) with zero trim and AOT warnings allowed. The library never reflects over your props. It writes values with `JsonTypeInfo` from your `JsonSerializerContext`.
+You can publish an Inertia.Net app with Native AOT. `Inertia.Net`, `Inertia.Net.FastEndpoints`, `Inertia.Net.Live.SignalR`, `Inertia.Net.Live.Sse` and `Inertia.Net.Postgres` are annotated `IsAotCompatible`. CI publishes a real app with Native AOT (`tests/Inertia.Net.AotSmoke`) with zero trim and AOT warnings allowed. The library never reflects over your props. It writes values with `JsonTypeInfo` from your `JsonSerializerContext`.
 
 ## 1. Register a JSON context
 
@@ -5632,7 +5679,8 @@ These features are all AOT safe and covered by the smoke test:
 - prefetching
 - `MapInertia`
 - the DevTools recorder
-- [live props over SignalR](/docs/live-props#signalr)
+- [live props over SignalR](/docs/live-props#signalr) and [Server-Sent Events](/docs/live-props#server-sent-events)
+- the [PostgreSQL and Redis live backplanes](/docs/live-props-at-scale) (CI runs the native binary against each)
 
 SignalR itself does not support strongly typed hubs (`Hub<T>`) under AOT, so keep any hubs of your own untyped.
 
@@ -5962,7 +6010,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/redis
 `Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis. Every app instance shares them, and a call to `IInertiaCache.RemoveByTagAsync` on one instance clears them for all instances. Inertia.Net reads a page's cached props from Redis together, not one round trip after another. The loaders of those props still run in turn unless you mark them `Parallel()`.
 
 ```sh
-dotnet add package Inertia.Net.Redis --version 1.9.11
+dotnet add package Inertia.Net.Redis --version 1.10.0
 ```
 
 ```csharp
@@ -5995,6 +6043,10 @@ Inertia.Net does not hide failures. When the store fails while a page renders, I
 The Redis store is not verified under [Native AOT](/docs/native-aot).
 
 See the [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Redis/README.md) and [Deploying behind a proxy](/docs/deploying#multi-instance-state) for the rest of the multi-instance setup.
+
+## Live backplane
+
+The same package carries [live props across instances](/docs/live-props-at-scale) over Redis pub/sub: `AddInertiaLive().AddSse().AddRedisBackplane(o => o.Configuration = "localhost:6379")`. It is independent of the cache store: use either or both.
 
 ---
 
@@ -6289,6 +6341,478 @@ These come from one run on shared cloud machines, with the load generator runnin
 The app code, the run script and every setting are in [benchmarks/frameworks](https://github.com/adzamkomladev/Inertia.Net/tree/main/benchmarks/frameworks). Its README explains how to run the comparison on your own machine or on GitHub Actions and lists the caveats. Every route in both modes, with latency percentiles and fixed-rate runs, is in the [full results](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-16-v3.md). The run with caching turned on is in its [own results file](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-16-inertianet-tuned.md).
 
 For what Inertia.Net itself costs next to a plain Minimal API, see [Performance](/docs/performance).
+
+---
+
+# Live props at scale
+
+URL: https://inertia-dotnet.temtem.dev/docs/live-props-at-scale
+
+> Live props across every app instance and every job, on the Redis or PostgreSQL you already run.
+
+With one app instance, a [live prop](/docs/live-props) works with no extra setup: the instance that publishes holds every open connection. Add a second instance, or publish from a worker process, and a publish only reaches the clients connected to the process that sent it. A **backplane** fixes that. Every process publishes once to the backplane, and every web instance delivers the event to its own clients.
+
+- **No new infrastructure.** Your existing Redis or PostgreSQL is the backplane, for SSE and SignalR alike. With SSE there is no client library either.
+- **Publish from anywhere.** A web request, a Runwick, Hangfire or Quartz job, a `BackgroundService` or a separate worker container: one `IInertiaLive.PublishAsync` call reaches every tab. See [Background jobs](/docs/background-jobs).
+- **Events only for committed data.** With PostgreSQL, publish inside your transaction. If it rolls back, the event never goes out.
+- **Self-healing.** Any gap (a store restart, a network blip, a slow client) ends in one reconnect and one reload. No page is left silently stale.
+- **Native AOT and trimming safe**, like the rest of Inertia.Net.
+
+<Flow
+  caption="Figure: any process publishes once; every web instance, the publishing one included, delivers what the backplane sends, in the backplane's order."
+  height={330}
+  nodes={[
+    { id: 'web', label: 'Web instance A', sub: 'a request publishes', x: 120, y: 70, tone: 'primary' },
+    { id: 'job', label: 'Worker process', sub: 'a job publishes', x: 120, y: 260, tone: 'muted' },
+    { id: 'bp', label: 'Backplane', sub: 'Redis or PostgreSQL', x: 380, y: 165, tone: 'warning' },
+    { id: 'a', label: 'Instance A clients', sub: 'SSE or SignalR', x: 640, y: 70, tone: 'success' },
+    { id: 'b', label: 'Instance B clients', sub: 'SSE or SignalR', x: 640, y: 260, tone: 'success' },
+  ]}
+  edges={[
+    { from: 'web', to: 'bp', label: 'publish once' },
+    { from: 'job', to: 'bp', label: 'publish once' },
+    { from: 'bp', to: 'a', label: 'A delivers' },
+    { from: 'bp', to: 'b', label: 'B delivers' },
+  ]}
+/>
+
+## Which setup do I need?
+
+| Your app | What to add |
+|---|---|
+| One web instance, publishes only from requests or in-process jobs | Nothing: a transport is enough (`AddSse()` or `AddSignalR()`) |
+| Several web instances behind a load balancer | A backplane: `AddRedisBackplane()` or `AddPostgresBackplane()` on every instance |
+| A separate worker process or container that publishes | The same backplane in the worker: `AddInertiaLive().AddRedisBackplane(...)`, no transport |
+| Events only after your data commits | `AddPostgresBackplane()` and [publish in the transaction](#publish-on-commit) |
+| Redis Cluster | `AddRedisBackplane(o => o.UseShardedPubSub = true)` (Redis 7 or later) |
+
+**SSE needs no sticky sessions**: each stream is one request held by one instance. **SignalR still needs them**, unless clients use WebSockets only with `skipNegotiation: true`: its negotiate request and the connection that follows must reach the same instance ([Microsoft's guidance](https://learn.microsoft.com/aspnet/core/signalr/scale#sticky-sessions)). The backplane solves delivery across instances, not that routing.
+
+Every instance delivers from the backplane, the publishing one too, so all clients see concurrent publishes in the same order and end on the same value. A publish costs one round trip to the store before its own instance's clients see it.
+
+## Install
+
+```sh
+dotnet add package Inertia.Net.Redis      # the Redis backplane (and the Redis cache store)
+dotnet add package Inertia.Net.Postgres   # the PostgreSQL backplane
+```
+
+Packages on NuGet: [Inertia.Net.Redis](https://www.nuget.org/packages/Inertia.Net.Redis), [Inertia.Net.Postgres](https://www.nuget.org/packages/Inertia.Net.Postgres), [Inertia.Net.Live.Sse](https://www.nuget.org/packages/Inertia.Net.Live.Sse), [Inertia.Net.Live.SignalR](https://www.nuget.org/packages/Inertia.Net.Live.SignalR).
+
+## Set it up
+
+<Tabs>
+  <Tab label="Redis">
+
+```csharp
+// Every web instance (SSE):
+builder.Services.AddInertiaLive()
+    .AddSse(o => o.Authorize<ChannelAuthorizer>())
+    .AddRedisBackplane(o => o.Configuration = builder.Configuration.GetConnectionString("Redis"));
+app.MapInertiaLiveSse();
+
+// Or every web instance (SignalR):
+builder.Services.AddInertiaLive()
+    .AddSignalR(o => o.Authorize<ChannelAuthorizer>())
+    .AddRedisBackplane(o => o.Configuration = builder.Configuration.GetConnectionString("Redis"));
+app.MapInertiaLiveHub();
+
+// A worker that only publishes (no web app, no AddInertia()):
+services.AddInertiaLive().AddRedisBackplane(o => o.Configuration = redis);
+```
+
+Leave `Configuration` unset to use the `IConnectionMultiplexer` already registered in your services. The backplane then never disposes it; a multiplexer it creates itself is disposed with the app.
+
+  </Tab>
+  <Tab label="PostgreSQL">
+
+```csharp
+// Every web instance (SSE):
+builder.Services.AddInertiaLive()
+    .AddSse(o => o.Authorize<ChannelAuthorizer>())
+    .AddPostgresBackplane(o => o.ConnectionString = builder.Configuration.GetConnectionString("Db"));
+app.MapInertiaLiveSse();
+
+// Or every web instance (SignalR):
+builder.Services.AddInertiaLive()
+    .AddSignalR(o => o.Authorize<ChannelAuthorizer>())
+    .AddPostgresBackplane(o => o.ConnectionString = builder.Configuration.GetConnectionString("Db"));
+app.MapInertiaLiveHub();
+
+// A worker that only publishes:
+services.AddInertiaLive().AddPostgresBackplane(o => o.ConnectionString = db);
+```
+
+Leave `ConnectionString` unset to use the `NpgsqlDataSource` registered in your services (for example by `AddNpgsqlDataSource`). Without `ListenConnectionString`, the `LISTEN` connection then comes from that data source's pool and stays rented for the app's lifetime, so its pool needs room for one more connection (`Maximum Pool Size` of 2 or more). Turn on `Keepalive` in its connection string, so a half-open connection is noticed; a connection the backplane builds itself (from `ConnectionString` or `ListenConnectionString`) gets a 30-second keepalive and TLS support.
+
+  </Tab>
+</Tabs>
+
+Registration order does not matter: transport then backplane, or backplane then transport, builds the same services.
+
+### Bind from appsettings.json
+
+The options are ordinary options classes, so you can bind them instead of setting them in code:
+
+```json
+{
+  "Inertia": {
+    "Live": {
+      "Postgres": { "Channel": "myapp_live", "LargeMessageRetention": "00:10:00" },
+      "Redis": { "Configuration": "redis:6379", "Prefix": "myapp:" },
+      "Sse": { "MaxQueuedEvents": 512, "HeartbeatInterval": "00:00:20" }
+    }
+  }
+}
+```
+
+```csharp
+builder.Services.Configure<InertiaPostgresBackplaneOptions>(builder.Configuration.GetSection("Inertia:Live:Postgres"));
+builder.Services.Configure<InertiaLiveSseOptions>(builder.Configuration.GetSection("Inertia:Live:Sse"));
+builder.Services.AddInertiaLive().AddSse().AddPostgresBackplane(o => o.ConnectionString = builder.Configuration.GetConnectionString("Db"));
+```
+
+The backplane reads its options once, at startup. The SSE options are read for each new stream: a configuration reload changes `MaxQueuedEvents`, `HeartbeatInterval` and the subscription limits for new streams, and open streams keep what they started with.
+
+## Options
+
+### Redis backplane (`InertiaRedisBackplaneOptions`)
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `Configuration` | `string?` | `null` | StackExchange.Redis configuration string. Null uses the registered `IConnectionMultiplexer` |
+| `Prefix` | `string` | `inertia:` | Prefix of the pub/sub channel names (`{Prefix}live`), so several apps can share one Redis |
+| `UseShardedPubSub` | `bool` | `false` | `SPUBLISH`/`SSUBSCRIBE` for Redis Cluster (Redis 7.0 or later) |
+| `ShardCount` | `int` | `1` | With sharded pub/sub, how many channels (`{Prefix}live:0` to `{Prefix}live:{N-1}`) to spread traffic over. 1 to 1024 |
+
+Classic pub/sub uses one channel per app; each instance looks up the event's live channel in its own index, so an instance does no work for channels nobody on it has open. In a Redis Cluster, a classic `PUBLISH` is copied to every node, while a sharded message stays on the shard that owns its slot. A publish picks its shard by a stable hash of the live channel (`private:orders.1`), so events on one channel stay in order. Every instance subscribes to every shard.
+
+**Managed Redis.** Classic mode works on Azure Cache for Redis, ElastiCache and Upstash. Sharded mode needs a cluster-mode Redis 7 or later: `INFO server` shows `redis_version`, and `CLUSTER INFO` answers only in cluster mode.
+
+**ShardCount guidance.** Keep 1 unless one shard's network or CPU is the limit. A few channels (4 to 16) spread publish traffic across nodes; more shards than cluster nodes gains nothing, since every instance subscribes to all of them.
+
+### PostgreSQL backplane (`InertiaPostgresBackplaneOptions`)
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `ConnectionString` | `string?` | `null` | Publishing and table reads. Null uses the registered `NpgsqlDataSource` |
+| `ListenConnectionString` | `string?` | `ConnectionString` | The dedicated `LISTEN` connection: point it at the database directly, or at a session-mode pool |
+| `Channel` | `string` | `inertia_live` | The notification channel; one per app sharing a database. Letters, digits and underscores |
+| `LargeMessages` | `LargeMessageMode` | `Table` | `Table` stores messages over the `NOTIFY` limit; `Reload` sends them without values |
+| `TableName` | `string` | `inertia_live_messages` | The large-message table. Schema-qualified names (`live.messages`) are allowed; checked at startup |
+| `AutoCreateTable` | `bool` | `true` | Creates the table at startup. Set false to create it from your migrations with `CreateTableSql` |
+| `DurableLargeMessages` | `bool` | `false` | A logged table instead of `UNLOGGED` |
+| `LargeMessageRetention` | `TimeSpan` | 5 minutes | Age at which stored messages are deleted (every minute, on every instance) |
+| `ReconnectDelayMax` | `TimeSpan` | 30 seconds | Cap of the listen reconnect backoff (1 second, doubling). At least 1 second |
+
+Each process holds one dedicated, unpooled connection that runs `LISTEN "inertia_live"`. When it drops, it reconnects with the backoff, listens again, and resyncs this instance's clients (see [failures](#when-something-fails)). Publishing runs `SELECT pg_notify(@channel, @payload)` on a pooled connection; both values are parameters, so nothing is spliced into SQL.
+
+### SSE transport (`InertiaLiveSseOptions`)
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `MaxQueuedEvents` | `int` | 256 | Events that wait for a slow stream before it is closed (the client reconnects and reloads). Memory per stream is roughly this times the event size |
+| `HeartbeatInterval` | `TimeSpan` | 15 seconds | How often an idle stream gets a `ping`, so proxies keep it open |
+| `MaxSubscriptionsPerConnection` | `int` | 64 | Channels one stream may ask for |
+| `MaxChannelNameLength` | `int` | 200 | Longest channel name, without the type prefix |
+| `AuthorizePublicChannels` | `bool` | `false` | Ask the authorizer about public channels too |
+| `AllowedOrigins` | `IList<string>` | empty | Origins allowed besides the app's own |
+
+### SignalR transport (`InertiaLiveSignalROptions`)
+
+Besides the options in [Live props](/docs/live-props#signalr), `AllowExternalHubLifetimeManager` (default `false`) decides what happens when SignalR's own scale-out is also registered. See [Moving from SignalR's Redis backplane](#moving-from-signalrs-redis-backplane).
+
+## Publish on commit
+
+PostgreSQL delivers a `NOTIFY` issued inside a transaction only when that transaction commits, and never if it rolls back. A live event then cannot announce data that was never saved. Build the message with `IInertiaLive.CreateMessage(...)` (it takes the same arguments as `PublishAsync`) and publish it with `PostgresLiveBackplane`, which the backplane registers:
+
+<Tabs>
+  <Tab label="EF Core">
+
+```csharp
+app.MapPost("/orders/{id:guid}/ship", async (Guid id, AppDb db, IInertiaLive live, PostgresLiveBackplane postgres, CancellationToken ct) =>
+{
+    await using var tx = await db.Database.BeginTransactionAsync(ct);
+    var order = await db.Orders.SingleAsync(o => o.Id == id, ct);
+    order.ShippedAt = DateTimeOffset.UtcNow;
+    await db.SaveChangesAsync(ct);
+
+    var message = live.CreateMessage(OrderEvents.Updated(id), new { order = OrderDto.From(order) });
+    await postgres.PublishAsync(message, db.Database.GetDbConnection(), tx.GetDbTransaction(), ct);
+
+    await tx.CommitAsync(ct);   // the event goes out now; an exception before this line rolls both back
+    return Back();
+});
+```
+
+`GetDbConnection()` and `GetDbTransaction()` come from the Npgsql EF Core provider your app already references, so neither Inertia package depends on EF Core.
+
+  </Tab>
+  <Tab label="ADO.NET">
+
+```csharp
+await using var connection = await dataSource.OpenConnectionAsync(ct);
+await using var tx = await connection.BeginTransactionAsync(ct);
+await using (var update = new NpgsqlCommand("UPDATE orders SET shipped_at = now() WHERE id = @id", connection, tx))
+{
+    update.Parameters.AddWithValue("id", id);
+    await update.ExecuteNonQueryAsync(ct);
+}
+
+await postgres.PublishAsync(live.CreateMessage(OrderEvents.Updated(id)), connection, tx, ct);
+await tx.CommitAsync(ct);
+```
+
+  </Tab>
+</Tabs>
+
+What to expect:
+
+- **Rollback**: nothing is delivered, and a large message's table row rolls back with it.
+- **The publishing instance** gets the event only after the commit, back through its own `LISTEN`, like every other instance.
+- **Several publishes in one transaction** arrive after the commit, in order. Each carries a unique id, so PostgreSQL never folds two of them into one (it folds identical notifications in one transaction).
+- The transaction must be an active `NpgsqlTransaction` of that connection; anything else throws, rather than publishing outside it.
+- The connection may be closed: `PublishAsync` opens it and closes it again. Pass `null` as the transaction to publish at once.
+- This is the same transaction a Runwick PostgreSQL job or outbox write can share.
+
+## PostgreSQL schema and permissions
+
+PostgreSQL rejects `NOTIFY` payloads of 8,000 bytes or more. Messages up to 7,900 bytes go inline. In `Table` mode, a larger message is stored in the large-message table and the notification carries only the event and the row id, in one round trip:
+
+```sql
+WITH m AS (INSERT INTO inertia_live_messages (body) VALUES (@body) RETURNING id)
+SELECT pg_notify(@channel, ...reference to m.id...) FROM m
+```
+
+The listener reads the row on a pooled connection (never on the `LISTEN` connection) and delivers it as usual. If the row is gone (swept, or lost in a failover), the event goes out without values, the clients reload the prop, and `inertia.live.backplane.oversize` counts it with `outcome=missing`.
+
+The table is `UNLOGGED` by default: live props need no crash safety, and unlogged writes skip the WAL. After a crash or a replica promotion its rows are gone, which falls back to a reload as above. The body is stored as `bytea`, so it comes back byte for byte.
+
+**Create it from migrations** when your app role may not create tables. Set `AutoCreateTable = false` and run the SQL from `CreateTableSql` (safe to run more than once):
+
+```csharp
+// EF Core migration
+protected override void Up(MigrationBuilder migrationBuilder) =>
+    migrationBuilder.Sql(PostgresLiveBackplane.CreateTableSql());               // or CreateTableSql("live.messages", durable: true)
+```
+
+Without the table, the first large publish fails with a message that points at `CreateTableSql`.
+
+| The app role needs | When |
+|---|---|
+| `CONNECT` on the database | always (`LISTEN` and `pg_notify` need nothing more) |
+| `CREATE` on the schema | only with `AutoCreateTable` |
+| `INSERT`, `SELECT`, `DELETE` on the table | in `Table` mode |
+
+**Locked-down databases**: `LargeMessages = LargeMessageMode.Reload` never touches a table. A message over the limit is sent without values, so its clients reload the prop.
+
+## When something fails
+
+Neither backplane stores history. Recovery always works the same way: the affected streams are closed, and the browser reconnects and reloads every live prop once.
+
+| Situation | What happens |
+|---|---|
+| An instance's subscription drops and comes back | That instance resyncs: SSE closes its streams, SignalR aborts its connections. Clients reconnect and reload |
+| A worker publishes while the store is down | `PublishAsync` throws. The job fails, and the job runner retries it (Runwick, Hangfire and Quartz all retry) |
+| The web app publishes while the store is down | `PublishAsync` throws and no client gets the event, this instance's included, so the caller can log or retry |
+| A message is over the `NOTIFY` limit (PostgreSQL) | Stored in the table and sent by reference; in `Reload` mode, sent without values |
+| A stored message is gone before a listener reads it | Sent without values; clients reload the prop; counted with `outcome=missing` |
+| A custom backplane with a size limit gets a larger message | Sent without values; clients reload the prop |
+| Any message over 1 MiB | Sent without values (receivers drop larger messages) |
+| A transactional publish rolls back | Nothing is delivered, and the table row (if any) rolls back with it |
+| A slow client fills its queue | Its SSE stream is closed, and it reloads on reconnect |
+| SignalR's own backplane is also registered | Startup fails with a clear message, unless `AllowExternalHubLifetimeManager` is set |
+| A malformed or unknown-version message arrives | Dropped, logged at Warning, counted in `inertia.live.backplane.errors` |
+
+## Limits and sizing
+
+- **NOTIFY**: payloads under 8,000 bytes inline; larger ones through the table (or a reload).
+- **Notification queue**: PostgreSQL buffers notifications for listeners in an 8 GB queue (by default). A listener that stops reading for a long time fills it, and `NOTIFY` then fails at commit. The listen loop only hands messages to an in-memory queue, so it keeps up.
+- **Message size**: every backplane message is at most 1 MiB; a larger publish goes out without values.
+- **Memory per SSE stream**: up to `MaxQueuedEvents` queued events.
+- **Fan-out cost**: with a backplane every instance receives every message, so each instance looks up the event's channel in an index instead of scanning its connections.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| Events stop after a while behind PgBouncer, Supabase, Neon or RDS Proxy | `LISTEN` needs a session, and a transaction-mode pooler hands the connection to someone else. Set `ListenConnectionString` to the direct database address or a session-mode pool. Publishing can stay on the pooler |
+| Every event arrives twice with SignalR | SignalR's own Redis backplane (`AddStackExchangeRedis`) or Azure SignalR is registered beside the Inertia one. Remove one (startup fails to tell you, unless you set `AllowExternalHubLifetimeManager`) |
+| `CROSSSLOT`/`MOVED` errors or missing events on Redis Cluster | Use `UseShardedPubSub = true` on Redis 7 or later |
+| SSE events arrive in bursts, or only when the stream ends | A proxy buffers the response. Turn buffering off for the stream path (nginx: `proxy_buffering off;`, or send `X-Accel-Buffering: no`) |
+| Clients reconnect every few minutes | Expected after a gap: check `inertia.live.backplane.resyncs` and the Warning logs under `Inertia.Net.Live` for the cause |
+| A large publish fails with "does not exist" | The table is missing and `AutoCreateTable` is off: run `CreateTableSql` from a migration, or use `Reload` mode |
+
+## Metrics and logs
+
+The instruments are on the `Inertia.Net` meter (`.WithMetrics(m => m.AddMeter(InertiaDiagnostics.MeterName))`), each tagged `inertia.live.backplane` = `redis`, `postgres` or `custom`:
+
+| Instrument | Counts | Extra tag |
+|---|---|---|
+| `inertia.live.backplane.published` | messages sent to the backplane | |
+| `inertia.live.backplane.received` | messages from other processes delivered by this instance | |
+| `inertia.live.backplane.resyncs` | gaps after which this instance's clients reconnect | |
+| `inertia.live.backplane.oversize` | messages sent without values | `outcome` = `reload` (over the limit) or `missing` (stored copy gone) |
+| `inertia.live.backplane.errors` | failures | `error.type` = `publish`, `malformed`, `deliver` or `resync` |
+
+Logs go under the `Inertia.Net.Live` category:
+
+| Event id | Level | Meaning |
+|---|---|---|
+| 1 | Error | A publish to the backplane failed |
+| 2 | Debug | A message was over the size limit and sent without values |
+| 3 | Warning | A malformed message was dropped |
+| 4 | Warning | A gap: this instance's clients reconnect |
+| 5, 6 | Error | Delivering a received message, or a resync, failed |
+| 10 | Error | Handling a Redis message failed |
+| 20, 21 | Warning, Information | The PostgreSQL `LISTEN` connection failed, then listens again |
+| 22 | Warning | Reading a stored message failed; it goes out without values |
+| 23, 24, 25 | Error, Warning | Handling a PostgreSQL message, creating the table, or sweeping failed |
+
+## Security
+
+Anything that can write to the Redis channel, or run `NOTIFY` on the database, can push events to your users' browsers. PostgreSQL lets any role that can connect send `NOTIFY`. Any role that can `LISTEN` on the database (or subscribe on the Redis server) also receives every inline value, private channels included: `LISTEN` has no permissions of its own. The database (or the Redis server) is the trust boundary. A dedicated role and a private network keep strangers out, but do not hide values from the database's other users; if they must not see them, publish without values, so each client reloads through your own authorization.
+
+Incoming messages are parsed strictly (the version, the channel shape and the payload object are checked), and anything invalid is dropped and logged. Channel authorization is unchanged: events only reach streams and connections already authorized for that channel. The existing rule still applies, and now covers the store too: every subscriber of a channel gets the same values, so publish no secrets in values.
+
+## Migrating from 1.9
+
+- **Nothing changes without a backplane.** One instance with SSE or SignalR works as before.
+- **Adding one is one line** on every instance: `.AddRedisBackplane(...)` or `.AddPostgresBackplane(...)`.
+- **SSE now works with several instances** once a backplane is added; the "one instance only" limit is gone.
+
+### Moving from SignalR's Redis backplane
+
+Replace `AddSignalR().AddStackExchangeRedis(...)` with the Inertia backplane:
+
+```csharp
+// before
+builder.Services.AddSignalR().AddStackExchangeRedis(redis);
+builder.Services.AddInertiaLive().AddSignalR();
+
+// after
+builder.Services.AddInertiaLive().AddSignalR().AddRedisBackplane(o => o.Configuration = redis);
+```
+
+Keep SignalR's backplane only if your other hubs need it, and then set `AllowExternalHubLifetimeManager = true` knowing that `InertiaLiveHub` events arrive twice. A worker does not care which transport the web app uses, so a fleet can move from SignalR to SSE one instance at a time.
+
+## Testing your app
+
+`FakeBackplane` from [Inertia.Net.Testing](https://www.nuget.org/packages/Inertia.Net.Testing) is an in-memory backplane. Register one instance in two test hosts, and a publish on one reaches the other's clients:
+
+```csharp
+var backplane = new FakeBackplane();
+await using var a = await StartHostAsync(s => s.AddSingleton<IInertiaLiveBackplane>(backplane));
+await using var b = await StartHostAsync(s => s.AddSingleton<IInertiaLiveBackplane>(backplane));
+
+backplane.SimulateGap();                  // every instance resyncs its clients
+backplane.MaxMessageBytes = 1_000;        // a store with a size limit
+backplane.PublishFailure = new Exception("down");   // the store is unreachable
+```
+
+## Try it
+
+The React sample runs on either store: `LIVE_BACKPLANE=redis` or `LIVE_BACKPLANE=postgres`, started twice on two ports. See [samples/README.md](https://github.com/adzamkomladev/Inertia.Net/blob/main/samples/README.md#live-props-on-several-instances).
+
+---
+
+# Background jobs
+
+URL: https://inertia-dotnet.temtem.dev/docs/background-jobs
+
+> Publish live props from Runwick, Hangfire, Quartz and BackgroundService, in the web process or in a separate worker.
+
+A background job publishes a live event the same way a request does: inject `IInertiaLive` and call `PublishAsync`. What you register depends on **where the job runs**.
+
+| The job runs | Register in that process |
+|---|---|
+| Inside the web app (Runwick `AddWorker`, Hangfire or Quartz in the same host, a `BackgroundService`) | Nothing extra: the web app's `AddInertiaLive().AddSse()` (or `.AddSignalR()`) already delivers to its clients |
+| Inside the web app, and you run several web instances | A [backplane](/docs/live-props-at-scale) on every instance, so the other instances' clients get the event too |
+| In a separate worker process or container | `AddInertiaLive()` plus the same backplane as the web app. No transport, no `AddInertia()` |
+
+```csharp
+// Worker Program.cs: publishes only, so no transport and no AddInertia().
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddInertiaLive().AddPostgresBackplane(o => o.ConnectionString = builder.Configuration.GetConnectionString("Db"));
+// or .AddRedisBackplane(o => o.Configuration = builder.Configuration.GetConnectionString("Redis"))
+```
+
+A worker serializes published values with the app's HTTP JSON options (`ConfigureHttpJsonOptions`), since it has no page serializer. Under Native AOT, chain the same `JsonSerializerContext` there as in the web app, or use the `JsonTypeInfo<T>` overload of `PublishAsync`.
+
+## Runwick
+
+```csharp
+public sealed class BuildReportHandler(ReportService reports, IInertiaLive live) : IJobHandler<BuildReport>
+{
+    public async Task HandleAsync(BuildReport job, CancellationToken cancellationToken)
+    {
+        var report = await reports.BuildAsync(job.ReportId, cancellationToken);
+        await live.PublishAsync(ReportEvents.Ready(report.OwnerId), new { report = ReportDto.From(report) }, cancellationToken: cancellationToken);
+    }
+}
+
+// In your Runwick setup:
+runwick.AddHandler<BuildReport, BuildReportHandler>();
+```
+
+Define the `BuildReport` job and configure Runwick's store and workers as its own documentation describes; nothing about them changes for live props.
+
+With Runwick on PostgreSQL you can also [publish on commit](/docs/live-props-at-scale#publish-on-commit) in the same transaction as the job's own writes.
+
+## Hangfire
+
+```csharp
+public sealed class ReportJob(ReportService reports, IInertiaLive live)
+{
+    public async Task RunAsync(Guid reportId, CancellationToken cancellationToken)
+    {
+        var report = await reports.BuildAsync(reportId, cancellationToken);
+        await live.PublishAsync(ReportEvents.Ready(report.OwnerId), cancellationToken: cancellationToken);
+    }
+}
+
+BackgroundJob.Enqueue<ReportJob>(job => job.RunAsync(reportId, CancellationToken.None));
+```
+
+## Quartz
+
+```csharp
+public sealed class StatsJob(StatsService stats, IInertiaLive live) : IJob
+{
+    public async Task Execute(IJobExecutionContext context)
+    {
+        await stats.RefreshAsync(context.CancellationToken);
+        await live.PublishAsync(DashboardEvents.StatsChanged, cancellationToken: context.CancellationToken);
+    }
+}
+```
+
+## BackgroundService
+
+```csharp
+public sealed class QueueDepthMonitor(QueueClient queue, IInertiaLive live) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            var depth = await queue.DepthAsync(stoppingToken);
+            await live.PublishAsync(OpsEvents.QueueDepth, new Dictionary<string, int> { ["queue.depth"] = depth }, cancellationToken: stoppingToken);
+        }
+    }
+}
+```
+
+## Failures and retries
+
+If the backplane store is down, `PublishAsync` throws. The job fails, and Runwick, Hangfire and Quartz retry it. That makes delivery **at least once**: a retried job may publish an event twice. For live props that is harmless. An event without values makes clients reload the prop, and an event with values replaces the prop with the same values; either way the page ends up showing the current data.
+
+Publish **after** the job's data is saved, or in the same transaction with PostgreSQL. A client that reloads on the event must find the new data.
+
+## Try it
+
+The React sample's `/__e2e/live/increment-with-value` endpoint publishes the way a job would. Start the sample twice with `LIVE_BACKPLANE=postgres` (see [samples/README.md](https://github.com/adzamkomladev/Inertia.Net/blob/main/samples/README.md#live-props-on-several-instances)), call the endpoint on one port, and watch `/live` on the other.
 
 ---
 
@@ -6935,7 +7459,7 @@ Each feature in this table shows one idea from Inertia.Net. The right column nam
 Install the templates once, then create the app. The `--auth` option adds cookie sign-in, so you do not write that yourself. For the other clients, use `--framework vue` or `--framework svelte`. Then pick the matching tab in the examples below.
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.9.11
+dotnet new install Inertia.Net.Templates::1.10.0
 dotnet new inertia -n ForgetMeNot --framework react --auth
 cd ForgetMeNot
 bun install
@@ -7261,7 +7785,7 @@ Lists and items must survive a restart, so the app needs a database. This tutori
 
 ```sh
 dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version "10.*"
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.11
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0
 ```
 
 <Callout type="tip" title="On .NET 11?">
@@ -9152,7 +9676,7 @@ Now look at the line that connects the worker to the page. In `ListsPage`, you w
 Install the SignalR transport. It carries the "something changed" message to the browser:
 
 ```sh
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.11
+dotnet add package Inertia.Net.Live.SignalR --version 1.10.0
 bun add @microsoft/signalr
 ```
 
@@ -9218,7 +9742,7 @@ dotnet new xunit -n ForgetMeNot.Tests
 cd ForgetMeNot.Tests
 dotnet add reference ../ForgetMeNot/ForgetMeNot.csproj
 dotnet add package Microsoft.AspNetCore.Mvc.Testing --version "10.*"
-dotnet add package Inertia.Net.Testing --version 1.9.11
+dotnet add package Inertia.Net.Testing --version 1.10.0
 ```
 
 The test project starts your real app in memory. For that to work, add one line at the very end of the app's `Program.cs`:

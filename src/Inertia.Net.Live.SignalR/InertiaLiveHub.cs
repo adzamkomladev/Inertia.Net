@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,6 +12,23 @@ namespace Inertia.Net.Live.SignalR;
 public sealed partial class InertiaLiveHub(ILiveChannelAuthorizer authorizer, IOptions<InertiaLiveSignalROptions> options, ILogger<InertiaLiveHub> logger) : Hub
 {
     private static readonly object SubscriptionsKey = new();
+
+    /// <inheritdoc />
+    public override Task OnConnectedAsync()
+    {
+        // Tracked so a backplane gap can abort this instance's connections (the hub's constructor is public API, so not injected there).
+        Connections?.Add(Context);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        Connections?.Remove(Context);
+        return Task.CompletedTask;
+    }
+
+    private SignalRLiveConnections? Connections => Context.GetHttpContext()?.RequestServices.GetService<SignalRLiveConnections>();
 
     /// <summary>The client method every event is sent to, with the channel key and the payload.</summary>
     public const string ClientMethod = "inertia";

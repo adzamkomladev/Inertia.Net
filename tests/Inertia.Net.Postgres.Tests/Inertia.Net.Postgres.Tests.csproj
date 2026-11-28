@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Inertia.Net.Postgres.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <Using Include="Xunit" />
+    <ProjectReference Include="../../src/Inertia.Net.Postgres/Inertia.Net.Postgres.csproj" />
+  </ItemGroup>
+  <!-- The EF Core publish-on-commit test: the Npgsql EF provider has a .NET 10 build only (and only this test project uses it). -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <DefineConstants>$(DefineConstants);EFCORE</DefineConstants>
+  </PropertyGroup>
+</Project>

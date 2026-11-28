@@ -7,6 +7,36 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-28
+
+### Added
+
+- Live props backplanes: every published event reaches every app instance and every worker, so SSE (with no sticky sessions) and SignalR scale out.
+  - `Inertia.Net.Redis`: `AddRedisBackplane()` over Redis pub/sub, with sharded pub/sub (`SPUBLISH`) for Redis 7+ clusters.
+  - New package `Inertia.Net.Postgres`: `AddPostgresBackplane()` over `LISTEN`/`NOTIFY`, publish on commit (`PostgresLiveBackplane.PublishAsync(message, connection, transaction)`), large messages through a table, `CreateTableSql()` for migrations, and a separate `ListenConnectionString` for PgBouncer.
+  - `IInertiaLiveBackplane` and `IInertiaLiveLocalTransport` for other stores and transports; `LiveWire` reads and writes the [wire format](docs/protocol.md#live-backplane-wire-format).
+  - When a backplane misses messages, SSE closes its streams and SignalR aborts its connections, so clients reconnect and reload.
+  - Metrics `inertia.live.backplane.{published,received,resyncs,oversize,errors}` on the `Inertia.Net` meter.
+- `IInertiaLive.CreateMessage(...)` builds the `LiveMessage` that `PublishAsync` would send.
+- `Inertia.Net.Testing`: `FakeBackplane` for tests of several instances in one process.
+- `InertiaLiveSignalROptions.AllowExternalHubLifetimeManager`.
+- `Inertia.Net.Redis` depends on StackExchange.Redis 2.13.23 (was 2.9.17), which routes sharded subscriptions correctly during slot migrations.
+- Docs: Live props at scale, Background jobs.
+
+### Changed
+
+- `AddSse()` and `AddSignalR()` register local transports behind one relay broadcaster instead of an `IInertiaLiveBroadcaster` each. An `IInertiaLiveBroadcaster` you register yourself still wins.
+- With both SSE and SignalR registered, each uses its own `Authorize(...)`; an `ILiveChannelAuthorizer` you register yourself is the shared fallback.
+- An SSE stream closed for falling behind (or after a backplane gap) is aborted if it has not ended 5 seconds later, so a stalled client cannot keep it open.
+- The SSE transport delivers through a channel index (no scan of every connection) and reads `InertiaLiveSseOptions` through `IOptionsMonitor` for each new stream.
+- With an Inertia backplane, SignalR refuses to start when the hub uses another `HubLifetimeManager` (SignalR's Redis backplane, Azure SignalR), because every event would arrive twice. Set `AllowExternalHubLifetimeManager` to opt out.
+
+### Migration
+
+- `IInertiaLive.CreateMessage` has default implementations, so existing `IInertiaLive` implementations still compile; the page-serializer overload throws `NotSupportedException` on them until they implement it.
+- With a backplane, the publishing instance's own clients get an event back through the store (one round trip later) instead of at once, so every instance delivers in the same order.
+- Behind a load balancer, SignalR still needs sticky sessions unless clients skip negotiation (WebSockets only); SSE needs none.
+
 ## [1.9.11] - 2026-11-28
 
 ### Added

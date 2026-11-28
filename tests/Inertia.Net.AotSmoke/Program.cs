@@ -29,8 +29,18 @@ builder.Services.AddInertia(o =>
     o.Vite.Prefetch = VitePrefetch.Waterfall;
     o.TypeScript.AddGeneratedPages(); // source-generated Page<TPage>() calls: no assembly scan under Native AOT
 });
-// Live props over SignalR (Inertia.Net.Live.SignalR): smoke.sh subscribes with a long-polling client made of curl calls.
-builder.Services.AddInertiaLive().AddSignalR();
+// Live props over SignalR (Inertia.Net.Live.SignalR): smoke.sh subscribes with a long-polling client made of curl calls. SSE runs beside
+// it (a second local transport, at /inertia-live-sse), and both backplanes are compiled in (trim and AOT analysis); one is used when its
+// store is set (POSTGRES_URL, else REDIS_URL), so the live checks then publish through it.
+var live = builder.Services.AddInertiaLive().AddSignalR().AddSse();
+if (Environment.GetEnvironmentVariable("POSTGRES_URL") is { Length: > 0 } postgres)
+{
+    live.AddPostgresBackplane(o => (o.ConnectionString, o.Channel) = (postgres, $"aot_smoke_{Guid.NewGuid():N}"));
+}
+else if (Environment.GetEnvironmentVariable("REDIS_URL") is { Length: > 0 } redisBackplane)
+{
+    live.AddRedisBackplane(o => (o.Configuration, o.Prefix) = (redisBackplane, $"aot-smoke:{Guid.NewGuid():N}:"));
+}
 // Recording on in the published binary too, so the smoke checks cover the DevTools protocol under Native AOT.
 builder.Services.AddInertiaDevTools(o =>
 {
@@ -220,6 +230,7 @@ app.MapPost("/live/publish-page-options", async (IInertiaLive live, Cancellation
     return Results.Redirect("/dashboard");
 });
 app.MapInertiaLiveHub();
+app.MapInertiaLiveSse("/inertia-live-sse");
 
 app.Run();
 

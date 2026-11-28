@@ -9,7 +9,7 @@ Later visits fetch a page object as JSON: the component name, its props, the URL
 the screen without a full reload. You keep ASP.NET Core routing, authentication and validation. You do not need a separate API
 or a client-side router for these pages.
 
-Inertia.Net **1.9.11** is a server adapter for the **Inertia.js v3** protocol. It targets .NET 10 and .NET 11 and supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT (ahead-of-time compilation). FastEndpoints apps support Native AOT when you add the FastEndpoints source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.10.0** is a server adapter for the **Inertia.js v3** protocol. It targets .NET 10 and .NET 11 and supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT (ahead-of-time compilation). FastEndpoints apps support Native AOT when you add the FastEndpoints source generator. MVC itself does not support Native AOT.
 
 <a id="implementation-tasks"></a>
 
@@ -45,7 +45,7 @@ Inertia.Net **1.9.11** is a server adapter for the **Inertia.js v3** protocol. I
 Install a .NET 10 SDK and Node.js 22.12+ first. In the folder where you want your app, run:
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.11
+dotnet new install Inertia.Net.Templates@1.10.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -179,7 +179,7 @@ When you add protocol behavior:
 11. [Once props](#once-props)
 12. [Infinite scroll](#infinite-scroll)
 13. [Pagination](#pagination) ([EF Core](#with-ef-core), [MongoDB](#with-mongodb))
-14. [Live props](#live-props) and [reloading scroll and merge props](#reloading-scroll-and-merge-props)
+14. [Live props](#live-props), [live props at scale](#live-props-at-scale) and [reloading scroll and merge props](#reloading-scroll-and-merge-props)
 15. [Validation and error bags](#validation-and-error-bags) and [Precognition](#precognition-live-validation)
 16. [Flash data](#flash-data)
 17. [Redirects, Location and Back](#redirects-location-and-back), [Error pages](#error-pages), [Authentication and rate limiting](#authentication-and-rate-limiting)
@@ -259,7 +259,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Install the template once.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.11
+dotnet new install Inertia.Net.Templates@1.10.0
 ```
 
 Run the command for your frontend, then change into the new app directory with `cd MyApp`.
@@ -359,6 +359,8 @@ Read the docs at [inertia-dotnet.temtem.dev](https://inertia-dotnet.temtem.dev).
 | Error pages (routing, authorization, exceptions) | `AddInertiaErrorPages()` | same | same |
 | Live props transport: SignalR | `Inertia.Net.Live.SignalR` | same | same |
 | Live props transport: Server-Sent Events | `Inertia.Net.Live.Sse` | same | same |
+| Live props across instances: Redis backplane | `Inertia.Net.Redis` (`AddRedisBackplane()`) | same | same |
+| Live props across instances: PostgreSQL backplane | `Inertia.Net.Postgres` (`AddPostgresBackplane()`, publish on commit) | same | same |
 | `useHttp` validation errors (`422`) | `.WithInertiaValidation()` | `ModelState` filter (global) | `c.ConfigureInertia()` |
 | Page records (`IInertiaPage`) | `Render(page)` | same | `Send.InertiaAsync(page)` |
 | Typed routes (`routes.ts`) | yes | yes | yes |
@@ -384,7 +386,8 @@ Read the docs at [inertia-dotnet.temtem.dev](https://inertia-dotnet.temtem.dev).
 - [x] Infinite scroll (`scrollProps`, merge intent header; `Page<T>` and `CursorPage<T>` from `Pagination`)
 - [x] Rescued props (`rescuedProps`)
 - [x] Live props (`liveProps`, `X-Socket-Id`, broadcast envelope, `IInertiaLive`), delivered over SignalR by `Inertia.Net.Live.SignalR`,
-  over Server-Sent Events by `Inertia.Net.Live.Sse`, or by your own broadcaster: see [Live props](#live-props)
+  over Server-Sent Events by `Inertia.Net.Live.Sse`, or by your own broadcaster, and carried across instances and workers by a Redis or
+  PostgreSQL backplane: see [Live props](#live-props)
 - [x] Shared props and `sharedProps`
 - [x] Server head tags (`WithHead`, the `head` prop for the client's `serverHead: true`)
 - [x] Validation errors, error bags, `WithAllErrors`, `useHttp` `422` errors
@@ -401,32 +404,36 @@ Inertia.Net is not compatible with the Inertia v2 protocol. MVC TempData storage
 
 ## Installation
 
+Every package is on [NuGet](https://www.nuget.org/profiles/adzamkomladev); the names below link to their NuGet pages.
+
 | Package | Install when |
 |---|---|
-| `Inertia.Net` | always. The core adapter, Minimal API support, Vite, SSR, state store, antiforgery cookie |
-| `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` to errors filter, Razor root view and tag helpers |
-| `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor, Precognition |
-| `Inertia.Net.Live.SignalR` | you deliver [live props](#live-props) over SignalR: hub, channel authorization, broadcaster |
-| `Inertia.Net.Live.Sse` | you deliver [live props](#server-sent-events) over Server-Sent Events from one app instance, with no client library |
-| `Inertia.Net.EntityFrameworkCore` | you page EF Core queries with numbered or cursor pagination |
-| `Inertia.Net.MongoDB` | you page MongoDB finds (`ToPageAsync`, `ToCursorPageAsync`) |
-| `Inertia.Net.Redis` | you share cached props and SSR renders across app instances (`AddInertiaRedisCache`) |
-| `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
-| `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte), `dotnet new inertia-page` adds a page |
+| [`Inertia.Net`](https://www.nuget.org/packages/Inertia.Net) | always. The core adapter, Minimal API support, Vite, SSR, state store, antiforgery cookie |
+| [`Inertia.Net.Mvc`](https://www.nuget.org/packages/Inertia.Net.Mvc) | you use MVC controllers: `ModelState` to errors filter, Razor root view and tag helpers |
+| [`Inertia.Net.FastEndpoints`](https://www.nuget.org/packages/Inertia.Net.FastEndpoints) | you use FastEndpoints: `Send` extensions, validation pre-processor, Precognition |
+| [`Inertia.Net.Live.SignalR`](https://www.nuget.org/packages/Inertia.Net.Live.SignalR) | you deliver [live props](#live-props) over SignalR: hub, channel authorization, local transport |
+| [`Inertia.Net.Live.Sse`](https://www.nuget.org/packages/Inertia.Net.Live.Sse) | you deliver [live props](#server-sent-events) over Server-Sent Events, with no client library |
+| [`Inertia.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Inertia.Net.EntityFrameworkCore) | you page EF Core queries with numbered or cursor pagination |
+| [`Inertia.Net.MongoDB`](https://www.nuget.org/packages/Inertia.Net.MongoDB) | you page MongoDB finds (`ToPageAsync`, `ToCursorPageAsync`) |
+| [`Inertia.Net.Redis`](https://www.nuget.org/packages/Inertia.Net.Redis) | you share cached props and SSR renders across app instances (`AddInertiaRedisCache`), or carry live props across them (`AddRedisBackplane`) |
+| [`Inertia.Net.Postgres`](https://www.nuget.org/packages/Inertia.Net.Postgres) | you carry [live props across instances](#live-props-at-scale) and workers over PostgreSQL `LISTEN`/`NOTIFY` (`AddPostgresBackplane`), with publish on commit |
+| [`Inertia.Net.Testing`](https://www.nuget.org/packages/Inertia.Net.Testing) | in your test project: fluent assertions over Inertia responses, `FakeBackplane` |
+| [`Inertia.Net.Templates`](https://www.nuget.org/packages/Inertia.Net.Templates) | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte), `dotnet new inertia-page` adds a page |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.11
-dotnet add package Inertia.Net.Mvc --version 1.9.11 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.11 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.11 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.11 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.11 # live props over SignalR
-dotnet add package Inertia.Net.Live.Sse --version 1.9.11 # live props over Server-Sent Events (one app instance)
-dotnet add package Inertia.Net.Redis --version 1.9.11 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.11 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.10.0
+dotnet add package Inertia.Net.Mvc --version 1.10.0 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.10.0 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.10.0 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.10.0 # live props over SignalR
+dotnet add package Inertia.Net.Live.Sse --version 1.10.0 # live props over Server-Sent Events
+dotnet add package Inertia.Net.Redis --version 1.10.0 # Redis cache store and live backplane
+dotnet add package Inertia.Net.Postgres --version 1.10.0 # PostgreSQL live backplane
+dotnet add package Inertia.Net.MongoDB --version 1.10.0 # MongoDB pagination
 ```
 
-Inertia.Net requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`). The frontend needs JavaScript build tools with npm, Bun, pnpm or Yarn. Use version `1.9.11` for all Inertia.Net packages. Inertia.Net 1.9.11 uses the Inertia.js v3 protocol. The package version and the protocol version are separate version numbers.
+Inertia.Net requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`). The frontend needs JavaScript build tools with npm, Bun, pnpm or Yarn. Use version `1.10.0` for all Inertia.Net packages. Inertia.Net 1.10.0 uses the Inertia.js v3 protocol. The package version and the protocol version are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -1646,7 +1653,7 @@ builder.Services.AddInertia(o => o.Share("notifications", ctx =>
 delivers the messages.
 
 ```csharp
-builder.Services.AddInertiaLive();   // then a transport, e.g. .AddSignalR() or your own IInertiaLiveBroadcaster
+builder.Services.AddInertiaLive();   // then a transport, e.g. .AddSse() or .AddSignalR(), and a backplane for several instances
 
 // Everyone else on the channel reloads `order`; the caller already has the response.
 app.MapPost("/orders/{id:guid}/ship", async (Guid id, HttpContext context, IInertiaLive live) =>
@@ -1711,15 +1718,16 @@ Public channels are open. Private, presence and encrypted-private channels need 
 
 - refuses other origins with a 403
 - closes connections when their authentication expires
-- works with a Redis backplane or Azure SignalR Service
+- scales out with `.AddRedisBackplane(...)` or `.AddPostgresBackplane(...)` ([Live props at scale](#live-props-at-scale))
 
+Do not also add SignalR's own Redis backplane or Azure SignalR for the same hub: events would arrive twice, so startup fails.
 See the [package README](src/Inertia.Net.Live.SignalR/README.md) for the options, scale-out and security notes.
 
 ### Server-Sent Events
 
 The `Inertia.Net.Live.Sse` package delivers live props over one `text/event-stream` endpoint and the browser's `EventSource`, so the
-client bundle needs no `@microsoft/signalr`. Use it for apps that run as **one instance**: events reach only the clients connected to
-the instance that publishes them, and there is no backplane. For several instances behind a load balancer, use SignalR with a backplane.
+client bundle needs no `@microsoft/signalr`. On its own, events reach only the clients connected to the instance that publishes them.
+For several instances, or a separate worker, add a backplane ([Live props at scale](#live-props-at-scale)); SSE needs no sticky sessions.
 
 ```csharp
 builder.Services.AddInertiaLive().AddSse(o =>
@@ -1737,6 +1745,30 @@ The same `ILiveChannelAuthorizer` serves both transports: its `HubCallerContext`
 another origin gets a 403, a stream ends when its sign-in cookie expires (the client reconnects and is authorized again), and a client
 too slow to keep up is disconnected and reloads its live props when it reconnects. See the
 [package README](src/Inertia.Net.Live.Sse/README.md) for the options and the wire format.
+
+### Live props at scale
+
+A backplane carries every published event to every instance, and each instance delivers it to its own SSE or SignalR clients.
+Use the Redis or PostgreSQL you already run:
+
+```csharp
+builder.Services.AddInertiaLive().AddSse().AddPostgresBackplane(o => o.ConnectionString = connectionString);
+// or .AddRedisBackplane(o => o.Configuration = "localhost:6379")
+// a worker that only publishes: AddInertiaLive().AddPostgresBackplane(...), with no transport
+```
+
+| | SSE | SSE + backplane | SignalR | SignalR + backplane |
+|---|---|---|---|---|
+| Client library | none | none | `@microsoft/signalr` | `@microsoft/signalr` |
+| Several instances, publish from a worker | no | yes | no | yes |
+| Publish on commit | no | with PostgreSQL | no | with PostgreSQL |
+| Client-to-server messages | no | no | yes | yes |
+
+With PostgreSQL, `PostgresLiveBackplane.PublishAsync(message, connection, transaction)` sends the event only when your transaction
+commits. When a backplane connection drops, every instance closes its streams and the clients reconnect and reload their live props,
+so no change is lost silently. Payloads above the store's limit go out without values (Redis) or through a small table (PostgreSQL).
+See the [docs page](https://inertia-dotnet.temtem.dev/docs/live-props-at-scale) for options, metrics and troubleshooting,
+and [Background jobs](https://inertia-dotnet.temtem.dev/docs/background-jobs) for publishing from Runwick, Hangfire or Quartz.
 
 ### Reloading scroll and merge props
 
@@ -1772,7 +1804,9 @@ The page metadata and the broadcast payload do not depend on the transport, so y
 
 - **Pusher-protocol servers** (Reverb, Soketi, Ably, Pusher) work with the client's built-in `pusher()` or `echo()` transport.
   Implement `IInertiaLiveBroadcaster` to send `LiveMessage.Payload` with your server's publish API.
-- **Action Cable** or anything else: implement `IInertiaLiveBroadcaster` (one method) and a client `LiveTransport`.
+- **Action Cable** or anything else: implement `IInertiaLiveBroadcaster` (one method) and a client `LiveTransport`. Implement
+  `IInertiaLiveLocalTransport` instead to have a backplane scale it out.
+- **Another backplane store**: implement `IInertiaLiveBackplane`. It moves the bytes Inertia.Net writes ([wire format](docs/protocol.md#live-backplane-wire-format)).
 
 The broadcast payload is `{"__inertia":{"event":"OrderUpdated","props":{...}}}`. See [docs/protocol.md](docs/protocol.md#broadcast-payload).
 

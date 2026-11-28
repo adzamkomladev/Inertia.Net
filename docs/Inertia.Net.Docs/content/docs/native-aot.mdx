@@ -5,7 +5,7 @@ section: Production
 order: 6
 ---
 
-You can publish an Inertia.Net app with Native AOT. `Inertia.Net`, `Inertia.Net.FastEndpoints` and `Inertia.Net.Live.SignalR` are annotated `IsAotCompatible`. CI publishes a real app with Native AOT (`tests/Inertia.Net.AotSmoke`) with zero trim and AOT warnings allowed. The library never reflects over your props. It writes values with `JsonTypeInfo` from your `JsonSerializerContext`.
+You can publish an Inertia.Net app with Native AOT. `Inertia.Net`, `Inertia.Net.FastEndpoints`, `Inertia.Net.Live.SignalR`, `Inertia.Net.Live.Sse` and `Inertia.Net.Postgres` are annotated `IsAotCompatible`. CI publishes a real app with Native AOT (`tests/Inertia.Net.AotSmoke`) with zero trim and AOT warnings allowed. The library never reflects over your props. It writes values with `JsonTypeInfo` from your `JsonSerializerContext`.
 
 ## 1. Register a JSON context
 
@@ -104,7 +104,8 @@ These features are all AOT safe and covered by the smoke test:
 - prefetching
 - `MapInertia`
 - the DevTools recorder
-- [live props over SignalR](/docs/live-props#signalr)
+- [live props over SignalR](/docs/live-props#signalr) and [Server-Sent Events](/docs/live-props#server-sent-events)
+- the [PostgreSQL and Redis live backplanes](/docs/live-props-at-scale) (CI runs the native binary against each)
 
 SignalR itself does not support strongly typed hubs (`Hub<T>`) under AOT, so keep any hubs of your own untyped.
 

@@ -347,6 +347,18 @@ status_is 302
 hub_poll
 has '"arguments":["public:stats",{"__inertia":{"event":"StatsChanged","props":{"live":{"Name":"live","Value":2}}}}]'
 
+# The same publish reaches an SSE stream (the second local transport; with POSTGRES_URL or REDIS_URL set, the app also sends it
+# through that backplane, and must not deliver its own message twice).
+curl -sN --max-time 4 -H 'Accept: text/event-stream' "$BASE/inertia-live-sse?channel=public:stats" >"$T/sse" &
+SSE_PID=$!
+for _ in $(seq 1 40); do grep -q '^event: connected' "$T/sse" 2>/dev/null && break; sleep 0.1; done
+inertia POST /live/publish-page-options
+status_is 302
+wait "$SSE_PID" || true
+grep -q '^event: connected' "$T/sse" || fail "SSE stream did not connect: $(cat "$T/sse")"
+[ "$(grep -c '^event: inertia' "$T/sse")" = 1 ] || fail "SSE stream did not get exactly one event: $(cat "$T/sse")"
+grep -q '"channel":"public:stats"' "$T/sse" || fail "SSE event without its channel"
+
 # 17. Named mount under /admin: its own version, shared props and error component.
 req GET /admin/ -H 'X-Inertia: true' -H 'X-Inertia-Version: admin-1'
 status_is 200
