@@ -163,7 +163,7 @@ internal sealed partial class RedisLiveBackplane : IInertiaLiveBackplane, IDispo
                     {
                         await deliver((byte[])message.Message!);
                     }
-                    catch (Exception exception)
+                    catch (Exception exception) when (exception is not OperationCanceledException)
                     {
                         LogDeliverFailed(_logger, exception);
                     }

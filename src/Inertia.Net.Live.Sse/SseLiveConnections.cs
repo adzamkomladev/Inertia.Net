@@ -41,9 +41,10 @@ internal sealed class SseLiveConnections : IInertiaLiveLocalTransport
         lock (_gate)
         {
             if (!_connections.TryRemove(new(connection.Id, connection))) return;
-            foreach (var key in connection.Channels)
+            // Add and Remove both hold _gate, so a channel found here is still there on the next line.
+            foreach (var key in connection.Channels.Where(_channels.ContainsKey))
             {
-                if (!_channels.TryGetValue(key, out var members)) continue;
+                var members = _channels[key];
                 members.TryRemove(new(connection.Id, connection));
                 if (members.IsEmpty) _channels.TryRemove(key, out _);
             }

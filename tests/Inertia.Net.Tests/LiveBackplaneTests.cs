@@ -412,7 +412,7 @@ public sealed class LiveBackplaneTests
         {
             _listener.InstrumentPublished = (instrument, listener) =>
             {
-                if (instrument.Meter.Scope == factory && instrument.Name.StartsWith("inertia.live.backplane.", StringComparison.Ordinal)) listener.EnableMeasurementEvents(instrument);
+                if (ReferenceEquals(instrument.Meter.Scope, factory) && instrument.Name.StartsWith("inertia.live.backplane.", StringComparison.Ordinal)) listener.EnableMeasurementEvents(instrument);
             };
             _listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
             {

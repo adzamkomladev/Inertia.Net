@@ -339,7 +339,7 @@ public sealed partial class PostgresLiveBackplane : IInertiaLiveBackplane, IAsyn
                 {
                     return;
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (!stopping.IsCancellationRequested)
                 {
                     attempts++;
                     LogListenFailed(backplane._logger, exception, delay.TotalSeconds);

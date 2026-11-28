@@ -133,6 +133,7 @@ public sealed class RedisBackplaneTests
                 }
                 catch (OperationCanceledException) when (i < 10 && !Ct.IsCancellationRequested)
                 {
+                    continue; // not delivered yet: the subscription is still coming back, so publish again
                 }
             }
 
@@ -272,6 +273,7 @@ public sealed class RedisBackplaneTests
                 }
                 catch (Exception exception) when (i < 30 && exception is OperationCanceledException or RedisException && !Ct.IsCancellationRequested)
                 {
+                    continue; // the client is still learning the new slot owner: publish again
                 }
             }
 

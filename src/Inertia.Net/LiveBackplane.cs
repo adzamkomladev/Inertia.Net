@@ -124,17 +124,11 @@ public static class LiveWire
             return false;
         }
 
+        var reader = new Utf8JsonReader(utf8);
         JsonDocument document;
         try
         {
-            var reader = new Utf8JsonReader(utf8);
             document = JsonDocument.ParseValue(ref reader);
-            if (reader.Read())
-            {
-                document.Dispose();
-                error = "trailing data";
-                return false;
-            }
         }
         catch (JsonException)
         {
@@ -144,6 +138,12 @@ public static class LiveWire
 
         using (document)
         {
+            if (HasTrailingData(ref reader))
+            {
+                error = "trailing data";
+                return false;
+            }
+
             var root = document.RootElement;
             try
             {
@@ -162,6 +162,18 @@ public static class LiveWire
             origin = null;
             reference = null;
             return false;
+        }
+    }
+
+    private static bool HasTrailingData(ref Utf8JsonReader reader)
+    {
+        try
+        {
+            return reader.Read();
+        }
+        catch (JsonException)
+        {
+            return true; // something that is not even JSON follows the object
         }
     }
 
@@ -340,7 +352,7 @@ internal sealed partial class LiveBackplaneRelay : IInertiaLiveBroadcaster, IAsy
             {
                 await local.DeliverAsync(message);
             }
-            catch (Exception exception)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 _metrics.RecordBackplane(InertiaMetrics.BackplaneErrors, _tag, "deliver");
                 LogDeliverFailed(_logger, exception, message.Event, message.Channel.Key);
@@ -363,7 +375,7 @@ internal sealed partial class LiveBackplaneRelay : IInertiaLiveBroadcaster, IAsy
             {
                 await local.ResyncAsync();
             }
-            catch (Exception exception)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 _metrics.RecordBackplane(InertiaMetrics.BackplaneErrors, _tag, "resync");
                 LogResyncFailed(_logger, exception);
