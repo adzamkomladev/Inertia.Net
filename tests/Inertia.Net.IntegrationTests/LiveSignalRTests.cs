@@ -182,6 +182,17 @@ public sealed class LiveSignalRTests
         Assert.Same(second.ServiceProvider.GetRequiredService<ScopedDependency>(), b.Dependency);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_hubs_explicit_policy_precedes_a_shared_authorizer(bool sharedFirst)
+    {
+        await using var app = await LiveApp.StartAsync(o => o.Authorize((_, _, _) => ValueTask.FromResult(false)),
+            sharedFirst: sharedFirst);
+        await using var client = await app.ConnectAsync();
+        Assert.False(await client.SubscribeAsync(OrderUpdated.Channel));
+    }
+
     private sealed class ScopedDependency;
 
     private sealed class InjectedAuthorizer(ScopedDependency dependency) : ILiveChannelAuthorizer
@@ -336,7 +347,7 @@ public sealed class LiveSignalRTests
 
         public IInertiaLive Live { get; } = app.Services.GetRequiredService<IInertiaLive>();
 
-        public static async Task<LiveApp> StartAsync(Action<InertiaLiveSignalROptions>? configure = null, LiveLogs? logs = null)
+        public static async Task<LiveApp> StartAsync(Action<InertiaLiveSignalROptions>? configure = null, LiveLogs? logs = null, bool? sharedFirst = null)
         {
             var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
             builder.WebHost.UseTestServer();
@@ -344,7 +355,9 @@ public sealed class LiveSignalRTests
             if (logs is not null) builder.Logging.AddProvider(logs);
             builder.Services.AddInertia();
             builder.Services.AddAntiforgery(o => o.HeaderName = InertiaHeaders.XsrfToken);
+            if (sharedFirst is true) builder.Services.AddScoped<ILiveChannelAuthorizer, OrdersOnly>();
             builder.Services.AddInertiaLive().AddSignalR(configure);
+            if (sharedFirst is false) builder.Services.AddScoped<ILiveChannelAuthorizer, OrdersOnly>();
             var app = builder.Build();
             app.UseInertia();
             app.UseInertiaAntiforgery(); // the hub is exempt: its origin check stands in for the token

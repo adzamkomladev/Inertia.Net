@@ -58,8 +58,8 @@ createInertiaApp({ live: sse() })
 | `onConnection` | none | Called once the first stream opens, with `{ state, stop() }` for tests and diagnostics. |
 
 The stream opens on the first subscription and closes when the page leaves its last channel. The channels are part of the stream URL,
-so the stream reopens when a page joins or leaves a channel. Joins and leaves in one visit are batched into one reopen, and a reopen
-does not count as a reconnect. When the stream drops, `EventSource` reconnects on its own. A refused stream (403 or 400) is tried
+so the stream reopens when a page joins or leaves a channel. Joins and leaves in one visit are batched into one reopen, and retained
+channels are refreshed after the new stream connects. When the stream drops, `EventSource` reconnects on its own. A refused stream (403 or 400) is tried
 again with a backoff of up to 30 seconds. After a reconnect, Inertia reloads every live prop once, so events missed while offline
 are caught up.
 

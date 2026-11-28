@@ -37,7 +37,7 @@ header_is() { tr -d '\r' <"$T/h" | grep -qix "$1: $2" || fail "header '$1: $2' m
 has() { grep -qF -- "$1" "$T/b" || fail "body lacks: $1"; }
 lacks() { ! grep -qF -- "$1" "$T/b" || fail "body should not contain: $1"; }
 # A rendered page varies on every header that selects its content (InertiaHeaders.PageVary).
-PAGE_VARY='X-Inertia, X-Inertia-Version, X-Inertia-Partial-Component, X-Inertia-Partial-Data, X-Inertia-Partial-Except, X-Inertia-Reset, X-Inertia-Except-Once-Props, X-Inertia-Error-Bag, X-Inertia-Infinite-Scroll-Merge-Intent'
+PAGE_VARY='X-Inertia, X-Inertia-Version, X-Inertia-Partial-Component, X-Inertia-Partial-Data, X-Inertia-Partial-Except, X-Inertia-Reset, X-Inertia-Except-Once-Props, X-Inertia-Error-Bag, X-Inertia-Infinite-Scroll-Merge-Intent, Purpose'
 
 # 1. First visit: HTML with the page script, Vite tags and view data.
 req GET /

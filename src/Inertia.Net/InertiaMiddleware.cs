@@ -76,7 +76,7 @@ internal sealed class InertiaMiddleware
         }
 
         // A prefetch is not the visit: it must leave pending flash and errors for the visit that follows (inertia-laravel #933).
-        var prefetch = isInertia && string.Equals(request.Headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase);
+        var prefetch = isInertia && IsPrefetch(request);
         if (!prefetch && await _store.LoadAsync(httpContext) is { } state)
         {
             var feature = httpContext.Inertia();
@@ -153,6 +153,8 @@ internal sealed class InertiaMiddleware
 
     private static bool IsInertia(HttpRequest request) => !string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]);
 
+    private static bool IsPrefetch(HttpRequest request) => string.Equals(request.Headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase);
+
     private static bool RequiresSeeOther(string method) =>
         HttpMethods.IsPut(method) || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method) || HttpMethods.IsQuery(method);
 
@@ -202,7 +204,7 @@ internal sealed class InertiaMiddleware
                 if (redirectHeader is not null)
                 {
                     InertiaHeaders.AppendVary(headers, InertiaHeaders.Purpose);
-                    if (!string.Equals(httpContext.Request.Headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase))
+                    if (!IsPrefetch(httpContext.Request))
                     {
                         response.StatusCode = StatusCodes.Status409Conflict;
                         headers.Location = default;
@@ -226,6 +228,13 @@ internal sealed class InertiaMiddleware
                 && (headers.ContainsKey(InertiaHeaders.Location) || headers.ContainsKey(InertiaHeaders.Redirect)));
         if (redirects && feature.HasState)
         {
+            // A speculative redirect leaves the stored state alone. Its Set-Cookie behavior differs from a real visit.
+            if (IsInertia(httpContext.Request))
+            {
+                InertiaHeaders.AppendVary(headers, InertiaHeaders.Purpose);
+                if (IsPrefetch(httpContext.Request)) return;
+            }
+
             await _store.SaveAsync(httpContext, InertiaStateSerializer.Serialize(feature, _pageWriter.SerializerOptions));
         }
         else if (feature.StateLoaded)

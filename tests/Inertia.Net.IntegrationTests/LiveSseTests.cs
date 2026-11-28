@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Inertia.Net.IntegrationTests;
 
@@ -153,6 +154,76 @@ public sealed class LiveSseTests
         finished.Ended();
         await Task.Delay(200, Ct);
         Assert.False(abortedToo);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Sse_does_not_inherit_a_policy_configured_only_for_the_hub(bool hubFirst)
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddInertia();
+        var live = builder.Services.AddInertiaLive();
+        if (!hubFirst) live.AddSse();
+        live.AddSignalR(o => o.Authorize((_, _, _) => ValueTask.FromResult(true)));
+        if (hubFirst) live.AddSse();
+        await using var app = builder.Build();
+        app.MapInertiaLiveSse();
+        await app.StartAsync(Ct);
+
+        await using var stream = await OpenAsync(app, "?channel=private:orders.1");
+        var connected = JsonNode.Parse((await stream.NextAsync()).Data)!;
+        Assert.Equal(["private:orders.1"], connected["refused"]!.AsArray().Select(n => n!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task A_stalled_write_is_aborted_at_expiry()
+    {
+        var lifetime = new AbortRecorder();
+        var http = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        http.Features.Set<Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature>(lifetime);
+        var clock = new FakeTimeProvider();
+        var expiry = InertiaLiveSseExtensions.AbortAtExpiryAsync(http, clock.GetUtcNow().AddMinutes(1), clock, Ct);
+        clock.Advance(TimeSpan.FromSeconds(59));
+        Assert.False(lifetime.Aborted);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await expiry.WaitAsync(Ct);
+        Assert.True(lifetime.Aborted);
+    }
+
+    private sealed class AbortRecorder : Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature
+    {
+        public bool Aborted { get; private set; }
+
+        public CancellationToken RequestAborted { get; set; }
+
+        public void Abort() => Aborted = true;
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task An_event_stream_stops_at_expiry_while_waiting_or_draining(bool draining)
+    {
+        var connection = new SseConnection("stream", ["private:orders.1"], 2);
+        var clock = new FakeTimeProvider();
+        var deadline = clock.GetUtcNow().AddMinutes(1);
+        await using var stream = InertiaLiveSseExtensions.StreamAsync(connection, "{}", TimeSpan.FromMinutes(1), deadline, clock, Ct)
+            .GetAsyncEnumerator(Ct);
+        Assert.True(await stream.MoveNextAsync()); // connected
+        if (draining)
+        {
+            Assert.True(connection.Queue.Writer.TryWrite("before expiry"));
+            Assert.True(connection.Queue.Writer.TryWrite("queued"));
+            Assert.True(await stream.MoveNextAsync());
+        }
+
+        var next = draining ? default : stream.MoveNextAsync();
+        clock.Advance(TimeSpan.FromMinutes(2));
+        if (draining) next = stream.MoveNextAsync();
+        else Assert.True(connection.Queue.Writer.TryWrite("after expiry"));
+        Assert.False(await next);
     }
 
     [Fact]

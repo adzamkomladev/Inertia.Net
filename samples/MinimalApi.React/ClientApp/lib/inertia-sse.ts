@@ -21,6 +21,7 @@ const channelKey = (channel: LiveChannel) => `${channel.type}:${channel.name}`
 export function sse({ url = '/inertia-live', onConnection, ...options }: SseOptions = {}): LiveOptions {
   const subscriptions = new Map<string, Subscription>()
   let source: EventSource | null = null
+  let streamChannels = new Set<string>()
   let socketId: string | null = null
   let connected = false
   let status: ((connected: boolean) => void) | null = null
@@ -61,6 +62,11 @@ export function sse({ url = '/inertia-live', onConnection, ...options }: SseOpti
 
   const open = () => {
     clearTimeout(restartTimer)
+    const channels = new Set(subscriptions.keys())
+    if (source && channels.size === streamChannels.size && [...channels].every((key) => streamChannels.has(key))) return
+    // Retained channels can miss events between the two requests. Signal one reconnect so Inertia reloads them.
+    if (source && [...channels].some((key) => streamChannels.has(key))) setConnected(false)
+    streamChannels = channels
     source?.close()
     source = null
     socketId = null
@@ -73,15 +79,16 @@ export function sse({ url = '/inertia-live', onConnection, ...options }: SseOpti
     const stream = new EventSource(`${url}?${query}`)
     source = stream
     stream.addEventListener('connected', (event) => {
+      if (source !== stream) return
       const { socketId: id, refused } = JSON.parse((event as MessageEvent<string>).data) as { socketId: string; refused: string[] }
       socketId = id
       restartAttempt = 0
       for (const key of refused) console.warn(`Inertia could not subscribe to the live channel "${key}".`)
       // Reported after the first connect too: Inertia refreshes live props on a reconnect only after it has seen one connect.
-      // A stream reopened for a channel change is not a reconnect: the status stays connected.
       setConnected(true)
     })
     stream.addEventListener('inertia', (event) => {
+      if (source !== stream) return
       const { channel, payload } = JSON.parse((event as MessageEvent<string>).data) as { channel: string; payload: unknown }
       subscriptions.get(channel)?.handlers.forEach((handler) => handler(payload))
     })

@@ -77,7 +77,12 @@ then reloads every live prop once, so events missed while offline are caught up.
 | `Private`, `Presence`, `EncryptedPrivate` | Only connections the authorizer allows. Without an authorizer, nobody. |
 
 A delegate (`o.Authorize((context, channel, ct) => ...)`) suits a one-line rule. For services, implement `ILiveChannelAuthorizer`
-and register it with `o.Authorize<OrderChannelAuthorizer>()`; it is created per subscription with constructor injection:
+and register it with `o.Authorize<OrderChannelAuthorizer>()`; it is created per subscription with constructor injection.
+A rule configured on the hub takes precedence over an application-registered `ILiveChannelAuthorizer`. To use a shared rule for the
+hub, omit its `o.Authorize(...)` call. When upgrading an app that registered both, check that the hub's rule includes every
+restriction previously supplied by the shared service.
+
+For example:
 
 ```csharp
 public sealed class OrderChannelAuthorizer(AppDb db) : ILiveChannelAuthorizer

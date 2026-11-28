@@ -27,7 +27,9 @@ public static class InertiaServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(name);
         var options = services.AddOptions<InertiaOptions>(name);
-        if (GetMounts(services).Names.Add(name) && name.Length > 0)
+        var mounts = GetMounts(services);
+        var firstMount = mounts.Names.Count == 0;
+        if (mounts.Names.Add(name) && name.Length > 0)
         {
             options.Configure(o =>
             {
@@ -59,20 +61,13 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<IInertiaCache, InertiaCache>();
         services.TryAddSingleton<InertiaPageWriter>();
         services.TryAddSingleton<PageComponentCheck>();
-        // Ssr.Timeout bounds the render; Ssr.ConnectTimeout also bounds connection establishment. No redirects (a render POST must not be replayed elsewhere), no proxy (renderers are local or
-        // on a private network), and pooled connections are recycled so a remote renderer's DNS changes are picked up. The default
-        // primary handler is set first, so a handler the app configures for this client (before or after AddInertia) replaces it.
-        // Without the factory's request logging: four Information lines per render and per liveness ping, which SSR outcomes already cover.
-        services.AddHttpClient(SsrGateway.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan).RemoveAllLoggers();
-        services.Configure<HttpClientFactoryOptions>(SsrGateway.HttpClientName, o => o.HttpMessageHandlerBuilderActions.Insert(0, static builder =>
-            builder.PrimaryHandler = new SocketsHttpHandler
-            {
-                AllowAutoRedirect = false,
-                UseProxy = false,
-                UseCookies = false,
-                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-                ConnectTimeout = builder.Services.GetRequiredService<IOptions<InertiaOptions>>().Value.Ssr.ConnectTimeout,
-            }));
+        if (firstMount)
+        {
+            // Applications can supply their own primary handler or delegating handlers on this shared named client.
+            services.AddHttpClient(SsrGateway.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan).RemoveAllLoggers();
+            services.Configure<HttpClientFactoryOptions>(SsrGateway.HttpClientName, o => o.HttpMessageHandlerBuilderActions.Insert(0,
+                static builder => builder.PrimaryHandler = SsrHttpTransport.Create(builder.Services)));
+        }
         services.TryAddSingleton<SsrGateway>();
         services.TryAddSingleton<IInertiaSsrRenderer>(static sp => sp.GetRequiredService<SsrGateway>());
         services.TryAddSingleton<SsrNodeProcess>();

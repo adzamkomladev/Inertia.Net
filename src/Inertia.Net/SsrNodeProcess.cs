@@ -504,7 +504,9 @@ internal sealed partial class SsrNodeProcess(
         cts.CancelAfter(timeout);
         try
         {
-            using var response = await httpClients.CreateClient(SsrGateway.HttpClientName).GetAsync($"{url}/health", HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{url}/health");
+            if (options.Value.Mount is { } mount) request.Options.Set(SsrHttpTransport.MountKey, mount);
+            using var response = await httpClients.CreateClient(SsrGateway.HttpClientName).SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex) when (ex is HttpRequestException or SocketException or InvalidOperationException or FormatException

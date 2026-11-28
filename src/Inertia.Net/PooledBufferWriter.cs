@@ -29,6 +29,31 @@ internal sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
 
     public ReadOnlyMemory<byte> WrittenMemory => _buffer.AsMemory(0, _written);
 
+    // A converter can write pre-serialized JSON directly, bypassing the JSON writer's encoder.
+    // In valid JSON, a literal '<' can only occur inside a string. Escaping it preserves the value.
+    public void EscapeHtmlScriptData()
+    {
+        var source = _buffer.AsSpan(0, _written);
+        var next = source.IndexOf((byte)'<');
+        if (next < 0) return;
+
+        var length = checked(_written + 5 * source[next..].Count((byte)'<'));
+        var escaped = Rent(length);
+        var target = escaped.AsSpan();
+        do
+        {
+            source[..next].CopyTo(target);
+            "\\u003C"u8.CopyTo(target[next..]);
+            target = target[(next + 6)..];
+            source = source[(next + 1)..];
+            next = source.IndexOf((byte)'<');
+        } while (next >= 0);
+        source.CopyTo(target);
+        Return(_buffer);
+        _buffer = escaped;
+        _written = length;
+    }
+
     public void Reset() => _written = 0;
 
     public void Advance(int count) => _written += count;

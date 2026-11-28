@@ -24,6 +24,8 @@
     <InternalsVisibleTo Include="Inertia.Net.EntityFrameworkCore" />
     <InternalsVisibleTo Include="Inertia.Net.MongoDB" />
     <InternalsVisibleTo Include="Inertia.Net.MongoDB.Tests" />
+    <InternalsVisibleTo Include="Inertia.Net.Redis" />
+    <InternalsVisibleTo Include="Inertia.Net.Postgres" />
     <InternalsVisibleTo Include="Inertia.Net.Mvc" />
     <InternalsVisibleTo Include="Inertia.Net.FastEndpoints" />
   </ItemGroup>

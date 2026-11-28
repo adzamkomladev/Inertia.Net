@@ -199,7 +199,8 @@ internal sealed class InertiaPageWriter
     public async ValueTask<PooledBufferWriter> WritePageAsync(HttpContext httpContext, string component, object? props, InertiaRequest request, bool htmlSafe)
     {
         _hints.TryGetValue(component, out var hints);
-        var buffer = new PooledBufferWriter(hints?.PageCapacity ?? MinPageCapacity);
+        var partial = request.IsInertia && string.Equals(request.PartialComponent, component, StringComparison.Ordinal);
+        var buffer = new PooledBufferWriter(hints?.Capacity(partial) ?? MinPageCapacity);
         var pooledEntries = EntryLists.Get();
         var propsWriter = _propsWriters.Get();
         try
@@ -274,7 +275,8 @@ internal sealed class InertiaPageWriter
 
             writer.WriteEndObject();
             writer.Flush();
-            RecordHints(component, hints, buffer.WrittenMemory.Length, propsWriter.SawParallel);
+            if (htmlSafe) buffer.EscapeHtmlScriptData();
+            RecordHints(component, hints, buffer.WrittenMemory.Length, partial, propsWriter.SawParallel);
             return buffer;
         }
         catch
@@ -290,7 +292,8 @@ internal sealed class InertiaPageWriter
     }
 
     /// <summary>The initial page buffer size for <paramref name="component"/>: the recent page size plus headroom, at least 4 KiB.</summary>
-    internal int InitialCapacity(string component) => _hints.TryGetValue(component, out var hints) ? hints.PageCapacity : MinPageCapacity;
+    internal int InitialCapacity(string component, bool partial = false) =>
+        _hints.TryGetValue(component, out var hints) ? hints.Capacity(partial) : MinPageCapacity;
 
     /// <summary>Whether renders of <paramref name="component"/> run the planning walk; null before its first render.</summary>
     internal bool? UsesParallel(string component) => _hints.TryGetValue(component, out var hints) ? hints.UsesParallel : null;
@@ -299,12 +302,12 @@ internal sealed class InertiaPageWriter
     // render) and shrinks back gradually, so one unusually large render does not pin a large buffer for the component. A component that
     // met a Parallel() prop keeps planning: a partial reload that filters the prop out does not turn it off. Bounded per component
     // count and size; components are developer-chosen names. A race between two renders only loses one of their updates.
-    private void RecordHints(string component, ComponentHints? hints, int written, bool sawParallel)
+    private void RecordHints(string component, ComponentHints? hints, int written, bool partial, bool sawParallel)
     {
         var target = (int)Math.Clamp(written + (long)written / 8, MinPageCapacity, MaxPageCapacityHint);
         if (hints is null)
         {
-            if (Volatile.Read(ref _hintCount) < MaxComponentHints && _hints.TryAdd(component, new ComponentHints(target, sawParallel)))
+            if (Volatile.Read(ref _hintCount) < MaxComponentHints && _hints.TryAdd(component, new ComponentHints(target, partial, sawParallel)))
             {
                 Interlocked.Increment(ref _hintCount);
             }
@@ -312,11 +315,12 @@ internal sealed class InertiaPageWriter
             return;
         }
 
-        var capacity = hints.PageCapacity;
+        var capacity = hints.Capacity(partial);
         var next = target >= capacity ? target : capacity - (capacity - target) / 4;
         if (next != capacity)
         {
-            hints.PageCapacity = next;
+            if (partial) hints.PartialCapacity = next;
+            else hints.FullCapacity = next;
         }
 
         if (sawParallel && !hints.UsesParallel)
@@ -343,11 +347,15 @@ internal sealed class InertiaPageWriter
     }
 
     /// <summary>What earlier renders of a component showed: how large its page is, and whether it has Parallel() props.</summary>
-    private sealed class ComponentHints(int pageCapacity, bool usesParallel)
+    private sealed class ComponentHints(int pageCapacity, bool partial, bool usesParallel)
     {
-        public volatile int PageCapacity = pageCapacity;
+        public volatile int FullCapacity = partial ? MinPageCapacity : pageCapacity;
+
+        public volatile int PartialCapacity = partial ? pageCapacity : MinPageCapacity;
 
         public volatile bool UsesParallel = usesParallel;
+
+        public int Capacity(bool partial) => partial ? PartialCapacity : FullCapacity;
     }
 
     private sealed class PropsWriterPolicy(InertiaPageWriter owner) : PooledObjectPolicy<PropsWriter>

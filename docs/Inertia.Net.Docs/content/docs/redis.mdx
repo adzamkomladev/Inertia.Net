@@ -8,7 +8,7 @@ order: 9
 `Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis. Every app instance shares them, and a call to `IInertiaCache.RemoveByTagAsync` on one instance clears them for all instances. Inertia.Net reads a page's cached props from Redis together, not one round trip after another. The loaders of those props still run in turn unless you mark them `Parallel()`.
 
 ```sh
-dotnet add package Inertia.Net.Redis --version 1.10.0
+dotnet add package Inertia.Net.Redis --version 1.10.1
 ```
 
 ```csharp

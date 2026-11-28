@@ -11,7 +11,8 @@ Inertia DevTools lets you see what your browser sent and what ASP.NET Core retur
 
 DevTools lets you inspect a visit without changing its response. Its read API, the endpoints that return the recorded entries,
 leaves pending errors and flash messages alone. Apps hosted under a path such as `/admin` report that path to the extension.
-Request URLs are absolute. Sensitive query values are redacted in the recorded copy, not in your real request.
+Request URLs are absolute. Recorded URLs redact sensitive query values and omit parameterized or percent-encoded fragments.
+Plain anchors such as `#overview` are kept.
 
 Entries live in memory and disappear on restart. Source-call locations are not collected, so some “open in editor” links
 are unavailable. Keep the read API private, because recorded entries can include user data.
@@ -31,8 +32,8 @@ app.MapInertiaDevTools();                // GET /_inertia/devtools/entries/{id} 
 ```
 
 The list endpoint returns metadata summaries. Fetch `/entries/{id}` for props, HTTP bodies and route details.
-Ordinary textual and JSON responses are captured up to `MaxResponseBytes`. Binary, explicitly streamed and oversized
-responses are omitted. Parsed multipart forms include file names, sizes and MIME types, never file contents.
+The recorder captures plain text and JSON responses up to `MaxResponseBytes`. It omits ordinary HTML and XML bodies,
+binary data, explicitly streamed responses and oversized bodies. Inertia page entries keep their redacted page data. Parsed multipart forms include file names, sizes and MIME types, never file contents.
 Unparsed uploads are not read only for recording. Render source locations are included when debug symbols are available.
 Published or Native AOT applications may not retain them. Malformed structured bodies and invalid UTF-8 are omitted, because
 a raw-text fallback could expose an unredacted secret.

@@ -57,8 +57,9 @@ internal sealed class SseLiveConnections : IInertiaLiveLocalTransport
         var key = message.Channel.Key;
         if (!_channels.TryGetValue(key, out var members)) return default;
         string? data = null;
-        foreach (var connection in members.Values)
+        foreach (var member in members)
         {
+            var connection = member.Value;
             if (connection.Id == message.ExceptSocketId) continue;
             data ??= Event(key, message.Payload);
             // A connection that cannot keep up is closed: its client reconnects and reloads its live props, so nothing is lost.

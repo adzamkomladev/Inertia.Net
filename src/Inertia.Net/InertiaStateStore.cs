@@ -43,7 +43,8 @@ internal sealed partial class CookieInertiaStateStore : IInertiaStateStore
 
     public CookieInertiaStateStore(IDataProtectionProvider dataProtection, IOptions<InertiaOptions> options, ILogger<CookieInertiaStateStore> logger)
     {
-        _protector = dataProtection.CreateProtector("Inertia.Net.State");
+        var protector = dataProtection.CreateProtector("Inertia.Net.State.v2");
+        _protector = options.Value.Mount is { } mount ? protector.CreateProtector(mount) : protector;
         _cookieName = options.Value.State.CookieName;
         _securePolicy = options.Value.State.CookieSecurePolicy;
         _logger = logger;

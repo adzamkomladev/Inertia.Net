@@ -41,6 +41,9 @@ public static class InertiaLiveSseExtensions
             .Validate(o => o.MaxQueuedEvents > 0, "InertiaLiveSseOptions.MaxQueuedEvents must be positive.")
             .Validate(o => o.HeartbeatInterval > TimeSpan.Zero, "InertiaLiveSseOptions.HeartbeatInterval must be positive.")
             .ValidateOnStart();
+        // Only an app-registered policy may serve as the shared fallback.
+        services.Remove(InertiaLiveSignalRExtensions.DefaultAuthorizer);
+        services.TryAddScoped<ILiveChannelAuthorizer>(static _ => DenyingLiveChannelAuthorizer.Instance);
         services.TryAddSingleton<SseLiveConnections>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IInertiaLiveLocalTransport, SseLiveConnections>(static sp => sp.GetRequiredService<SseLiveConnections>()));
         services.TryAddSingleton<LiveOrigin>();
@@ -64,11 +67,12 @@ public static class InertiaLiveSseExtensions
         var options = services.GetRequiredService<IOptionsMonitor<InertiaLiveSseOptions>>();
         var origin = services.GetRequiredService<LiveOrigin>();
         var connections = services.GetRequiredService<SseLiveConnections>();
+        var clock = services.GetService<TimeProvider>() ?? TimeProvider.System;
         var stopping = services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping;
-        return endpoints.MapGet(pattern, http => ConnectAsync(http, options.CurrentValue, origin, connections, stopping));
+        return endpoints.MapGet(pattern, http => ConnectAsync(http, options.CurrentValue, origin, connections, clock, stopping));
     }
 
-    private static async Task ConnectAsync(HttpContext http, InertiaLiveSseOptions options, LiveOrigin origin, SseLiveConnections connections, CancellationToken stopping)
+    private static async Task ConnectAsync(HttpContext http, InertiaLiveSseOptions options, LiveOrigin origin, SseLiveConnections connections, TimeProvider clock, CancellationToken stopping)
     {
         if (!origin.IsAllowed(http.Request, options.AllowedOrigins))
         {
@@ -88,8 +92,7 @@ public static class InertiaLiveSseExtensions
         // SSE's own Authorize(...) first, so a SignalR policy registered alongside never decides for SSE; then an app-registered
         // ILiveChannelAuthorizer (shared by both transports); otherwise only public channels.
         var authorizer = options.AuthorizerFactory?.Invoke(http.RequestServices)
-            ?? http.RequestServices.GetService<ILiveChannelAuthorizer>()
-            ?? DenyingLiveChannelAuthorizer.Instance;
+            ?? http.RequestServices.GetRequiredService<ILiveChannelAuthorizer>();
         var channels = new HashSet<string>(StringComparer.Ordinal);
         var refused = new List<string>();
         foreach (var key in requested.OfType<string>())
@@ -117,10 +120,11 @@ public static class InertiaLiveSseExtensions
         // Set by UseAuthentication(); without it (or without a sign-in) the stream has no expiry.
         var expires = http.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties?.ExpiresUtc;
         using var aborted = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted, stopping);
+        var expiry = expires is { } deadline ? AbortAtExpiryAsync(http, deadline, clock, aborted.Token) : Task.CompletedTask;
         connections.Add(connection);
         try
         {
-            await TypedResults.ServerSentEvents(StreamAsync(connection, Connected(id, refused), options.HeartbeatInterval, expires, aborted.Token))
+            await TypedResults.ServerSentEvents(StreamAsync(connection, Connected(id, refused), options.HeartbeatInterval, expires, clock, aborted.Token))
                 .ExecuteAsync(http);
         }
         catch (OperationCanceledException) when (aborted.IsCancellationRequested)
@@ -129,20 +133,43 @@ public static class InertiaLiveSseExtensions
         }
         finally
         {
+            await aborted.CancelAsync();
+            await expiry;
             connections.Remove(connection);
             connection.Ended();
         }
     }
 
-    private static async IAsyncEnumerable<SseItem<string>> StreamAsync(SseConnection connection, string connected, TimeSpan heartbeat,
-        DateTimeOffset? expires, [EnumeratorCancellation] CancellationToken cancellationToken)
+    // A blocked response write cannot reach the iterator's deadline checks. Abort it independently.
+    internal static async Task AbortAtExpiryAsync(HttpContext http, DateTimeOffset expires, TimeProvider clock, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (true)
+            {
+                var remaining = expires - clock.GetUtcNow();
+                if (remaining <= TimeSpan.Zero) break;
+                // Timers have a maximum duration; persistent authentication tickets can last longer.
+                await Task.Delay(remaining < TimeSpan.FromDays(30) ? remaining : TimeSpan.FromDays(30), clock, cancellationToken);
+            }
+
+            if (!cancellationToken.IsCancellationRequested) http.Abort();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The stream ended before its ticket expired.
+        }
+    }
+
+    internal static async IAsyncEnumerable<SseItem<string>> StreamAsync(SseConnection connection, string connected, TimeSpan heartbeat,
+        DateTimeOffset? expires, TimeProvider clock, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         yield return new SseItem<string>(connected, "connected");
         var reader = connection.Queue.Reader;
-        while (expires is null || expires > DateTimeOffset.UtcNow)
+        while (expires is null || expires > clock.GetUtcNow())
         {
             var ready = await WaitAsync(reader, heartbeat, cancellationToken);
-            if (ready is false) yield break; // closed for falling behind
+            if (expires <= clock.GetUtcNow() || ready is false) yield break; // closed for falling behind
             if (ready is null)
             {
                 yield return new SseItem<string>("", "ping");
@@ -151,6 +178,7 @@ public static class InertiaLiveSseExtensions
 
             while (reader.TryRead(out var data))
             {
+                if (expires <= clock.GetUtcNow()) yield break;
                 yield return new SseItem<string>(data, "inertia");
             }
         }

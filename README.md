@@ -9,7 +9,7 @@ Later visits fetch a page object as JSON: the component name, its props, the URL
 the screen without a full reload. You keep ASP.NET Core routing, authentication and validation. You do not need a separate API
 or a client-side router for these pages.
 
-Inertia.Net **1.10.0** is a server adapter for the **Inertia.js v3** protocol. It targets .NET 10 and .NET 11 and supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT (ahead-of-time compilation). FastEndpoints apps support Native AOT when you add the FastEndpoints source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.10.1** is a server adapter for the **Inertia.js v3** protocol. It targets .NET 10 and .NET 11 and supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT (ahead-of-time compilation). FastEndpoints apps support Native AOT when you add the FastEndpoints source generator. MVC itself does not support Native AOT.
 
 <a id="implementation-tasks"></a>
 
@@ -45,7 +45,7 @@ Inertia.Net **1.10.0** is a server adapter for the **Inertia.js v3** protocol. I
 Install a .NET 10 SDK and Node.js 22.12+ first. In the folder where you want your app, run:
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.10.0
+dotnet new install Inertia.Net.Templates@1.10.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -259,7 +259,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Install the template once.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.10.0
+dotnet new install Inertia.Net.Templates@1.10.1
 ```
 
 Run the command for your frontend, then change into the new app directory with `cd MyApp`.
@@ -421,19 +421,19 @@ Every package is on [NuGet](https://www.nuget.org/profiles/adzamkomladev); the n
 | [`Inertia.Net.Templates`](https://www.nuget.org/packages/Inertia.Net.Templates) | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte), `dotnet new inertia-page` adds a page |
 
 ```sh
-dotnet add package Inertia.Net --version 1.10.0
-dotnet add package Inertia.Net.Mvc --version 1.10.0 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.10.0 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.10.0 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.10.0 # live props over SignalR
-dotnet add package Inertia.Net.Live.Sse --version 1.10.0 # live props over Server-Sent Events
-dotnet add package Inertia.Net.Redis --version 1.10.0 # Redis cache store and live backplane
-dotnet add package Inertia.Net.Postgres --version 1.10.0 # PostgreSQL live backplane
-dotnet add package Inertia.Net.MongoDB --version 1.10.0 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.10.1
+dotnet add package Inertia.Net.Mvc --version 1.10.1 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.10.1 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.1 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.10.1 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.10.1 # live props over SignalR
+dotnet add package Inertia.Net.Live.Sse --version 1.10.1 # live props over Server-Sent Events
+dotnet add package Inertia.Net.Redis --version 1.10.1 # Redis cache store and live backplane
+dotnet add package Inertia.Net.Postgres --version 1.10.1 # PostgreSQL live backplane
+dotnet add package Inertia.Net.MongoDB --version 1.10.1 # MongoDB pagination
 ```
 
-Inertia.Net requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`). The frontend needs JavaScript build tools with npm, Bun, pnpm or Yarn. Use version `1.10.0` for all Inertia.Net packages. Inertia.Net 1.10.0 uses the Inertia.js v3 protocol. The package version and the protocol version are separate version numbers.
+Inertia.Net requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`). The frontend needs JavaScript build tools with npm, Bun, pnpm or Yarn. Use version `1.10.1` for all Inertia.Net packages. Inertia.Net 1.10.1 uses the Inertia.js v3 protocol. The package version and the protocol version are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -2061,8 +2061,8 @@ This cookie is used with both cookie and session state stores. The remembered UR
 
 The middleware adds `Vary: X-Inertia` to every response that passes through it. A rendered page, and the version-mismatch `409`,
 also vary on every request header that selects their content: `X-Inertia-Version`, `X-Inertia-Partial-Component`,
-`X-Inertia-Partial-Data`, `X-Inertia-Partial-Except`, `X-Inertia-Reset`, `X-Inertia-Except-Once-Props`, `X-Inertia-Error-Bag` and
-`X-Inertia-Infinite-Scroll-Merge-Intent`. A shared cache (a CDN or proxy) that is allowed to store a page then keeps a full visit
+`X-Inertia-Partial-Data`, `X-Inertia-Partial-Except`, `X-Inertia-Reset`, `X-Inertia-Except-Once-Props`, `X-Inertia-Error-Bag`,
+`X-Inertia-Infinite-Scroll-Merge-Intent` and `Purpose`. A shared cache (a CDN or proxy) that is allowed to store a page then keeps a full visit
 and a partial visit to the same URL apart. The middleware keeps values that are already in `Vary`, and leaves `Vary: *` alone. This
 covers protocol variation only. A page that depends on the user (cookies, authorization) must still be sent with
 `Cache-Control: private` or `no-store`. If a cache would store too many selector combinations, it is better to configure that
@@ -2864,7 +2864,7 @@ app.UseInertia();
 ```
 
 `Map` sets the path base, so page URLs, `Back()` fallbacks and asset URLs stay under `/dashboard`. Startup fails when
-`UseInertia(name)` names a mount that is not registered, or when two mounts share a cookie name. All mounts share the cache, live
+`UseInertia(name)` names a mount that is not registered, or when two mounts share a cookie name. The encrypted state cookie is bound to its issuing mount. Upgrading from the shared protection purpose discards pending encrypted-cookie flash, validation errors and history flags once. All mounts share the cache, live
 props, metrics, DevTools and antiforgery. Named mounts add an `inertia.mount` tag to the metrics.
 `healthChecks.AddInertiaSsrForMount(name)` checks the SSR servers of one mount. The page protocol does not change.
 
@@ -3142,9 +3142,9 @@ The recorder redacts sensitive values and limits what it keeps:
 
 - A value is replaced with `[REDACTED]` in props, bodies and headers when its name contains `password`, `secret`, `token`,
   `authorization`, `cookie` or `api_key` (also `apikey`, `api-key`). Add more names with `RedactedKeys`.
-- Sensitive query parameters are also redacted in recorded request and page URLs, redirects and URL headers. The actual application
-  URLs are unchanged.
-- Malformed JSON bodies are omitted.
+- Sensitive query parameters are redacted in recorded request and page URLs, redirects and URL headers. The recorder drops
+  parameterized or percent-encoded fragments and keeps plain anchors such as `#overview`.
+- The recorder omits malformed JSON and ordinary HTML or XML response bodies. Inertia page entries keep their redacted page data.
 - Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered. Nonseekable bodies of unknown length are
   omitted as streamed, so recording does not spool bulk requests to disk.
 - A page larger than `MaxResponseBytes` (default 1 MiB) is recorded without its body and is never copied. The entry is marked

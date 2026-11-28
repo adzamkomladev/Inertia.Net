@@ -9,7 +9,7 @@ namespace Inertia.Net.Live.SignalR;
 /// The hub the client transport connects to. A client joins a channel with <c>Subscribe(type, name)</c> and receives every event on it
 /// as <c>inertia(channelKey, payload)</c>. Map it with <c>app.MapInertiaLiveHub()</c>.
 /// </summary>
-public sealed partial class InertiaLiveHub(ILiveChannelAuthorizer authorizer, IOptions<InertiaLiveSignalROptions> options, ILogger<InertiaLiveHub> logger) : Hub
+public sealed partial class InertiaLiveHub([FromKeyedServices(InertiaLiveSignalRExtensions.HubPolicy)] ILiveChannelAuthorizer authorizer, IOptions<InertiaLiveSignalROptions> options, ILogger<InertiaLiveHub> logger) : Hub
 {
     private static readonly object SubscriptionsKey = new();
 

@@ -2,7 +2,6 @@ using System.Data.Common;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -292,8 +291,7 @@ public sealed partial class PostgresLiveBackplane : IInertiaLiveBackplane, IAsyn
         // The listen loop only queues notifications, so it keeps up with the server; one reader keeps them in order. A null item is a
         // gap, queued behind the messages before it, so their (older) values cannot overwrite what the clients reload after the gap.
         private const int Capacity = 10_000;
-        private readonly Channel<string?> _inbox = Channel.CreateBounded<string?>(new BoundedChannelOptions(Capacity) { SingleReader = true, SingleWriter = true });
-        private bool _overflowed;
+        private readonly LiveBackplaneInbox<string> _inbox = new(Capacity);
         private readonly TaskCompletionSource _firstAttempt = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Task? _listen, _dispatch;
 
@@ -317,7 +315,7 @@ public sealed partial class PostgresLiveBackplane : IInertiaLiveBackplane, IAsyn
                     await using var connection = await backplane._listenSource.OpenConnectionAsync(stopping);
                     connection.Notification += (_, e) =>
                     {
-                        if (e.Channel == options.Channel) Enqueue(e.Payload);
+                        if (e.Channel == options.Channel) _inbox.Enqueue(e.Payload);
                     };
                     await using (var command = new NpgsqlCommand($"LISTEN \"{options.Channel}\"", connection))
                     {
@@ -328,7 +326,7 @@ public sealed partial class PostgresLiveBackplane : IInertiaLiveBackplane, IAsyn
                     if (attempts++ > 0)
                     {
                         LogListening(backplane._logger, options.Channel);
-                        Enqueue(null);
+                        _inbox.Enqueue(null);
                     }
 
                     _firstAttempt.TrySetResult();
@@ -358,18 +356,6 @@ public sealed partial class PostgresLiveBackplane : IInertiaLiveBackplane, IAsyn
             }
         }
 
-        // Only the listen loop writes. A full queue drops the message and queues a gap as soon as there is room again.
-        private void Enqueue(string? payload)
-        {
-            if (_overflowed)
-            {
-                if (!_inbox.Writer.TryWrite(null)) return;
-                _overflowed = false;
-            }
-
-            if (!_inbox.Writer.TryWrite(payload)) _overflowed = true;
-        }
-
         private async Task DispatchAllAsync(CancellationToken stopping)
         {
             try
@@ -396,7 +382,6 @@ public sealed partial class PostgresLiveBackplane : IInertiaLiveBackplane, IAsyn
         public async ValueTask DisposeAsync()
         {
             await _stopping.CancelAsync();
-            _inbox.Writer.TryComplete();
             if (_listen is not null) await _listen;
             if (_dispatch is not null) await _dispatch;
             _stopping.Dispose();

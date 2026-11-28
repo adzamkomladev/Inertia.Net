@@ -13,6 +13,9 @@ public sealed class DevToolsTests
     [Theory]
     [InlineData("json", "present", null)]
     [InlineData("malformed", "omitted", "unserializable")]
+    [InlineData("html", "omitted", "unserializable")]
+    [InlineData("xml", "omitted", "unserializable")]
+    [InlineData("markup-as-text", "omitted", "unserializable")]
     [InlineData("binary", "omitted", "binary")]
     [InlineData("streamed", "omitted", "streamed")]
     [InlineData("large", "omitted", "too-large")]
@@ -27,7 +30,7 @@ public sealed class DevToolsTests
         var body = entry["http"]!["responseBody"]!;
         Assert.Equal(status, (string?)body["status"]);
         Assert.Equal(reason, (string?)body["reason"]);
-        if (kind is "json" or "malformed")
+        if (kind is "json" or "malformed" or "html" or "xml" or "markup-as-text")
         {
             Assert.Contains("private-value", actual, StringComparison.Ordinal);
             Assert.DoesNotContain("private-value", entry.ToJsonString(), StringComparison.Ordinal);
@@ -371,6 +374,25 @@ public sealed class DevToolsTests
     }
 
     [Theory]
+    [InlineData("/dashboard#access_token=fragment-value", "/dashboard")]
+    [InlineData("/dashboard?ok=yes#route?credential=fragment-value", "/dashboard?ok=yes")]
+    [InlineData("/dashboard?api_key=query-value#id_token=fragment-value", "/dashboard?api_key=%5BREDACTED%5D")]
+    public async Task Structured_redirect_fragments_are_omitted_from_entries_and_list_summaries(string target, string expected)
+    {
+        await using var app = await StartAsync();
+        using var client = app.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/redirect-fragment");
+        request.Headers.Add("X-Test-Token-Target", target);
+        using var redirect = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(target, redirect.Header("Location"));
+        var entry = await EntryAsync(client, redirect);
+        Assert.Equal(expected, (string?)entry["__meta"]!["redirectLocation"]);
+        Assert.Equal(expected, (string?)entry["http"]!["responseHeaders"]!["location"]);
+        Assert.DoesNotContain("fragment-value", entry.ToJsonString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("fragment-value", await client.GetStringAsync("/_inertia/devtools/entries", TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(true, true)]
@@ -491,13 +513,21 @@ public sealed class DevToolsTests
             app.MapGet("/raw/{kind}", async (HttpContext http, string kind) =>
             {
                 if (kind == "empty") { http.Response.StatusCode = 204; return; }
-                http.Response.ContentType = kind is "json" or "malformed" ? "application/json"
-                    : kind == "binary" ? "application/octet-stream" : "text/plain";
+                http.Response.ContentType = kind switch
+                {
+                    "json" or "malformed" => "application/json",
+                    "html" => "text/html; charset=utf-8",
+                    "xml" => "application/problem+xml",
+                    "binary" => "application/octet-stream",
+                    _ => "text/plain",
+                };
                 if (kind == "streamed") http.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>()!.DisableBuffering();
                 var body = kind switch
                 {
                     "json" => """{"name":"Ann","password":"private-value"}""",
                     "malformed" => """{"password":"private-value",""",
+                    "html" => """Account <input name="token" value="private-value">""",
+                    "xml" or "markup-as-text" => "\uFEFF  <password>private-value</password>",
                     "large" => new string('x', 257),
                     "streamed" => "stream",
                     _ => "binary",
@@ -519,6 +549,7 @@ public sealed class DevToolsTests
                 using var reader = new StreamReader(http.Request.Body, Encoding.UTF8, leaveOpen: true);
                 return Results.Text(await reader.ReadToEndAsync(http.RequestAborted));
             });
+            app.MapGet("/redirect-fragment", (HttpContext http) => Results.LocalRedirect(http.Request.Headers["X-Test-Token-Target"].ToString()));
             app.MapGet("/redirect-secret/{kind}", (HttpContext http, string kind) =>
             {
                 var target = (kind == "external" ? "https://example.test" : "") + "/dashboard?token=redirect-secret&ok=visible" + (kind == "location" ? "" : "#kept");
