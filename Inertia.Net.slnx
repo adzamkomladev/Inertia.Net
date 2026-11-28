@@ -6,6 +6,7 @@
     <Project Path="src/Inertia.Net.Redis/Inertia.Net.Redis.csproj" />
     <Project Path="src/Inertia.Net.FastEndpoints/Inertia.Net.FastEndpoints.csproj" />
     <Project Path="src/Inertia.Net.Live.SignalR/Inertia.Net.Live.SignalR.csproj" />
+    <Project Path="src/Inertia.Net.Live.Sse/Inertia.Net.Live.Sse.csproj" />
     <Project Path="src/Inertia.Net.Mvc/Inertia.Net.Mvc.csproj" />
     <Project Path="src/Inertia.Net.Testing/Inertia.Net.Testing.csproj" />
     <Project Path="src/Inertia.Net/Inertia.Net.csproj" />

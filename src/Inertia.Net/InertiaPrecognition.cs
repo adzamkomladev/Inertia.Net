@@ -38,7 +38,7 @@ public static class InertiaPrecognition
     {
         if (errors is not { Count: > 0 })
         {
-            return new PrecognitionResult(null);
+            return new ValidationErrorsResult(null, precognitive: true);
         }
 
         errors = InertiaValidationFilter.ToClientKeys(errors, naming, schema);
@@ -53,8 +53,11 @@ public static class InertiaPrecognition
                 .ToDictionary(e => e.Key, e => e.Value, StringComparer.Ordinal);
         }
 
-        return new PrecognitionResult(errors.Count == 0 ? null : errors);
+        return new ValidationErrorsResult(errors.Count == 0 ? null : errors, precognitive: true);
     }
+
+    /// <summary>A <c>422</c> with <c>{ message, errors }</c> (client keys), the body <c>useHttp</c> reads into <c>form.errors</c>.</summary>
+    internal static IResult Unprocessable(Dictionary<string, string[]> errors) => new ValidationErrorsResult(errors, precognitive: false);
 
     // A field matches itself and, when it names an object or array, everything below it: the key, or a prefix of it ending before a
     // '.' or '['. One lookup per prefix, so a long header costs no more per error than a short one.
@@ -74,13 +77,17 @@ public static class InertiaPrecognition
 
     private static readonly SearchValues<char> PathSeparators = SearchValues.Create(".[");
 
-    private sealed class PrecognitionResult(Dictionary<string, string[]>? errors) : IResult
+    private sealed class ValidationErrorsResult(Dictionary<string, string[]>? errors, bool precognitive) : IResult
     {
         public async Task ExecuteAsync(HttpContext httpContext)
         {
             var response = httpContext.Response;
-            response.Headers[Header] = "true";
-            AppendVary(response.Headers);
+            if (precognitive)
+            {
+                response.Headers[Header] = "true";
+                AppendVary(response.Headers);
+            }
+
             if (errors is null)
             {
                 response.StatusCode = StatusCodes.Status204NoContent;

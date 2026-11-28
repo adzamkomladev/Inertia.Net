@@ -9,7 +9,8 @@ public static class InertiaFastEndpointsConfig
     /// <summary>
     /// For every endpoint, answers request validation failures of Inertia requests (other than GET) with a redirect back carrying
     /// the errors (first message per field, keyed by the JSON name, in the bag named by <c>X-Inertia-Error-Bag</c>) instead of
-    /// FastEndpoints' 400 JSON. Requests without <c>X-Inertia</c> still get the normal 400.
+    /// FastEndpoints' 400 JSON. A request without <c>X-Inertia</c> that carries <c>X-Requested-With: XMLHttpRequest</c> (the client's
+    /// <c>useHttp</c>) gets a <c>422</c> with <c>{ message, errors }</c>; other requests without <c>X-Inertia</c> still get the normal 400.
     /// <para>
     /// Also answers Precognition requests (<c>Precognition: true</c>, live validation): after validation, and without running the
     /// handler, with <c>204</c> when valid or <c>422</c> with <c>{ message, errors }</c> limited to <c>Precognition-Validate-Only</c>.
@@ -51,7 +52,8 @@ internal sealed class InertiaPreProcessor(Config config) : IGlobalPreProcessor
         }
 
         var precognitive = InertiaPrecognition.IsPrecognitive(httpContext.Request);
-        if (!precognitive && !(context.HasValidationFailures && InertiaValidationFilter.IsInertiaMutation(httpContext)))
+        if (!precognitive && !(context.HasValidationFailures
+            && (InertiaValidationFilter.IsInertiaMutation(httpContext) || InertiaValidationFilter.IsHttpRequest(httpContext))))
         {
             return Task.CompletedTask;
         }
@@ -66,9 +68,9 @@ internal sealed class InertiaPreProcessor(Config config) : IGlobalPreProcessor
         errors = InertiaValidationFilter.ToClientKeys(errors, naming,
             context.Request is { } request
                 ? InertiaValidationFilter.GetSchema(config.Serializer.Options, request.GetType()) : null);
-        return httpContext.Response.SendResultAsync(precognitive
-            ? InertiaPrecognition.Result(httpContext, errors, null)
-            : InertiaValidationFilter.Back(httpContext, errors));
+        return httpContext.Response.SendResultAsync(precognitive ? InertiaPrecognition.Result(httpContext, errors, null)
+            : InertiaValidationFilter.IsInertiaMutation(httpContext) ? InertiaValidationFilter.Back(httpContext, errors)
+            : InertiaPrecognition.Unprocessable(errors));
     }
 }
 

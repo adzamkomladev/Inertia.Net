@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Inertia.Net contributors",
+  "classifications": [
+    "Web",
+    "Inertia",
+    "React",
+    "Vue",
+    "Svelte"
+  ],
+  "identity": "Inertia.Net.Page",
+  "name": "Inertia.Net page",
+  "description": "A page record and the matching React, Vue or Svelte page file. Run it in the project directory: dotnet new inertia-page --component Users/Index.",
+  "shortName": "inertia-page",
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "forms": {
+    "withoutSlashes": {
+      "identifier": "replace",
+      "pattern": "[/\\\\]",
+      "replacement": ""
+    },
+    "toParents": {
+      "identifier": "replace",
+      "pattern": "[^/\\\\]+",
+      "replacement": ".."
+    }
+  },
+  "symbols": {
+    "component": {
+      "type": "parameter",
+      "datatype": "string",
+      "isRequired": true,
+      "description": "The component name, as Render() names it: Users/Index writes ClientApp/pages/Users/Index.tsx and UsersIndexPage.cs.",
+      "replaces": "PageName",
+      "fileRename": "PageName"
+    },
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "react",
+      "description": "The client-side framework of the page file.",
+      "choices": [
+        {
+          "choice": "react",
+          "description": "A .tsx page for @inertiajs/react"
+        },
+        {
+          "choice": "vue",
+          "description": "A .vue page for @inertiajs/vue3"
+        },
+        {
+          "choice": "svelte",
+          "description": "A .svelte page for @inertiajs/svelte"
+        }
+      ]
+    },
+    "namespace": {
+      "type": "bind",
+      "binding": "msbuild:RootNamespace",
+      "replaces": "PageNamespace",
+      "defaultValue": "App"
+    },
+    "recordName": {
+      "type": "derived",
+      "valueSource": "component",
+      "valueTransform": "withoutSlashes",
+      "replaces": "RecordName",
+      "fileRename": "RecordName"
+    },
+    "parents": {
+      "type": "derived",
+      "valueSource": "component",
+      "valueTransform": "toParents",
+      "replaces": "PARENTS"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "condition": "(framework != \"react\")",
+          "exclude": [
+            "ClientApp/pages/PageName.tsx"
+          ]
+        },
+        {
+          "condition": "(framework != \"vue\")",
+          "exclude": [
+            "ClientApp/pages/PageName.vue"
+          ]
+        },
+        {
+          "condition": "(framework != \"svelte\")",
+          "exclude": [
+            "ClientApp/pages/PageName.svelte"
+          ]
+        }
+      ]
+    }
+  ],
+  "postActions": [
+    {
+      "description": "Register the page record in the app's JSON context.",
+      "manualInstructions": [
+        {
+          "text": "Add [JsonSerializable(typeof(<the new page record>))] to the app's JsonSerializerContext (AppJsonContext in Program.cs for apps from dotnet new inertia). Inertia.Net needs its JSON metadata to render the page and to write its type to ClientApp/types."
+        }
+      ],
+      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
+      "continueOnError": true
+    }
+  ]
+}

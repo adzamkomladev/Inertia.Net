@@ -8,6 +8,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <InternalsVisibleTo Include="Inertia.Net.Benchmarks" />
+    <InternalsVisibleTo Include="Inertia.Net.Live.Sse" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Inertia.Net\Inertia.Net.csproj" />

@@ -23,5 +23,6 @@
     <ProjectReference Include="..\..\src\Inertia.Net.FastEndpoints\Inertia.Net.FastEndpoints.csproj" />
     <ProjectReference Include="..\..\src\Inertia.Net.Testing\Inertia.Net.Testing.csproj" />
     <ProjectReference Include="..\..\src\Inertia.Net.Live.SignalR\Inertia.Net.Live.SignalR.csproj" />
+    <ProjectReference Include="..\..\src\Inertia.Net.Live.Sse\Inertia.Net.Live.Sse.csproj" />
   </ItemGroup>
 </Project>

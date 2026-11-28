@@ -29,7 +29,7 @@ public sealed class UsersEndpoint : EndpointWithoutRequest
 ```
 
 - An endpoint that implements `ExecuteAsync` can return `Render(...)`, `Back()` or `Location(...)` directly (`Endpoint<TReq, InertiaResult>`): FastEndpoints sends any `IResult`.
-- `c.ConfigureInertia()` turns validation failures of Inertia requests (not GET) into a redirect back with the errors (JSON names, `X-Inertia-Error-Bag` honoured). Other requests keep the normal 400. An existing `c.Endpoints.Configurator` runs first, followed by the Inertia setup and the optional callback.
+- `c.ConfigureInertia()` turns validation failures of Inertia requests (not GET) into a redirect back with the errors (JSON names, `X-Inertia-Error-Bag` honoured). A `useHttp` request (`X-Requested-With: XMLHttpRequest` without `X-Inertia`) gets a `422` `{ message, errors }`. Other requests keep the normal 400. An existing `c.Endpoints.Configurator` runs first, followed by the Inertia setup and the optional callback.
 - It also answers Precognition requests (`Precognition: true`) with 204 or 422 `{ message, errors }`, without running the handler.
 - Native AOT: register endpoints with the FastEndpoints source generator, `AddFastEndpoints(new[] { DiscoveredTypes.All })`.
 

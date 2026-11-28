@@ -159,6 +159,11 @@
           "depth": 2
         },
         {
+          "id": "add-a-page",
+          "text": "Add a page",
+          "depth": 3
+        },
+        {
           "id": "namespace-and-global-usings",
           "text": "Namespace and global usings",
           "depth": 2
@@ -427,6 +432,11 @@
           "id": "rescue",
           "text": "Rescue",
           "depth": 2
+        },
+        {
+          "id": "timeout",
+          "text": "Timeout",
+          "depth": 2
         }
       ]
     },
@@ -486,6 +496,11 @@
         {
           "id": "fastendpoints",
           "text": "FastEndpoints",
+          "depth": 2
+        },
+        {
+          "id": "usehttp-requests",
+          "text": "useHttp requests",
           "depth": 2
         },
         {
@@ -934,6 +949,11 @@
           "depth": 3
         },
         {
+          "id": "server-sent-events",
+          "text": "Server-Sent Events",
+          "depth": 2
+        },
+        {
           "id": "reloading-scroll-and-merge-props",
           "text": "Reloading scroll and merge props",
           "depth": 2
@@ -1182,6 +1202,11 @@
           "id": "development",
           "text": "Development",
           "depth": 2
+        },
+        {
+          "id": "one-command",
+          "text": "One command",
+          "depth": 3
         },
         {
           "id": "options",

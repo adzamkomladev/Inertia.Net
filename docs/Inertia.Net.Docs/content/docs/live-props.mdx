@@ -349,6 +349,46 @@ SignalR groups exist on one server only. When you run several instances, add a R
 
 The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.SignalR/README.md) lists the client options, how channels map to SignalR groups, and the security notes.
 
+## Server-Sent Events
+
+`Inertia.Net.Live.Sse` delivers live props over one `text/event-stream` endpoint. The browser reads it with its built-in `EventSource`, so there is no client library to install.
+
+```sh
+dotnet add package Inertia.Net.Live.Sse
+```
+
+```csharp
+builder.Services.AddInertiaLive().AddSse(o =>
+    o.Authorize((context, channel, ct) =>
+        ValueTask.FromResult(channel.Name == $"users.{context.UserIdentifier}")));
+
+var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseInertia();
+app.MapInertiaLiveSse();   // /inertia-live
+```
+
+Apps created with `dotnet new inertia` ship the client transport as `ClientApp/lib/inertia-sse.ts`. In other apps, copy [the file](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Templates/content/common/ClientApp/lib/inertia-sse.ts) into your app:
+
+```ts
+import { sse } from './lib/inertia-sse'
+
+createInertiaApp({ live: sse() })
+```
+
+The channel rules and the `ILiveChannelAuthorizer` are the same as for SignalR. One authorizer class serves both transports, and its `HubCallerContext` wraps the stream request. The channels are part of the stream URL, so the stream reopens when a page joins or leaves a channel. These cases are handled for you:
+
+- A stream from another origin gets a 403.
+- A stream ends when its sign-in expires. The client reconnects, and its channels are authorized again.
+- A client too slow to keep up is disconnected. It reloads its live props when it reconnects.
+
+<Callout type="warning" title="One instance only">
+There is no backplane for Server-Sent Events. A publish reaches only the clients connected to the instance that sent it. When you run several instances, use SignalR with a backplane.
+</Callout>
+
+The [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.Live.Sse/README.md) lists the options and the wire format.
+
 ## Reloading scroll and merge props
 
 A `Scroll(...)` or `Merge(...)` prop cannot be live, because a live reload would merge the reloaded page into the list. Reload such a prop from the page instead, with `ClientApp/lib/inertia-live-reload.ts`, which `dotnet new inertia` apps include:
@@ -409,14 +449,14 @@ onUnmounted(() => stop?.())
 - The scroll position is kept.
 - The client that caused the event (`exceptSocketId`) is not reloaded.
 
-`reset` replaces the prop instead of merging it, so the reload brings no duplicates. The SignalR client transport delivers a channel's events to every subscriber. See [Typed routes](/docs/typed-routes) for `routes.ts`.
+`reset` replaces the prop instead of merging it, so the reload brings no duplicates. The SignalR and Server-Sent Events client transports deliver a channel's events to every subscriber. See [Typed routes](/docs/typed-routes) for `routes.ts`.
 
 ## Custom transports
 
 The page metadata and the payload do not depend on SignalR, so any transport works:
 
 - **Pusher-protocol servers** (Reverb, Soketi, Ably, Pusher) work with the client's built-in `pusher()` or `echo()` transport. On the server, implement `IInertiaLiveBroadcaster` with your server's publish API.
-- **Anything else** (Action Cable, server-sent events, Azure Web PubSub): implement `IInertiaLiveBroadcaster` on the server and a `LiveTransport` on the client.
+- **Anything else** (Action Cable, Azure Web PubSub): implement `IInertiaLiveBroadcaster` on the server and a `LiveTransport` on the client.
 
 A broadcaster has one method. It receives the channel, the finished payload and the connection to skip:
 

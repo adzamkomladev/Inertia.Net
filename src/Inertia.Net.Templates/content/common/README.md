@@ -4,7 +4,7 @@ An ASP.NET Core Minimal API app with an Inertia.js v3 client, built on [Inertia.
 
 ## Run it
 
-Install dependencies and start Vite with the package manager you use for your app. npm, Bun, pnpm and Yarn are supported:
+Install dependencies with the package manager you use for your app. npm, Bun, pnpm and Yarn are supported:
 
 | Package manager | Install dependencies | Start Vite | Build assets |
 |---|---|---|---|
@@ -13,14 +13,20 @@ Install dependencies and start Vite with the package manager you use for your ap
 | pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
 | Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
 
-Keep Vite running in one terminal. Start ASP.NET Core in a second terminal:
+Install the dependencies once, then start the app. In Development it also starts Vite (the package's `dev` script, with the
+package manager whose lock file is in the project) and stops it when the app stops:
 
 ```sh
 dotnet watch       # http://localhost:5180
 ```
 
-While Vite runs it writes `wwwroot/hot`, and the app serves the pages through it. For production, run the build command from
+While Vite runs it writes `wwwroot/hot`, and the app serves the pages through it. To run Vite in a terminal of your own instead,
+start it first (the app then leaves it alone) or remove `o.Vite.StartDevServer = true` from `Program.cs`. For production, run the build command from
 your row to write `wwwroot/build`, then publish with `dotnet publish -c Release`.
+
+To add a page, run `dotnet new inertia-page --component Users/Index` here (add `--framework vue` or `--framework svelte` for those
+clients). It writes the page record `UsersIndexPage.cs` and `ClientApp/pages/Users/Index`, typed from the record. Then add
+`[JsonSerializable(typeof(UsersIndexPage))]` to `AppJsonContext` at the end of `Program.cs`.
 
 The build script type-checks before it bundles. Three more scripts check the client: `lint` runs [oxlint](https://oxc.rs),
 `format` runs oxfmt (its settings are in `.oxfmtrc.json`) and `format:check` only reports.

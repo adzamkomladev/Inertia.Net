@@ -32,6 +32,36 @@ public sealed class ValidationNamingTests
         Assert.Equal(["displayName", "items.0.mail", "mail"], keys);
     }
 
+    [Theory]
+    [InlineData("minimal")]
+    [InlineData("mvc")]
+    [InlineData("fast")]
+    public async Task UseHttp_requests_get_a_422_with_client_keyed_errors_and_other_requests_keep_the_400(string adapter)
+    {
+        await using var app = adapter switch
+        {
+            "mvc" => await ConformanceApp.StartAsync<MvcHost>(Setup()),
+            "fast" => await ConformanceApp.StartAsync<FastEndpointsHost>(Setup()),
+            _ => await ConformanceApp.StartAsync<Host>(Setup()),
+        };
+        var client = app.CreateClient();
+        var body = new { mail = "", displayName = "", items = new[] { new { mail = "" } } };
+        // What useHttp sends: X-Requested-With without X-Inertia.
+        var request = new HttpRequestMessage(HttpMethod.Post, "/naming/" + adapter) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+        request.WithHeader("X-Requested-With", "XMLHttpRequest");
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.False(response.Headers.Contains("Precognition"));
+        var json = System.Text.Json.Nodes.JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!;
+        Assert.False(string.IsNullOrEmpty(json["message"]!.GetValue<string>()));
+        Assert.Equal(["displayName", "items.0.mail", "mail"], json["errors"]!.AsObject().Select(entry => entry.Key).Order().ToArray());
+
+        var plain = await client.PostAsync("/naming/" + adapter, System.Net.Http.Json.JsonContent.Create(body), TestContext.Current.CancellationToken);
+        // A plain controller (no [ApiController]) leaves an invalid model to the action, as before.
+        Assert.Equal(adapter == "mvc" ? System.Net.HttpStatusCode.OK : System.Net.HttpStatusCode.BadRequest, plain.StatusCode);
+    }
+
     [Fact]
     public async Task Mvc_uses_http_page_naming_even_when_mvc_binding_uses_another_policy()
     {

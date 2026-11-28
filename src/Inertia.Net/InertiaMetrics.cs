@@ -10,7 +10,7 @@ public static class InertiaDiagnostics
     /// <summary>The <see cref="Meter"/> name: <c>inertia.page.*</c>, <c>inertia.props.*</c>, <c>inertia.cache.*</c> and <c>inertia.ssr.*</c> instruments.</summary>
     public const string MeterName = "Inertia.Net";
 
-    /// <summary>The <see cref="System.Diagnostics.ActivitySource"/> name: <c>inertia.render</c> and <c>inertia.ssr</c> activities.</summary>
+    /// <summary>The <see cref="System.Diagnostics.ActivitySource"/> name: <c>inertia.render</c>, <c>inertia.prop</c> (one per loader, tagged <c>inertia.prop</c> with its path) and <c>inertia.ssr</c> activities.</summary>
     public const string ActivitySourceName = "Inertia.Net";
 
     internal static readonly ActivitySource ActivitySource = new(ActivitySourceName);

@@ -65,9 +65,7 @@ public static class InertiaMvcExtensions
         builder.Services.PostConfigure<ApiBehaviorOptions>(o =>
         {
             var inner = o.InvalidModelStateResponseFactory;
-            o.InvalidModelStateResponseFactory = context => InertiaValidationFilter.IsInertiaMutation(context.HttpContext)
-                ? new ResultAdapter(InertiaModelStateFilter.BackWithErrors(context))
-                : inner(context);
+            o.InvalidModelStateResponseFactory = context => InertiaModelStateFilter.Respond(context) ?? inner(context);
         });
 
         if (options.RazorView is { } view)

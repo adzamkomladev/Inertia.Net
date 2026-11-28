@@ -12,7 +12,8 @@ namespace Inertia.Net;
 /// The Inertia protocol middleware (protocol §3):
 /// <list type="number">
 /// <item>An Inertia GET with a stale <c>X-Inertia-Version</c> gets a 409 with <c>X-Inertia-Location</c> (the request's path and query) before the handler runs; the stored state is kept.</item>
-/// <item>The stored flash/errors/history flags are loaded into <see cref="InertiaFeature"/> (and consumed).</item>
+/// <item>The stored flash/errors/history flags are loaded into <see cref="InertiaFeature"/> (and consumed), except for prefetches,
+/// which render without them and leave them stored for the visit.</item>
 /// <item>After the handler, an Inertia request answered with an empty 200 is redirected back.</item>
 /// <item>When the response starts: <c>Vary: X-Inertia</c>; for Inertia requests a 302 becomes a 303 for PUT/PATCH/DELETE/QUERY and a
 /// redirect to a URL with a fragment becomes a 409 with <c>X-Inertia-Redirect</c> (except prefetches); when the response is a redirect,
@@ -74,7 +75,9 @@ internal sealed class InertiaMiddleware
             return;
         }
 
-        if (await _store.LoadAsync(httpContext) is { } state)
+        // A prefetch is not the visit: it must leave pending flash and errors for the visit that follows (inertia-laravel #933).
+        var prefetch = isInertia && string.Equals(request.Headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase);
+        if (!prefetch && await _store.LoadAsync(httpContext) is { } state)
         {
             var feature = httpContext.Inertia();
             feature.StateLoaded = true;

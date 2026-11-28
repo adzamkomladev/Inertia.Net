@@ -39,6 +39,18 @@ While the dev server runs, the tags are `@vite/client` and the entry from the de
 
 Your Vite config writes the hot file. The `@inertiajs/vite` plugin does not write one, so the samples include a small plugin that does.
 
+### One command
+
+Set `o.Vite.StartDevServer = true` and `dotnet watch` alone is enough. In Development the app does the following:
+
+- It runs the package's `dev` script in the content root: `npm run dev`, or `bun`, `pnpm` or `yarn` when their lock file is there.
+- It waits up to 30 seconds for the hot file, and logs Vite's output under `Inertia.Net.Vite`.
+- It stops Vite when the app stops, and removes a hot file Vite left behind.
+
+Nothing starts outside Development, when `Vite.DevServerUrl` is set, or when a dev server already answers at the hot file's URL. Apps from `dotnet new inertia` turn it on.
+
+With [.NET Aspire](https://aspire.dev), run Vite as its own resource in the AppHost instead, for example with the JavaScript hosting integration's `AddViteApp`, and leave this option off.
+
 <Callout type="warning" title="base must differ between dev and build">
 Built assets are served from `/build/`, so the Vite `base` is `/build/` for a build. The dev server must serve from the root because Inertia.Net emits `{origin}/@vite/client` and `{origin}/{entry}`. Use `base: command === 'build' ? '/build/' : '/'`.
 </Callout>
@@ -54,6 +66,7 @@ builder.Services.AddInertia(o =>
     o.Vite.HotFilePath = null;                                 // default wwwroot/hot
     o.Vite.DevServerUrl = builder.Environment.IsDevelopment() ? "http://localhost:5173" : null;
     o.Vite.AssetBaseUrl = "https://cdn.example.com/build";     // serve built assets from a CDN
+    o.Vite.StartDevServer = true;                              // run the dev script with the app in Development
 });
 ```
 

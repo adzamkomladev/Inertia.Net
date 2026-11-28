@@ -241,6 +241,7 @@ of the protocol; the payload is:
   - a `default` bag exists and there is no header → the default bag's errors, flattened;
   - otherwise → `{ bag: errors, ... }`.
 - The flow: validation fails, the server redirects back (303 for PUT/PATCH/DELETE/QUERY) with the errors stored in the state store, and the next GET renders them.
+- A `useHttp` request (`X-Requested-With: XMLHttpRequest` without `X-Inertia`) is not a visit: the client reads errors only from a `422` JSON body. Such a request gets `422` with `{ "message": "<first message>[ (and N more error[s])]", "errors": { "<client key>": ["..."] } }` (all messages, the same keys as above, no bag, no `Precognition` headers) instead of the redirect. Laravel answers the same way, because the request expects JSON. Requests with neither header keep the framework's `400` validation problem.
 
 ## 7. Flash, clearHistory, preserveFragment
 
@@ -253,7 +254,7 @@ All three (and validation errors) are stored in the state store when a response 
 | preserveFragment | the same mechanism | `preserveFragment: true` on the next rendered page |
 | encryptHistory | global option, or per request | not persisted |
 
-The state is kept (not consumed) when the response is a version-mismatch 409.
+The state is kept (not consumed) when the response is a version-mismatch 409. A prefetch (`Purpose: prefetch`) neither loads nor consumes it: the prefetched page renders without flash and with empty errors, so the visit that follows still gets them.
 
 `ForgetFlashed(keys)` removes current or restored flash values before rendering or redirecting. An exact key wins over a dot path.
 Nested removal copies the value rather than mutating the caller's object. Removing the last key omits `flash`; remaining values

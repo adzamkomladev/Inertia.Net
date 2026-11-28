@@ -96,7 +96,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sample: [react, vue, svelte]
+        sample: [react, vue, svelte, react-sse]
         include:
           - sample: react
             dir: MinimalApi.React
@@ -105,9 +105,17 @@ jobs:
             dir: Mvc.Vue
           - sample: svelte
             dir: FastEndpoints.Svelte
+          # The live spec again, with live props over Server-Sent Events (Inertia.Net.Live.Sse) instead of SignalR.
+          - sample: react-sse
+            app: react
+            dir: MinimalApi.React
+            live: sse
+            specs: specs/live.spec.ts
     env:
-      SAMPLE: ${{ matrix.sample }}
+      SAMPLE: ${{ matrix.app || matrix.sample }}
       INERTIA_SSR: ${{ matrix.ssr }}
+      LIVE_TRANSPORT: ${{ matrix.live }}
+      VITE_LIVE_TRANSPORT: ${{ matrix.live }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -129,7 +137,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run the E2E suite
         working-directory: tests/e2e
-        run: npx playwright test
+        run: npx playwright test ${{ matrix.specs }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
@@ -195,6 +203,16 @@ jobs:
           dotnet build -warnaserror -p:InertiaGenerateTypesOnBuild=true
           TYPES=src/Inertia.Net.Templates/content/${{ matrix.auth && 'auth/common' || 'common' }}/ClientApp/types
           git diff --no-index --exit-code "$GITHUB_WORKSPACE/$TYPES" ClientApp/types
+      - name: Add a page with the item template
+        working-directory: ${{ runner.temp }}/Starter
+        run: |
+          dotnet new inertia-page --component Reports/Monthly --framework ${{ matrix.framework }}
+          test -f ReportsMonthlyPage.cs
+          # The step the template asks for: register the record in the app's JSON context.
+          sed -i 's/^\(\s*\)internal sealed partial class AppJsonContext/\1[JsonSerializable(typeof(ReportsMonthlyPage))]\n&/' Program.cs
+          # The page type reaches inertia.d.ts, so the client build below type-checks the new page file.
+          dotnet build -warnaserror -p:InertiaGenerateTypesOnBuild=true
+          grep -q "'Reports/Monthly'" ClientApp/types/inertia.d.ts
       - name: Build, lint and format-check the client
         working-directory: ${{ runner.temp }}/Starter
         run: |

@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\src\Inertia.Net.EntityFrameworkCore\Inertia.Net.EntityFrameworkCore.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <ProjectReference Include="..\..\src\Inertia.Net.Live.SignalR\Inertia.Net.Live.SignalR.csproj" />
+    <ProjectReference Include="..\..\src\Inertia.Net.Live.Sse\Inertia.Net.Live.Sse.csproj" />
   </ItemGroup>
   <!-- The frontend is built separately (npm run build); dotnet build never needs Node. -->
   <ItemGroup>

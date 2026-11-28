@@ -46,3 +46,6 @@ Inertia.Net.ViteOptions.PageModule.get -> System.Func<string!, string?>?
 Inertia.Net.ViteOptions.PageModule.set -> void
 static Inertia.Net.InertiaEndpointRouteBuilderExtensions.WithInertiaComponent<TBuilder>(this TBuilder builder, string! component) -> TBuilder
 static Inertia.Net.InertiaViteHealthChecksBuilderExtensions.AddInertiaVite(this Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder! builder, System.Collections.Generic.IEnumerable<string!>! entries, string? mount = null, string? name = null, System.Collections.Generic.IEnumerable<string!>? tags = null) -> Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder!
+Inertia.Net.InertiaProp.Timeout(System.TimeSpan timeout) -> Inertia.Net.InertiaProp!
+Inertia.Net.ViteOptions.StartDevServer.get -> bool
+Inertia.Net.ViteOptions.StartDevServer.set -> void

@@ -146,6 +146,13 @@ internal sealed class DevToolsCapture(string id, long started, int maxPageBytes 
         PropMetadata[path] = meta;
     }
 
+    /// <summary>How long the prop's loader (or its cache lookup) took, as <c>durationMs</c> in the entry's prop metadata.</summary>
+    internal void RecordDuration(string path, TimeSpan elapsed)
+    {
+        if (!PropMetadata.TryGetValue(path, out var meta)) PropMetadata[path] = meta = [];
+        meta["durationMs"] = Math.Round(elapsed.TotalMilliseconds, 2);
+    }
+
     private ArrayBufferWriter<byte>? _response;
     internal bool ResponseStreamed { get; set; }
     internal bool ResponseTooLarge { get; private set; }

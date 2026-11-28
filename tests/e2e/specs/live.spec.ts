@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test'
 
-// Live props over SignalR: the React sample's /live page (contract in samples/README.md).
+// Live props over SignalR, or Server-Sent Events with LIVE_TRANSPORT=sse: the React sample's /live page (contract in samples/README.md).
 
 test.skip((process.env.SAMPLE ?? 'react') !== 'react', 'The React sample hosts the live page')
 
@@ -10,9 +10,25 @@ test.beforeEach(async ({ page, request }) => {
   await page.addInitScript(() => ((window as any).__e2e = true))
 })
 
-/** Records hub invocations: the channels joined (completions with `true`) and left. */
+/**
+ * Records the channels joined and left. SignalR: hub invocations (completions with `true`, Unsubscribe calls). Server-Sent Events
+ * (LIVE_TRANSPORT=sse): the channels of each stream request, which reopens whenever the set changes.
+ */
 const watchHub = (page: Page) => {
   const hub = { joined: 0, left: 0 }
+  if (process.env.LIVE_TRANSPORT === 'sse') {
+    let current = new Set<string>()
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname !== '/inertia-live') return
+      const next = new Set(url.searchParams.getAll('channel'))
+      hub.left += [...current].filter((key) => !next.has(key)).length
+      hub.joined = next.size
+      current = next
+    })
+    return hub
+  }
+
   page.on('websocket', (socket) => {
     if (!socket.url().includes('/inertia-live')) return
     socket.on('framereceived', ({ payload }) => {

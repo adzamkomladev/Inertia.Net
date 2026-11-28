@@ -30,7 +30,7 @@ public sealed class UsersController : Controller
 }
 ```
 
-- **Validation:** a global filter redirects an Inertia non-GET request with an invalid `ModelState` back with the errors, in the bag named by `X-Inertia-Error-Bag` (default `default`). Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). `[ApiController]` controllers are covered too.
+- **Validation:** a global filter redirects an Inertia non-GET request with an invalid `ModelState` back with the errors, in the bag named by `X-Inertia-Error-Bag` (default `default`). Keys go through the JSON naming policy per segment (`Address.Street` becomes `address.street`). `[ApiController]` controllers are covered too. A `useHttp` request (`X-Requested-With: XMLHttpRequest` without `X-Inertia`) gets a `422` `{ message, errors }` with the same keys instead.
 - **Razor root view (optional):** `UseRazorRootView("App")` renders `Views/Shared/App.cshtml` with an `InertiaRootViewContext` model. After `@addTagHelper *, Inertia.Net.Mvc` the view can use `<inertia />`, `<inertia-head />`, `<vite entry="resources/js/app.tsx" />` and `<vite-react-refresh />`.
 - **TempData state store (optional):** `AddInertiaMvc(o => o.UseTempDataStateStore())` keeps flash data, errors and history flags in TempData (cookie provider by default, or `AddSessionStateTempDataProvider()` plus `AddSession()`/`app.UseSession()` before `app.UseInertia()`). It also serves Minimal API endpoints.
 - **Action components:** `return this.InertiaView(props);` renders `{Controller}/{Action}` (`{Area}/...` in an area); change the rule with `AddInertiaMvc(o => o.ComponentResolver = ctx => ...)`.
