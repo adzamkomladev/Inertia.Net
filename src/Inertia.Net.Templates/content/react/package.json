@@ -13,7 +13,7 @@
   "dependencies": {
     "@inertiajs/react": "^3.11.0",
     "@inertiajs/vite": "^3.11.0",
-    "@microsoft/signalr": "^10.0.0",
+    "@microsoft/signalr": "^11.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
