@@ -17,14 +17,14 @@ app.UseInertiaAntiforgery();
 
 ## What it does
 
-- **Issue.** Page loads (GET/HEAD requests that are Inertia requests or accept `text/html`) get the request token in a script-readable, essential cookie (`HttpOnly` off, `SameSite=Lax`, `Path=/`, `Secure` per `SecurePolicy`). Essential means a cookie-consent policy does not withhold it.
-- **Validate.** Every unsafe request (anything but GET, HEAD, OPTIONS and TRACE), with a JSON or a form body, Inertia or not, is checked with `IAntiforgery.ValidateRequestAsync`. A plain cross-site HTML form post is rejected as well as a forged XHR. It also sets the antiforgery feature, so form-binding endpoints work without `app.UseAntiforgery()`.
-- **Reject.** A missing or wrong token gets **`419`** (page expired, as in Laravel); the handler does not run.
-- **Opt out** per endpoint with `.DisableAntiforgery()` (webhooks, test hooks), or for whole areas with `ShouldValidate`.
+- **Issue.** A page load gets the request token in a cookie. A page load is a GET or HEAD request that is an Inertia request or accepts `text/html`. The cookie is script-readable and essential: `HttpOnly` off, `SameSite=Lax`, `Path=/`, `Secure` per `SecurePolicy`. Essential means a cookie-consent policy does not withhold it.
+- **Validate.** `IAntiforgery.ValidateRequestAsync` checks every unsafe request. An unsafe request is anything but GET, HEAD, OPTIONS and TRACE. The check covers JSON bodies and form bodies, and Inertia requests and other requests. A plain cross-site HTML form post is rejected, and so is a forged XHR. `UseInertiaAntiforgery()` also sets the antiforgery feature, so form-binding endpoints work without `app.UseAntiforgery()`.
+- **Reject.** A request with a missing or wrong token gets **`419`** (page expired, as in Laravel). The handler does not run.
+- **Opt out** per endpoint with `.DisableAntiforgery()`, for example for webhooks and test hooks. Opt out for whole areas with `ShouldValidate`.
 
 ## .NET 11 automatic CSRF check
 
-Apps built with `WebApplication.CreateBuilder` on .NET 11 also get the framework's automatic CSRF middleware. It checks `Sec-Fetch-Site` and `Origin` on unsafe requests, issues no tokens, and only records a verdict. `UseInertiaAntiforgery()` remains the token check Inertia needs: like `app.UseAntiforgery()`, it replaces that verdict with its own, so a request with a valid token passes and one without still gets `419`. `.DisableAntiforgery()` opts an endpoint out of both; configuration `DisableCsrfProtection=true` turns the automatic check off.
+Apps built with `WebApplication.CreateBuilder` on .NET 11 also get the framework's automatic CSRF middleware. That middleware checks `Sec-Fetch-Site` and `Origin` on unsafe requests, issues no tokens, and only records a verdict. `UseInertiaAntiforgery()` remains the token check Inertia needs. Like `app.UseAntiforgery()`, it replaces that verdict with its own. A request with a valid token passes, and a request without one still gets `419`. `.DisableAntiforgery()` opts an endpoint out of both checks. The configuration setting `DisableCsrfProtection=true` turns the automatic check off.
 
 ## Options
 
@@ -38,32 +38,32 @@ app.UseInertiaAntiforgery(o =>
 });
 ```
 
-`OnRejected` runs after `UseInertia()`; returning `Back()` gives the tab a fresh token and a message instead of the client's error dialog.
+`OnRejected` runs after `UseInertia()`. Returning `Back()` gives the tab a fresh token and a message instead of the client's error dialog.
 
 ## Lazy refresh
 
-By default every page load issues a fresh token, and antiforgery marks that response `Cache-Control: no-cache, no-store` (which also keeps the page out of the browser's back/forward cache).
+By default, every page load issues a fresh token, and antiforgery marks that response `Cache-Control: no-cache, no-store`. That header also keeps the page out of the browser's back/forward cache.
 
-`o.CookieRefresh = XsrfCookieRefresh.Lazy` keeps a token that still validates. Such responses get no `Set-Cookie` and stay cacheable, and a token issued before a sign-in or sign-out is replaced on the next page load.
+`o.CookieRefresh = XsrfCookieRefresh.Lazy` keeps a token that still validates. Responses that keep the token get no `Set-Cookie` and stay cacheable. A token issued before a sign-in or sign-out is replaced on the next page load.
 
-Validating costs about what issuing does, so the gain is in the responses, not in CPU. Set your own `Cache-Control` on pages with private data.
+Validating a token costs about as much as issuing one, so the gain is in the responses, not in CPU. Set your own `Cache-Control` on pages with private data.
 
 <Callout type="info" title="Session changes">
-A session that expires or a sign-in that changes the user invalidates the token in an open tab; the next page load issues a new one. Returning `Back()` from `OnRejected` gives that tab a fresh token and a message.
+A session that expires or a sign-in that changes the user invalidates the token in an open tab. The next page load issues a new token. Returning `Back()` from `OnRejected` gives that tab a fresh token and a message.
 </Callout>
 
 ## MVC and FastEndpoints
 
-`UseInertiaAntiforgery()` covers controllers too. `[AutoValidateAntiforgeryToken]` as a global filter still works, but is not needed. FastEndpoints is covered by the middleware; FastEndpoints' own `EnableAntiforgery()` is not needed for Inertia forms.
+`UseInertiaAntiforgery()` covers controllers too. `[AutoValidateAntiforgeryToken]` as a global filter still works, but is not needed. The middleware covers FastEndpoints as well. FastEndpoints' own `EnableAntiforgery()` is not needed for Inertia forms.
 
 ## Issue only
 
-`UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` (the 1.0 API) only writes the cookie. You then validate with `app.UseAntiforgery()` (form bodies only) and your own check for JSON bodies (`await antiforgery.ValidateRequestAsync(context)`). Prefer `UseInertiaAntiforgery()`.
+`UseInertiaAntiforgeryCookie(cookieName = "XSRF-TOKEN")` is the 1.0 API. It only writes the cookie. You then validate in two places: `app.UseAntiforgery()` checks form bodies only, and your own check covers JSON bodies (`await antiforgery.ValidateRequestAsync(context)`). Prefer `UseInertiaAntiforgery()`.
 
 ## Troubleshooting 419
 
-- Was the page loaded through the middleware? It sets the cookie.
-- Does the cookie reach the browser? `Secure` cookies are dropped on plain HTTP; behind a TLS-terminating proxy, configure forwarded headers or set `CookieSecurePolicy.Always`.
+- Was the page loaded through the middleware? The middleware sets the cookie.
+- Does the cookie reach the browser? `Secure` cookies are dropped on plain HTTP. Behind a proxy that terminates TLS, configure forwarded headers or set `CookieSecurePolicy.Always`.
 - Do all instances share the Data Protection key ring?
 - Does `UseAuthentication()` run before the antiforgery middleware?
 - Did a sign-in or sign-out change the token? Reload the page, or use `OnRejected`.

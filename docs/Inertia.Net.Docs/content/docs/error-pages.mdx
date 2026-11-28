@@ -25,12 +25,17 @@ app.UseInertiaErrorPages();                        // before UseInertia and the 
 app.UseInertia();
 ```
 
-A second Inertia UI mounted under its own path registers its own components with `AddInertiaErrorPages(name, ...)`; see
+A second Inertia UI mounted under its own path registers its own components with `AddInertiaErrorPages(name, ...)`. See
 [Multiple apps and libraries](/docs/mounts).
 
-Create the named components in your client pages directory. Each receives `status`, the optional `Props` callback's values, and
-shared props registered globally or through `context.Inertia().Share(...)`. The callback receives the exception for exception
-responses and `null` for status-code pages. Avoid returning exception messages or stack traces to the client.
+Create the named components in your client pages directory. Each component receives:
+
+- `status`
+- the values from the optional `Props` callback
+- shared props registered globally or through `context.Inertia().Share(...)`
+
+The `Props` callback receives the exception for exception responses and `null` for status-code pages. Avoid returning exception
+messages or stack traces to the client.
 
 Set `o.IncludeSharedProps = false` to omit configured/request shared props and shared head tags from these error pages.
 The `errors` prop and explicit error-page props (including `status`) remain available.
@@ -92,22 +97,29 @@ const title = computed(() =>
   </Tab>
 </Tabs>
 
-The handler answers requests with `X-Inertia` or an `Accept: text/html` navigation. It preserves the error status: XHR receives a
-JSON page with `X-Inertia: true`; the first visit receives the normal root template. Root views and SSR work as for any other
-render. An error component must also resolve in your SSR bundle when SSR is enabled.
+The handler answers requests with `X-Inertia` or an `Accept: text/html` navigation. It preserves the error status. An XHR receives a
+JSON page with `X-Inertia: true`. The first visit receives the normal root template. Root views and SSR work as for any other
+render. When SSR is enabled, an error component must also resolve in your SSR bundle.
 
-Only configured error statuses with an empty response are replaced. API clients, existing response bodies, redirects, Inertia's
-`409` responses and antiforgery's `419` responses are left to their existing handlers. Exceptions use the status selected by
-ASP.NET Core's exception middleware (500 by default). The default statuses are 403, 404, 500 and 503; extend `StatusCodes` to handle
-other error statuses. A page explicitly returned with `Render(...).WithStatusCode(404)` keeps its component and props.
+Only configured error statuses with an empty response are replaced. These are left to their existing handlers:
+
+- API clients
+- existing response bodies
+- redirects
+- Inertia's `409` responses
+- antiforgery's `419` responses
+
+Exceptions use the status selected by ASP.NET Core's exception middleware, which is 500 by default. The default statuses are 403, 404,
+500 and 503. Extend `StatusCodes` to handle other error statuses. A page explicitly returned with
+`Render(...).WithStatusCode(404)` keeps its component and props.
 
 In Development, error pages are disabled so the developer exception page and Inertia debug modal stay available. Set
-`o.EnabledInDevelopment = true` to preview your error components. The Inertia client renders non-2xx Inertia responses by default;
-application `httpException` event handlers or `onHttpException` callbacks can cancel that rendering.
+`o.EnabledInDevelopment = true` to preview your error components. The Inertia client renders non-2xx Inertia responses by default.
+Application `httpException` event handlers or `onHttpException` callbacks can cancel that rendering.
 
 ## Already using `UseExceptionHandler()`
  `AddInertiaErrorPages()` registers an `IExceptionHandler` in the existing chain. Register
-API-specific handlers first if they should take priority. Use one exception middleware, then install just the status-code part:
+API-specific handlers first if they should take priority. Use one exception middleware. Then install only the status-code part:
 
 ```csharp
 app.UseExceptionHandler();
@@ -126,9 +138,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ExceptionHandlerOptions>
 
 `AddInertiaErrorPages()` also registers the built-in ProblemDetails service as the exception middleware’s fallback. The Inertia
 exception handler declines requests that do not ask for an Inertia page or HTML, so API exceptions use the host’s ProblemDetails
-fallback and content negotiation. Existing ProblemDetails configuration and earlier application handlers still apply; empty
+fallback and content negotiation. Existing ProblemDetails configuration and earlier application handlers still apply. Empty
 status-code responses remain unchanged. Loaded flash and validation state is consumed when an error page renders, as on any other page response.
 
 ## Validation, SSR and rate limits
 
-Validation redirects keep their existing behavior. A required SSR failure can be handled by the exception pipeline; configure the error page so it can render without relying on the same failed renderer. Rate-limit responses with an existing body are preserved; configure the rejection response explicitly, including the Precognition header for validation requests. See [Precognition](/docs/precognition#rate-limiting).
+Validation redirects keep their existing behavior. The exception pipeline can handle a required SSR failure. Configure the error page so that it can render without relying on the same failed renderer. Rate-limit responses with an existing body are preserved. Configure the rejection response explicitly, including the Precognition header for validation requests. See [Precognition](/docs/precognition#rate-limiting).

@@ -5,24 +5,24 @@ section: Essentials
 order: 2
 ---
 
-Props are the data a page receives. `Render(component, props)` takes an `InertiaProps`, a string-keyed dictionary, or a typed object. Nested `InertiaProps` and dictionaries are walked, so props can be nested at any depth.
+Props are the data a page receives. `Render(component, props)` takes an `InertiaProps`, a string-keyed dictionary, or a typed object. Inertia.Net walks nested `InertiaProps` and dictionaries, so you can nest props at any depth.
 
-Every page has an `errors` prop. Its key order is `errors`, shared props, then page props.
+Every page has an `errors` prop. The keys of a page's props come in this order: `errors`, shared props, then page props.
 
 ## Choose how to load data
 
 Start with a plain value. Use a lazy loader when the query should run only if the response needs that prop.
 Use `Defer` when the page should open before a slow query finishes. Use `Optional` when the data is needed only on request.
-`Once` keeps a value on the client across visits; `Cache` keeps it on the server. They solve different problems.
+`Once` keeps a value on the client across visits. `Cache` keeps a value on the server. They solve different problems.
 
 ## Large integer IDs
 
 JavaScript cannot represent every 64-bit integer exactly. Set `o.PreserveBigIntegers = true` at registration to wrap unsafe
-integers as `$bigint` markers; the v3 client reads them as `BigInt`. The default is false.
+integers as `$bigint` markers. The v3 client reads the markers as `BigInt`. The default is false.
 To override that choice for one page, return `Render("Orders/Show", props).PreserveBigIntegers()` or
 `.PreserveBigIntegers(false)`. Props and flash use the same setting. This is a handler fragment.
 
-**C# 15 unions (.NET 11).** A prop whose type is a `union` (for example `public union Subject(User, Team);`) is written as the JSON of its active case, with no wrapper or discriminator, through your source-generated `JsonSerializerContext`; partial reloads select it like any other prop. An `InertiaProp` (`Defer`, `Optional`, ...) stored inside a union case is not resolved: keep lazy props at the page level.
+**C# 15 unions (.NET 11).** A prop can have a `union` type, for example `public union Subject(User, Team);`. Inertia.Net writes such a prop as the JSON of its active case, with no wrapper or discriminator, through your source-generated `JsonSerializerContext`. Partial reloads select it like any other prop. Inertia.Net does not resolve an `InertiaProp` (`Defer`, `Optional`, ...) stored inside a union case, so keep lazy props at the page level.
 
 ## The prop factories
 
@@ -48,15 +48,15 @@ Prop(ct => repo.GetAsync(ct))                      // Func<CancellationToken, Ta
 Prop(ct => repo.GetValueTaskAsync(ct))             // Func<CancellationToken, ValueTask<T>>
 ```
 
-The token is `HttpContext.RequestAborted`. An `async` lambda always binds to the awaiting overload, never to “a prop whose value is a Task”.
+The cancellation token a loader receives is `HttpContext.RequestAborted`. An `async` lambda always binds to the awaiting overload, never to “a prop whose value is a Task”.
 
 Fluent methods mutate and return the same instance: `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)` and `.Cache(key, duration, staleFor?, tags?)`.
 
-`Fresh()` makes a prop a once prop, and `WithGroup()` makes it deferred. Repeated `MatchOn()` calls add keys. Root `Append()` and `Prepend()` are mutually exclusive and combining them throws. Fluent methods mutate the prop, so create prop instances per request; do not share them across requests.
+`Fresh()` makes a prop a once prop, and `WithGroup()` makes it deferred. Repeated `MatchOn()` calls add keys. Root `Append()` and `Prepend()` are mutually exclusive, and combining them throws. Fluent methods mutate the prop, so create prop instances per request. Do not share prop instances across requests.
 
 ## Resolution order
 
-Loaders run sequentially by default, in prop order, and only when their prop is included in the response. That makes a scoped EF Core `DbContext` safe to use in several loaders.
+By default, loaders run one after another, in prop order. A loader runs only when its prop is included in the response. Because loaders run one at a time, a scoped EF Core `DbContext` is safe to use in several loaders.
 
 ```csharp
 return Render("Users/Index", new InertiaProps
@@ -77,7 +77,7 @@ return Render("Users/Index", new InertiaProps
 }
 ```
 
-The page is buffered before it is sent, so a loader that throws never produces a half-written `200`.
+Inertia.Net buffers the page before sending it, so a loader that throws never produces a half-written `200`.
 
 ### Parallel props
 
@@ -93,10 +93,10 @@ return Render("Dashboard", new InertiaProps
 ```
 
 - Only `Task` and `ValueTask` loaders can be parallel. `Parallel()` throws for values and synchronous loaders.
-- At most `InertiaOptions.Props.MaxConcurrency` loaders run at once per render (default 4).
-- Top-level props and props inside literal objects (`InertiaProps` and other string-keyed dictionaries) start early. Elsewhere they resolve in turn.
+- At most `InertiaOptions.Props.MaxConcurrency` loaders run at once per render. The default is 4.
+- Top-level props and props inside literal objects (`InertiaProps` and other string-keyed dictionaries) start early. Parallel props anywhere else resolve in turn.
 - Loaders of props that are not part of the response never start.
-- If a loader fails, the others are cancelled and awaited, and the render fails with the first failure in prop order. A `Rescue()`d prop fails alone.
+- If a loader fails, Inertia.Net cancels and awaits the others. The render then fails with the first failure in prop order. A `Rescue()`d prop fails alone.
 
 <Callout type="warning" title="DbContext and HttpContext">
 A parallel loader must not use the request's `DbContext` or other non-thread-safe scoped services, and must not touch `HttpContext`. Give each loader its own context through `IDbContextFactory<T>` or its own scope.
@@ -119,10 +119,10 @@ A parallel loader must not use the request's `DbContext` or other non-thread-saf
 ["inbox"] = Prop<InboxService, Inbox>((inbox, ct) => inbox.LoadAsync(ct)).Defer(), // and .Once(), .Cache(...), .Live(...), .Rescue()
 ```
 
-- A loader that runs during the request gets the request's instance (the same `DbContext` the handler used).
+- A loader that runs during the request gets the request's instance. This is the same `DbContext` the handler used.
 - A `.Parallel()` loader gets a scope of its own, so two parallel loaders never share a `DbContext`. The scope is disposed when the loader finishes.
-- A [stale-while-revalidate](#cached-props) refresh runs after the response, in a new scope disposed when the refresh ends.
-- A service that is not registered fails the render with the prop's path and the service type.
+- A [stale-while-revalidate](#cached-props) refresh runs after the response, in a new scope. That scope is disposed when the refresh ends.
+- If the service is not registered, the render fails with the prop's path and the service type.
 
 ## Deferred props
 
@@ -173,11 +173,11 @@ The full behavior is in [Merging props](/docs/merging-props).
 }
 ```
 
-When the client already holds the key it sends `X-Inertia-Except-Once-Props`; the value is left out while the `onceProps` entry stays. See [Once props](/docs/once-props).
+When the client already holds the key, it sends `X-Inertia-Except-Once-Props`. The value is then left out, and the `onceProps` entry stays. See [Once props](/docs/once-props).
 
 ## Cached props
 
-`.Cache(key, duration)` keeps a prop's value as JSON in the cache (the app's `IMemoryCache` by default). A hit costs neither the query nor serialization.
+`.Cache(key, duration)` keeps a prop's value as JSON in the cache. The default cache is the app's `IMemoryCache`. A cache hit costs neither the query nor serialization.
 
 ```csharp
 return Render("Dashboard", new InertiaProps
@@ -192,7 +192,7 @@ return Render("Dashboard", new InertiaProps
 Every request that uses a key gets the same value. Put the user, tenant or anything else the value depends on in the key. Keys live in their own cache space and cannot collide with the app's own entries.
 </Callout>
 
-Only loading changes: optional, deferred, merged, once and scroll props keep their behavior, and their metadata is written from the cache too. A parallel cached prop does not start its loader on a hit. A rescued failure is not cached.
+Caching only changes how a prop loads. Optional, deferred, merged, once and scroll props keep their behavior, and their metadata is written from the cache too. A parallel cached prop does not start its loader on a cache hit. A rescued failure is not cached.
 
 **Removing and replacing values.** Inject `IInertiaCache` where the data changes:
 
@@ -207,17 +207,17 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 });
 ```
 
-`ClearPropsAsync()` removes every cached prop and `ClearSsrAsync()` every cached render. `SetPropAsync` serializes the value as a prop of its type would, and takes the same `staleFor` and `tags`.
+`ClearPropsAsync()` removes every cached prop. `ClearSsrAsync()` removes every cached render. `SetPropAsync` serializes the value the way a prop of that type is serialized, and takes the same `staleFor` and `tags`.
 
-The default store keeps cached props in the app's `IMemoryCache`, with no size limit of their own. Set `o.Props.CacheMaxBytes` to cap them: they then go in a private cache, and the least recently used are evicted past the cap.
+The default store keeps cached props in the app's `IMemoryCache`, with no size limit of their own. Set `o.Props.CacheMaxBytes` to cap them. Cached props then go in a private cache, and the least recently used ones are evicted past the cap.
 
-**Stale-while-revalidate.** `staleFor` keeps serving a value after its duration. The first request that reads a stale value gets it at once, and the loader runs after the response has been sent. Past `duration + staleFor` the loader runs during the request again.
+**Stale-while-revalidate.** `staleFor` keeps serving a value after its duration. The first request that reads a stale value gets the stale value at once, and the loader runs after the response has been sent. After `duration + staleFor`, the loader runs during the request again.
 
-- Response completion enqueues refreshes on a bounded background worker; it does not wait for the loader. Loaders using `staleFor` must use singleton dependencies or create an independent scope inside the loader with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`. Do not capture request-scoped services or `HttpContext`.
-- The worker accepts 64 pending refreshes, runs up to 4 at a time, cancels each one after 30 seconds and cancels them all on host shutdown. A full queue drops the refresh and logs a warning, leaving the stale value at its existing expiration. Monitor `inertia.cache.refresh.dropped`, tagged with `inertia.cache.kind=prop|ssr`.
+- When the response completes, Inertia.Net queues the refreshes on a bounded background worker. The response does not wait for the loader. Loaders that use `staleFor` must use singleton dependencies, or create an independent scope inside the loader with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`. Do not capture request-scoped services or `HttpContext`.
+- The worker accepts 64 pending refreshes and runs up to 4 at a time. It cancels each refresh after 30 seconds, and cancels all of them on host shutdown. When the queue is full, Inertia.Net drops the refresh and logs a warning. The stale value keeps its existing expiration. Monitor `inertia.cache.refresh.dropped`, tagged with `inertia.cache.kind=prop|ssr`.
 - One refresh runs per key and app instance at a time. A refresh that finds the value fresh again skips its loader.
-- A fill or refresh whose loader started before an `IInertiaCache` removal of its key or of one of its tags (`RemovePropAsync`, `RemoveByTagAsync`, `ClearPropsAsync`) on the same app instance does not store its value; the request still gets it. Removing another key or tag leaves it alone.
-- A refresh that fails is logged as a warning and keeps the stale value; the next stale read tries again.
+- An `IInertiaCache` removal (`RemovePropAsync`, `RemoveByTagAsync`, `ClearPropsAsync`) can happen while a fill or refresh is running. If the loader started before the removal of its key or of one of its tags, on the same app instance, the fill or refresh does not store its value. The request still gets the value. Removing another key or tag does not affect the fill or refresh.
+- A refresh that fails is logged as a warning, and the stale value stays. The next stale read tries again.
 
 **Another store.** Props and SSR renders live in an `IInertiaCacheStore`. Register your own singleton before or after `AddInertia()`:
 
@@ -225,13 +225,13 @@ The default store keeps cached props in the app's `IMemoryCache`, with no size l
 builder.Services.AddSingleton<IInertiaCacheStore, MyRedisInertiaCacheStore>();
 ```
 
-The store gets and sets byte arrays by `InertiaCacheKey`, removes by key and by tag, and reads unknown formats as a miss. While a page renders, a store that throws is logged (at most once every 30 seconds) and counts as a miss; `IInertiaCache` lets the exception through.
+The store gets and sets byte arrays by `InertiaCacheKey`, removes by key and by tag, and reads unknown formats as a miss. While a page renders, a store that throws is logged, at most once every 30 seconds, and counts as a miss. `IInertiaCache` lets the exception through.
 
 For a store shared by every app instance, `Inertia.Net.Redis` registers one with `AddInertiaRedisCache(...)`. See [Redis cache](/docs/redis).
 
 ## Typed page props
 
-A typed object is AOT-friendly: it is walked through its `JsonTypeInfo`, and members of type `InertiaProp` are resolved by Inertia.Net while the rest is serialized normally.
+A typed object is AOT-friendly. Inertia.Net walks the object through its `JsonTypeInfo`. It resolves members of type `InertiaProp`, and the rest is serialized normally.
 
 ```csharp
 public sealed class UsersPage
@@ -247,11 +247,11 @@ app.MapGet("/users", (AppDb db) => Render("Users/Index", new UsersPage
 }));
 ```
 
-Register `UsersPage` and its value types in your `JsonSerializerContext` under Native AOT. Anonymous types work only when reflection-based serialization is enabled, so not under AOT.
+Under Native AOT, register `UsersPage` and its value types in your `JsonSerializerContext`. Anonymous types work only when reflection-based serialization is enabled, so they do not work under AOT.
 
 ## Dot keys
 
-Cached props under dot keys use the cache too. A top-level key containing dots is unpacked. `["user.name"] = "Ann"` becomes `"user": { "name": "Ann" }`.
+A top-level key containing dots is unpacked. `["user.name"] = "Ann"` becomes `"user": { "name": "Ann" }`. Cached props under dot keys use the cache too.
 
 ## BigInteger safety
 
@@ -269,4 +269,4 @@ builder.Services.AddInertia(o => o.PreserveBigIntegers = true);
 ["recommendations"] = Defer(ct => recs.GetAsync(ct)).Rescue(),
 ```
 
-If the loader throws, the exception is logged, the prop is left out of `props`, and its path goes to `"rescuedProps": ["recommendations"]`. Without `.Rescue()` the exception propagates normally. Cancellation of the request is never rescued.
+If the loader throws, Inertia.Net logs the exception and leaves the prop out of `props`. The prop's path goes to `"rescuedProps": ["recommendations"]`. Without `.Rescue()`, the exception propagates normally. Cancellation of the request is never rescued.

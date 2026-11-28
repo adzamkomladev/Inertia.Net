@@ -7,9 +7,9 @@ order: 4
 
 Inertia forms post, expect a redirect, and read validation errors from `props.errors` on the next page. Inertia.Net performs the redirect and carries the errors across it.
 
-- A field maps to its **first** message. With `o.WithAllErrors = true` it maps to an array of all messages (the client's `form.withAllErrors()` expects that).
-- Error keys use dotted indices, for example `items.0.email`. Names use JSON member aliases when metadata exposes them and the applicable naming policy for other members. Dictionary keys are preserved. Minimal API and MVC use the page serializer’s HTTP JSON options; FastEndpoints uses its binding serializer policy. Custom resolvers that omit member metadata and paths without a model schema may fall back to naming-policy conversion; align field names and serializer settings.
-- **Error bags.** The client sends `X-Inertia-Error-Bag: createUser` when the form has `errorBag="createUser"`. Errors arrive as `errors: { createUser: { email: "..." } }`. Without the header, `errors` is the flat object `{ email: "..." }`. A bag stored under a name other than `default` is always nested by bag name.
+- A field maps to its **first** message. With `o.WithAllErrors = true` a field maps to an array of all its messages. The client's `form.withAllErrors()` expects that array.
+- Error keys use dotted indices, for example `items.0.email`. A name uses the JSON member alias when metadata exposes one. Other members use the applicable naming policy. Dictionary keys are preserved. Minimal API and MVC use the page serializer’s HTTP JSON options. FastEndpoints uses its binding serializer policy. Two cases may fall back to naming-policy conversion: custom resolvers that omit member metadata, and paths without a model schema. Align field names and serializer settings.
+- **Error bags.** An error bag is a named group of errors. The client sends `X-Inertia-Error-Bag: createUser` when the form has `errorBag="createUser"`. Errors arrive as `errors: { createUser: { email: "..." } }`. Without the header, `errors` is the flat object `{ email: "..." }`. A bag stored under a name other than `default` is always nested by bag name.
 
 ```ts
 router.post('/users', data, { errorBag: 'createUser' })
@@ -19,13 +19,13 @@ router.post('/users', data, { errorBag: 'createUser' })
 
 | Backend | Validation |
 |---|---|
-| Minimal API | .NET 10 source-generated DataAnnotations through `AddValidation()`; `ValidationProblem` results; call FluentValidation `IValidator<T>` manually and return `WithErrors` |
+| Minimal API | .NET 10 source-generated DataAnnotations through `AddValidation()`. `ValidationProblem` results. For FluentValidation, call `IValidator<T>` yourself and return `WithErrors`. |
 | MVC | MVC model validation and `ModelState` |
 | FastEndpoints | FastEndpoints validators, including FluentValidation |
 
 ## Minimal API
 
-`WithInertiaValidation()` applies to a route or route group and requires `services.AddValidation()`. Without validation resolvers, it throws `InvalidOperationException` when the endpoint is constructed. Routing may construct endpoints lazily, so this need not happen during application startup.
+`WithInertiaValidation()` applies to a route or route group. It requires `services.AddValidation()`. Without validation resolvers, `WithInertiaValidation()` throws `InvalidOperationException` when the endpoint is constructed. Routing may construct endpoints lazily, so the exception does not always appear during application startup.
 
 ```csharp
 builder.Services.AddValidation();
@@ -40,12 +40,12 @@ app.MapGroup("/admin").WithInertiaValidation()
    .MapPost("/roles", (RoleInput input) => Results.Redirect("/admin/roles"));
 ```
 
-For an Inertia request that is not a GET, a failure becomes a redirect back (303 for PUT/PATCH/DELETE/QUERY) with the errors. Every other client still gets the normal `400` validation problem. A handler that returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails` is converted the same way.
+For an Inertia request that is not a GET, a validation failure becomes a redirect back with the errors. The redirect status is 303 for PUT/PATCH/DELETE/QUERY. Every other client still gets the normal `400` validation problem. Inertia.Net converts a handler result the same way when the handler returns `TypedResults.ValidationProblem(...)`, `Results.ValidationProblem(...)` or an `HttpValidationProblemDetails`.
 
-On .NET 11, async validators (`AsyncValidationAttribute`, `IAsyncValidatableObject`) report through `WithInertiaValidation()` and `WithInertiaPrecognition()` like synchronous attributes. A body that cannot be bound (malformed JSON) is still a `400` on both .NET 10 and .NET 11, never a redirect back without errors or a Precognition success.
+On .NET 11, async validators (`AsyncValidationAttribute`, `IAsyncValidatableObject`) report through `WithInertiaValidation()` and `WithInertiaPrecognition()` like synchronous attributes. A body that cannot be bound, such as malformed JSON, is still a `400` on both .NET 10 and .NET 11. It is never a redirect back without errors, and never a Precognition success.
 
 <Callout type="warning" title="Why not rely on AddValidation alone?">
-The built-in .NET 10 validation filter is added automatically and always runs outermost: it writes the 400 itself before any filter you add can see it. `WithInertiaValidation()` disables it on the endpoint and runs the same source-generated validation itself. Do not combine it with your own `.DisableValidation()`.
+The built-in .NET 10 validation filter is added automatically and always runs outermost. It writes the 400 itself before any filter you add can see the failure. `WithInertiaValidation()` disables the built-in filter on the endpoint and runs the same source-generated validation itself. Do not combine `WithInertiaValidation()` with your own `.DisableValidation()`.
 </Callout>
 
 To report errors yourself, without attribute validation:
@@ -60,7 +60,7 @@ app.MapPost("/login", (LoginInput input, SignInService auth) =>
         }));
 ```
 
-`Back().WithErrors(IDictionary<string, string[]> errors, string bag = "default")` also takes arrays of messages. FluentValidation is not automatically integrated into Minimal API `AddValidation()`. Call a registered `IValidator<T>` yourself and map its failures:
+`Back().WithErrors(IDictionary<string, string[]> errors, string bag = "default")` also takes arrays of messages. Minimal API `AddValidation()` does not run FluentValidation automatically. Call a registered `IValidator<T>` yourself and map its failures:
 
 ```csharp
 app.MapPost("/users", async (CreateUserInput input, IValidator<CreateUserInput> validator) =>
@@ -76,11 +76,11 @@ app.MapPost("/users", async (CreateUserInput input, IValidator<CreateUserInput> 
 });
 ```
 
-Import `FluentValidation` and register your validator. Supply client JSON field names in the dictionary when they differ from its property names.
+Import `FluentValidation` and register your validator. Use the client's JSON field names as the dictionary keys when they differ from the validator's property names.
 
 ## MVC
 
-`AddInertiaMvc()` registers a global filter. An Inertia non-GET request with an invalid `ModelState` is redirected back with the errors before the action runs, in the bag from `X-Inertia-Error-Bag` (default `default`). `[ApiController]` controllers work too: their automatic 400 is replaced by the same redirect for Inertia requests.
+`AddInertiaMvc()` registers a global filter. When an Inertia non-GET request has an invalid `ModelState`, the filter redirects back with the errors before the action runs. The errors go in the bag named by `X-Inertia-Error-Bag`. The default bag is `default`. `[ApiController]` controllers work too. For Inertia requests, the same redirect replaces their automatic 400.
 
 ```csharp
 [HttpPost("/users")]
@@ -96,7 +96,7 @@ Binding failures get the generic message `The value is invalid.`, because their 
 
 ## FastEndpoints
 
-`c.ConfigureInertia()` adds a global pre-processor. A validation failure of an Inertia non-GET request becomes a redirect back with the errors; other requests keep FastEndpoints' 400 JSON. FluentValidation validators work as usual.
+`c.ConfigureInertia()` adds a global pre-processor. A validation failure of an Inertia non-GET request becomes a redirect back with the errors. Other requests keep FastEndpoints' 400 JSON. FluentValidation validators work as usual.
 
 ```csharp
 public sealed class CreateUserValidator : Validator<CreateUserRequest>
@@ -107,11 +107,11 @@ public sealed class CreateUserValidator : Validator<CreateUserRequest>
 app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));
 ```
 
-`c.ConfigureInertia()` composes with an existing `c.Endpoints.Configurator`. Its optional callback runs after Inertia setup. The pre-processor runs after an endpoint's own pre-processors, so one that already answered (a 403, say) wins.
+`c.ConfigureInertia()` works together with an existing `c.Endpoints.Configurator`. The optional callback of `c.ConfigureInertia()` runs after Inertia setup. The Inertia pre-processor runs after an endpoint's own pre-processors. If one of those already answered, for example with a 403, its answer wins.
 
 ## Precognition (live validation)
 
-[Precognition](/docs/precognition) validates a request without running the handler. Minimal APIs use `.WithInertiaPrecognition()` instead of `.WithInertiaValidation()`; FastEndpoints enables it with `ConfigureInertia()`. MVC does not support it.
+[Precognition](/docs/precognition) validates a request without running the handler. Minimal APIs use `.WithInertiaPrecognition()` instead of `.WithInertiaValidation()`. FastEndpoints enables Precognition with `ConfigureInertia()`. MVC does not support Precognition.
 
 ## Error bags in the client
 
@@ -182,4 +182,4 @@ With the option on, `errors.email` is an array of every message instead of the f
 
 ## State and redirects
 
-Validation errors travel in the state store across the redirect. By default that is an encrypted cookie; it can be a session or MVC TempData instead. See [Flash data](/docs/flash-data) for the store choices and size limits.
+Validation errors travel in the state store across the redirect. By default the state store is an encrypted cookie. It can be a session or MVC TempData instead. See [Flash data](/docs/flash-data) for the store choices and size limits.

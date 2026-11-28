@@ -5,7 +5,7 @@ section: Loading data
 order: 3
 ---
 
-By default a reloaded prop replaces the client's value. Merge props tell the client to combine them. This is how pagination, chat messages and incremental lists work.
+By default, a reloaded prop replaces the client's value. A merge prop tells the client to combine the new value with the value it already has. Pagination, chat messages and incremental lists work this way.
 
 | C\# | Metadata | Client behavior |
 |---|---|---|
@@ -44,7 +44,7 @@ By default a reloaded prop replaces the client's value. Merge props tell the cli
 }
 ```
 
-The path before the wrapper stays on the client; only the value below the path is merged.
+The path before the wrapper stays on the client. Only the value below the path is merged.
 
 ## Resetting a merge
 
@@ -54,11 +54,11 @@ The client can ask for a fresh value instead of a merge by listing the path in `
 router.reload({ only: ['posts'], reset: ['posts'] })
 ```
 
-Metadata is skipped for paths in the reset list, and on partial reloads for paths the reload did not ask for.
+Merge metadata is skipped for paths in the reset list. On partial reloads, it is also skipped for paths the reload did not ask for.
 
 ## Match on a stable key
 
-`.MatchOn("id")` replaces an item with the same key instead of appending a duplicate. Use a stable, unique key from your data. Without it, incremental updates append every item again.
+`.MatchOn("id")` replaces an item with the same key instead of appending a duplicate. Use a stable, unique key from your data. Without a match key, incremental updates append every item again.
 
 ```csharp
 ["messages"] = Merge(page.Items).MatchOn("id"),
@@ -66,7 +66,7 @@ Metadata is skipped for paths in the reset list, and on partial reloads for path
 
 ## Deep merge
 
-`DeepMerge` recursively combines objects. Arrays are merged by index; use `MatchOn` when you need item identity.
+`DeepMerge` recursively combines objects. Arrays are merged by index. Use `MatchOn` when you need item identity.
 
 ```csharp
 ["filters"] = DeepMerge(new { search, tags }),

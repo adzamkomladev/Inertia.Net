@@ -5,13 +5,19 @@ section: Tutorial
 order: 1
 ---
 
-ForgetMeNot is a small todo app. It is small, but it uses the same pieces as a real product: sign-in, private data, a public page, a long list that loads as you scroll, and a reminder that appears on your screen without a refresh.
+ForgetMeNot is a small todo app. It is small, but it uses the same pieces as a real product:
 
-Each step tells you **what** to do and **why**. If you know why a line is there, you can change it later without fear.
+- sign-in
+- private data
+- a public page
+- a long list that loads as you scroll
+- a reminder that appears on your screen without a refresh
+
+Each step tells you **what** to do and **why**. If you know why a line is there, you can change it later with confidence.
 
 <Callout type="info" title="What you need">
 - The .NET 10 or .NET 11 SDK
-- Bun, npm, pnpm or Yarn. The commands use Bun; swap in your own.
+- Bun, npm, pnpm or Yarn. The commands on this page use Bun. If you use another tool, use it in place of Bun.
 - A code editor and a terminal
 
 You do not need a database server. The app uses SQLite, a database that lives in one file.
@@ -19,7 +25,7 @@ You do not need a database server. The app uses SQLite, a database that lives in
 
 ## What you will build
 
-Every feature below is here because it shows one idea from Inertia.Net. The right column says which one.
+Each feature in this table shows one idea from Inertia.Net. The right column names the idea.
 
 | You build | You learn |
 |---|---|
@@ -35,7 +41,7 @@ Every feature below is here because it shows one idea from Inertia.Net. The righ
 
 ## 1. Create the app
 
-Install the templates once, then create the app. `--auth` adds cookie sign-in, so you do not write that yourself. Use `--framework vue` or `--framework svelte` for the other clients, and pick the matching tab in the examples below.
+Install the templates once, then create the app. The `--auth` option adds cookie sign-in, so you do not write that yourself. For the other clients, use `--framework vue` or `--framework svelte`. Then pick the matching tab in the examples below.
 
 ```sh
 dotnet new install Inertia.Net.Templates::1.9.8
@@ -54,30 +60,30 @@ bun run dev
 dotnet watch
 ```
 
-Open `http://localhost:5180`, click **Log in**, and sign in with `demo@example.com` and the password `password`. Click around before you change anything.
+Open `http://localhost:5180`, click **Log in**, and sign in with `demo@example.com` and the password `password`. Try the pages before you change anything.
 
 <Callout type="info" title="Why two processes?">
-Vite serves your React, Vue or Svelte code and reloads it the moment you save. ASP.NET Core serves the pages. While Vite runs, it writes a small file called `wwwroot/hot`, and the app uses it to find Vite. Nothing else is needed.
+Vite serves your React, Vue or Svelte code and reloads it when you save. ASP.NET Core serves the pages. While Vite runs, it writes a small file called `wwwroot/hot`. The app reads this file to find Vite. You do not need to set up anything else.
 </Callout>
 
-The template is not empty. It already uses the features we want, and it is worth knowing where they are:
+The template is not empty. It already uses the features this tutorial needs. This table shows where they are:
 
 | Where | What it does | Why it matters |
 |---|---|---|
 | `HomePage`, `LoginPage` in `Program.cs` | **Page records.** A record that names its component once: `Component => "Home"` | The props and the page name stay together, and the compiler checks them |
-| `.WithName("login")` on each route | **Named routes** | A name is a stable handle for a URL. You can change the URL and nothing breaks |
+| `.WithName("login")` on each route | **Named routes** | The name stays the same when the URL changes. You can change the URL and nothing breaks |
 | `ClientApp/types/routes.ts` | **Typed routes**, written from the names | In the browser you write `routes.login()`, never the string `"/login"` |
 | `ClientApp/types/inertia.d.ts` | TypeScript types for every page, written from the C# records | A renamed property is a compile error, not a blank spot on the page |
 | `.WithInertiaPrecognition()` on the login | The form checks a field on the server when you leave it | One set of rules, run in the browser and on the server |
 | `AddInertiaErrorPages()` | A 404 or 500 shows your `Error` page | Visitors never see a raw error |
 
-Both generated files are rewritten when the app starts in Development. You never edit them by hand.
+The app rewrites both generated files, `ClientApp/types/routes.ts` and `ClientApp/types/inertia.d.ts`, when it starts in Development. Never edit them by hand.
 
 ## 2. Make it look good with shadcn/ui
 
-The template's pages have almost no styling. We will use **shadcn/ui**, a set of well-made components: cards, inputs, checkboxes, switches, lists and more. They are built on Tailwind CSS, and they are *copied into your project*, so you own the code and can change any of it.
+The template's pages have almost no styling. This step adds **shadcn/ui**, a set of components: cards, inputs, checkboxes, switches, lists and more. The components are built on Tailwind CSS. They are *copied into your project*, so you own the code and can change any of it.
 
-First, Tailwind CSS and an `@` shortcut for imports (so you write `@/components/ui/button` instead of `../../components/ui/button`):
+First, add Tailwind CSS and an `@` shortcut for imports. With the shortcut, you write `@/components/ui/button` instead of `../../components/ui/button`. Start by installing Tailwind CSS:
 
 ```sh
 bun add -d tailwindcss @tailwindcss/vite
@@ -104,7 +110,7 @@ In `tsconfig.json`, add this inside `compilerOptions`, so TypeScript understands
 "paths": { "@/*": ["./ClientApp/*"] }
 ```
 
-Create `ClientApp/app.css` with one line, and import it at the top of the client entry (`ClientApp/app.tsx` for React, `ClientApp/app.ts` for Vue and Svelte):
+Create `ClientApp/app.css` with one line. Then import it at the top of the client entry file. The client entry file is `ClientApp/app.tsx` for React, and `ClientApp/app.ts` for Vue and Svelte:
 
 ```css
 @import "tailwindcss";
@@ -114,7 +120,7 @@ Create `ClientApp/app.css` with one line, and import it at the top of the client
 import './app.css'
 ```
 
-Now let shadcn set itself up and add the components we need. The flags answer its questions in advance (the `nova` preset is a clean neutral look); if you leave them out, it asks you instead.
+Now run the shadcn setup and add the components this app needs. The flags answer the setup questions in advance. The `nova` preset is a clean neutral look. If you leave the flags out, the tool asks you the questions instead.
 
 <Tabs>
   <Tab label="React">
@@ -147,10 +153,10 @@ The Svelte tool asks before it changes `app.css`. Answer yes.
   </Tab>
 </Tabs>
 
-Look in `ClientApp/components/ui`. Those files are yours now: open `button` and you will see ordinary code, not a library.
+Look in `ClientApp/components/ui`. Those files are yours now. Open `button` and you see ordinary code, not a library.
 
 <Callout type="info" title="Why copy components instead of installing a package?">
-When a library does almost what you want, you fight it. These are plain files in your repo. Want a rounder button? Edit the file. There is no version to upgrade and nothing hidden. Still, you rarely need to: **theming** (next) changes the look of every component at once.
+A library that does almost what you want is hard to change. These components are plain files in your repo. To make a button rounder, edit its file. There is no version to upgrade and nothing hidden. You rarely need to edit a file, though. **Theming**, in the next section, changes the look of every component at once.
 </Callout>
 
 ### Make the theme yours
@@ -172,11 +178,11 @@ Every shadcn component reads a few CSS variables, such as `--primary` for the ma
 }
 ```
 
-Try other values to see how far one line goes. The `.dark` block is used when the page has the `dark` class on its root element; we do not add a switch here, but the theme is ready for one.
+Try other values to see how much one line changes. The `.dark` block applies when the root element of the page has the `dark` class. This tutorial does not add a switch for it, but the theme is ready for one.
 
 ### The login page
 
-The template's login page is plain HTML, and Tailwind resets plain HTML to nothing. Replace it with a card. A `Field` groups a label, an input and its error message, so the error appears in the right place and is announced to screen readers.
+The template's login page is plain HTML, and Tailwind removes the default styles of plain HTML. Replace the login page with a card. A `Field` groups a label, an input and its error message. The error then appears in the right place, and screen readers announce it.
 
 <Tabs>
   <Tab label="React">
@@ -356,11 +362,11 @@ const submit = () => form.submit(routes.login.store(), { onFinish: () => form.re
   </Tab>
 </Tabs>
 
-The form still uses `withPrecognition`: when you leave a field, the server checks it with the same rules as the real submit. Open `http://localhost:5180/login` to see the new look.
+The form still uses `withPrecognition`. When you leave a field, the server checks that field with the same rules as the real submit. Open `http://localhost:5180/login` to see the new look.
 
 ## 3. Add a database
 
-Lists and items must survive a restart, so they need a database. We use **EF Core with SQLite**: EF Core is the usual way to talk to a database from C#, and SQLite needs no server.
+Lists and items must survive a restart, so the app needs a database. This tutorial uses **EF Core with SQLite**. EF Core is the usual way to use a database from C#, and SQLite needs no server. Install the two packages:
 
 ```sh
 dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version "10.*"
@@ -371,7 +377,7 @@ dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.8
 Use `--version "11.*"` for the SQLite package. The EF Core version must match your .NET version.
 </Callout>
 
-Create `Data.cs`. These classes are the **database shape**. They are not what the browser sees; that comes next.
+Create `Data.cs`. Its classes are the **database shape**. They are not what the browser sees. Step 4 covers that.
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -421,12 +427,12 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 
 A few choices are worth explaining:
 
-- **`OwnerEmail` instead of a users table.** The template's demo user already has an email in the sign-in cookie. Using it as the owner key keeps this guide short. In a real app you would use ASP.NET Core Identity and a user id.
-- **`ShareSlug` is null until you share.** A random secret in the URL is the only thing that opens a public list. There is nothing to guess, and turning sharing off simply forgets the secret.
+- **`OwnerEmail` instead of a users table.** The template's demo user already has an email in the sign-in cookie. Using that email as the owner key keeps this guide short. In a real app you would use ASP.NET Core Identity and a user id.
+- **`ShareSlug` is null until you share.** A random secret in the URL is the only thing that opens a public list. There is nothing to guess. When you turn sharing off, the app removes the secret.
 - **`RemindedAt` makes reminders safe to repeat.** If the app restarts halfway through, a reminder that was already sent is never sent twice.
-- **`DateTime`, not `DateTimeOffset`, for reminders.** SQLite cannot compare `DateTimeOffset` values inside a query. We store UTC times as plain `DateTime`, and the query `RemindAt <= now` works.
+- **`DateTime`, not `DateTimeOffset`, for reminders.** SQLite cannot compare `DateTimeOffset` values inside a query. The app stores UTC times as plain `DateTime`, so the query `RemindAt <= now` works.
 
-Now open `Program.cs`. First, **delete the demo todo code** that came with the template. We replace it with our own:
+Now open `Program.cs`. First, **delete the demo todo code** that came with the template. Your own code replaces it. Delete these parts:
 
 - the `AddSingleton<TodoStore>()` line
 - the `/todos` endpoints (the ones named `todos.index`, `todos.store`, `todos.toggle` and `todos.destroy`)
@@ -434,7 +440,7 @@ Now open `Program.cs`. First, **delete the demo todo code** that came with the t
 - the `Todo`, `TodoStats`, `TodosPage`, `NewTodo` and `TodoStore` types
 - their lines in `AppJsonContext` at the bottom
 
-Then register the database where the other services are registered:
+Then register the database in `Program.cs`, where the other services are registered:
 
 ```csharp
 using Microsoft.EntityFrameworkCore; // at the top of the file
@@ -443,7 +449,7 @@ builder.Services.AddDbContext<AppDb>(o =>
     o.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=forgetmenot.db"));
 ```
 
-And create the tables right after `var app = builder.Build();`:
+Then create the tables right after `var app = builder.Build();`:
 
 ```csharp
 using (var scope = app.Services.CreateScope())
@@ -454,14 +460,14 @@ using (var scope = app.Services.CreateScope())
 ```
 
 <Callout type="info" title="Why read the connection string from configuration?">
-Production and tests need a different database than your laptop. With `GetConnectionString("Default")` they can set `ConnectionStrings:Default` without touching the code. We use this in the tests.
+Production and tests need a different database than your laptop. With `GetConnectionString("Default")`, they can set `ConnectionStrings:Default` without a code change. The tests in this tutorial use this.
 </Callout>
 
 `EnsureCreated()` builds the tables on the first run. It cannot change them later. When the model changes in a real app, switch to EF Core migrations.
 
 ## 4. Decide what the browser sees
 
-Never send a database entity to the browser. It may have columns you did not mean to share (like `OwnerEmail`), and every change to the table would change your page. Send small **records** that hold only what a page needs.
+Never send a database entity to the browser. An entity may have columns you did not mean to share, such as `OwnerEmail`. Every change to the table would also change your page. Instead, send small **records** that hold only what a page needs.
 
 Create `Models.cs`:
 
@@ -514,11 +520,11 @@ public static class UserExtensions
 
 Three things here are easy to miss:
 
-- **Form classes are `public`.** The validation generator, `AddValidation()`, skips `internal` types. A private form class means the `[Required]` rules silently do nothing.
-- **`Events.RemindersChanged(email)` is one value used twice.** The page uses it to say "refresh me when this happens", and the worker uses it to say "this happened". Because both use the same value, they cannot drift apart.
-- **`Email()` hides one claim lookup.** Every endpoint asks the same question, "whose list is this?", so we ask it in one place.
+- **Form classes are `public`.** The validation generator, `AddValidation()`, skips `internal` types. With a private form class, the `[Required]` rules do nothing, and you get no error.
+- **`Events.RemindersChanged(email)` is one value used twice.** The page uses it to say "refresh me when this happens", and the worker uses it to say "this happened". Because both use the same value, the page and the worker always agree.
+- **`Email()` hides one claim lookup.** Every endpoint asks the same question, "whose list is this?", so the code asks it in one place.
 
-The template turned off reflection-based JSON, which keeps the app ready for Native AOT. The price is that you list every type that goes to or from the browser. Add these lines to `AppJsonContext` at the bottom of `Program.cs`:
+The template turned off reflection-based JSON. This keeps the app ready for Native AOT. In return, you must list every type that goes to or from the browser. Add these lines to `AppJsonContext` at the bottom of `Program.cs`:
 
 ```csharp
 [JsonSerializable(typeof(ListCard))]
@@ -533,12 +539,12 @@ The template turned off reflection-based JSON, which keeps the app ready for Nat
 Each page record gets its own line when you create it: `ListsPage` in step 5, `ListPage` in step 6 and `PublicPage` in step 7.
 
 <Callout type="tip" title="Forgot one?">
-You get an error the first time that type is sent, and the message names the type. Add it and try again.
+If you forget a type, you get an error the first time the app sends that type. The message names the type. Add the type to `AppJsonContext` and try again.
 </Callout>
 
 ## 5. The lists page
 
-A **page record** holds the props of a page and also the code that fills them. Create `ListsPage.cs`:
+A **page record** holds the props of a page, which are the values the server sends to the page component. It also holds the code that fills them. Create `ListsPage.cs`:
 
 ```csharp
 using System.Security.Claims;
@@ -589,12 +595,12 @@ public sealed record ListsPage(
 
 Add `[JsonSerializable(typeof(ListsPage))]` to `AppJsonContext`, then read the handler from top to bottom:
 
-1. `lists` is read straight from the database into `ListCard` records. `AsNoTracking()` tells EF Core we will not change these rows, which makes the query cheaper.
-2. `Stats` is **deferred**. The page is sent right away and the browser asks for the numbers a moment later. The visitor sees the page sooner, even if counting is slow.
-3. `.Cache(...)` keeps the finished stats for five minutes, so a second visit does not count again. The `tags` give us a way to throw them away: every write will remove the tag `user:email`, so the numbers are never wrong for long.
-4. `Reminders` is deferred and **live**. We come back to it in step 8.
+1. The query reads `lists` straight from the database into `ListCard` records. `AsNoTracking()` tells EF Core that the code will not change these rows, which makes the query cheaper.
+2. `Stats` is **deferred**. The server sends the page right away, and the browser asks for the numbers a moment later. The visitor sees the page sooner, even if counting is slow.
+3. `.Cache(...)` keeps the finished stats for five minutes, so a second visit does not count again. The `tags` give you a way to clear the cached stats. Every write removes the tag `user:email`, so the numbers are never wrong for long.
+4. `Reminders` is deferred and **live**. Step 8 explains it.
 
-Now the routes. Create `Endpoints.cs`:
+Now add the routes. Create `Endpoints.cs`:
 
 ```csharp
 using System.Security.Claims;
@@ -627,7 +633,7 @@ public static class ForgetMeNotEndpoints
 }
 ```
 
-Call it from `Program.cs`, in the place where the `/dashboard` endpoint used to be:
+Call the new method from `Program.cs`, in the place where the `/dashboard` endpoint was:
 
 ```csharp
 app.MapForgetMeNot(); // our lists, items and the public page
@@ -636,22 +642,22 @@ app.MapForgetMeNot(); // our lists, items and the public page
 Also send people to their lists after they sign in. In the `/login` endpoint, change the last `"/dashboard"` to `"/lists"`.
 
 <Callout type="info" title="Why these routes have names">
-`.WithName("lists.store")` costs nothing, and it pays you back twice. The name becomes `routes.lists.store()` in your frontend, so you never type `"/lists"` again. And the form's type, `RouteBodies['lists.store']`, is taken from the C# class `NewList`, so the C# and the TypeScript cannot disagree.
+`.WithName("lists.store")` costs nothing and gives you two things. First, the name becomes `routes.lists.store()` in your frontend, so you never type `"/lists"` again. Second, the form's type, `RouteBodies['lists.store']`, comes from the C# class `NewList`, so the C# and the TypeScript cannot disagree.
 </Callout>
 
 <Callout type="info" title="Why .WithInertiaPrecognition()?">
-It does two jobs. A normal submit with bad data is sent back to the form with the error messages. And when the page asks, "is this one field valid?" while the person is still typing, the server answers without running your code. You write the rules once, on the class, with `[Required]` and `[StringLength]`.
+`.WithInertiaPrecognition()` does two jobs. First, it sends a normal submit with bad data back to the form with the error messages. Second, the page can ask "is this one field valid?" while the person is still typing, and the server answers without running your code. You write the rules once, on the class, with `[Required]` and `[StringLength]`.
 </Callout>
 
 ### Make the frontend ready
 
-Write the types and routes files now. The app does this by itself when it starts in Development; this command does it on demand, which is handy in CI:
+Write the types file and the routes file now. The app does this by itself when it starts in Development. This command does it when you ask, which is useful in CI:
 
 ```sh
 bun run types
 ```
 
-Open `ClientApp/types/routes.ts` and look. You will find functions you did not write, one per named route:
+Open `ClientApp/types/routes.ts`. It contains functions you did not write, one for each named route:
 
 ```ts
 routes.lists.index()            // { url: '/lists', method: 'get' }
@@ -659,15 +665,15 @@ routes.lists.store()            // { url: '/lists', method: 'post' }
 routes.lists.index.url()        // '/lists'
 ```
 
-Now run the checker. It should fail, and that is the point:
+Now run the build, which also checks the types. It should fail, and that is expected:
 
 ```sh
 bun run build
 ```
 
-Because we deleted the `todos` and `dashboard` routes, TypeScript lists every place that still uses them: the layout and the home page. A string URL would have failed silently, in front of a visitor. A typed route fails at your desk.
+You deleted the `todos` and `dashboard` routes, so TypeScript lists every place that still uses them: the layout and the home page. A URL written as a string would fail without an error, in front of a visitor. A typed route fails during development, where you see it.
 
-Fix them one by one. First the layout, which is used by every page. It has the top bar with the **My lists** link and the **Log out** button, and an `Alert` for the messages the server sends after an action (the **flash** messages):
+Fix them one by one. Start with the layout, which every page uses. It has the top bar with the **My lists** link and the **Log out** button. It also has an `Alert` for the **flash** messages, which are the messages the server sends after an action:
 
 <Tabs>
   <Tab label="React">
@@ -846,7 +852,7 @@ const user = computed(() => page.props.auth.user)
   </Tab>
 </Tabs>
 
-Then the home page, whose link pointed at the deleted todos route:
+Then fix the home page. Its link pointed at the deleted todos route:
 
 <Tabs>
   <Tab label="React">
@@ -991,12 +997,12 @@ const features = [
 Finally delete `ClientApp/pages/Todos` and the Dashboard page (`Dashboard.tsx`, `Dashboard.vue` or `Dashboard.svelte`). Run `bun run build` again. It passes.
 
 <Callout type="info" title="Why a warning appears when you build the C#">
-`dotnet build` prints `INERTIA002` for `ListsPage`: "this component has no file under `ClientApp/pages`". That is a helper catching a typo, or a page you forgot to write. It goes away in the next step, when we add the page.
+`dotnet build` prints `INERTIA002` for `ListsPage`: "this component has no file under `ClientApp/pages`". The warning exists to catch a typo, or a page you forgot to write. It goes away in the next step, when you add the page.
 </Callout>
 
 ## 6. One list, with infinite scroll
 
-A list can have thousands of items. Sending them all would make the page slow, so we send one page of items and the browser asks for the next page when the reader scrolls to the end.
+A list can have thousands of items. Sending them all would make the page slow. Instead, the server sends one page of items. The browser asks for the next page when the reader scrolls to the end.
 
 Create `ListPage.cs`, and add `[JsonSerializable(typeof(ListPage))]` to `AppJsonContext`:
 
@@ -1041,13 +1047,13 @@ public sealed record ListPage(
 }
 ```
 
-- **`.ToPageAsync(request)`** (from `Inertia.Net.EntityFrameworkCore`) adds `Skip` and `Take` for you and counts the rows. `PageRequest` reads `?page=2` from the URL by itself.
-- **The order must be unique.** We sort by `IsDone` and then by `Id`. If two items could tie, a row might appear on two pages or on none.
+- **`.ToPageAsync(request)`** comes from `Inertia.Net.EntityFrameworkCore`. It adds `Skip` and `Take` for you and counts the rows. `PageRequest` reads `?page=2` from the URL by itself.
+- **The order must be unique.** The query sorts by `IsDone` and then by `Id`. If two items could tie, a row might appear on two pages or on none.
 - **`Scroll(items)`** tells the browser that this value is a list that grows. New pages are merged into `items.data` instead of replacing it.
-- **Someone else's list is a 404.** The query asks for the id and the owner together. It does not reveal that the list exists.
-- **`links.GetPathByName("public.show", ...)`** is a named route used on the **server**. The page needs the public address, and the name builds it, so the URL pattern lives in one place only. (The route is added in step 7, until then the address is simply empty.)
+- **Someone else's list is a 404.** The query asks for the id and the owner together. The response does not reveal that the list exists.
+- **`links.GetPathByName("public.show", ...)`** is a named route used on the **server**. The page needs the public address, and the name builds it, so the URL pattern is written in one place only. You add the route in step 7. Until then, the address is empty.
 
-Add the rest of the routes inside `MapForgetMeNot`, after the two list routes. Add `using System.Security.Cryptography;` at the top of the file too:
+Add the rest of the routes to `Endpoints.cs`, inside `MapForgetMeNot`, after the two list routes. Also add `using System.Security.Cryptography;` at the top of the file:
 
 ```csharp
 signedIn.MapGet("/lists/{id:int}", ListPage.Handle).WithName("lists.show");
@@ -1100,17 +1106,24 @@ signedIn.MapPost("/lists/{id:int}/share", async (
 }).WithName("lists.share");
 ```
 
-Notice the pattern. Each write **checks the owner in the query**, **saves**, **clears the stats cache**, and **sends the person back** with `Back(...)`. `Back` returns them to the page they came from, so the page shows the new state, and `WithFlash` carries the one-time message.
+Notice the pattern. Each write does the same things in the same order:
+
+1. It **checks the owner in the query**.
+2. It **saves**.
+3. It **clears the stats cache**.
+4. It **sends the person back** with `Back(...)`.
+
+`Back` returns the person to the page they came from, so the page shows the new state. `WithFlash` carries the one-time message.
 
 <Callout type="warning" title="Do not forget the owner check">
-`GET /lists/5` is protected, but `PATCH /items/9` is a separate door. Every endpoint that takes an id must check that the id belongs to the signed-in person. This is the most common security bug in apps like this one.
+`GET /lists/5` is protected, but `PATCH /items/9` is a separate endpoint and needs its own check. Every endpoint that takes an id must check that the id belongs to the signed-in person. A missing owner check is the most common security bug in apps like this one.
 </Callout>
 
-Sharing works like this: the first press creates a random secret, and the second press forgets it. Eight random bytes are 16 characters nobody can guess. Do not use `Random` or a counter for a secret.
+Sharing works like this. The first press of the share button creates a random secret. The second press removes it. Eight random bytes are 16 characters that nobody can guess. Do not use `Random` or a counter for a secret.
 
 Run `bun run types` again, so the browser knows the new routes and pages. Then add the two pages.
 
-The lists page. `useForm` holds the form's values, and `withPrecognition` gives it `validate`, which asks the server about one field:
+First, the lists page. `useForm` holds the form's values. `withPrecognition` adds `validate` to the form, and `validate` asks the server about one field:
 
 <Tabs>
   <Tab label="React">
@@ -1510,7 +1523,7 @@ const submit = () => form.submit(routes.lists.store())
   </Tab>
 </Tabs>
 
-And the page for one list. Pay attention to `InfiniteScroll`: it wraps your rows and does the loading for you.
+Next, the page for one list. Look at `InfiniteScroll`. It wraps your rows and does the loading for you.
 
 <Tabs>
   <Tab label="React">
@@ -1908,12 +1921,12 @@ const copy = () => navigator.clipboard.writeText(location.origin + props.list.sh
 Try it:
 
 1. Open **My lists** and click **Add** with the box empty. The server answers with "The Title field is required".
-2. Paste a title longer than 80 characters and click outside the box. The error appears **before** you submit. That is Precognition, and it is the same message the server would send.
+2. Paste a title longer than 80 characters and click outside the box. The error appears **before** you submit. That is Precognition. The message is the same one the server would send.
 3. Add a list, add a few items, tick one off and add a reminder. The numbers at the top change, because every write cleared the cached stats.
 
 <Callout type="info" title="Two small things you will notice">
 - **`<Deferred>` needs a `fallback`**, even an empty one, or the page will not render. For the stats we show skeleton cards. For the reminders we show nothing until they arrive.
-- **A change reloads the list from the first page.** When you tick an item, the server sends the list again, so the extra pages you scrolled in are dropped. That is the price of the simple `Back()` redirect. If it matters for your app, reload only what changed with a [partial reload](/docs/partial-reloads).
+- **A change reloads the list from the first page.** When you tick an item, the server sends the list again, so the extra pages you loaded by scrolling are dropped. That is the cost of the simple `Back()` redirect. If it matters for your app, reload only what changed with a [partial reload](/docs/partial-reloads).
 </Callout>
 
 <Callout type="warning" title="Svelte: submit buttons need type=submit">
@@ -1922,20 +1935,20 @@ shadcn-svelte's `Button` is `type="button"` by default, so inside a form it does
 
 ## 7. Share a list, and render it on the server
 
-A shared list is a page that anyone can open, and many people may open the same one. That makes it the perfect page for **server-side rendering (SSR)**.
+A shared list is a page that anyone can open, and many people may open the same one. That makes it a good page for **server-side rendering (SSR)**.
 
-Without SSR, the server sends an empty page and the browser has to download JavaScript, run it, and only then show the list. With SSR, the server runs your component first and sends finished HTML. Search engines and slow phones get the content at once, and the browser then "wakes up" the page with the same code.
+Without SSR, the server sends an empty page. The browser has to download JavaScript, run it, and only then show the list. With SSR, the server runs your component first and sends finished HTML. Search engines and slow phones get the content at once. The browser then makes the page interactive with the same code.
 
-The share button already exists, from step 6. All that is missing is the page it points to.
+The share button already exists, from step 6. Only the page it points to is missing.
 
-Create `PublicPage.cs`, add `[JsonSerializable(typeof(PublicPage))]` to `AppJsonContext`, and map the route:
+Create `PublicPage.cs`, add `[JsonSerializable(typeof(PublicPage))]` to `AppJsonContext`, and map the route. The route goes in `Endpoints.cs`:
 
 ```csharp
 // inside MapForgetMeNot, at the end. No sign-in here: anyone with the link can read the list.
 app.MapGet("/p/{slug}", PublicPage.Handle).WithName("public.show");
 ```
 
-The page record:
+This is the page record, in `PublicPage.cs`:
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -1973,14 +1986,14 @@ public sealed record PublicPage(
 }
 ```
 
-Look at the last line. `.WithSsrCache(...)` is the **SSR cache**. Rendering takes time, and this page looks the same for everyone, so the finished HTML can be reused:
+Look at the last line. `.WithSsrCache(...)` is the **SSR cache**. Rendering takes time, and this page looks the same for everyone, so the app can reuse the finished HTML:
 
-- For **5 minutes** the saved HTML is served without calling the SSR server at all.
-- For **one hour more** it is still served, and a new render is made in the background (`staleFor`). Nobody waits.
+- For **5 minutes**, the app serves the saved HTML without calling the SSR server at all.
+- For **one hour more**, the app still serves the saved HTML and makes a new render in the background (`staleFor`). Nobody waits.
 - The cache key is built from the page's **JSON**, which includes the title and the items. If the list changes, the JSON changes, the key changes, and the old render is never used. You cannot show a stale page by mistake.
 
 <Callout type="warning" title="Cache only pages that everyone sees the same">
-A page with per-person props makes one cache entry per person. That wastes memory and gains nothing. Our list pages are **not** cached for that reason, and the public page is.
+A page with per-person props makes one cache entry per person. That wastes memory and gains nothing. The list pages in this app are **not** cached for that reason. The public page is cached.
 </Callout>
 
 Turn SSR on. In `AddInertia(...)` in `Program.cs`, add:
@@ -1992,13 +2005,19 @@ o.Ssr.BundlePath = "ssr/ssr.js";
 o.Ssr.UseNodeProcess(n => n.Executable = "bun");
 ```
 
-`UseNodeProcess` makes the app start and watch the SSR process for you. If it stops answering, it is restarted, and while it is down the pages are rendered in the browser instead. Use `n.Executable = "node"` if you do not have Bun.
+`UseNodeProcess` makes the app start and watch the SSR process for you. If the SSR process stops answering, the app restarts it. While the SSR process is down, the pages are rendered in the browser instead. Use `n.Executable = "node"` if you do not have Bun.
 
 <Callout type="warning" title="Two apps on one machine">
-The SSR process listens on port 13714. If a second Inertia.Net app tries to start its own on the same machine, its SSR process cannot start, and that app quietly renders in the browser instead (you will see a warning in the log). Give each app its own port: `o.Ssr.UseNodeProcess(n => { n.Executable = "bun"; n.BasePort = 13715; })`, and set the same port in the `inertia({ ssr: { port: ... } })` line of `vite.config.ts`, then run the build again. The port is written into the SSR bundle when it is built, so changing only the C# side does not work. We ran two apps side by side this way and both rendered on the server.
+The SSR process listens on port 13714. If a second Inertia.Net app on the same machine tries to start its own SSR process, that process cannot start. The second app then renders in the browser instead, without an error. You see a warning in the log. To avoid this, give each app its own port:
+
+1. Set the port in C#: `o.Ssr.UseNodeProcess(n => { n.Executable = "bun"; n.BasePort = 13715; })`.
+2. Set the same port in the `inertia({ ssr: { port: ... } })` line of `vite.config.ts`.
+3. Run the build again.
+
+The port is written into the SSR bundle when the bundle is built, so changing only the C# side does not work. We ran two apps side by side this way and both rendered on the server.
 </Callout>
 
-The SSR bundle needs an entry file and a build setting. The entry is two lines:
+The SSR bundle needs an entry file and a build setting. The entry file has two lines:
 
 ```tsx
 // ClientApp/ssr.tsx (ClientApp/ssr.ts for Vue and Svelte, importing from @inertiajs/vue3 or @inertiajs/svelte)
@@ -2007,7 +2026,7 @@ import { createInertiaApp } from '@inertiajs/react'
 createInertiaApp()
 ```
 
-In `vite.config.ts`, tell the Inertia plugin where the entry is, and build the SSR bundle into the `ssr` folder with its dependencies included, so it runs without `node_modules`:
+In `vite.config.ts`, tell the Inertia plugin where the entry file is. Also build the SSR bundle into the `ssr` folder with its dependencies included, so the bundle runs without `node_modules`:
 
 ```ts
 export default defineConfig(({ command, isSsrBuild }) => ({
@@ -2026,9 +2045,9 @@ Change the `build` script in `package.json` so it builds both bundles:
 { "scripts": { "build": "tsc --noEmit && vite build && vite build --ssr" } }
 ```
 
-Use `vue-tsc --noEmit` (Vue) or `svelte-check --tsgo --tsconfig ./tsconfig.json` (Svelte) instead of `tsc --noEmit`. The template's script already has the right one; only add the last part.
+Instead of `tsc --noEmit`, use `vue-tsc --noEmit` for Vue or `svelte-check --tsgo --tsconfig ./tsconfig.json` for Svelte. The template's script already has the right command. Only add the last part.
 
-And the public page:
+Then add the public page:
 
 <Tabs>
   <Tab label="React">
@@ -2163,23 +2182,23 @@ defineProps<InertiaPages['Public/Show']>()
 </Tabs>
 
 <Callout type="info" title="Your component runs on the server too">
-Code in a page runs in Node or Bun during SSR, where there is no `window` or `document`. That is why `Show` uses a relative link and not `window.location.origin`. If a component must use the browser, do it inside an effect, which runs only in the browser.
+During SSR, the code in a page runs in Node or Bun, where there is no `window` or `document`. That is why `Show` uses a relative link and not `window.location.origin`. If a component must use the browser, do that inside an effect, which runs only in the browser.
 </Callout>
 
-To see it work, build, start the app in the Production setting, and look at the page source of a shared list. The list title and items are there as real HTML:
+To see SSR work, build the app, start it in the Production setting, and look at the page source of a shared list. The list title and the items are there as real HTML:
 
 ```sh
 bun run build
 ASPNETCORE_ENVIRONMENT=Production dotnet run
 ```
 
-While Vite runs in development, Vite does the rendering itself and the SSR cache is switched off, so every change shows at once. That is why you build and run in Production to see the real thing.
+While Vite runs in development, Vite does the rendering itself and the SSR cache is switched off, so every change shows at once. That is why you build and run in Production to see the real behavior.
 
 ## 8. A reminder that appears by itself
 
-Add a reminder time to an item. When the time comes, the **My lists** page should show it, without anyone reloading. Two parts make that work: a **worker** that notices due reminders, and a **live prop** that refreshes the page when told.
+You can add a reminder time to an item. When the time comes, the **My lists** page should show the reminder, without anyone reloading. Two parts make that work: a **worker** that notices due reminders, and a **live prop** that refreshes the page when it is told to.
 
-First the worker. A `BackgroundService` runs for as long as the app runs:
+Start with the worker. A `BackgroundService` runs for as long as the app runs:
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -2232,12 +2251,12 @@ public sealed class ReminderWorker(IServiceScopeFactory scopes, ILogger<Reminder
 }
 ```
 
-- **Every 20 seconds** is plenty for a demo. A real app might use a minute.
-- **`CreateScope()`** gives the worker its own `AppDb`. The worker lives forever, but a database context must not.
-- **Save first, publish second.** The reminders are marked as sent before anyone is told. If the app dies in between, nobody gets the same reminder twice.
-- **`try`/`catch` around the work.** If one round fails, the worker logs it and tries again next time instead of stopping for good.
+- **Every 20 seconds** is enough for a demo. A real app might use a minute.
+- **`CreateScope()`** gives the worker its own `AppDb`. The worker runs for as long as the app runs, but a database context must not live that long.
+- **Save first, publish second.** The worker marks the reminders as sent before it tells anyone. If the app stops between the two steps, nobody gets the same reminder twice.
+- **`try`/`catch` around the work.** If one round fails, the worker logs the error and tries again next time. It does not stop.
 
-Now the line that connects the worker to the page. In `ListsPage` we wrote `.Live(Events.RemindersChanged(email))`. When the worker publishes that event, the browser reloads **only** the `reminders` prop. Nothing else on the page is touched.
+Now look at the line that connects the worker to the page. In `ListsPage`, you wrote `.Live(Events.RemindersChanged(email))`. When the worker publishes that event, the browser reloads **only** the `reminders` prop. Nothing else on the page changes.
 
 Install the SignalR transport. It carries the "something changed" message to the browser:
 
@@ -2246,7 +2265,7 @@ dotnet add package Inertia.Net.Live.SignalR --version 1.9.8
 bun add @microsoft/signalr
 ```
 
-In `Program.cs`, register it and the worker, and map the connection endpoint:
+In `Program.cs`, register the SignalR transport and the worker, and map the connection endpoint:
 
 ```csharp
 builder.Services.AddHostedService<ReminderWorker>();
@@ -2275,19 +2294,31 @@ createInertiaApp({
 })
 ```
 
-Run it. Add an item with a reminder one minute from now, open **My lists** and wait. When the time comes, the reminder shows up on its own. Open the browser's network tab to see how little happens: one small request, only for `reminders`.
+Run the app. Add an item with a reminder one minute from now, open **My lists** and wait. When the time comes, the reminder appears without a reload. Open the browser's network tab to see how little happens: one small request, only for `reminders`.
 
 <Callout type="info" title="Why not just poll?">
-Polling asks "anything new?" every few seconds, for every open page, all day. A live prop sends nothing until something changes, and then sends one small request. It is cheaper for the server and faster for the person.
+Polling asks "anything new?" every few seconds, for every open page, all day. A live prop sends nothing until something changes, and then sends one small request. A live prop is cheaper for the server and faster for the person.
 </Callout>
 
 <Callout type="warning" title="More than one server">
-A SignalR message reaches only the browsers connected to the server that sent it, and each server would also run its own worker. Behind a load balancer, add a Redis backplane, keep the props cache in Redis (see [Redis cache](/docs/redis)), and run the worker on one instance. For a single server, what you have now is right.
+A SignalR message reaches only the browsers connected to the server that sent it. Each server would also run its own worker. Behind a load balancer, do these things:
+
+- Add a Redis backplane.
+- Keep the props cache in Redis (see [Redis cache](/docs/redis)).
+- Run the worker on one instance.
+
+For a single server, the setup you have now is correct.
 </Callout>
 
 ## 9. Test the important paths
 
-You have a few rules the app must never break: nobody reads another person's list, a private list has no public page, and the dashboard's slow numbers arrive after the page. Tests make sure these stay true.
+The app has a few rules it must never break:
+
+- Nobody reads another person's list.
+- A private list has no public page.
+- The dashboard's slow numbers arrive after the page.
+
+Tests make sure these rules stay true.
 
 Create a test project next to the app. Make sure its `TargetFramework` matches the app's:
 
@@ -2299,7 +2330,7 @@ dotnet add package Microsoft.AspNetCore.Mvc.Testing --version "10.*"
 dotnet add package Inertia.Net.Testing --version 1.9.8
 ```
 
-The test project starts your real app in memory, so add one line at the very end of `Program.cs` of the app:
+The test project starts your real app in memory. For that to work, add one line at the very end of the app's `Program.cs`:
 
 ```csharp
 public partial class Program; // lets the test project start the app
@@ -2442,18 +2473,18 @@ Read the setup, because it explains most of the rest:
 
 - **A fresh database file per test class.** Tests must not see each other's lists.
 - **`o.Version = "test"`** fixes the asset version, so requests do not need a first visit to learn it.
-- **`SsrMode.Disabled`** means no Bun is started during tests.
+- **`SsrMode.Disabled`** means the tests do not start Bun.
 - **`AllowAutoRedirect = false`** lets a test look at the redirect itself, such as "a signed-out visitor is sent to `/login`".
 - **`HandleCookies = true`** keeps the sign-in cookie and the anti-forgery cookie between requests, like a browser.
 
-Run them:
+Run the tests:
 
 ```sh
 dotnet test
 ```
 
 <Callout type="info" title="Why does the helper read an XSRF token?">
-The template protects every form against CSRF. A real browser gets a cookie and sends it back as a header. In a test, `WithXsrfToken` copies the token from a page response into your request, so the server accepts it. If a test fails with a 400, this is usually the reason.
+The template protects every form against cross-site request forgery (CSRF). A real browser gets a cookie and sends it back as a header. In a test, `WithXsrfToken` copies the token from a page response into your request, so the server accepts the request. If a test fails with a 400, a missing token is usually the reason.
 </Callout>
 
 ## 10. Run it in production
@@ -2473,7 +2504,7 @@ Before the app is public, go through this short list. Each item has a reason.
 | Keep the Data Protection keys somewhere that survives a restart | The sign-in cookie is encrypted with them. A new key signs everyone out |
 | Use EF Core migrations instead of `EnsureCreated()` | The tables will change, and `EnsureCreated()` cannot change them |
 | Set `ConnectionStrings__Default` for the real database | The file next to the app is only for your laptop |
-| Forward the proxy headers when you run behind one | The sign-in rate limit counts clients by address, and every client looks like the proxy. See [Deploying behind a proxy](/docs/deploying) |
+| Forward the proxy headers when you run behind one | The sign-in rate limit counts clients by address. Without the headers, every client looks like the proxy. See [Deploying behind a proxy](/docs/deploying) |
 | Run one instance, or add Redis for the caches and SignalR | The props cache, SSR cache and live messages are per server unless you share them |
 
 Container examples are in [Deploying behind a proxy](/docs/deploying) and the [server-side rendering](/docs/server-side-rendering) guide. For the container's memory, use the [memory table](/docs/performance#memory-and-hosting).

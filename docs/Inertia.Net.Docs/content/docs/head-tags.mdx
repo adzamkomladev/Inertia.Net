@@ -5,7 +5,7 @@ section: Essentials
 order: 9
 ---
 
-Set the page's `<title>`, meta and link tags on the server. They are in the first HTML response (no JavaScript needed, so crawlers and link previews see them) and travel with every visit as the `head` prop.
+Set the page's `<title>`, meta and link tags on the server. The tags are in the first HTML response. No JavaScript is needed, so crawlers and link previews see them. The tags are also sent with every visit as the `head` prop.
 
 ```csharp
 return Render("Posts/Show", post).WithHead(h => h
@@ -35,7 +35,7 @@ Put `@inertiaHead` (or `<inertia-head />` in Razor) before the template's own `<
 ## How tags are keyed
 
 - Values are HTML-encoded.
-- Each tag is keyed (`data-inertia`) by `title`, the meta name or property, or the link rel. A later call with the same key replaces the tag, and `Remove(key)` drops one set earlier (for example by middleware).
+- Each tag is keyed (`data-inertia`) by `title`, the meta name or property, or the link rel. A later call with the same key replaces the tag. `Remove(key)` removes a tag that was set earlier, for example by middleware.
 - With SSR the server-rendered head is used, which the client builds from the same prop.
 - `o.Head.PropName` renames the prop.
 

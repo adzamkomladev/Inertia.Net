@@ -5,7 +5,7 @@ section: Essentials
 order: 3
 ---
 
-Shared props are merged into every page. A page prop with the same key wins.
+Shared props are merged into every page. Use them for values that every page needs and that are cheap to compute. When a page prop has the same key as a shared prop, the page prop wins.
 
 ## Register shared values
 
@@ -34,11 +34,11 @@ o.Share("permissions", ctx => Once(() => LoadPermissions(ctx)));
 o.Share("plans", Once(() => plans.All()));   // like Laravel's shareOnce
 ```
 
-`plans` is resolved once and kept by the client across visits.
+`plans` is resolved once, and the client keeps it across visits.
 
-`context.Inertia().FlushShared()` clears configured and request shared props for the current request only. It does not mutate
-application defaults or other requests, and validation errors remain available. Call `Share(...)` afterwards to add replacement
-request shares. To omit shared data specifically on error pages, set `InertiaErrorPagesOptions.IncludeSharedProps = false`.
+`context.Inertia().FlushShared()` clears configured and request shared props for the current request only. It does not change
+application defaults or other requests. Validation errors remain available. Call `Share(...)` afterwards to add replacement
+request shares. To omit shared data on error pages only, set `InertiaErrorPagesOptions.IncludeSharedProps = false`.
 
 ## The shared prop key list
 
@@ -69,9 +69,9 @@ Use shared props for values that every page needs and that are cheap to compute:
 Keep large or page-specific data in page props. Shared props are considered on every page response, including partial reloads, so keep them cheap or wrap an expensive value in `Once`.
 
 <Callout type="tip" title="Share once">
-Wrapping a shared value in `Once` is the equivalent of Laravel's `shareOnce`. The client keeps the value across visits and sends `X-Inertia-Except-Once-Props`; the loader does not run again until the value expires.
+Wrapping a shared value in `Once` is the equivalent of Laravel's `shareOnce`. The client keeps the value across visits and sends `X-Inertia-Except-Once-Props`. The loader does not run again until the value expires.
 </Callout>
 
 ## TypeScript
 
-The generated declarations infer shared props from the values passed to `o.Share(...)`. Factories and per-request shares are typed as `unknown`; use `o.TypeScript.SharedProps<T>()` when you want an explicit shape. See [TypeScript types](/docs/typescript).
+The generated declarations infer shared props from the values passed to `o.Share(...)`. Factories and per-request shares are typed as `unknown`. Use `o.TypeScript.SharedProps<T>()` when you want an explicit shape. See [TypeScript types](/docs/typescript).

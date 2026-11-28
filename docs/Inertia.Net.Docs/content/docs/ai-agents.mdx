@@ -5,18 +5,29 @@ section: Get started
 order: 6
 ---
 
-An Inertia.Net app is a good fit for coding agents. The backend and the frontend live in one project, a feature follows one request path (endpoint, props, page component), and there is no API contract or client router for the agent to keep in sync. The main thing an agent needs is to know the conventions. This page gives you that context in a form you can paste into your project.
+An Inertia.Net app is a good fit for coding agents:
+
+- The backend and the frontend live in one project.
+- A feature follows one request path: endpoint, props, page component.
+- There is no API contract or client router for the agent to keep in sync.
+
+The main thing an agent needs is to know the conventions. This page gives you that context in a form you can paste into your project.
 
 ## Choose the right reference
 
 - **Building an app?** Start with [First 10 minutes](/docs/first-10-minutes), then read the guide for the feature you need.
 - **Changing the adapter?** Read the repository's `AGENTS.md`, `docs/protocol.md`, and the README's **For AI agents** section.
   They explain the source files, tests and protocol rules. Do not apply repository-maintenance rules to an unrelated consuming app.
-- **Looking for a complete Inertia example?** Use [Kitchen Sink](/docs/kitchen-sink), the official v3 demo. Its Laravel
-  handlers need to be translated to C#; the client-side Inertia patterns are the reference.
+- **Looking for a complete Inertia example?** Use [Kitchen Sink](/docs/kitchen-sink), the official v3 demo. You need to
+  translate its Laravel handlers to C#. The client-side Inertia patterns are the reference.
 
-Keep examples honest: name the file being changed, say whether a snippet is a complete file or a fragment, and run the checks
-you report. Do not guess API names from another server adapter.
+Keep examples honest:
+
+- Name the file being changed.
+- Say whether a snippet is a complete file or a fragment.
+- Run the checks you report.
+
+Do not guess API names from another server adapter.
 
 ## Point the agent at the docs
 
@@ -27,11 +38,18 @@ The documentation is published as plain text for language models:
 | [`/llms.txt`](/llms.txt) | An index of every page with a one-line summary, following the [llms.txt](https://llmstxt.org) format. |
 | [`/llms-full.txt`](/llms-full.txt) | The whole documentation in one Markdown file. |
 
-Agents that can fetch URLs can read these directly. For agents that cannot, download `llms-full.txt` into your repository (for example as `docs/inertia-net.md`) and reference it from your agent instructions.
+Agents that can fetch URLs can read these files directly. For agents that cannot, download `llms-full.txt` into your repository, for example as `docs/inertia-net.md`. Then reference the file from your agent instructions.
 
 ## Add an AGENTS.md section
 
-Most coding agents read a project instruction file: `AGENTS.md` for Codex and many others, `CLAUDE.md` for Claude Code, `.github/copilot-instructions.md` for GitHub Copilot and `.cursor/rules` for Cursor. Copy this section into yours and adjust the paths and framework to match your app.
+Most coding agents read a project instruction file:
+
+- `AGENTS.md` for Codex and many others
+- `CLAUDE.md` for Claude Code
+- `.github/copilot-instructions.md` for GitHub Copilot
+- `.cursor/rules` for Cursor
+
+Copy this section into your instruction file. Adjust the paths and framework to match your app.
 
 ````md
 ## Inertia.Net
@@ -72,10 +90,10 @@ A request like this tells the agent which [props](/docs/props) to use, how [vali
 
 Agents are most reliable when they can verify a change. Inertia.Net gives them a few cheap checks:
 
-- **Compile-time types.** With [generated TypeScript types](/docs/typescript), a prop renamed in C# breaks the client build, so the client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`) catches mismatches.
+- **Compile-time types.** With [generated TypeScript types](/docs/typescript), a prop renamed in C# breaks the client build. The client build script (`npm run build`, `bun run build`, `pnpm run build` or `yarn run build`) therefore catches mismatches.
 - **Response tests.** `Inertia.Net.Testing` asserts the component name and props without a browser. Ask the agent to add one test per page.
 - **Missing components.** In Development, [DevTools checks](/docs/devtools) report a `Render` call whose page component does not exist.
 
 <Callout type="tip" title="Starter template">
-`dotnet new inertia -n MyApp --framework react` creates an app with pages, a validated form, flash messages, CSRF and Vite already set up. Starting an agent from the template gives it working examples of every convention above.
+`dotnet new inertia -n MyApp --framework react` creates an app with pages, a validated form, flash messages, CSRF and Vite already set up. Starting an agent from the template gives the agent working examples of every convention above.
 </Callout>

@@ -62,11 +62,11 @@ defineProps<{ greeting: string }>()
 
   </Step>
   <Step title="The client updates the page">
-    The first request returns HTML with the page object embedded. Inertia links and form submissions request the next page in the background and swap the component while the browser keeps its state.
+    The first request returns HTML with the page object embedded. The page object holds the component name and its props. Inertia links and form submissions request the next page in the background and swap the component while the browser keeps its state.
   </Step>
 </Steps>
 
-Your .NET app still owns the request. The adapter adds the protocol middleware, prop resolution, redirect semantics, flash data and asset tags.
+Your .NET app still handles the request. The adapter adds the protocol middleware, prop resolution, redirect semantics, flash data and asset tags.
 
 ## What you get
 
@@ -81,7 +81,7 @@ Your .NET app still owns the request. The adapter adds the protocol middleware, 
     CSRF cookies, encrypted state, asset versioning, proxy support and SSR supervision.
   </Card>
   <Card title="AOT-friendly by design" icon="rocket" href="/docs/native-aot">
-    Props are written through System.Text.Json metadata. No reflection over your page objects.
+    Props are written through System.Text.Json metadata. Inertia.Net does not use reflection over your page objects.
   </Card>
 </Cards>
 
@@ -100,12 +100,12 @@ The client packages are `@inertiajs/react`, `@inertiajs/vue3` and `@inertiajs/sv
 
 ## This documentation site
 
-This site is an Inertia.Net app. The sidebar, search, docs pages and theme switcher are React components rendered by an ASP.NET Core Minimal API. Navigation uses Inertia links, and the source is in `docs/Inertia.Net.Docs` so it doubles as a real example.
+This site is an Inertia.Net app. The sidebar, search, docs pages and theme switcher are React components rendered by an ASP.NET Core Minimal API. Navigation uses Inertia links. The source is in `docs/Inertia.Net.Docs`, so the site is also a real example.
 
 ## Requirements
 
 - .NET 10 or .NET 11 SDK
-- JavaScript frontend build tools with npm, Bun, pnpm or Yarn; managed SSR requires Node.js or Bun at runtime
+- JavaScript frontend build tools with npm, Bun, pnpm or Yarn. Managed SSR requires Node.js or Bun at runtime
 - An Inertia.js v3 client package for React, Vue or Svelte
 
 <Callout type="tip" title="Starting from scratch?">

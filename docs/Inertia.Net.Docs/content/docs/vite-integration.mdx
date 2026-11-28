@@ -5,17 +5,17 @@ section: Production
 order: 2
 ---
 
-`ViteAssets` (a singleton, also usable directly as `vite.RenderTags(httpContext, "resources/js/app.tsx")`) renders the tags for the `@vite(...)` token and the `<vite />` tag helper.
+`ViteAssets` renders the tags for the `@vite(...)` token and the `<vite />` tag helper. It is a singleton, and you can also use it directly as `vite.RenderTags(httpContext, "resources/js/app.tsx")`.
 
 ## Production
 
-In production Inertia.Net reads `wwwroot/build/.vite/manifest.json` (falling back to `wwwroot/build/manifest.json` for older Vite). It parses the manifest once and pre-renders the tags to UTF-8. For each entry it emits, in order:
+In production, Inertia.Net reads `wwwroot/build/.vite/manifest.json`. For older Vite, it falls back to `wwwroot/build/manifest.json`. It parses the manifest once and pre-renders the tags to UTF-8. For each entry it emits, in order:
 
 1. `<link rel="stylesheet">` for the entry's CSS and the CSS of its static imports, recursively and deduplicated;
 2. `<script type="module" src="...">` for the entry file;
 3. `<link rel="modulepreload">` for each static import.
 
-URLs are `{PathBase}/{BuildDirectory}/{file}` so apps under a path base work, or `{AssetBaseUrl}/{file}`. An entry missing from the manifest throws with the list of available entries. A missing manifest throws with the paths it looked in.
+URLs are `{PathBase}/{BuildDirectory}/{file}` so apps under a path base work, or `{AssetBaseUrl}/{file}`. If an entry is missing from the manifest, Inertia.Net throws an exception that lists the available entries. If the manifest is missing, the exception lists the paths Inertia.Net looked in.
 
 ## Development
 
@@ -24,7 +24,7 @@ While the dev server runs, the tags are `@vite/client` and the entry from the de
 - `o.Vite.DevServerUrl` is set (always, in any environment), or
 - the environment is Development and the hot file (`wwwroot/hot` by default) exists and contains the origin.
 
-The hot file is written by your Vite config. The `@inertiajs/vite` plugin does not write one, so the samples include a small plugin that does.
+Your Vite config writes the hot file. The `@inertiajs/vite` plugin does not write one, so the samples include a small plugin that does.
 
 <Callout type="warning" title="base must differ between dev and build">
 Built assets are served from `/build/`, so the Vite `base` is `/build/` for a build. The dev server must serve from the root because Inertia.Net emits `{origin}/@vite/client` and `{origin}/{entry}`. Use `base: command === 'build' ? '/build/' : '/'`.
@@ -44,9 +44,9 @@ builder.Services.AddInertia(o =>
 });
 ```
 
-Only plain http(s) origins without quotes or markup are accepted from the hot file or `DevServerUrl`, because the origin is echoed into a script.
+Inertia.Net accepts only plain http(s) origins without quotes or markup from the hot file or `DevServerUrl`, because the origin is echoed into a script.
 
-With `AssetBaseUrl` set, Vite's own `base` must match so lazily imported chunks resolve against the CDN too:
+When `AssetBaseUrl` is set, Vite's own `base` must match it, so that lazily imported chunks resolve against the CDN too. In your Vite config:
 
 ```ts
 base: 'https://cdn.example.com/build/'
@@ -61,11 +61,16 @@ o.Vite.Prefetch = VitePrefetch.Waterfall;   // PrefetchConcurrency (default 3) a
 o.Vite.Prefetch = VitePrefetch.Aggressive;  // all at once
 ```
 
-The tags get one small inline script with the list of chunks the entries can import later (dynamic imports, then their static imports and CSS), minus those already loaded. It is rendered once per entry set.
+The tags get one small inline script. The script lists the chunks the entries can import later: dynamic imports, then their static imports and CSS. Chunks that are already loaded are left out. The script is rendered once per entry set.
 
 ## Content Security Policy
 
-With a nonce-based CSP, set `o.CspNonce` to the request's nonce. Every script and stylesheet tag Inertia.Net writes then carries it: the page `<script data-page>`, the Vite tags, the React refresh preamble and the prefetch script (whose links get it too).
+With a nonce-based CSP, set `o.CspNonce` to the request's nonce. Every script and stylesheet tag Inertia.Net writes then carries the nonce:
+
+- the page `<script data-page>`
+- the Vite tags
+- the React refresh preamble
+- the prefetch script, whose links get the nonce too
 
 ```csharp
 builder.Services.AddInertia(o => o.CspNonce = ctx => ctx.Items["csp-nonce"] as string);
@@ -80,7 +85,7 @@ app.Use((ctx, next) =>
 });
 ```
 
-The nonce must be base64 or base64url; anything else throws. Cached tags are split where the nonce goes, so a nonce costs one copy of the tag bytes per request and no re-rendering.
+The nonce must be base64 or base64url. Anything else throws. Cached tags are split where the nonce goes, so a nonce costs one copy of the tag bytes per request and no re-rendering.
 
 <Callout type="tip" title="Static assets">
 Use `app.UseStaticFiles()` with a long `Cache-Control` for `/build/assets`, or `app.MapStaticAssets()` when the client is built before `dotnet publish`. See [Deploying](/docs/deploying).

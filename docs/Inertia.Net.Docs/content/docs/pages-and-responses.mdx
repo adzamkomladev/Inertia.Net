@@ -5,7 +5,7 @@ section: Essentials
 order: 1
 ---
 
-An Inertia page is a component name plus a set of props. The server writes the page object into the response; the client resolves the component and renders it.
+An Inertia page is a component name plus a set of props, the data that the component receives. The server writes this page object into the response. The client resolves the component and renders it.
 
 ## Rendering a page
 
@@ -18,7 +18,13 @@ app.MapGet("/users", () => Render("Users/Index", new InertiaProps
 }));
 ```
 
-`Render` accepts an `InertiaProps` (an ordered string-keyed dictionary), any `IDictionary<string, object?>`, or a typed object whose properties are the props. Nested `InertiaProps` and dictionaries are walked at any depth.
+`Render` accepts the props in one of these forms:
+
+- An `InertiaProps`, which is an ordered string-keyed dictionary.
+- Any `IDictionary<string, object?>`.
+- A typed object whose properties are the props.
+
+Nested `InertiaProps` and dictionaries are walked at any depth.
 
 ```csharp
 public sealed record UsersPage(List<User> Users, string Title);
@@ -26,9 +32,9 @@ public sealed record UsersPage(List<User> Users, string Title);
 app.MapGet("/users", () => Render("Users/Index", new UsersPage(users, "Users")));
 ```
 
-This is the default style, and the rest of these docs use it. If you want typed props, a record that implements `IInertiaPage` names its component, so `Render(new UsersPage(...))` needs no component string, and the record can hold its own GET handler. See [Page records](/docs/page-records).
+This is the default style, and the rest of these docs use it. If you want typed props, use a record that implements `IInertiaPage`. The record names its component, so `Render(new UsersPage(...))` needs no component string. The record can also hold its own GET handler. See [Page records](/docs/page-records).
 
-Every page has an `errors` prop (an empty object when there are no errors). Key order is `errors`, shared props, then page props.
+Every page has an `errors` prop. It is an empty object when there are no errors. The key order is `errors`, shared props, then page props.
 
 Every response is one of three things, depending on how the request arrived:
 
@@ -72,7 +78,7 @@ Every response is one of three things, depending on how the request arrived:
 
 ## Per-response options
 
-`InertiaResult` builds on the response without changing the component:
+`InertiaResult` has methods that change one response without changing the component:
 
 ```csharp
 return Render("Admin/Home")
@@ -87,7 +93,7 @@ return Render("Errors/NotFound").WithStatusCode(404);
 | `.WithStatusCode(int)` | Sets the HTTP status of the page response |
 | `.WithRootView(string)` | Uses another root template for this response |
 | `.WithViewData(key, value)` | Makes a value available to `@viewData("key")` |
-| `.WithSsr(SsrMode)` / `.WithoutSsr()` | Overrides the SSR mode for this response |
+| `.WithSsr(SsrMode)` / `.WithoutSsr()` | Overrides the server-side rendering (SSR) mode for this response |
 | `.WithSsrCache(duration, staleFor?)` | Reuses a server-rendered response for the same page JSON |
 
 ## Pages without a handler
@@ -103,7 +109,7 @@ app.MapInertia("/about", "About", new InertiaProps
 
 ## The root template
 
-On the first visit the response is an HTML document. Inertia.Net reads `app.html` from the content root (configurable with `RootView`), parses it once, and replaces these tokens:
+On the first visit the response is an HTML document. Inertia.Net reads `app.html` from the content root. You can change the file with `RootView`. Inertia.Net parses the template once and replaces these tokens:
 
 | Token | Output |
 |---|---|
@@ -114,9 +120,9 @@ On the first visit the response is an HTML document. Inertia.Net reads `app.html
 | `@viewData("title")` | An HTML-encoded value passed with `WithViewData`. |
 | `@@` | A literal `@`. |
 
-Other `@` characters, such as CSS at-rules and e-mail addresses, are left alone. Arguments accept single or double quotes.
+Inertia.Net leaves other `@` characters alone, such as CSS at-rules and e-mail addresses. Token arguments accept single or double quotes.
 
-The page JSON is escaped with `\uXXXX` sequences, so a prop containing `</script>` cannot break out of the script element.
+The page JSON is escaped with `\uXXXX` sequences, so a prop containing `</script>` cannot break out of the script element. An example `app.html`:
 
 ```html
 <!DOCTYPE html>
@@ -135,10 +141,10 @@ The page JSON is escaped with `\uXXXX` sequences, so a prop containing `</script
 </html>
 ```
 
-`RootElementId` (default `app`) changes both the root element id and the `data-page` value. The client finds the page script by that id.
+`RootElementId` changes both the root element id and the `data-page` value. The default is `app`. The client finds the page script by that id.
 
 <Callout type="warning" title="Copy the template">
-`app.html` is read from disk at runtime. Add `CopyToOutputDirectory` and `CopyToPublishDirectory` so it is present after `dotnet publish`.
+Inertia.Net reads `app.html` from disk at runtime. Add `CopyToOutputDirectory` and `CopyToPublishDirectory` so the file is present after `dotnet publish`.
 </Callout>
 
 ### Razor root view (MVC)
@@ -172,7 +178,7 @@ builder.Services.AddControllersWithViews().AddInertiaMvc(o => o.UseRazorRootView
 @addTagHelper *, Inertia.Net.Mvc
 ```
 
-`<vite entry="a.ts, b.css" />` takes comma-separated entries. SSR runs at most once per request and is shared by `<inertia-head />` and `<inertia />`. `WithRootView("Other")` takes Razor view names when the Razor root view is enabled.
+`<vite entry="a.ts, b.css" />` takes comma-separated entries. SSR runs at most once per request, and `<inertia-head />` and `<inertia />` share the result. `WithRootView("Other")` takes Razor view names when the Razor root view is enabled.
 
 ### A custom root view
 
@@ -197,7 +203,7 @@ public sealed class MyRootView : IInertiaRootView
 
 ## Page URL and path base
 
-The page object's `url` is the request PathBase, Path and QueryString. Behind a proxy that rewrites paths, set `o.UrlResolver` to return the URL the browser sees:
+The page object's `url` is the request PathBase, Path and QueryString. If your app runs behind a proxy that rewrites paths, set `o.UrlResolver` to return the URL that the browser sees:
 
 ```csharp
 builder.Services.AddInertia(o => o.UrlResolver = ctx => ctx.Request.GetEncodedUrl());

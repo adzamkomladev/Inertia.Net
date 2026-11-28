@@ -7,7 +7,7 @@ order: 5
 
 Flash data is a message or value for the next page, such as “Contact saved.” Unlike shared props, it is not kept in browser history.
 
-Flash data is carried across the redirect (and any further redirects) and consumed by the next response that is not a redirect. It appears as `page.flash`, only when there is some.
+Inertia.Net carries flash data across the redirect and any further redirects. The next response that is not a redirect consumes it. Flash data appears as `page.flash`, and only when there is some.
 
 ```csharp
 app.MapPost("/users", (CreateUserInput input, HttpContext context) =>
@@ -28,7 +28,7 @@ return Back().WithFlash("toast", "Saved");
 }
 ```
 
-Read it from the page's `flash` (`usePage().flash`, or `page.flash` in Svelte) or the `onFlash` visit callback:
+On the client, read flash data from the page's `flash` or from the `onFlash` visit callback. The page's `flash` is `usePage().flash`, or `page.flash` in Svelte:
 
 <Tabs>
   <Tab label="React">
@@ -73,10 +73,10 @@ const page = usePage()
 </Tabs>
 
 <Callout type="info" title="Typed flash data">
-The TypeScript generator can type `page.flash`. `FlashData<T>()` takes the whole flash object, so for the `toast` above use `record Flash(Toast? Toast)` and call `o.TypeScript.FlashData<Flash>()`; see [TypeScript types](/docs/typescript#flash-data).
+The TypeScript generator can type `page.flash`. `FlashData<T>()` takes the whole flash object. For the `toast` above, use `record Flash(Toast? Toast)` and call `o.TypeScript.FlashData<Flash>()`. See [TypeScript types](/docs/typescript#flash-data).
 </Callout>
 
-Inertia forms keep their input on the client after `Back().WithErrors(...)`; they do not need a `WithInput()` helper. For a full-page form submission, choose only safe fields to flash before redirecting:
+Inertia forms keep their input on the client after `Back().WithErrors(...)`. They do not need a `WithInput()` helper. For a full-page form submission, choose only safe fields to flash before redirecting:
 
 ```csharp
 return Back().WithFlash("old", new InertiaProps { ["email"] = email });
@@ -92,11 +92,11 @@ the nested path. If no flash values remain, the page has no `flash` field. The r
 
 ## Where state is kept
 
-Flash data, errors, `clearHistory` and `preserveFragment` set during a request that ends in a redirect (or a `Location()` / fragment `409`) are saved in an `IInertiaStateStore` and loaded at the start of the next request. If that request redirects again, the state is carried on, so `Back()` to a URL that itself redirects still shows the flash. Otherwise its response consumes it. The state is also kept when the response is the version-mismatch `409`.
+Some state must survive a redirect: flash data, errors, `clearHistory` and `preserveFragment`. When a request sets any of these and ends in a redirect, Inertia.Net saves the state in an `IInertiaStateStore`. The same applies when the request ends in a `Location()` / fragment `409`. Inertia.Net loads the state at the start of the next request. If the next request redirects again, the state is carried on, so `Back()` to a URL that itself redirects still shows the flash. Otherwise the response of the next request consumes the state. The state is also kept when the response is the version-mismatch `409`.
 
 ### Encrypted cookie (default)
 
-The default store is an encrypted cookie named `.Inertia.State`. It is protected with ASP.NET Core Data Protection, `HttpOnly`, `SameSite=Lax`, and works without sessions and under Native AOT. Tampered or undecryptable cookies are ignored and deleted. It logs a warning above about 4 KB because browsers drop larger cookies.
+The default store is an encrypted cookie named `.Inertia.State`. The cookie is protected with ASP.NET Core Data Protection, and it is `HttpOnly` and `SameSite=Lax`. The store works without sessions and under Native AOT. Tampered or undecryptable cookies are ignored and deleted. The store logs a warning when the cookie is larger than about 4 KB, because browsers drop larger cookies.
 
 ### Session store
 
@@ -116,7 +116,7 @@ Use the session store when flash data can be large or must not reach the browser
 builder.Services.AddInertiaMvc(o => o.UseTempDataStateStore());
 ```
 
-This keeps the state in MVC TempData, so it follows your TempData provider: the default cookie provider, or `AddSessionStateTempDataProvider()` with `AddSession()` and `app.UseSession()` before `app.UseInertia()`. It works for Minimal API endpoints too, because the store saves TempData itself. Not Native AOT compatible.
+This store keeps the state in MVC TempData, so the state follows your TempData provider. The provider is the default cookie provider, or `AddSessionStateTempDataProvider()` with `AddSession()` and `app.UseSession()` before `app.UseInertia()`. The store works for Minimal API endpoints too, because it saves TempData itself. It is not compatible with Native AOT.
 
 ### Your own store
 
@@ -131,7 +131,7 @@ public interface IInertiaStateStore
 }
 ```
 
-The methods move opaque bytes; the format is Inertia.Net's.
+The methods move opaque bytes. The format belongs to Inertia.Net.
 
 ## Choosing a store
 
@@ -148,7 +148,7 @@ In a multi-instance deployment, configure Data Protection with a shared key ring
 
 ## History flags
 
-`encryptHistory` is written only when set and is not carried across redirects. `clearHistory` and `preserveFragment` go through the state store and apply to the next page rendered after the redirects, then are consumed.
+`encryptHistory` is written only when set and is not carried across redirects. `clearHistory` and `preserveFragment` go through the state store. They apply to the next page rendered after the redirects, and are then consumed.
 
 ```csharp
 app.MapPost("/logout", (HttpContext context) =>

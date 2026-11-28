@@ -5,7 +5,7 @@ section: Loading data
 order: 8
 ---
 
-The [Minimal API React sample](https://github.com/adzamkomladev/Inertia.Net/tree/main/samples/MinimalApi.React) includes a login validation demo. It accepts dummy values and does not create an authentication session. Precognition sends the same POST as the form with `Precognition: true`. The server validates it and returns without running the handler:
+Precognition validates a form before the user submits it. The client sends the same POST as the form, with a `Precognition: true` header. The server validates the request and returns without running the handler. The [Minimal API React sample](https://github.com/adzamkomladev/Inertia.Net/tree/main/samples/MinimalApi.React) includes a login validation demo. The demo accepts dummy values and does not create an authentication session. A request and response look like this:
 
 ```http
 POST /login HTTP/1.1
@@ -23,7 +23,7 @@ Content-Type: application/json
 {"message":"The Email field is not a valid e-mail address.","errors":{"email":["The Email field is not a valid e-mail address."]}}
 ```
 
-The `message` is the first returned error. A valid request returns `204` and `Precognition-Success: true`. For Minimal APIs register `AddValidation()` and use:
+The `message` is the first returned error. A valid request returns `204` and `Precognition-Success: true`. For Minimal APIs, register `AddValidation()` and map the endpoint like this:
 
 ```csharp
 app.MapPost("/login", (LoginForm input) => Back().WithFlash("success", "Demo form submitted"))
@@ -43,7 +43,7 @@ public sealed class LoginForm
 }
 ```
 
-Import `System.ComponentModel.DataAnnotations`. This replaces `.WithInertiaValidation()`; do not use both. It also handles normal validation redirects. Filters added after it do not run on precognitive requests. FastEndpoints enables this through `c.ConfigureInertia()`; MVC does not support Precognition.
+Import `System.ComponentModel.DataAnnotations`. `.WithInertiaPrecognition()` replaces `.WithInertiaValidation()`. Do not use both. `.WithInertiaPrecognition()` also handles normal validation redirects. Filters added after it do not run on precognitive requests. A precognitive request is a validation request that carries `Precognition: true`. FastEndpoints enables Precognition through `c.ConfigureInertia()`. MVC does not support Precognition.
 
 ## Client setup
 
@@ -117,19 +117,19 @@ form.setValidationTimeout(3000)
   </Tab>
 </Tabs>
 
-`Precognition-Validate-Only` selects returned errors by field, including nested paths. Validation still runs the validator: keep database rules cheap. Validate on blur for login and payment forms to avoid an error while the user is still typing. `setValidationTimeout(3000)` raises the debounce interval for expensive rules; it is not the HTTP deadline.
+`Precognition-Validate-Only` selects which errors the server returns, by field. Nested paths work too. A precognitive request still runs the validator, so keep database rules cheap. Validate on blur for login and payment forms. This avoids showing an error while the user is still typing. `setValidationTimeout(3000)` raises the debounce interval for expensive rules. It is not the HTTP deadline.
 
 ## Antiforgery and authorization
 
-`UseInertiaAntiforgery()` validates precognitive POSTs like other unsafe requests; the Inertia client sends the token automatically. Authorization middleware runs before endpoint filters, so protected forms validate only for authorized users.
+`UseInertiaAntiforgery()` validates precognitive POSTs like other unsafe requests. The Inertia client sends the token automatically. Authorization middleware runs before endpoint filters, so protected forms validate only for authorized users.
 
 ## Rate limiting
 
-Precognitive POSTs pass through rate limiting before the endpoint filter, so using a single strict login bucket can lock users out while typing. Use separate bounded partitions for validation and real submissions, and check endpoint `InertiaPrecognitionMetadata` as well as `InertiaPrecognition.IsPrecognitive(request)`: the header alone does not guarantee the handler is skipped. Do not use `GetNoLimiter` for validation; validators consume CPU and may query a database. With the metadata present the handler is skipped, so the validation bucket does not allow credential attempts.
+Precognitive POSTs pass through rate limiting before the endpoint filter. A single strict login bucket can therefore lock users out while they type. Use separate bounded partitions for validation and real submissions. To tell the two apart, check the endpoint's `InertiaPrecognitionMetadata` as well as `InertiaPrecognition.IsPrecognitive(request)`. The header alone does not guarantee that the handler is skipped. Do not use `GetNoLimiter` for validation, because validators consume CPU and may query a database. When the metadata is present the handler is skipped, so the validation bucket does not allow credential attempts.
 
-On a rejected precognitive request set `Precognition: true` on the 429 response. This lets the client recognize the response; the validation request still rejects, so provide a retry or error message. Run `UseRouting`, `UseRateLimiter`, `UseInertia` and `UseInertiaAntiforgery` in that order. See the example below for a complete policy.
+When the rate limiter rejects a precognitive request, set `Precognition: true` on the 429 response. The header lets the client recognize the response. The validation request still rejects, so provide a retry or error message. Run `UseRouting`, `UseRateLimiter`, `UseInertia` and `UseInertiaAntiforgery` in that order. The example below shows a complete policy.
 
-The following `AddServices` method is copied from the Minimal API sample's `LoginDemo` class. The sample's `_generation` field exists only to reset E2E test buckets; real apps can partition on a stable client identity appropriate to their deployment. Import `System.Globalization`, `System.Threading.RateLimiting` and `Microsoft.AspNetCore.RateLimiting`, and declare `private static int _generation;` and `private static int _submissions;` in that class. The [complete sample class](https://github.com/adzamkomladev/Inertia.Net/blob/main/samples/MinimalApi.React/LoginDemo.cs) includes `LoginForm`, `LoginPage`, and the reset helper:
+The following `AddServices` method is copied from the Minimal API sample's `LoginDemo` class. The sample's `_generation` field exists only to reset E2E test buckets. Real apps can partition on a stable client identity that suits their deployment. Import `System.Globalization`, `System.Threading.RateLimiting` and `Microsoft.AspNetCore.RateLimiting`. Declare `private static int _generation;` and `private static int _submissions;` in the `LoginDemo` class. The [complete sample class](https://github.com/adzamkomladev/Inertia.Net/blob/main/samples/MinimalApi.React/LoginDemo.cs) includes `LoginForm`, `LoginPage`, and the reset helper:
 
 ```csharp
     public static void AddServices(IServiceCollection services)
@@ -180,13 +180,13 @@ The following `AddServices` method is copied from the Minimal API sample's `Logi
     }
 ```
 
-Register it before building the app. The sample also opts 429 into error-page handling for real Inertia submissions; 429 is not a default error-page status:
+Call `AddServices` before you build the app. The sample also adds 429 to error-page handling for real Inertia submissions, because 429 is not a default error-page status:
 
 ```csharp
 builder.Services.AddInertiaErrorPages(o => o.StatusCodes.Add(429));
 ```
 
-Map an error page with a retry message. Precognitive requests accepting JSON retain their 429 response and `Precognition: true` header. Attach the policy to the endpoint:
+Map an error page with a retry message. Precognitive requests that accept JSON keep their 429 response and `Precognition: true` header. Attach the policy to the endpoint:
 
 ```csharp
 LoginDemo.AddServices(builder.Services);
@@ -213,11 +213,11 @@ The sample routes use this method:
     }
 ```
 
-The sample partitions by remote IP for demonstration; configure trusted forwarded headers when behind a proxy and choose a partition key suited to your authentication and abuse model.
+The sample partitions by remote IP for demonstration. When your app runs behind a proxy, configure trusted forwarded headers. Choose a partition key that suits your authentication and abuse model.
 
 ## Testing
 
-With an `Inertia.Net.Testing` client that retains cookies, load the form page and attach its XSRF token. For an endpoint that validates `email`:
+Use an `Inertia.Net.Testing` client that keeps cookies. Load the form page and attach its XSRF token to each request. This test covers an endpoint that validates `email`:
 
 ```csharp
 client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
@@ -253,4 +253,4 @@ Import `System.Net`, `System.Net.Http.Json`, `System.Text.Json`, `Inertia.Net` a
 | `Precognition-Success: true` | Response | Validation succeeded (204) |
 | `Vary: Precognition` | Response | Varies the response by request type |
 
-A validation failure returns `422`; a limiter may return `429`. `InertiaPrecognition.IsPrecognitive(HttpRequest)` checks the header; `InertiaPrecognitionMetadata` identifies endpoints whose handler is skipped for these requests.
+A validation failure returns `422`. A rate limiter may return `429`. `InertiaPrecognition.IsPrecognitive(HttpRequest)` checks the header. `InertiaPrecognitionMetadata` identifies endpoints whose handler is skipped for precognitive requests.

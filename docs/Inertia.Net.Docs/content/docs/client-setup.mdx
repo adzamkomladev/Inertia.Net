@@ -5,12 +5,12 @@ section: Get started
 order: 5
 ---
 
-Inertia.Net speaks the Inertia.js v3 protocol. Install a v3 client package; v2 clients are not supported.
+Inertia.Net uses the Inertia.js v3 protocol. Install a v3 client package. Inertia.Net does not support v2 clients.
 
 ## Install the client
 
-Run client setup commands from the ASP.NET Core project directory (the one containing your `.csproj`). npm, Bun, pnpm and
-Yarn are supported. The framework snippets use npm spelling; replace the command with the equivalent for your package manager:
+Run the client setup commands from the ASP.NET Core project directory, the one that contains your `.csproj`. You can use npm, Bun,
+pnpm or Yarn. The framework snippets below use npm commands. For another package manager, replace each command with its equivalent:
 
 | Package manager | Add packages | Add development packages |
 |---|---|---|
@@ -49,7 +49,7 @@ npm install -D vite typescript @types/node
   </Tab>
 </Tabs>
 
-`@types/node` types the `node:fs` import and `process` in the Vite config. Add `vite/client` to `tsconfig.json` so `import.meta.glob` is typed:
+`@types/node` provides the types for the `node:fs` import and for `process` in the Vite config. Add `vite/client` to `tsconfig.json` so that `import.meta.glob` is typed:
 
 ```json
 {
@@ -67,15 +67,15 @@ npm install -D vite typescript @types/node
 }
 ```
 
-Use `"jsx": "preserve"` or omit it for Vue and Svelte.
+For Vue and Svelte, use `"jsx": "preserve"` or omit that setting.
 
 The starter templates use `ClientApp/pages`. The manual examples below use `resources/js/Pages`. Keep the resolver, file paths and Vite entry consistent with the layout you choose.
 
-The templates also ship `ClientApp/lib/inertia-signalr.ts`, the client transport for [live props over SignalR](/docs/live-props#signalr). Uncomment `live: signalr()` in `ClientApp/app.tsx` (or `app.ts`) to turn it on.
+The templates also ship `ClientApp/lib/inertia-signalr.ts`, the client transport for [live props over SignalR](/docs/live-props#signalr). To turn the transport on, uncomment `live: signalr()` in `ClientApp/app.tsx` (or `app.ts`).
 
 ## Vite configuration
 
-The Vite config is the same for every client except the framework plugin and the entry file (`app.tsx` for React, `app.ts` for Vue and Svelte).
+The Vite config is the same for every client, except for the framework plugin and the entry file. The entry file is `app.tsx` for React and `app.ts` for Vue and Svelte.
 
 <Tabs>
   <Tab label="React">
@@ -227,11 +227,11 @@ Add these fields to `package.json`:
 { "type": "module", "scripts": { "dev": "vite", "build": "vite build" } }
 ```
 
-The manifest key of the entry (`resources/js/app.tsx` for React, `resources/js/app.ts` for Vue and Svelte) is what you pass to `@vite("...")`.
+Pass the manifest key of the entry to `@vite("...")`. The key is `resources/js/app.tsx` for React and `resources/js/app.ts` for Vue and Svelte.
 
 ## Client entry
 
-The optional `@inertiajs/vite` plugin resolves pages and mounts the app for you. With it, the entry is just:
+The optional `@inertiajs/vite` plugin resolves pages and mounts the app for you. With the plugin, the client entry file needs only this:
 
 <Tabs>
   <Tab label="React">
@@ -263,7 +263,7 @@ createInertiaApp()
   </Tab>
 </Tabs>
 
-Without the plugin, provide the resolver and setup yourself.
+Without the plugin, you provide the resolver and the setup function yourself.
 
 <Tabs>
   <Tab label="React">
@@ -387,6 +387,8 @@ Inertia.Net can write TypeScript declarations for your page props, shared props 
 
 ## Development workflow
 
+Run Vite in one terminal and the app in a second terminal:
+
 ```sh
 npm run dev          # or bun/pnpm/yarn run dev; Vite writes wwwroot/hot
 dotnet watch         # terminal 2: the app, ASPNETCORE_ENVIRONMENT=Development
@@ -399,7 +401,7 @@ Open the ASP.NET Core URL, not the Vite URL. Two servers run side by side:
 | `http://localhost:5180` (the template's default) | Your app. ASP.NET Core routes the request, runs your endpoint and renders the Inertia page. | Yes |
 | `http://localhost:5173` | The Vite dev server. It only serves JavaScript, CSS and hot-reload updates to the page above. | No. It has no pages, so it shows a blank page. |
 
-Vite prints `localhost:5173` prominently when it starts, but that address is for the browser's asset requests, not for you. In Development the app reads `wwwroot/hot` and renders the Vite tags; in production it reads the manifest.
+Vite prints `localhost:5173` prominently when it starts. That address is for the browser's asset requests, not for you to open. In Development the app reads `wwwroot/hot` and renders the Vite tags. In production the app reads the manifest.
 
 For production:
 
@@ -408,11 +410,11 @@ npm run build        # or bun/pnpm/yarn run build
 dotnet publish -c Release
 ```
 
-Node is needed to build the assets and only needed at runtime when SSR is enabled.
+You need Node to build the assets. At runtime, you need Node only when server-side rendering (SSR) is enabled.
 
 ## Using @inertiajs/vite
 
-The plugin also contributes the SSR dev endpoint and page resolution. Add it before the hot-file plugin:
+The `@inertiajs/vite` plugin also provides the SSR dev endpoint and page resolution. In `vite.config.ts`, add it before the hot-file plugin:
 
 <Tabs>
   <Tab label="React">
@@ -465,4 +467,4 @@ export default defineConfig({
   </Tab>
 </Tabs>
 
-Keep the SSR listener on loopback: the renderer trusts its output and has no authentication. The [SSR guide](/docs/server-side-rendering) covers the full setup.
+Keep the SSR listener on the loopback address (`127.0.0.1`). The renderer trusts its output and has no authentication. The [SSR guide](/docs/server-side-rendering) covers the full setup.

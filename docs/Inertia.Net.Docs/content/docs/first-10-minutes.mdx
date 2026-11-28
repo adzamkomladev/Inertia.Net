@@ -7,12 +7,12 @@ order: 3
 
 You'll run a small todo app, submit a form, and change how C# validates it. The starter sets up ASP.NET Core, your frontend, and Vite for you.
 
-Want to see the bigger picture first? Explore [Kitchen Sink](/docs/kitchen-sink), the official Inertia.js v3 sample app.
-It uses Laravel and Vue. This guide gets the same server-driven page model running on .NET.
+To see a complete app first, explore [Kitchen Sink](/docs/kitchen-sink), the official Inertia.js v3 sample app.
+It uses Laravel and Vue. This guide runs the same server-driven page model on .NET.
 
 ## 1. Create the app
 
-Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) and use Node.js 22.12 or newer with npm for the commands below. Run `dotnet --list-sdks` to check for an installed 10.0 SDK and `node --version` to check Node.
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). The commands below also need Node.js 22.12 or newer with npm. To check what you have, run `dotnet --list-sdks` and look for a 10.0 SDK, then run `node --version` to see the Node version.
 
 Run these commands in the folder where you want to create `MyApp`.
 
@@ -24,7 +24,7 @@ npm install
 npm run dev
 ```
 
-For Vue or Svelte, use `--framework vue` or `--framework svelte` in the template command. For .NET 11, install the .NET 11 SDK and add `--tfm net11.0`.
+For Vue or Svelte, use `--framework vue` or `--framework svelte` in the `dotnet new inertia` command. For .NET 11, install the .NET 11 SDK and add `--tfm net11.0`.
 
 Leave Vite running. In a second terminal, open the same `MyApp` folder and start the server.
 
@@ -32,13 +32,13 @@ Leave Vite running. In a second terminal, open the same `MyApp` folder and start
 dotnet watch
 ```
 
-Open [http://localhost:5180/todos](http://localhost:5180/todos) in your browser. That's the address from `dotnet watch`. Vite also prints an address on port 5173, where it serves JavaScript, CSS and live updates to the page.
+Open [http://localhost:5180/todos](http://localhost:5180/todos) in your browser. That is the address `dotnet watch` prints. Vite also prints an address on port 5173. Vite uses that address to serve JavaScript, CSS and live updates to the page.
 
 ## 2. Change a C# validation rule
 
 1. With the title empty, click **Add**. The page shows an error below the input.
-2. In `Program.cs`, find `NewTodo` and change `StringLength(100)` to `StringLength(10)`. Save the file, then restart the server to load the new rule. Press **Ctrl+C** in the server terminal and run `dotnet watch` again. Leave Vite running.
-3. Enter `Buy groceries` and click **Add**. The new error shows the 10-character limit. Try `Buy milk` to see the todo appear in the list.
+2. In `Program.cs`, find `NewTodo` and change `StringLength(100)` to `StringLength(10)`. Save the file, then restart the server to load the new rule. To restart, press **Ctrl+C** in the server terminal and run `dotnet watch` again. Leave Vite running.
+3. Enter `Buy groceries` and click **Add**. The new error shows the 10-character limit. Then try `Buy milk`. The todo appears in the list.
 
 ## 3. Follow the form from the browser to C#
 
@@ -55,7 +55,7 @@ app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
 
 `WithInertiaValidation()` checks the rules on `NewTodo.Title`. If validation fails, Inertia.Net sends the browser back to the page with the error. If the title passes, the handler adds the todo and sends back a one-time success message.
 
-Open `ClientApp/pages/Todos/Index.tsx`, `Index.vue`, or `Index.svelte` for your frontend. The excerpts below show how the form uses the generated route and displays `form.errors.title`.
+Open the page file for your frontend: `ClientApp/pages/Todos/Index.tsx`, `Index.vue`, or `Index.svelte`. The excerpts below show how the form uses the generated route and displays `form.errors.title`.
 
 <Tabs>
   <Tab label="React">
@@ -132,9 +132,9 @@ const submit = () => form.submit(routes.todos.store(), { onSuccess: () => form.r
 
 **Follow the route in your editor.** Jump to the definition of `routes.todos.store()`. The starter generates `ClientApp/types/routes.ts` from your named C# endpoints. That function supplies both the URL and the HTTP method to the form.
 
-**Explore the data your page receives.** Find `InertiaPages['Todos/Index']` in the page component. Hover over `todos` in your editor to see the type or open `ClientApp/types/inertia.d.ts`. The starter generates that declaration from the C# `TodosPage` record in `Program.cs`.
+**Explore the data your page receives.** Find `InertiaPages['Todos/Index']` in the page component. To see the type, hover over `todos` in your editor or open `ClientApp/types/inertia.d.ts`. The starter generates that declaration from the C# `TodosPage` record in `Program.cs`.
 
-**Inspect a submission in your browser.** The starter already records visits in Development. Open the Inertia panel, submit an empty title again, and inspect the request and the page data that contains the error. [Install the browser extension and open the panel](/docs/devtools#try-it-in-the-starter)
+**Inspect a submission in your browser.** The starter already records visits in Development. Open the Inertia panel and submit an empty title again. Then inspect the request and the page data that contains the error. [Install the browser extension and open the panel](/docs/devtools#try-it-in-the-starter)
 
 ## Next steps
 

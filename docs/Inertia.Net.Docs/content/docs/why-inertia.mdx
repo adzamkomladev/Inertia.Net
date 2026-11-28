@@ -11,7 +11,7 @@ Keep React, Vue or Svelte and the frontend tools you know. Write your routes and
 
 ASP.NET Core gives you routing, cookie sign-in and authorization in one web framework. When you add a database, Entity Framework Core lets you write queries in C# and manage schema changes alongside the app.
 
-Inertia.Net can generate TypeScript types from your C# page data and named routes. Change a field in C# and your editor can show where the frontend needs to catch up. [TypeScript types](/docs/typescript) · [Typed routes](/docs/typed-routes)
+Inertia.Net can generate TypeScript types from your C# page data and named routes. Change a field in C# and your editor can show where the frontend needs to change. [TypeScript types](/docs/typescript) · [Typed routes](/docs/typed-routes)
 
 ## Already building in .NET?
 
@@ -26,7 +26,7 @@ app.MapGet("/users", (UserStore users) =>
     Render("Users/Index", new InertiaProps { ["users"] = users.All() }));
 ```
 
-The matching component receives `users` as a prop, just like data passed in by another component.
+The matching component receives `users` as a prop, the same way it receives data passed in by another component.
 
 <Tabs>
   <Tab label="React">
@@ -113,7 +113,7 @@ The Inertia client sends the `X-Inertia` header when it requests a page in the b
 | API contract | You design, version and document JSON endpoints | The props you pass are the contract. [TypeScript types](/docs/typescript) can be generated |
 | Frontend | React, Vue or Svelte | React, Vue or Svelte |
 
-You still write components, hooks and styles. What goes away is the glue: the API layer, the client router, and the code that keeps state in sync with the server.
+You still write components, hooks and styles. What you no longer write is the connecting code: the API layer, the client router, and the code that keeps state in sync with the server.
 
 ### Features
 
@@ -139,7 +139,7 @@ You still write components, hooks and styles. What goes away is the glue: the AP
 
 ### Prop features
 
-Props are the data a page receives, and most of the performance and user-experience features of Inertia are choices about how a prop is sent.
+Props are the data a page receives. Most of Inertia's performance and user-experience features are choices about how a prop is sent.
 
 | Prop type | In C# | What it does | Learn more |
 |---|---|---|---|
@@ -156,7 +156,7 @@ Props are the data a page receives, and most of the performance and user-experie
 | Cached | `.Cache(key, duration)` | Caches a loader's result between requests | [Props](/docs/props) |
 | Live | live props | Refresh themselves when the server broadcasts an event, over SignalR or your own transport | [Live props](/docs/live-props) |
 
-Partial reloads let the client ask for only some props (`only` and `except`), so a filter change or a poll does not recompute the whole page. See [Pagination](/docs/pagination) for the numbered and cursor pages that feed pagers and infinite scroll.
+Partial reloads let the client ask for only some props, with `only` and `except`. A filter change or a poll then does not recompute the whole page. See [Pagination](/docs/pagination) for the numbered and cursor pages that feed pagers and infinite scroll.
 
 ### When it is not a good fit
 

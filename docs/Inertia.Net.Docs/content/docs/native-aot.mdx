@@ -5,7 +5,7 @@ section: Production
 order: 6
 ---
 
-`Inertia.Net`, `Inertia.Net.FastEndpoints` and `Inertia.Net.Live.SignalR` are annotated `IsAotCompatible`. A real app is published with Native AOT in CI (`tests/Inertia.Net.AotSmoke`) with zero trim and AOT warnings allowed. The library never reflects over your props: values are written with `JsonTypeInfo` from your `JsonSerializerContext`.
+You can publish an Inertia.Net app with Native AOT. `Inertia.Net`, `Inertia.Net.FastEndpoints` and `Inertia.Net.Live.SignalR` are annotated `IsAotCompatible`. CI publishes a real app with Native AOT (`tests/Inertia.Net.AotSmoke`) with zero trim and AOT warnings allowed. The library never reflects over your props. It writes values with `JsonTypeInfo` from your `JsonSerializerContext`.
 
 ## 1. Register a JSON context
 
@@ -24,13 +24,19 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 internal sealed partial class AppJsonContext : JsonSerializerContext;
 ```
 
-Register the type that each loader returns and each plain value you place in `InertiaProps`, plus flash values that are not plain strings or numbers. The library's own context already covers `string`, `bool`, `int`, `long`, `double`, `decimal`, `float`, `Guid`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `TimeSpan`, `JsonElement`, `string[]`, `int[]`, `List<string>`, `Dictionary<string, string>`, `Dictionary<string, string[]>`, `InertiaProps` and `Dictionary<string, object>`.
+Register these in the context:
 
-Members of type `InertiaProp` are accepted by the source generator without any attribute.
+- the type that each loader returns
+- each plain value you place in `InertiaProps`
+- flash values that are not plain strings or numbers
+
+The library's own context already covers `string`, `bool`, `int`, `long`, `double`, `decimal`, `float`, `Guid`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `TimeSpan`, `JsonElement`, `string[]`, `int[]`, `List<string>`, `Dictionary<string, string>`, `Dictionary<string, string[]>`, `InertiaProps` and `Dictionary<string, object>`.
+
+The source generator accepts members of type `InertiaProp` without any attribute.
 
 ## 2. Make validation models public
 
-The .NET 10 `AddValidation()` source generator skips internal types, and validation then silently does nothing. Only one `AddValidation()` call site per project is allowed.
+The .NET 10 `AddValidation()` source generator skips internal types. Validation of those types then does nothing and reports no error. Only one `AddValidation()` call site per project is allowed.
 
 ## 3. Add ProblemDetails
 
@@ -42,11 +48,11 @@ The non-Inertia `400` validation problem needs the `ProblemDetails` JSON metadat
 
 ## 4. Avoid anonymous types
 
-Anonymous types do not work as props, flash values or published [live prop](/docs/live-props) values under AOT. Use `InertiaProps`, records or classes registered in the context, and register the types you publish as live values in the same context.
+Anonymous types do not work as props, flash values or published [live prop](/docs/live-props) values under AOT. Use `InertiaProps`, records or classes registered in the context. Register the types you publish as live values in the same context.
 
 ## 5. Copy content files
 
-`app.html` and the Vite manifest are read from disk at runtime. Copy them to the publish directory, and set the content root to the binary's directory when it may run from elsewhere:
+The app reads `app.html` and the Vite manifest from disk at runtime. Copy them to the publish directory. When the binary may run from another directory, set the content root to the binary's directory:
 
 ```csharp
 var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
@@ -55,6 +61,8 @@ var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
     ContentRootPath = AppContext.BaseDirectory,
 });
 ```
+
+In the project file:
 
 ```xml
 <PropertyGroup>
@@ -68,7 +76,7 @@ var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
 
 ## 6. Use Minimal APIs or FastEndpoints
 
-MVC is not AOT compatible (neither is MVC itself), so `Inertia.Net.Mvc` is not either. Use Minimal APIs or FastEndpoints.
+`Inertia.Net.Mvc` is not AOT compatible, because ASP.NET Core MVC itself is not. Use Minimal APIs or FastEndpoints.
 
 ## 7. FastEndpoints source generation
 
@@ -80,7 +88,7 @@ builder.Services.AddFastEndpoints(new[] { DiscoveredTypes.All });
 
 ## 8. Trim HTTP/3
 
-The SSR client never uses HTTP/3, so it can be trimmed out:
+The SSR client never uses HTTP/3, so HTTP/3 support can be trimmed out:
 
 ```xml
 <ItemGroup>
@@ -88,7 +96,17 @@ The SSR client never uses HTTP/3, so it can be trimmed out:
 </ItemGroup>
 ```
 
-Cached props, the SSR cache, nonces, prefetching, `MapInertia`, the DevTools recorder and [live props over SignalR](/docs/live-props#signalr) are all AOT safe and covered by the smoke test. SignalR itself does not support strongly typed hubs (`Hub<T>`) under AOT, so keep any hubs of your own untyped.
+These features are all AOT safe and covered by the smoke test:
+
+- cached props
+- the SSR cache
+- nonces
+- prefetching
+- `MapInertia`
+- the DevTools recorder
+- [live props over SignalR](/docs/live-props#signalr)
+
+SignalR itself does not support strongly typed hubs (`Hub<T>`) under AOT, so keep any hubs of your own untyped.
 
 <Callout type="tip" title="Catch missing registrations early">
 Set `JsonSerializerIsReflectionEnabledByDefault=false` in regular builds too. A missing `JsonSerializable` registration then fails in tests instead of only in the AOT publish.

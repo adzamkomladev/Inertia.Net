@@ -5,7 +5,7 @@ section: Production
 order: 3
 ---
 
-The asset version tells the client when its assets are stale. The server resolves it in this order:
+The asset version tells the client when its JavaScript and CSS are stale, so that the client can perform a full page reload. The server resolves the asset version in this order:
 
 1. `InertiaOptions.VersionResolver(HttpContext)`, when it returns non-null;
 2. else `InertiaOptions.Version`;
@@ -19,9 +19,9 @@ o.VersionResolver = ctx => ctx.Request.Headers["X-Tenant"].ToString();   // per 
 
 ## How the client checks it
 
-When an Inertia **GET** carries a different `X-Inertia-Version`, the server answers `409` with `X-Inertia-Location` (the request's path and query) and `X-Inertia-Version`, and the client performs a full page reload.
+When an Inertia **GET** carries a different `X-Inertia-Version`, the server answers `409`. The response carries `X-Inertia-Location` (the request's path and query) and `X-Inertia-Version`. The client then performs a full page reload.
 
-The check runs **before your handler**, so no work is wasted rendering a page that will be thrown away. Other methods never get this `409`.
+The check runs **before your handler**, so no work is wasted rendering a page that will be discarded. Other methods never get this `409`.
 
 ```text
 GET /users
@@ -29,15 +29,15 @@ X-Inertia: true
 X-Inertia-Version: old
 
 409 Conflict
-X-Inertia-Location: https://example.com/users
+X-Inertia-Location: /users
 X-Inertia-Version: new
 ```
 
 ## Choosing a version
 
 - **Vite manifest hash (default).** Nothing to configure. A new build changes the manifest and the version.
-- **Assembly version or build id.** Good when the client build is not tied to the manifest, or when several apps share assets.
-- **Per-request version.** Useful for multi-tenant apps with different frontend builds per tenant.
+- **Assembly version or build id.** Use it when the client build is not tied to the manifest, or when several apps share assets.
+- **Per-request version.** Use it for multi-tenant apps with different frontend builds per tenant.
 
 <Callout type="danger" title="Never generate a new version on every request">
 A `VersionResolver` that returns a random value on every call makes the client reload forever. Different instances behind a load balancer must serve the same build, or the client will bounce between versions.
@@ -45,4 +45,4 @@ A `VersionResolver` that returns a random value on every call makes the client r
 
 ## Path base
 
-The version check and `X-Inertia-Location` use the request URL. Behind a path base or reverse proxy, configure forwarded headers so the scheme and host match the browser's URL. See [Deploying](/docs/deploying).
+`X-Inertia-Location` holds the path base, the path and the query of the request. It has no scheme or host, so the client resolves it against the page it is on, and a reverse proxy cannot make it wrong. Other features still need forwarded headers behind a proxy. See [Deploying](/docs/deploying).

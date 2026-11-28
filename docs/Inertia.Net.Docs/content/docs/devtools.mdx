@@ -9,12 +9,12 @@ Inertia DevTools lets you see what your browser sent and what ASP.NET Core retur
 
 ## Try it in the starter
 
-DevTools lets you inspect a visit without changing its response. Its read API leaves pending errors and flash messages alone.
-Apps hosted under a path such as `/admin` report that path to the extension. Request URLs are absolute; sensitive query values
-are redacted in the recorded copy, not in your real request.
+DevTools lets you inspect a visit without changing its response. Its read API, the endpoints that return the recorded entries,
+leaves pending errors and flash messages alone. Apps hosted under a path such as `/admin` report that path to the extension.
+Request URLs are absolute. Sensitive query values are redacted in the recorded copy, not in your real request.
 
 Entries live in memory and disappear on restart. Source-call locations are not collected, so some “open in editor” links
-are unavailable. Keep the read API private: recorded entries can include user data.
+are unavailable. Keep the read API private, because recorded entries can include user data.
 
 1. Install the browser extension using the [Inertia.js DevTools guide](https://inertiajs.com/docs/v3/advanced/devtools#installation).
 2. Start the app and Vite from [First 10 minutes](/docs/first-10-minutes). Open `http://localhost:5180/todos`, open your browser's developer tools, and select the **Inertia** panel.
@@ -30,25 +30,33 @@ app.UseInertia();
 app.MapInertiaDevTools();                // GET /_inertia/devtools/entries/{id} and /entries
 ```
 
-The list endpoint returns metadata summaries; fetch `/entries/{id}` for props, HTTP bodies and route details.
-Ordinary textual and JSON responses are captured up to `MaxResponseBytes`; binary, explicitly streamed and oversized
+The list endpoint returns metadata summaries. Fetch `/entries/{id}` for props, HTTP bodies and route details.
+Ordinary textual and JSON responses are captured up to `MaxResponseBytes`. Binary, explicitly streamed and oversized
 responses are omitted. Parsed multipart forms include file names, sizes and MIME types, never file contents.
-Unparsed uploads are not read just for recording. Render source locations are included when debug symbols are available;
-published or Native AOT applications may not retain them. Malformed structured bodies and invalid UTF-8 are omitted rather
-than risking an unredacted secret in a raw-text fallback.
+Unparsed uploads are not read only for recording. Render source locations are included when debug symbols are available.
+Published or Native AOT applications may not retain them. Malformed structured bodies and invalid UTF-8 are omitted, because
+a raw-text fallback could expose an unredacted secret.
 
-Use `o.ExcludePaths.Add("/health")` or `o.ExcludePaths.Add("/assets/*")` in `AddInertiaDevTools(o => ...)` to exclude paths.
-Untagged requests use the global entry/byte/age limits; `MaxEntriesPerTab` applies only when a browser tab ID is supplied.
+To exclude paths, use `o.ExcludePaths.Add("/health")` or `o.ExcludePaths.Add("/assets/*")` in `AddInertiaDevTools(o => ...)`.
+Untagged requests use the global entry/byte/age limits. `MaxEntriesPerTab` applies only when a browser tab ID is supplied.
 
-Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry in memory (per browser tab, at most `MaxEntriesPerTab` and `MaxEntries`, for `MaxAge`): request type, timings, headers, bodies, the page object and its props metadata.
+Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry in memory. Entries are kept per browser tab, at most `MaxEntriesPerTab` and `MaxEntries`, for `MaxAge`. An entry holds:
 
-The first page carries the discovery tag the extension reads. Values of names containing `password`, `secret`, `token`, `authorization`, `cookie` or `api_key` are replaced with `[REDACTED]` in props, bodies and headers. Add names with `RedactedKeys`. Nothing leaves the app.
+- request type
+- timings
+- headers
+- bodies
+- the page object and its props metadata
 
-Sensitive query parameters are also redacted in recorded request/page URLs, redirects and URL headers; actual application URLs are unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered; unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk. A page larger than `MaxResponseBytes` (default 1 MiB) is recorded without its body (`too-large`, with its size in `__meta.responseBytes`) and is never copied; the browser still receives all of it. Kept entries are also bounded by `MaxTotalBytes` (default 64 MiB, oldest dropped first).
+The first page carries the discovery tag that the extension reads. In props, bodies and headers, DevTools replaces a value with `[REDACTED]` when its name contains `password`, `secret`, `token`, `authorization`, `cookie` or `api_key`. Add names with `RedactedKeys`. Nothing leaves the app.
 
-Outside Development nothing is recorded unless `Enabled = true`, and the read API answers only requests that `Authorize` accepts (`404` otherwise). With `Pages.Directory` set, entries link the component to its file.
+Sensitive query parameters are also redacted in recorded request/page URLs, redirects and URL headers. Actual application URLs are unchanged. Malformed JSON bodies are omitted. Only eligible Inertia text bodies with a known length up to `MaxBodyBytes` are buffered. Unknown-length nonseekable bodies are omitted as streamed, so recording does not spool bulk requests to disk. A page larger than `MaxResponseBytes` is recorded without its body and is never copied. The default for `MaxResponseBytes` is 1 MiB. The entry is marked `too-large`, with the page size in `__meta.responseBytes`. The browser still receives the whole page. Kept entries are also bounded by `MaxTotalBytes`. The default for `MaxTotalBytes` is 64 MiB, and the oldest entries are dropped first.
+
+Outside Development, nothing is recorded unless `Enabled = true`. Outside Development, the read API answers only requests that `Authorize` accepts. Other requests get `404`. With `Pages.Directory` set, entries link the component to its file.
 
 ## Page component check
+
+To turn on the check, set `Pages.Directory`:
 
 ```csharp
 builder.Services.AddInertia(o =>
@@ -58,7 +66,7 @@ builder.Services.AddInertia(o =>
 });
 ```
 
-In Development, `Render` throws when the component has no page file, naming the closest one:
+In Development, `Render` throws when the component has no page file. The message names the closest one:
 
 ```text
 'Users/Indx' was not found in 'ClientApp/pages' ... Did you mean 'Users/Index'?
@@ -66,15 +74,15 @@ In Development, `Render` throws when the component has no page file, naming the 
 
 Names match exactly, as the client resolver does, even on case-insensitive file systems. Outside Development there is no check and no file access.
 
-`Pages.Extensions` lists the file types: `.tsx`, `.jsx`, `.ts`, `.js`, `.vue` and `.svelte` by default.
+`Pages.Extensions` lists the file types. The default is `.tsx`, `.jsx`, `.ts`, `.js`, `.vue` and `.svelte`.
 
 ## Generated TypeScript
 
-The development startup also writes TypeScript declarations when `o.TypeScript.OutputPath` is set. It only writes the file when the content changed. See [TypeScript types](/docs/typescript).
+The development startup also writes TypeScript declarations when `o.TypeScript.OutputPath` is set. The startup writes the file only when the content changed. See [TypeScript types](/docs/typescript).
 
 ## What to check before deploying
 
-- `Pages.Directory` can stay configured; it is inactive outside Development.
+- `Pages.Directory` can stay configured. It is inactive outside Development.
 - DevTools recording is off unless explicitly enabled.
 - The generated TypeScript file is committed if the client build type-checks in CI.
 - Production logs do not contain the DevTools read API.

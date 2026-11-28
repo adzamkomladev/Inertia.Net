@@ -16,7 +16,7 @@ return Back("/users");                             // Referer, else "/users"
 return Location("https://billing.example.com");    // leave the SPA
 ```
 
-`Back()` follows a `Referer` only when it is an http(s) URL with the request's own host and port. When it is unavailable, the opt-in [previous URL](#previous-url) is tried before the fallback. This prevents an open redirect. The scheme is not compared, so it works behind a TLS-terminating proxy; on HTTPS an `http` Referer is upgraded to `https`.
+`Back()` follows a `Referer` only when the `Referer` is an http(s) URL with the request's own host and port. When the `Referer` is unavailable, `Back()` tries the opt-in [previous URL](#previous-url) before the fallback. This prevents an open redirect. The scheme is not compared, so `Back()` works behind a TLS-terminating proxy. On HTTPS, an `http` Referer is upgraded to `https`.
 
 ## Previous URL
 
@@ -26,11 +26,17 @@ If a form returns `Back()` but the browser does not send its previous address (`
 builder.Services.AddInertia(o => o.State.RememberPreviousUrl = true);
 ```
 
-After a successful page visit, a later `Back()` can use that saved address. `Back()` and the middleware's empty-response redirect consult the same-host `Referer` first, then the remembered URL, then the fallback. `context.Inertia().PreviousUrl` reads the remembered URL, or returns `null` when disabled, absent or invalid; it is user-controlled input validated as a relative path.
+After a successful page visit, a later `Back()` can use that saved address. `Back()` and the middleware's empty-response redirect look for a target in this order:
 
-Only successful status-200 page GET renders are remembered, including initial HTML visits. Partial reloads, prefetches, Precognition, non-GET requests and error pages are excluded. The value is the relative `PathBase + Path + QueryString`, without scheme or host, in the plain `.Inertia.Previous` session cookie (`HttpOnly`, `SameSite=Lax`, `Path=/`, essential, with `Secure` following `o.State.CookieSecurePolicy`). The cookie is written only when the URL changes. Set `o.State.PreviousUrlCookieName` to change its name; it must differ from `o.State.CookieName`.
+1. The same-host `Referer`.
+2. The remembered URL.
+3. The fallback.
 
-This cookie is used with both cookie and session state stores. It is **per browser, not per tab**: the most recent page render wins across tabs. The `Referer` still takes precedence when available.
+`context.Inertia().PreviousUrl` reads the remembered URL. It returns `null` when the option is disabled, or when the remembered URL is absent or invalid. The remembered URL is user-controlled input, validated as a relative path.
+
+Only successful status-200 page GET renders are remembered, including initial HTML visits. Partial reloads, prefetches, Precognition, non-GET requests and error pages are excluded. The value is the relative `PathBase + Path + QueryString`, without scheme or host. It is stored in the plain `.Inertia.Previous` session cookie. The cookie is `HttpOnly`, `SameSite=Lax`, `Path=/` and essential, and `Secure` follows `o.State.CookieSecurePolicy`. The cookie is written only when the URL changes. Set `o.State.PreviousUrlCookieName` to change the cookie name. The name must differ from `o.State.CookieName`.
+
+The `.Inertia.Previous` cookie is used with both cookie and session state stores. It is **per browser, not per tab**: the most recent page render wins across tabs. The `Referer` still takes precedence when available.
 
 ## What the middleware changes
 
@@ -51,9 +57,9 @@ Turn off external redirect conversion with `o.ConvertExternalRedirects = false` 
 app.MapInertia("/about", "About", props);
 ```
 
-Maps GET and HEAD to `Render("About", props)`, like Laravel's `Route::inertia`.
+`MapInertia` maps GET and HEAD to `Render("About", props)`, like Laravel's `Route::inertia`.
 
-In MVC, `return this.InertiaView(props);` renders the action's own component, `{Controller}/{Action}` by default. `AddInertiaMvc(o => o.ComponentResolver = ctx => ...)` changes the rule.
+In MVC, `return this.InertiaView(props);` renders the action's own component. The default component name is `{Controller}/{Action}`. `AddInertiaMvc(o => o.ComponentResolver = ctx => ...)` changes the rule.
 
 ## History encryption
 
@@ -76,7 +82,7 @@ app.MapPost("/logout", (HttpContext context) =>
 });
 ```
 
-`clearHistory` goes through the state store, applies to the next page rendered after the redirect(s), then is consumed. It is typically used before a redirect after logout.
+`clearHistory` goes through the state store. It applies to the next page rendered after the redirect(s), and is then consumed. It is typically used before a redirect after logout.
 
 ## Preserving a fragment
 
@@ -88,12 +94,12 @@ By default a redirect loses the URL fragment. `PreserveFragment()` keeps it acro
 
 ## Page URL
 
-The page object's `url` is PathBase, Path and QueryString. Behind a proxy that rewrites paths, set `o.UrlResolver` to return the URL the browser sees:
+The page object's `url` is PathBase, Path and QueryString. If your app runs behind a proxy that rewrites paths, set `o.UrlResolver` to return the URL that the browser sees:
 
 ```csharp
 o.UrlResolver = ctx => ctx.Request.GetEncodedUrl();
 ```
 
 <Callout type="tip" title="History state is in the cookie">
-Flash data, errors, `clearHistory` and `preserveFragment` share the state store. By default that is an encrypted cookie; see [Flash data](/docs/flash-data#where-state-is-kept).
+Flash data, errors, `clearHistory` and `preserveFragment` share the state store. By default the state store is an encrypted cookie. See [Flash data](/docs/flash-data#where-state-is-kept).
 </Callout>

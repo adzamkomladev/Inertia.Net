@@ -6,7 +6,7 @@ order: 6
 ---
 
 
-A long list is easier to browse when the server sends a small group of items at a time. A numbered page lets readers choose a page; a cursor page uses a marker to fetch the next or previous group. Start with a list already in memory:
+A long list is easier to browse when the server sends a small group of items at a time. A numbered page lets readers choose a page. A cursor page uses a marker to fetch the next or previous group. Start with a list already in memory:
 
 ```csharp
 builder.Services.AddInertia();
@@ -20,26 +20,26 @@ app.MapGet("/posts", (PageRequest request) => Render("Posts/Index", new InertiaP
 }));
 ```
 
-Visiting `/posts?page=2&perPage=5` returns the second group in `posts.data`. The default page size is 20 and the maximum is 100; configure both in [Pagination options](/docs/configuration#opagination-paginationoptions). Set `MaxPage` there to stop at a last page: a page beyond it is empty and runs no query or count. For infinite scroll, wrap that value in `Scroll(...)` and render it with `InfiniteScroll` as shown in [Infinite scroll](/docs/infinite-scroll).
+A visit to `/posts?page=2&perPage=5` returns the second group in `posts.data`. The default page size is 20 and the maximum is 100. Configure both in [Pagination options](/docs/configuration#opagination-paginationoptions). To stop at a last page, set `MaxPage` there. A page beyond `MaxPage` is empty and runs no query or count. For infinite scroll, wrap the page value in `Scroll(...)` and render it with `InfiniteScroll`, as shown in [Infinite scroll](/docs/infinite-scroll).
 
-`Pagination` creates page values; `Scroll` adds infinite-scroll metadata and merging. Use a page directly for a classic pager.
+`Pagination` creates page values. `Scroll` adds infinite-scroll metadata and merging. Use a page directly for a classic pager.
 
 | You write | You get |
 |---|---|
 | `Pagination.Paginate(posts, request)` | A numbered `Page<T>` for a pager |
 | `Scroll(Pagination.Paginate(posts, request))` | Numbered infinite scroll |
 | `Scroll(await Pagination.PaginateAsync(request, key, fetch, ct: ct))` | Cursor-based infinite scroll using your data source |
-| `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` | A deferred page; other prop modifiers also work |
+| `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` | A deferred page. Other prop modifiers also work |
 
-Minimal API handlers can take `PageRequest` or `CursorRequest` directly, as in [Infinite scroll](/docs/infinite-scroll). MVC and FastEndpoints can call `PageRequest.From(Request.Query)` and `CursorRequest.From(HttpContext)`. Page numbers below 1 become 1; invalid page sizes use the default and sizes above the maximum are clamped. Set defaults and parameter names with `o.Pagination` in `AddInertia`. `From` and `BindAsync` retain the query parameter name for the returned page. An explicit paginator name overrides it.
+Minimal API handlers can take `PageRequest` or `CursorRequest` directly, as in [Infinite scroll](/docs/infinite-scroll). MVC and FastEndpoints can call `PageRequest.From(Request.Query)` and `CursorRequest.From(HttpContext)`. Page numbers below 1 become 1. Invalid page sizes use the default, and sizes above the maximum are reduced to the maximum. Set defaults and parameter names with `o.Pagination` in `AddInertia`. `From` and `BindAsync` keep the query parameter name for the returned page. An explicit paginator name overrides that name.
 
-`Pagination.Paginate` slices an already materialized `IReadOnlyList<T>`. For a database, search SDK or HTTP API, `Pagination.PaginateAsync` accepts a `fetch(skip, take, ct)` delegate and an optional count delegate. It requests one extra item to determine `hasMore`; without a count, `total` and `lastPage` are null. Delegate offsets above `int.MaxValue` return an empty page without calling `fetch`; the optional count still runs. Supply a stable, fully unique ordering to your data source. For a classic pager, use `currentPage`, `lastPage`, and `pageName` to build links; pages do not contain URL links.
+`Pagination.Paginate` slices an `IReadOnlyList<T>` that is already in memory. For a database, search SDK or HTTP API, use `Pagination.PaginateAsync`. It accepts a `fetch(skip, take, ct)` delegate and an optional count delegate. It requests one extra item to determine `hasMore`. Without a count, `total` and `lastPage` are null. Delegate offsets above `int.MaxValue` return an empty page without calling `fetch`. The optional count still runs. Supply a stable, fully unique ordering to your data source. Pages do not contain URL links. For a classic pager, use `currentPage`, `lastPage`, and `pageName` to build links.
 
 ```json
 { "data": [ { "id": 21 } ], "currentPage": 2, "perPage": 20, "total": 95, "lastPage": 5, "from": 21, "to": 40, "hasMore": true, "pageName": "page" }
 ```
 
-`from` and `to` are one-based and null on an empty page. The examples abbreviate the data array.
+`from` and `to` are one-based. Both are null on an empty page. The examples shorten the data array.
 
 For example, a data source can implement numbered pages without exposing `IQueryable`:
 
@@ -114,15 +114,21 @@ defineProps<{ page: { currentPage: number; lastPage: number | null; pageName: st
 
 ## Cursors
 
-A cursor is a marker for the position of an item, useful when readers move forward and backward rather than jump to page numbers. The cursor overload of `PaginateAsync` takes a key selector and a fetch delegate. The delegate receives a decoded cursor with `Direction` (`After` or `Before`) and `Value`, a take count, and a cancellation token. Return rows in the requested direction, including up to one extra; the helper trims and reverses `Before` results to display order. Choose a stable unique non-null key. `hasMore` indicates more rows in the requested direction.
+A cursor is a marker for the position of an item. Cursors are useful when readers move forward and backward rather than jump to page numbers. The cursor overload of `PaginateAsync` takes a key selector and a fetch delegate. The delegate receives:
+
+- a decoded cursor with `Direction` (`After` or `Before`) and `Value`
+- a take count
+- a cancellation token
+
+Return rows in the requested direction, including up to one extra. The helper trims and reverses `Before` results to display order. Choose a stable, unique, non-null key. `hasMore` indicates that there are more rows in the requested direction.
 
 ```json
 { "data": [ { "id": 21 } ], "perPage": 20, "nextCursor": "eyJ...", "previousCursor": null, "hasMore": true, "cursorName": "cursor" }
 ```
 
-Cursors are URL-safe base64 of a compact JSON array: direction (`"a"` or `"b"`) followed by the key values. Supported keys are `int`, `long`, `Guid`, `string`, `DateTime`, `DateTimeOffset`, `decimal`, `double`, and `bool`. Cursors are **not tamper-proof**; apps that need tamper protection should wrap them with `IDataProtector`.
+A cursor is the URL-safe base64 form of a compact JSON array: the direction (`"a"` or `"b"`) followed by the key values. Supported keys are `int`, `long`, `Guid`, `string`, `DateTime`, `DateTimeOffset`, `decimal`, `double`, and `bool`. Cursors are **not tamper-proof**. Apps that need tamper protection should wrap cursors with `IDataProtector`.
 
-A malformed or foreign nonempty cursor falls back to the first page. When `CursorRequest.Logger` is set, the paginator logs this at Debug without cursor values or exception details. Minimal API binding uses configured pagination options and supplies a logger in the `Inertia.Net.Pagination` category when a logger factory is available. In MVC or FastEndpoints, `CursorRequest.From(HttpContext)` does the same; optional arguments override the configured defaults and parameter names. For a query-only request or a request created outside HTTP, supply an app logger explicitly:
+A malformed or foreign nonempty cursor falls back to the first page. When `CursorRequest.Logger` is set, the paginator logs the fallback at Debug, without cursor values or exception details. Minimal API binding uses the configured pagination options. It also supplies a logger in the `Inertia.Net.Pagination` category when a logger factory is available. In MVC or FastEndpoints, `CursorRequest.From(HttpContext)` does the same. Optional arguments override the configured defaults and parameter names. For a query-only request or a request created outside HTTP, supply an app logger explicitly:
 
 ```csharp
 var request = CursorRequest.From(query) with { Logger = logger };
@@ -132,7 +138,7 @@ var request = CursorRequest.From(query) with { Logger = logger };
 
 ## Defer or cache a page
 
-A page can use the same prop modifiers as other values. For example, `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` loads it after the first response; a lazy prop can also use `.Cache(...)`. See [Deferred props](/docs/deferred-props) and [Props](/docs/props) for loader and cache options.
+A page can use the same prop modifiers as other values. For example, `Scroll(ct => Pagination.PaginateAsync(request, fetch, ct: ct)).Defer()` loads the page after the first response. A lazy prop can also use `.Cache(...)`. See [Deferred props](/docs/deferred-props) and [Props](/docs/props) for loader and cache options.
 
 ## With EF Core
 
@@ -142,7 +148,7 @@ If your app uses EF Core, install the optional package alongside your database p
 dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.8
 ```
 
-The following uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
+The following example uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
 
 ```csharp
 using Inertia.Net;
@@ -160,11 +166,11 @@ var cursorPage = await db.Posts
 return Render("Feed", new InertiaProps { ["posts"] = Scroll(cursorPage) });
 ```
 
-Both results contain the selected group in `data`. A cursor is a marker: send it back unchanged to request the next or previous group. `ToPageAsync` requires an ordered query and counts rows by default; pass `countTotal: false` to skip the count and return null `total` and `lastPage`. `ToCursorPageAsync` rejects an already ordered query and orders by the supplied key and optional tie-breaker itself. Both guards throw `InvalidOperationException`. The cursor helper fetches in both directions without counting.
+Both results contain the selected group in `data`. A cursor is a marker. Send it back unchanged to request the next or previous group. `ToPageAsync` requires an ordered query and counts rows by default. To skip the count, pass `countTotal: false`. Then `total` and `lastPage` are null. `ToCursorPageAsync` rejects a query that is already ordered. It orders by the supplied key and optional tie-breaker itself. Both guards throw `InvalidOperationException`. The cursor helper fetches in both directions without counting.
 
-Choose a stable, fully unique ordering: use a unique key, or add a unique tie-breaker when the first key can repeat. Nullable keys are unsupported. The cursor codec supports the types listed above, but EF translation and ordering for each type depend on the database provider; for example, SQLite needs a suitable value conversion to order `DateTimeOffset`. The name from a bound request or `From(...)` is used for the corresponding page parameter; an explicit `pageName` or `cursorName` argument takes precedence.
+Choose a stable, fully unique ordering. Use a unique key, or add a unique tie-breaker when the first key can repeat. Nullable keys are not supported. The cursor codec supports the types listed above, but EF translation and ordering for each type depend on the database provider. For example, SQLite needs a suitable value conversion to order `DateTimeOffset`. The corresponding page parameter uses the name from a bound request or `From(...)`. An explicit `pageName` or `cursorName` argument takes precedence.
 
-The EF Core package is not marked Native AOT compatible. EF Core has its own compiled-model requirements; for Native AOT applications, use the core delegate paginators with an AOT-compatible data source instead.
+The EF Core package is not marked Native AOT compatible. EF Core has its own compiled-model requirements. For Native AOT applications, use the core delegate paginators with an AOT-compatible data source instead.
 
 ## With MongoDB
 
@@ -181,10 +187,10 @@ dotnet add package Inertia.Net.MongoDB --version 1.9.8
     .ToCursorPageAsync(p => p.CreatedAt, p => p.Id, CursorRequest.From(http), descending: true, ct: ct)),
 ```
 
-The rules are those of the EF Core helpers:
+The rules are the same as for the EF Core helpers:
 
-- `ToPageAsync` needs a sorted find (skip and limit are replaced) and counts the filter with `CountDocuments` unless `countTotal: false`.
-- `ToCursorPageAsync` needs an unsorted find: it adds the keyset condition to the find's filter and sorts by the key (and tie-breaker). Keys may be `ObjectId` (held in the cursor as its 24-character string), `int`, `long`, `string`, `Guid`, `DateTime`, `DateTimeOffset`, `decimal`, `double` or `bool`. A tampered or unparseable cursor starts at the first page.
+- `ToPageAsync` needs a sorted find. It replaces skip and limit, and counts the filter with `CountDocuments` unless you pass `countTotal: false`.
+- `ToCursorPageAsync` needs an unsorted find. It adds the keyset condition to the find's filter and sorts by the key (and tie-breaker). Keys may be `ObjectId` (held in the cursor as its 24-character string), `int`, `long`, `string`, `Guid`, `DateTime`, `DateTimeOffset`, `decimal`, `double` or `bool`. A tampered or unparseable cursor starts at the first page.
 - MongoDB orders strings by their UTF-8 bytes.
 
 The MongoDB driver does not support trimming or Native AOT, so neither does this package. See the [package README](https://github.com/adzamkomladev/Inertia.Net/blob/main/src/Inertia.Net.MongoDB/README.md).
@@ -202,4 +208,4 @@ See [Native AOT](/docs/native-aot).
 
 ## Caching and scroll props
 
-A cached page still writes its scroll metadata. Use cache keys that include the page or cursor and all user or tenant dependencies. `Scroll(...)` can be deferred or cached; do not reuse its mutable prop instance across requests. Root `Append()` and `Prepend()` cannot be combined on the same prop. See [Props](/docs/props#cached-props) and [Infinite scroll](/docs/infinite-scroll).
+A cached page still writes its scroll metadata. Use cache keys that include the page or cursor and all user or tenant dependencies. `Scroll(...)` can be deferred or cached. Do not reuse its mutable prop instance across requests. You cannot combine root `Append()` and `Prepend()` on the same prop. See [Props](/docs/props#cached-props) and [Infinite scroll](/docs/infinite-scroll).

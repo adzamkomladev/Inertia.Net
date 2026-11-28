@@ -5,7 +5,7 @@ section: Production
 order: 9
 ---
 
-`Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis, so every app instance shares them and one instance's `IInertiaCache.RemoveByTagAsync` clears them for all. A page's cached props are read from Redis together, not one round trip after another; their loaders still run in turn unless marked `Parallel()`.
+`Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis. Every app instance shares them, and a call to `IInertiaCache.RemoveByTagAsync` on one instance clears them for all instances. Inertia.Net reads a page's cached props from Redis together, not one round trip after another. The loaders of those props still run in turn unless you mark them `Parallel()`.
 
 ```sh
 dotnet add package Inertia.Net.Redis --version 1.9.8
@@ -25,16 +25,16 @@ The default prefix is `inertia.net:`.
 ## How entries are stored
 
 - Each entry is a Redis string with the entry's expiration. Each tag is a set of entry keys that lives as long as its longest entry, and each entry keeps an index of its tags.
-- Storing or removing an entry is one script, so a removal racing a store leaves the entry either removed or whole and still tagged.
+- Storing or removing an entry is one script. When a removal races a store, the entry ends up either removed, or whole and still tagged.
 - Removing a tag works in batches, so a tag on every entry does not block the server.
 
 <Callout type="warning" title="Redis Cluster">
-Put a hash tag in the prefix (`{myapp}:`): an entry, its index and its tag sets change together in one script.
+Put a hash tag in the prefix (`{myapp}:`), because an entry, its index and its tag sets change together in one script.
 </Callout>
 
 ## Failures
 
-Failures are not swallowed. While a page renders, Inertia.Net logs a failing store (rate-limited) and renders without the cache: the loaders run, as on a miss. `IInertiaCache` calls throw, so a failed invalidation is not silent.
+Inertia.Net does not hide failures. When the store fails while a page renders, Inertia.Net logs the failure (rate-limited) and renders without the cache. The loaders run, as on a cache miss. `IInertiaCache` calls throw, so a failed invalidation is not silent.
 
 ## Native AOT
 

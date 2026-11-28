@@ -5,11 +5,11 @@ section: Reference
 order: 4
 ---
 
-`Inertia.Net.Testing` has Laravel-style fluent assertions over Inertia responses and `HttpClient` helpers. It parses both JSON responses (`X-Inertia: true`) and the first-visit HTML `<script data-page>`, and decodes `$bigint` values. Failures throw `InertiaAssertionException` with a readable message, so it works with any test framework.
+`Inertia.Net.Testing` has Laravel-style fluent assertions over Inertia responses and `HttpClient` helpers. It parses both JSON responses (`X-Inertia: true`) and the first-visit HTML `<script data-page>`. It also decodes `$bigint` values. A failed assertion throws `InertiaAssertionException` with a readable message, so the package works with any test framework.
 
 ## Check page files and large integers
 
-By default, `Component("Users/Index")` checks only the returned name. To also check the file, use this fragment inside a test:
+By default, `Component("Users/Index")` checks only the returned component name. To also check that the page file exists, use this fragment inside a test:
 
 ```csharp
 var options = new InertiaTestingOptions { EnsurePagesExist = true };
@@ -19,10 +19,12 @@ new AssertableInertia(page, options).Component("Users/Index");
 ```
 
 React, Vue and Svelte extensions are allowed by default. Change `PageExtensions` to narrow that list.
-`Component("Users/Index", false)` skips the file check; `true` forces it.
+`Component("Users/Index", false)` skips the file check. Passing `true` forces it.
 
 When the page enables `preserveBigIntegers`, `Where` and `HasFlash` compare `$bigint` markers as integers,
 including nested values. The raw page stays unchanged. Without that flag, markers remain ordinary objects.
+
+A complete test class looks like this:
 
 ```csharp
 using Inertia.Net.Testing;
@@ -63,7 +65,7 @@ await response.AssertInertiaAsync(page => page.Status(404).Component("Error"));
 
 ## Test host recipe
 
-With `WebApplicationFactory<Program>`, pin the asset version so requests need no first visit to learn it, and turn SSR off so tests need no Node server:
+With `WebApplicationFactory<Program>`, pin the asset version so that requests need no first visit to learn it. Also turn SSR (server-side rendering) off so that tests need no Node server:
 
 ```csharp
 builder.ConfigureTestServices(services => services.PostConfigure<InertiaOptions>(o =>
@@ -73,7 +75,7 @@ builder.ConfigureTestServices(services => services.PostConfigure<InertiaOptions>
 }));
 ```
 
-For form posts, read the XSRF token from a page response with `GetXsrfToken()` and send it with `WithXsrfToken()` (see [Testing a form with antiforgery](#testing-a-form-with-antiforgery)). A cookie-keeping client (`factory.CreateClient(new() { AllowAutoRedirect = false, HandleCookies = true })`) holds the antiforgery cookie and the sign-in cookie between requests.
+For form posts, read the XSRF token from a page response with `GetXsrfToken()` and send it with `WithXsrfToken()`. See [Testing a form with antiforgery](#testing-a-form-with-antiforgery). A client that keeps cookies holds the antiforgery cookie and the sign-in cookie between requests. Create one with `factory.CreateClient(new() { AllowAutoRedirect = false, HandleCookies = true })`.
 
 ## Request helpers
 
@@ -86,7 +88,15 @@ For form posts, read the XSRF token from a page response with `GetXsrfToken()` a
 
 ## Page assertions
 
-`Component`, `Url`, `Version`, `HasFlash(key)`, `HasFlash(key, value)`, `MissingFlash(key)`, `HasDeferred(path)`, `HasDeferred(group, path)`, `HasLive(path)` and `HasLive(path, channel, event)` for [live props](/docs/live-props) (the channel as `"{type}:{name}"`, e.g. `private:orders.1`), and `HasHead(key)` or `HasHead(key, contains)` for [head tags](/docs/head-tags), keyed like the tags' `data-inertia` attribute (`title`, a meta name or property, a link rel):
+The page assertions are:
+
+- `Component`, `Url` and `Version`.
+- `HasFlash(key)`, `HasFlash(key, value)` and `MissingFlash(key)`.
+- `HasDeferred(path)` and `HasDeferred(group, path)`.
+- `HasLive(path)` and `HasLive(path, channel, event)` for [live props](/docs/live-props). Write the channel as `"{type}:{name}"`, for example `private:orders.1`.
+- `HasHead(key)` or `HasHead(key, contains)` for [head tags](/docs/head-tags). The key matches the tags' `data-inertia` attribute: `title`, a meta name or property, or a link rel.
+
+For example:
 
 ```csharp
 await response.AssertInertiaAsync(page => page.HasHead("title", "Users - App").HasHead("description"));
@@ -94,17 +104,17 @@ await response.AssertInertiaAsync(page => page.HasHead("title", "Users - App").H
 
 ## Prop assertions
 
-On props and nested scopes (dot paths and array indexes allowed):
+These assertions work on props and nested scopes. Keys can use dot paths and array indexes:
 
 `Has(key)`, `Has(key, count)`, `Has(key, scope)`, `Has(key, count, firstItemScope)`, `HasAll`, `HasAny`, `Missing`, `MissingAll`, `Where(key, value)`, `Where(key, predicate)`, `WhereNot`, `WhereNull`, `WhereNotNull`, `WhereType(key, "string|null")`, `WhereAllType`, `WhereContains(key, ...)`, `Count`, `CountBetween`, `Each(scope)`, `First(scope)` and `Dump()`.
 
-`WhereRoute(key, url, method)` asserts a route sent as a prop in the client's `{ url, method }` shape, which is what the generated [`routes.ts`](/docs/typed-routes) functions return. The method defaults to `get` and is compared ignoring case:
+`WhereRoute(key, url, method)` asserts a route sent as a prop in the client's `{ url, method }` shape. The generated [`routes.ts`](/docs/typed-routes) functions return that shape. The method defaults to `get`, and the comparison ignores case:
 
 ```csharp
 await response.AssertInertiaAsync(page => page.WhereRoute("actions.delete", "/users/1", "delete"));
 ```
 
-**Strict interaction tracking.** Like Laravel, a nested scope fails when it contains properties you did not assert, unless you end it with `Etc()`. The root scope is not checked automatically: call `.Interacted()` at the end to enforce that every top-level prop was asserted.
+**Strict interaction tracking.** Like Laravel, a nested scope fails when it contains properties you did not assert, unless you end the scope with `Etc()`. The root scope is not checked automatically. Call `.Interacted()` at the end to require that every top-level prop was asserted.
 
 ## Partial reloads and deferred props
 
@@ -126,21 +136,25 @@ var only = await page.ReloadOnlyAsync(_client, "users");
 var except = await page.ReloadExceptAsync(_client, "users");
 ```
 
-`HasScroll(path)` asserts scroll metadata; `HasScroll(path, currentPage, nextPage)` also checks the page values. The page helpers use the metadata and send the appropriate append or prepend intent.
+`HasScroll(path)` asserts scroll metadata. `HasScroll(path, currentPage, nextPage)` also checks the page values. The next-page and previous-page helpers use the metadata and send the appropriate append or prepend intent.
 
-`ReloadOnlyAsync` asserts that `"users"` is in the result; `ReloadExceptAsync` asserts that it is missing.
+`ReloadOnlyAsync` asserts that `"users"` is in the result. `ReloadExceptAsync` asserts that `"users"` is missing.
 
 ## InertiaPage members
 
 `Props`, `Raw`, `Prop(path)`, `HasProp(path)`, `PropBigInteger(path)`, `DeferredProps`, `MergeProps`, `PrependProps`, `DeepMergeProps`, `MatchPropsOn`, `RescuedProps`, `SharedProps`, `ScrollProps`, `OnceProps`, `LiveProps`, `Flash`, `EncryptHistory`, `ClearHistory`, `PreserveFragment`, `PreserveBigIntegers`.
 
 <Callout type="tip" title="Cookies and redirects">
-Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies. Disable `AllowAutoRedirect` to assert the redirect itself, then follow it with a second `InertiaGetAsync` to read the flash or errors.
+Flash and errors travel in a cookie across the redirect, so use a client that keeps cookies. Disable `AllowAutoRedirect` to assert the redirect itself. Then follow the redirect with a second `InertiaGetAsync` to read the flash or errors.
 </Callout>
 
 ## Testing a form with antiforgery
 
-Keep cookies and disable redirects on the test client. Load the form first, then send its XSRF token on the Inertia POST and follow the redirect:
+Keep cookies and disable redirects on the test client. Then:
+
+1. Load the form.
+2. Send the form's XSRF token on the Inertia POST.
+3. Follow the redirect.
 
 ```csharp
 using var formPage = await _client.InertiaGetAsync("/users/create");
@@ -158,4 +172,4 @@ using var redirected = await _client.InertiaGetAsync("/users/create");
 await redirected.AssertInertiaAsync(page => page.HasErrors().HasError("email"));
 ```
 
-Import `System.Net` and `System.Net.Http.Json`. For a named bag use `HasErrorBag("createUser")` and `HasError("email", bag: "createUser")`. Dotted keys such as `items.0.email` are matched as flat error keys; with all errors enabled a message assertion matches any message. `GetXsrfToken()` and `WithXsrfToken()` accept custom cookie and header names. The cookie container must retain the antiforgery cookie as well as the Inertia state cookie.
+Import `System.Net` and `System.Net.Http.Json`. For a named error bag, use `HasErrorBag("createUser")` and `HasError("email", bag: "createUser")`. Dotted keys such as `items.0.email` are matched as flat error keys. With all errors enabled, a message assertion matches any message. `GetXsrfToken()` and `WithXsrfToken()` accept custom cookie and header names. The cookie container must keep the antiforgery cookie as well as the Inertia state cookie.

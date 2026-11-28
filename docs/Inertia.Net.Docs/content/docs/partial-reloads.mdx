@@ -5,7 +5,7 @@ section: Loading data
 order: 1
 ---
 
-The Inertia client can reload the current page and ask for a subset of its props. This is how deferred props, polling and infinite scroll work, and you can use it directly for dashboard refresh buttons and filters. To refresh props when something changes on the server, without polling, use [live props](/docs/live-props).
+In a partial reload, the Inertia client reloads the current page and asks for a subset of its props. Deferred props, polling and infinite scroll work this way. You can also use a partial reload directly for dashboard refresh buttons and filters. To refresh props when something changes on the server, without polling, use [live props](/docs/live-props).
 
 ## From the client
 
@@ -42,7 +42,7 @@ router.reload({ except: ['permissions'] })
   </Tab>
 </Tabs>
 
-`router.visit('/users', { only: ['users'] })` works for a new page too. The client sends:
+`router.visit('/users', { only: ['users'] })` works for a new page too. The client sends these headers:
 
 | Header | Meaning |
 |---|---|
@@ -59,16 +59,16 @@ Filtering applies only when the partial component equals the component being ren
 ["roles"] = Prop(ct => db.Roles.ToListAsync(ct)),    // does not run
 ```
 
-- Paths are dot paths and match on a `.` boundary. `only: ["user"]` includes `user.name`; `only: ["user.name"]` includes `user.name` and keeps `user` as a container.
-- `except` beats `only`. `Always(...)` ignores both.
-- The children of a value produced by a loader are not filtered. Nested literal `InertiaProps` are.
+- Paths are dot paths and match on a `.` boundary. `only: ["user"]` includes `user.name`. `only: ["user.name"]` includes `user.name` and keeps `user` as a container.
+- `except` takes priority over `only`. `Always(...)` ignores both.
+- The children of a value produced by a loader are not filtered. Nested literal `InertiaProps` are filtered.
 - Loaders of excluded props never run.
-- Selecting an array descendant (`rows.1.extra`) reloads the complete array, including sibling fields and nested loaders. A descendant `except` excludes the entire array; `Always` still wins.
-- Omitted or rescued direct array elements retain their positions as `null`.
+- Selecting an array descendant (`rows.1.extra`) reloads the complete array, including sibling fields and nested loaders. A descendant `except` excludes the entire array. `Always` still wins.
+- Omitted or rescued direct array elements keep their positions as `null`.
 - A missing or empty list header means “no filter”, which differs from an empty list.
 
 <Callout type="warning" title="Always wins">
-`Always(...)` is sent even when a partial reload does not ask for it. Use it for props the page cannot render without; do not use it for expensive data.
+`Always(...)` is sent even when a partial reload does not ask for it. Use it for props the page cannot render without. Do not use it for expensive data.
 </Callout>
 
 ## What the client keeps
@@ -93,4 +93,4 @@ var except = await page.ReloadExceptAsync(client, "permissions");
 var deferred = await page.LoadDeferredPropsAsync(client, "sidebar");
 ```
 
-`ReloadOnlyAsync` asserts that the requested prop is present; `ReloadExceptAsync` asserts that it is missing.
+`ReloadOnlyAsync` asserts that the requested prop is present. `ReloadExceptAsync` asserts that the excluded prop is missing.

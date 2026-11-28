@@ -5,7 +5,7 @@ section: Loading data
 order: 5
 ---
 
-Use infinite scroll when a reader should see more items as they reach the end of a list. `Scroll(...)` merges the items inside a value (the *wrapper*, `"data"` by default) and reports paging metadata to the `<InfiniteScroll>` client component.
+Use infinite scroll when a reader should see more items as they reach the end of a list. `Scroll(...)` merges the items inside a value and reports paging metadata to the `<InfiniteScroll>` client component. The items sit in the *wrapper*, which is `"data"` by default.
 
 ```csharp
 app.MapGet("/feed", (PageRequest request) => Render("Feed", new InertiaProps
@@ -80,9 +80,9 @@ defineProps<{ posts: { data: { id: number }[] } }>()
 
 ## Metadata
 
-`ScrollMetadata(PageName, PreviousPage, NextPage, CurrentPage)` is a record. Page values can be `int`, `long`, `string` or `null` (cursor paging uses strings).
+`ScrollMetadata(PageName, PreviousPage, NextPage, CurrentPage)` is a record. Page values can be `int`, `long`, `string` or `null`. Cursor paging uses strings.
 
-Metadata comes from the `metadata:` argument, or from the value if it implements `IProvidesScrollMetadata`. Without either, the render throws with a message naming the prop.
+Metadata comes from the `metadata:` argument, or from the value if it implements `IProvidesScrollMetadata`. Without either, the render throws an exception with a message that names the prop.
 
 ```csharp
 ["posts"] = Scroll(page, wrapper: "data", metadata: ScrollMetadata.FromPage(2, hasMore: true)),
@@ -94,14 +94,14 @@ The client sends `X-Inertia-Infinite-Scroll-Merge-Intent: prepend` when scrollin
 
 ## Combining with other props
 
-`Scroll(...)` accepts the five loader shapes, and `.Defer()`, `.Once()` and `.Rescue()` combine with it:
+`Scroll(...)` accepts the five loader shapes. You can combine it with `.Defer()`, `.Once()` and `.Rescue()`:
 
 ```csharp
 ["posts"] = Scroll(ct => feed.PageAsync(1, ct)).Defer(),
 ```
 
-A deferred scroll prop reports `"posts.data"` just like a resolved one. This is a deliberate fix of an inertia-laravel quirk.
+A deferred scroll prop reports `"posts.data"` in the same way as a resolved one. This behavior deliberately fixes an inertia-laravel quirk.
 
 <Callout type="tip" title="Keep pages small">
-Infinite scroll is also a payload-size tool. Load 10 to 20 items per page instead of sending an unbounded list on the first request.
+Infinite scroll also limits the payload size. Load 10 to 20 items per page instead of sending an unbounded list on the first request.
 </Callout>

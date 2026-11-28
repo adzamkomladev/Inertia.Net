@@ -5,7 +5,7 @@ section: Loading data
 order: 4
 ---
 
-Once props are expensive values that rarely change. The client remembers them across visits and tells the server which keys it holds with `X-Inertia-Except-Once-Props`.
+Use once props for expensive values that rarely change. The client remembers a once prop across visits. It tells the server which keys it holds with `X-Inertia-Except-Once-Props`, so the server can skip them on later visits.
 
 ```csharp
 ["countries"] = Once(ct => db.CountriesAsync(ct)),                                  // key = the prop path
@@ -43,7 +43,7 @@ The default key is the prop path. Use `.As("billing-plans")` when the same value
 ```
 
 <Callout type="warning" title="A key is a value identity">
-Two props that share a key are treated as the same client value. Only share a key when the values are actually the same. When in doubt, use the default prop path.
+Two props that share a key are treated as the same client value. Only share a key when the values are the same. If you are not sure, use the default prop path.
 </Callout>
 
 ## Expiry
@@ -56,7 +56,7 @@ Two props that share a key are treated as the same client value. Only share a ke
 o.Share("plans", Once(() => plans.All()));
 ```
 
-This is the equivalent of Laravel's `shareOnce`: the client keeps the value across visits.
+A shared once prop is the equivalent of Laravel's `shareOnce`. The client keeps the value across visits.
 
 ## Testing
 

@@ -5,7 +5,7 @@ section: Type safety
 order: 2
 ---
 
-Inertia.Net can write TypeScript declarations for typed page props, shared props and flash data. They follow the app's JSON contracts (the HTTP JSON options and their source-generated contexts), so names, nullability and enum values match the page JSON.
+Inertia.Net can write TypeScript declarations for typed page props, shared props and flash data. The declarations follow the app's JSON contracts, which are the HTTP JSON options and their source-generated contexts. As a result, names, nullability and enum values match the page JSON.
 
 To name a page's component once, see [Page records](/docs/page-records). To generate a typed `routes.ts` for your named endpoints, see [Typed routes](/docs/typed-routes).
 
@@ -24,19 +24,20 @@ public sealed record UsersPage(
     [property: InertiaPropType(typeof(UserStats))] InertiaProp Stats);
 ```
 
-The file is written when the app starts in Development, and only when its content changed. Commit it so `tsc` passes in CI without running the app.
+Inertia.Net writes the file when the app starts in Development, and only when the content changed. Commit the file so that `tsc` passes in CI without running the app.
 
 ## Generate in CI
 
-To write the file without starting the app for real (in CI, or outside Development), run it with `--inertia-types`: it writes the
-declarations in any environment, then stops, and exits with code 1 if they could not be written. The templates add it as a script:
+To write the file without starting the app for real, for example in CI or outside Development, run the app with `--inertia-types`.
+The app writes the declarations in any environment and then stops. It exits with code 1 if it could not write them. The templates
+add this command as a script:
 
 ```sh
 dotnet run -- --inertia-types   # or: npm run types
 git diff --exit-code ClientApp/types/inertia.d.ts   # fail CI when the committed file is stale
 ```
 
-Program.cs still runs up to `app.Run()`, so startup code such as migrations runs too; the server stops as soon as it has started.
+Program.cs still runs up to `app.Run()`, so startup code such as migrations runs too. The server stops as soon as it has started.
 
 ```ts
 // ClientApp/types/inertia.d.ts (excerpt)
@@ -95,11 +96,11 @@ const { users, stats } = defineProps<InertiaPages['Users/Index']>()
 
 ## Shared props
 
-Shared props are inferred from the values passed to `o.Share(...)`; dot keys nest. A factory is typed by what it returns: `o.Share("user", ctx => new UserDto(...))` gives `user: UserDto`, while a factory cast to `Func<HttpContext, object?>` is `unknown`. Shares added per request (middleware, `HttpContext.Inertia().Share(...)`) are not known at startup; type them with `o.TypeScript.SharedProps<T>()`, which replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
+Inertia.Net infers shared props from the values passed to `o.Share(...)`. Dot keys nest. A factory is typed by what it returns. For example, `o.Share("user", ctx => new UserDto(...))` gives `user: UserDto`. A factory cast to `Func<HttpContext, object?>` is `unknown`. Shares added per request (middleware, `HttpContext.Inertia().Share(...)`) are not known at startup. Type them with `o.TypeScript.SharedProps<T>()`, which replaces the inference with an explicit type. The `InertiaConfig` augmentation types `usePage().props` and `flash`.
 
 ## Flash data
 
-`FlashData<T>()` types the whole flash object, not one entry: each property of `T` is a flash key. To type
+`FlashData<T>()` types the whole flash object, not one entry. Each property of `T` is a flash key. To type
 `Flash("toast", new Toast("success", "Saved"))`, wrap the entry:
 
 ```csharp
@@ -110,7 +111,7 @@ o.TypeScript.FlashData<Flash>();
 
 ## Prop members
 
-An `InertiaProp` member is optional (it can be deferred, optional or rescued) and `unknown`, unless `[InertiaPropType(typeof(T))]` names its value type.
+An `InertiaProp` member is optional, because it can be deferred, optional or rescued. Its type is `unknown`, unless `[InertiaPropType(typeof(T))]` names its value type.
 
 ## Mapping
 
@@ -118,16 +119,16 @@ An `InertiaProp` member is optional (it can be deferred, optional or rescued) an
 |---|---|
 | `int`, `long`, `double`, `decimal`, `float` | `number` (`number \| bigint` for 64-bit and larger with `PreserveBigIntegers`) |
 | `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid`, `byte[]` | `string` |
-| enum | union of JSON values: numbers by default, with the member names in a doc comment; string names with `JsonStringEnumConverter` |
+| enum | union of JSON values. The values are numbers by default, with the member names in a doc comment. They are string names with `JsonStringEnumConverter`. |
 | dictionary | `Record<string, T>` |
 | polymorphic type | union tagged with its discriminator |
 | C# 15 `union` (.NET 11) | union of its case types, `User \| Team` (plus `\| null` when a case is nullable) |
 | nullable member | `T \| null` |
 
-Types missing from the JSON metadata (under Native AOT, register them in your context) are `unknown`, with a warning in the log.
+Types missing from the JSON metadata are `unknown`, with a warning in the log. Under Native AOT, register them in your context.
 
 Number handling follows member settings, then type settings, then the global JSON options. Custom converter output is typed as `unknown` with a warning when its shape cannot be inferred.
 
 <Callout type="info" title="Validation and JSON names">
-Props and MVC validation error keys use the HTTP `JsonOptions`. FastEndpoints error keys use its binding serializer policy. Keep client field names aligned with the applicable policy; custom resolvers without member metadata may require client JSON names for aliases.
+Props and MVC validation error keys use the HTTP `JsonOptions`. FastEndpoints error keys use its binding serializer policy. Keep client field names aligned with the applicable policy. Custom resolvers without member metadata may require client JSON names for aliases.
 </Callout>

@@ -5,7 +5,7 @@ section: Production
 order: 5
 ---
 
-Behind a load balancer or reverse proxy that terminates TLS, Kestrel sees plain HTTP unless the scheme is forwarded. Without it, the state and `XSRF-TOKEN` cookies are not marked `Secure`.
+Behind a load balancer or reverse proxy that terminates TLS, Kestrel sees plain HTTP unless the scheme is forwarded. When the scheme is not forwarded, the state and `XSRF-TOKEN` cookies are not marked `Secure`.
 
 ## Forwarded headers
 
@@ -20,7 +20,7 @@ app.UseForwardedHeaders();               // first
 app.UseInertia();
 ```
 
-When the scheme cannot be forwarded, force the cookies:
+When the scheme cannot be forwarded, force the cookies to be secure:
 
 ```csharp
 builder.Services.AddInertia(o => o.State.CookieSecurePolicy = CookieSecurePolicy.Always);
@@ -29,7 +29,7 @@ app.UseInertiaAntiforgery(o => o.SecurePolicy = CookieSecurePolicy.Always);
 
 ## Multi-instance state
 
-On several instances, share the Data Protection key ring so the state cookie and antiforgery tokens can be read by every instance:
+When the app runs on several instances, share the Data Protection key ring, so that every instance can read the state cookie and antiforgery tokens:
 
 ```csharp
 builder.Services.AddDataProtection()
@@ -37,7 +37,7 @@ builder.Services.AddDataProtection()
     .SetApplicationName("MyApp");
 ```
 
-Using the session store? Sessions must be shared too (for example Redis). The default cookie store only needs shared Data Protection keys.
+If you use the session store, sessions must be shared too, for example with Redis. The default cookie store only needs shared Data Protection keys.
 
 Keep the SSR server on loopback on each instance. See [Server-side rendering](/docs/server-side-rendering).
 
@@ -50,11 +50,11 @@ builder.Services.AddResponseCompression();   // Brotli and gzip; Zstandard too o
 app.UseResponseCompression();                // before UseStaticFiles and UseInertia
 ```
 
-Over HTTPS the middleware compresses only with `o.EnableForHttps = true`. Review BREACH for your pages first: Inertia.Net keeps the antiforgery token in a cookie, not in the body, but a page that reflects request input next to a secret is still exposed.
+Over HTTPS, the middleware compresses only when you set `o.EnableForHttps = true`. Review BREACH for your pages first. Inertia.Net keeps the antiforgery token in a cookie, not in the body. However, a page that reflects request input next to a secret is still exposed.
 
 ## Asset caching
 
-Vite puts a content hash in every built file name, so files under `build/assets` can be cached for good:
+Vite puts a content hash in every built file name, so files under `build/assets` can be cached as immutable:
 
 ```csharp
 app.UseStaticFiles(new StaticFileOptions
@@ -69,11 +69,11 @@ app.UseStaticFiles(new StaticFileOptions
 });
 ```
 
-`app.MapStaticAssets()` does the same with build-time Brotli when the client is built before `dotnet publish`, so the files are in `wwwroot` when the static web assets manifest is generated.
+`app.MapStaticAssets()` does the same with build-time Brotli. Use it when the client is built before `dotnet publish`, so that the files are in `wwwroot` when the static web assets manifest is generated.
 
 ## Path base
 
-Use `app.UsePathBase("/app")` before `UseInertia()`. The page `url`, Vite URLs and `Back()` include the path base. If a proxy rewrites paths, set `o.UrlResolver` to return the browser-visible URL.
+Call `app.UsePathBase("/app")` before `UseInertia()`. The page `url`, Vite URLs and `Back()` include the path base. If a proxy rewrites paths, set `o.UrlResolver` to return the URL that the browser sees.
 
 ## Health and readiness
 
@@ -97,4 +97,4 @@ The SSR health check is covered in [Server-side rendering](/docs/server-side-ren
 
 ## Hosts and SSR failures
 
-Keep `AllowedHosts` configured. `Ssr.ConnectTimeout` bounds connection establishment (five seconds by default). In `SsrMode.Required`, the exception message is generic; diagnostic properties may contain private renderer details and should stay in trusted logs.
+Keep `AllowedHosts` configured. `Ssr.ConnectTimeout` limits the time to establish a connection. The default is five seconds. In `SsrMode.Required`, the exception message is generic. Diagnostic properties may contain private renderer details and should stay in trusted logs.

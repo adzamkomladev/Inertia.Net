@@ -6,7 +6,7 @@ order: 8
 ---
 
 One ASP.NET Core app can serve more than one Inertia UI. A typical case is a library, such as an admin dashboard, that ships
-its own prebuilt client and is mounted under `/dashboard` in a host app that already uses Inertia.Net.
+its own prebuilt client. A host app that already uses Inertia.Net mounts the library under `/dashboard`.
 
 Each UI is a **mount**: a named `InertiaOptions` that `app.UseInertia(name)` selects inside an `app.Map(...)` branch. The
 default mount is the one `AddInertia(...)` and `UseInertia()` configure, so existing apps do not change.
@@ -47,16 +47,22 @@ app.UseInertia();                            // the host app's mount
 app.MapGet("/", () => Render("Home"));
 ```
 
-`Map` sets the request's path base, so page URLs, `Back()` fallbacks, Vite asset URLs and the previous-URL cookie stay inside
-`/dashboard`. Calling `AddInertia("dashboard", ...)` again adds to that mount's configuration.
+`Map` sets the request's path base, so these stay inside `/dashboard`:
+
+- page URLs
+- `Back()` fallbacks
+- Vite asset URLs
+- the previous-URL cookie
+
+Calling `AddInertia("dashboard", ...)` again adds to that mount's configuration.
 
 Startup fails when `UseInertia(name)` names a mount that was never registered, or when two mounts share a state or
 previous-URL cookie name.
 
 ## A root view shipped by a library
 
-A library cannot rely on a file in the host's content root. Register a keyed `IInertiaRootView` that writes an embedded
-template instead:
+A library cannot rely on a file in the host's content root. Instead, register a keyed `IInertiaRootView` that writes an
+embedded template:
 
 ```csharp
 builder.Services.AddKeyedSingleton<IInertiaRootView, DashboardRootView>("dashboard");
@@ -88,8 +94,8 @@ mount without `AddInertiaErrorPages(name, ...)` leaves its errors to the rest of
 
 ## SSR, health checks and TypeScript
 
-Each mount has its own SSR gateway, and its own managed Node processes when `o.Ssr.UseNodeProcess()` is set; give each mount
-its own `BasePort`. Check a mount's SSR servers with:
+Each mount has its own SSR gateway. When `o.Ssr.UseNodeProcess()` is set, each mount also has its own managed Node processes.
+Give each mount its own `BasePort`. Check a mount's SSR servers with a health check:
 
 ```csharp
 builder.Services.AddHealthChecks().AddInertiaSsrForMount("dashboard"); // named "inertia-ssr-dashboard"
@@ -115,4 +121,4 @@ public static IApplicationBuilder MapDashboard(this IApplicationBuilder app, str
     });
 ```
 
-Mounts are adapter configuration: the Inertia protocol on the wire does not change.
+Mounts are adapter configuration. The Inertia protocol on the wire does not change.

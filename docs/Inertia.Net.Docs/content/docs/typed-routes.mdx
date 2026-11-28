@@ -5,11 +5,11 @@ section: Type safety
 order: 3
 ---
 
-This builds on [TypeScript types](/docs/typescript): the same `o.TypeScript` options write both files. Routes come from endpoint names, so they work the same whether an endpoint renders with `Render("Component", props)` or a [page record](/docs/page-records).
+Typed routes give every named endpoint a typed function in `routes.ts`, with typed parameters and request bodies. This page builds on [TypeScript types](/docs/typescript). The same `o.TypeScript` options write both files. Routes come from endpoint names, so they work the same whether an endpoint renders with `Render("Component", props)` or a [page record](/docs/page-records).
 
 ## Generate routes.ts
 
-Set `RoutesOutputPath` and every named endpoint (`WithName`, a controller route name, or a FastEndpoints `Description(x => x.WithName(...))`) gets a typed function in `routes.ts`:
+Set `RoutesOutputPath`, and every named endpoint gets a typed function in `routes.ts`. An endpoint gets its name from `WithName`, a controller route name, or a FastEndpoints `Description(x => x.WithName(...))`:
 
 ```csharp
 o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
@@ -94,9 +94,9 @@ const posts = computed(() => routes.users.show.url(props.user.id, { query: { tab
   </Tab>
 </Tabs>
 
-- Route parameters are typed from their constraints; optional and catch-all parameters are optional.
+- Route parameters are typed from their constraints. Optional and catch-all parameters are optional.
 - Every HTTP method of an endpoint has a variant (`routes.users.update.put(1)`).
-- `routeConfig.base` prefixes every URL (an app under a path base).
+- `routeConfig.base` prefixes every URL, for an app under a path base.
 - `RouteBodies` holds the `[FromBody]` (or FastEndpoints request) type of each route that has one.
 - Unnamed endpoints are skipped.
 
@@ -106,7 +106,7 @@ To assert a route sent as a prop in tests, use `WhereRoute(key, url, method)`. S
 
 ## Generating at build time
 
-Set `<InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>` in the project file, and every build (including the one inside `dotnet publish`) runs the app once with `--inertia-types` to write both files. The app starts without listening on any port and exits; a failure to write fails the build. In CI, compare the result with the committed files:
+Set `<InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild>` in the project file. Every build, including the one inside `dotnet publish`, then runs the app once with `--inertia-types` to write both files. The app starts without listening on any port and exits. If the write fails, the build fails. In CI, compare the result with the committed files:
 
 ```sh
 dotnet build -p:InertiaGenerateTypesOnBuild=true

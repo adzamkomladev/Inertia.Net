@@ -14,7 +14,8 @@ navigation, deferred data, prefetching, state, layouts and error handling.
 
 Kitchen Sink uses **Laravel and Vue**, not Inertia.Net. Its client-side patterns still apply: the server chooses a page,
 passes props, validates forms and redirects after submissions. Replace the Laravel handler with a C# endpoint.
-The public demo resets its database every midnight; use it respectfully and do not enter private information.
+
+The public demo resets its database every midnight. Use it respectfully and do not enter private information.
 
 ## Pick one flow to learn
 
@@ -43,11 +44,17 @@ return Render("Contacts/Index", new InertiaProps { ["contacts"] = contacts });
 ```
 
 For a runnable .NET example, use this repository's [sample apps](https://github.com/adzamkomladev/Inertia.Net/tree/main/samples), or create a starter with
-[First 10 minutes](/docs/first-10-minutes). The samples exercise Minimal APIs with React, MVC with Vue,
-and FastEndpoints with Svelte. Kitchen Sink is the upstream learning reference; these samples show the .NET setup.
+[First 10 minutes](/docs/first-10-minutes). The samples use Minimal APIs with React, MVC with Vue,
+and FastEndpoints with Svelte. Kitchen Sink is the upstream learning reference. These samples show the .NET setup.
 
 ## Check the whole request, not just the JSON
 
-When you add a feature, check that the first visit works, a link updates the page without reloading the document,
-an invalid form shows errors, a partial reload sends only the selected props plus always props, and an asset-version
-change triggers a full reload. These checks catch problems that a JSON snapshot alone can miss.
+When you add a feature, check that:
+
+- the first visit works
+- a link updates the page without reloading the document
+- an invalid form shows errors
+- a partial reload sends only the selected props plus always props
+- an asset-version change triggers a full reload
+
+These checks catch problems that a JSON snapshot alone can miss.

@@ -12,20 +12,20 @@ This page explains what was built, introduces each framework and what it is good
 <Callout type="info" title="This is a framework-stack comparison, not an adapter comparison">
 The .NET entry is **C# and ASP.NET Core, with Inertia.Net connecting the backend to React pages**. The Laravel entry is PHP and Laravel with Inertia. Next.js, TanStack Start and Nuxt bring their own application structure and rendering tools.
 
-**Inertia.Net does not make .NET faster.** The language, runtime, web framework, database access, rendering and deployment setup all contribute to these results. Inertia.Net provides the page-and-props connection and optional features such as caching; it is not the source of C#'s execution speed or ASP.NET Core's concurrency. These numbers cannot isolate adapter overhead or predict every app's performance.
+**Inertia.Net does not make .NET faster.** The language, runtime, web framework, database access, rendering and deployment setup all contribute to these results. Inertia.Net provides the page-and-props connection and optional features such as caching. It is not the source of C#'s execution speed or ASP.NET Core's concurrency. These numbers cannot isolate adapter overhead or predict every app's performance.
 </Callout>
 
 ## What you gain with each setup
 
 | Stack | How you build it | What you gain |
 |---|---|---|
-| **C# / ASP.NET Core + Inertia.Net** | Keep routing, data access and business logic in .NET. Return React, Vue or Svelte pages and props through Inertia instead of designing a separate page API. | ASP.NET Core's backend tools and .NET's runtime characteristics, plus a modern component frontend. Inertia.Net supplies the connection—not a faster runtime. |
+| **C# / ASP.NET Core + Inertia.Net** | Keep routing, data access and business logic in .NET. Return React, Vue or Svelte pages and props through Inertia instead of designing a separate page API. | ASP.NET Core's backend tools and .NET's runtime characteristics, plus a modern component frontend. Inertia.Net supplies the connection, not a faster runtime. |
 | **TypeScript / Next.js** | Build around React's App Router, server/client components and Next.js data and rendering conventions. | An integrated React application framework, static and server rendering options, and a broad hosting and tooling ecosystem. |
 | **TypeScript / TanStack Start** | Use React routes, loaders and server functions with TanStack's typed APIs. | A TypeScript-first workflow with closely connected routing and server calls, and explicit control over data loading. |
 | **TypeScript / Nuxt** | Build Vue pages with file-based routing, auto-imports, composables and Nitro server routes. | A cohesive Vue setup with less wiring, modules and integrated server-rendering tools. |
 | **PHP / Laravel + Inertia** | Use Laravel routes, controllers and backend services; return component pages through Inertia. | Laravel's conventions and backend ecosystem, with React, Vue or Svelte pages rather than a separately designed page API. |
 
-For example, choosing .NET with Inertia.Net means keeping your C# services and ASP.NET Core infrastructure while adding a component frontend. Choosing Nuxt means adopting its Vue and TypeScript application model. Neither choice is just a different adapter: it changes where your code lives, which tools you use and how you deploy.
+For example, choosing .NET with Inertia.Net means keeping your C# services and ASP.NET Core infrastructure while adding a component frontend. Choosing Nuxt means adopting its Vue and TypeScript application model. Neither choice is only a different adapter. Each choice changes where your code lives, which tools you use and how you deploy.
 
 ## The short version
 
@@ -48,7 +48,7 @@ Each framework runs the same todo app on the same Postgres database and Redis ca
 
 Each app runs in two modes. In **SSR mode** the server sends a fully rendered page on the first visit. In **SPA mode** the server sends an empty shell and the browser renders it. After the first visit, moving between pages only fetches data, in every framework.
 
-Before any measuring, a parity check confirms that every app returns exactly the same todos, totals, calculation results and error messages. If one app did less work, it would show up there.
+Before any measuring, a parity check confirms that every app returns exactly the same todos, totals, calculation results and error messages. If one app did less work, the parity check would show it.
 
 ## The frameworks
 
@@ -56,7 +56,7 @@ Before any measuring, a parity check confirms that every app returns exactly the
 
 ### ASP.NET Core with Inertia.Net
 
-Inertia.Net lets you write the server in ASP.NET Core and the pages in React, Vue or Svelte, without building a separate API. Controllers or Minimal API handlers return a page name and its data; Inertia's client does the routing in the browser.
+Inertia.Net lets you write the server in ASP.NET Core and the pages in React, Vue or Svelte, without building a separate API. Controllers or Minimal API handlers return a page name and its data. Inertia's client does the routing in the browser.
 
 **How it was built here**: a Minimal API with React pages, EF Core for the database, `InertiaProp.Cache` for the dashboard, .NET validation with `WithInertiaValidation()`, and antiforgery protection on every form. It ran in two builds:
 
@@ -65,7 +65,7 @@ Inertia.Net lets you write the server in ASP.NET Core and the pages in React, Vu
 
 **What comes from .NET and ASP.NET Core**: the C# runtime, concurrent request handling, backend libraries such as EF Core and Identity, and the option of Native AOT.
 
-**What Inertia.Net adds**: returning component pages and props from those endpoints, with Inertia navigation, forms and optional prop/render caching. You keep a .NET backend and a React, Vue or Svelte frontend without building a separate page API. The adapter still does work on each response; it does not accelerate the underlying runtime.
+**What Inertia.Net adds**: returning component pages and props from those endpoints, with Inertia navigation, forms and optional prop/render caching. You keep a .NET backend and a React, Vue or Svelte frontend without building a separate page API. The adapter still does work on each response. It does not make the underlying runtime faster.
 
 ### Next.js
 
@@ -87,21 +87,21 @@ TanStack Start is a newer full-stack React framework built on TanStack Router. I
 
 Nuxt is the main full-stack framework for Vue. It brings file-based pages, auto-imports, data fetching with `useFetch`, and a server layer for APIs, all on Nitro.
 
-**How it was built here**: Vue pages that fetch their data with `useFetch`, API routes on Nitro, Drizzle, zod, and the same Nitro cache in Redis as TanStack Start. Nuxt renders Vue, while the other apps render the same React pages, so part of any difference in page rendering comes from Vue, not Nuxt itself.
+**How it was built here**: Vue pages that fetch their data with `useFetch`, API routes on Nitro, Drizzle, zod, and the same Nitro cache in Redis as TanStack Start. Nuxt renders Vue, while the other apps render the same React pages. So part of any difference in page rendering comes from Vue, not from Nuxt itself.
 
 **Strengths**: the most complete Vue experience, conventions that remove a lot of setup, a big module ecosystem, and a fast API layer that can be deployed almost anywhere.
 
 ### Laravel
 
-Laravel is PHP's most popular framework. With Inertia, its controllers return React, Vue or Svelte pages the same way Inertia.Net does. Here it runs on Octane with FrankenPHP, which keeps the app in memory between requests instead of starting fresh each time.
+Laravel is PHP's most popular framework. With Inertia, its controllers return React, Vue or Svelte pages the same way Inertia.Net does. In this comparison it runs on Octane with FrankenPHP, which keeps the app in memory between requests instead of starting fresh each time.
 
 **How it was built here**: Eloquent models, a Form Request for validation, `Cache::remember` for the dashboard, and CSRF protection with cookie sessions.
 
-**Strengths**: a famously productive developer experience, everything built in (auth, queues, mail, scheduling, storage), a huge ecosystem, and the official Inertia adapter that started it all.
+**Strengths**: a developer experience known for being productive, everything built in (auth, queues, mail, scheduling, storage), a huge ecosystem, and the official Inertia adapter, the one Inertia started with.
 
 ## The results
 
-For brevity, charts and tables label the .NET setup **Inertia.Net** and the PHP setup **Laravel**. Read these as **ASP.NET Core + Inertia.Net** and **Laravel + Inertia**, with the database, frontend and hosting choices described above—not measurements of either adapter alone. The JIT and AOT entries also use different database access libraries, so their difference is not solely a compilation-mode effect.
+To keep labels short, charts and tables call the .NET setup **Inertia.Net** and the PHP setup **Laravel**. Read these as **ASP.NET Core + Inertia.Net** and **Laravel + Inertia**, with the database, frontend and hosting choices described above. They are not measurements of either adapter alone. The JIT and AOT entries also use different database access libraries, so the difference between them does not come only from the compilation mode.
 
 All six apps ran on GitHub's cloud machines. Each test route got its own machine with every app on it, so the apps in any one row of the tables below shared the same hardware. Each app was limited to 2 CPU cores and 2 GB of memory. Every request succeeded, and every server-rendered page really was rendered on the server.
 
@@ -146,7 +146,7 @@ A first visit is what a visitor gets when they open a link or reload the page. I
 | Next.js | 364 | 41.9 ms | 4.1 ms |
 | Laravel | 337 | 32.4 ms | 5.8 ms |
 
-The last column is the useful reality check: at everyday traffic, every framework answers in a few milliseconds. The first column is how much traffic one small server can take before it saturates.
+The last column shows what to expect in practice: at everyday traffic, every framework answers in a few milliseconds. The first column is how much traffic one small server can take before it is saturated.
 
 ### Moving between pages
 
@@ -165,7 +165,7 @@ Nuxt does well here: its API routes are fast, and on the smallest page it matche
 
 ### Saving a form
 
-The form test posts a new todo. A valid post is checked and saved to the database; an invalid post fails all four checks and returns the error messages.
+The form test posts a new todo. A valid post is checked and saved to the database. An invalid post fails all four checks and returns the error messages.
 
 | App | Valid posts per second | Invalid posts per second |
 |---|---:|---:|
@@ -176,7 +176,7 @@ The form test posts a new todo. A valid post is checked and saved to the databas
 | Next.js | 957 | 1,841 |
 | Laravel | 517 | 854 |
 
-Saving is limited by the database for every framework, so the fast apps end up close together on valid posts. Invalid posts never touch the database, so they show what the framework itself costs. The Inertia apps also check a forgery-protection token on every post; the JavaScript apps' API routes don't by default.
+Saving is limited by the database for every framework, so the fast apps end up close together on valid posts. Invalid posts never touch the database, so they show what the framework itself costs. The Inertia apps also check a forgery-protection token on every post. The JavaScript apps' API routes don't by default.
 
 ### Heavy work
 
@@ -204,15 +204,15 @@ The heavy page runs a CPU-intensive calculation. This is mostly a test of the pr
 | Next.js (cluster) | 349 | 179 / 330 / 445 |
 | Laravel | 81 | 56 / 79 / 157 |
 
-.NET ran the calculation about three times faster than Node.js and fifteen times faster than PHP, and used extra cores in one process without any extra code. Laravel gains cores by running more PHP workers.
+.NET ran the calculation about three times faster than Node.js and fifteen times faster than PHP. It also used extra cores in one process without any extra code. Laravel gains cores by running more PHP workers.
 
 <Callout type="warning" title="The JavaScript apps get an edge here: cluster mode">
-Node.js runs one request's JavaScript at a time, so a single Node.js server uses about one core. To give Next.js, TanStack Start and Nuxt the best chance on heavy work, their numbers here come from cluster mode: one server process per core, sharing one port, as PM2's cluster mode does. Run as a single process, like everywhere else on this page, they handled 207 (Next.js), 227 (TanStack Start) and 240 (Nuxt) requests per second, and more cores didn't help. Cluster mode also roughly doubles their memory, since every process loads the whole app. Their cluster numbers come from a [separate run](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-17-heavy-work.md) on a different machine.
+Node.js runs one request's JavaScript at a time, so a single Node.js server uses about one core. To give Next.js, TanStack Start and Nuxt the best chance on heavy work, their numbers here come from cluster mode: one server process per core, sharing one port, as PM2's cluster mode does. Run as a single process, like everywhere else on this page, they handled 207 (Next.js), 227 (TanStack Start) and 240 (Nuxt) requests per second. More cores didn't help. Cluster mode also roughly doubles their memory, since every process loads the whole app. Their cluster numbers come from a [separate run](https://github.com/adzamkomladev/Inertia.Net/blob/main/benchmarks/frameworks/results/2026-11-17-heavy-work.md) on a different machine.
 </Callout>
 
 ## Inertia.Net with its caching turned on
 
-All the results above run each setup without page caching; the dashboard data is still cached as described earlier. They measure the complete request path, not just the framework or adapter. A real app usually caches what it can. So we ran the .NET app once more, next to itself, with Inertia.Net's optional caching features turned on:
+All the results above run each setup without page caching. The dashboard data is still cached as described earlier. The results measure the complete request path, not only the framework or adapter. A real app usually caches what it can. So we ran the .NET app once more, next to a copy of itself with Inertia.Net's optional caching features turned on:
 
 - **The SSR render cache** keeps the HTML of a server-rendered page. When the next visitor gets exactly the same page, Inertia.Net sends that HTML without asking Node to render it again. See [Server-side rendering](/docs/server-side-rendering).
 - **Two Node renderers** instead of one, so rendering can use both CPU cores.
@@ -231,12 +231,12 @@ Plain and tuned builds ran side by side on the same machines:
 With caching on, server-rendered pages were served 4 to 27 times faster, in about a millisecond, because a cached page skips rendering entirely. Form posts and the heavy calculation didn't change, since nothing there is cached. The second Node renderer adds about 25 MB of memory.
 
 <Callout type="warning" title="Cache what everyone sees the same way">
-The render cache is keyed by the page's data, so pages with per-user data make one entry per user. Turn it on for pages that are the same for every visitor, such as landing, catalog and article pages. The other frameworks have caching of their own, so these numbers aren't in the tables above; the next section turns caching on for all of them.
+The render cache uses the page's data as its key, so pages with per-user data make one entry per user. Turn the render cache on for pages that are the same for every visitor, such as landing, catalog and article pages. The other frameworks have caching of their own, so these numbers aren't in the tables above. The next section turns caching on for all of them.
 </Callout>
 
 ## Every framework with its caching turned on
 
-Comparing a cached Inertia.Net with uncached rivals wouldn't be fair, so we gave every app its own framework's caching, set the same way: pages kept for 60 seconds and todo lists for 10, each served stale while a fresh copy is made in the background, all kept in the app's memory.
+Comparing a cached Inertia.Net with uncached rivals wouldn't be fair. So we gave every app its own framework's caching, set the same way. Pages are kept for 60 seconds and todo lists for 10. Each is served stale, which means the expired copy is still sent while a fresh copy is made in the background. Everything is kept in the app's memory.
 
 - **Next.js:** `'use cache'` on the page components and their data.
 - **TanStack Start and Nuxt:** Nitro route rules, which store the whole response.
@@ -261,13 +261,13 @@ Requests per second for a first visit, every app with caching on:
 
 Inertia.Net has two caches that work together, and you choose what goes in each.
 
-**The SSR render cache stores HTML, not data.** On a first visit Inertia.Net still runs your endpoint and builds the page's data as usual. It then looks up that exact data: if the same page with the same data was rendered recently, it sends the stored HTML and Node isn't called at all. Rendering with Node is the most expensive step of a server-rendered page, so this is where most of the speed comes from. Because the lookup uses the data itself, the cache can never show an out-of-date page: when one todo changes, the data changes, and the page is rendered fresh.
+**The SSR render cache stores HTML, not data.** On a first visit Inertia.Net still runs your endpoint and builds the page's data as usual. It then looks up that exact data. If the same page with the same data was rendered recently, Inertia.Net sends the stored HTML and Node isn't called at all. Rendering with Node is the most expensive step of a server-rendered page, so this is where most of the speed comes from. Because the lookup uses the data itself, the cache can never show an out-of-date page. When one todo changes, the data changes, and the page is rendered fresh.
 
-**Cached props store data.** Add `.Cache(key, duration)` to a prop and its value is kept, in memory or in Redis, so the database isn't asked again until it expires. With `staleFor`, an expired value is still served while a fresh one loads in the background. This is the only place Inertia.Net will show data that is a little old, and only for the props you mark.
+**Cached props store data.** Add `.Cache(key, duration)` to a prop and Inertia.Net keeps its value, in memory or in Redis. The database isn't asked again until the value expires. With `staleFor`, an expired value is still served while a fresh one loads in the background. This is the only place Inertia.Net will show data that is a little old, and only for the props you mark.
 
-In the benchmark's tuned app, a todo list visit therefore reads the rows from the prop cache, finds the HTML in the render cache, and sends it, all in well under a millisecond on the server. Moving between pages in the browser fetches only data and never involves Node, so there the prop cache does the work.
+In the benchmark's tuned app, a todo list visit therefore reads the rows from the prop cache, finds the HTML in the render cache, and sends it. All of this takes well under a millisecond on the server. Moving between pages in the browser fetches only data and never involves Node, so for those requests the prop cache does the work.
 
-This is different from the other frameworks' caches, which store the whole response under its address. Those skip your code entirely on a hit, but they show the same response, possibly out of date, until it expires, and they need care so that one user's page isn't served to another. Inertia.Net always runs your code, so permissions and per-user data are checked on every request, and you decide which data may be a little old.
+This is different from the other frameworks' caches, which store the whole response under its address. Those caches skip your code entirely on a hit. But they show the same response, possibly out of date, until it expires. They also need care so that one user's page isn't served to another. Inertia.Net always runs your code, so permissions and per-user data are checked on every request, and you decide which data may be a little old.
 
 See [Server-side rendering](/docs/server-side-rendering) for the render cache and [Props](/docs/props) for cached props.
 
@@ -278,7 +278,7 @@ See [Server-side rendering](/docs/server-side-rendering) for the render cache an
 - **Choose Native AOT** for the smallest memory, image and startup time, if plain Npgsql or Dapper-style data access suits you.
 - **Choose TanStack Start** for a light, type-safe React stack in TypeScript end to end.
 - **Choose Next.js** for the largest React ecosystem, static and incrementally generated content, or Vercel's platform.
-- **Choose Nuxt** if your team writes Vue and wants batteries-included conventions.
+- **Choose Nuxt** if your team writes Vue and wants conventions that remove a lot of setup.
 - **Choose Laravel** for PHP's most productive ecosystem and everything built in.
 
 <Callout type="info" title="How to read these numbers">

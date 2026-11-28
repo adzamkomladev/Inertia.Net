@@ -5,7 +5,7 @@ section: Loading data
 order: 2
 ---
 
-`Defer` leaves a prop out of the first response and lists it under `deferredProps`. The client requests each group with a partial reload as soon as the page is mounted. The page becomes interactive without waiting for the slow data. A deferred prop can also be [live](/docs/live-props): it is fetched again whenever its event is broadcast.
+`Defer` leaves a prop out of the first response and lists it under `deferredProps`. The client requests each group with a partial reload as soon as the page is mounted. The page becomes interactive without waiting for the slow data. A deferred prop can also be [live](/docs/live-props). A live deferred prop is fetched again whenever its event is broadcast.
 
 ```csharp
 return Render("Dashboard", new InertiaProps
@@ -41,7 +41,7 @@ return Render("Dashboard", new InertiaProps
   ]}
 />
 
-Props in the same group load in one request. Different groups load in parallel requests. `deferredProps` is only produced on non-partial renders.
+Props in the same group load in one request. Different groups load in parallel requests. Inertia.Net only produces `deferredProps` on non-partial renders.
 
 ## The client
 
@@ -113,7 +113,7 @@ The metadata combines: `deferredProps` lists the group, `mergeProps` lists the p
 
 ## Deferred scroll props
 
-A deferred `Scroll(...)` prop reports `"posts.data"` just like a resolved one. This is a deliberate fix of an inertia-laravel quirk:
+A deferred `Scroll(...)` prop reports `"posts.data"`, the same as a resolved one. This deliberately fixes a quirk in inertia-laravel:
 
 ```csharp
 ["posts"] = Scroll(page, wrapper: "data").Defer(),
@@ -133,5 +133,5 @@ new AssertableInertia(loaded).Has("stats");
 See [Testing](/docs/testing) for the full assertion API.
 
 <Callout type="tip" title="Use deferred props for below-the-fold data">
-Deferred props are for data the page can render without. If the page cannot be meaningful until the data arrives, a normal prop is simpler.
+Use deferred props for data the page can render without. If the page means nothing until the data arrives, a normal prop is simpler.
 </Callout>

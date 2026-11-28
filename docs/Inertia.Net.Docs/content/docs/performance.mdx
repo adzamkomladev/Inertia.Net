@@ -5,13 +5,13 @@ section: Production
 order: 7
 ---
 
-Benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. These controlled microbenchmarks are not production throughput estimates.
+The benchmarks cover page rendering, partial reloads, deferred props, SSR, caching and state storage. They are controlled microbenchmarks, not estimates of production throughput.
 
 To compare a whole app with Next.js, TanStack Start, Nuxt and Laravel, see [Framework comparison](/docs/framework-comparison).
 
 ## With and without Inertia
 
-What does Inertia.Net cost next to a Minimal API without it? `tests/Inertia.Net.HostingProbe` serves the same screen both ways: a list of 25 users plus `appName` and `auth`, about 2.7 KB of JSON.
+This section measures what Inertia.Net costs next to a Minimal API without it. `tests/Inertia.Net.HostingProbe` serves the same screen both ways: a list of 25 users plus `appName` and `auth`, about 2.7 KB of JSON.
 
 - **Plain JSON API** returns the data from `Results.Json`.
 - **Plain HTML shell** writes it into a hand-made HTML page.
@@ -20,7 +20,7 @@ What does Inertia.Net cost next to a Minimal API without it? `tests/Inertia.Net.
 
 Each row runs in its own process, under load from 64 keep-alive connections. The first four handlers do no I/O, so the gap between them is the whole cost of the adapter. The two todo rows add a real handler: cookie sign-in and a SQLite query.
 
-All runs were on a GitHub-hosted `ubuntu-24.04` runner (AMD EPYC 9V74, 4 vCPUs) on .NET 10. The server was pinned to 2 vCPUs and the load client to the other 2. Values are medians of 5 rounds, which agreed within about 2%.
+All runs were on a GitHub-hosted `ubuntu-24.04` runner (AMD EPYC 9V74, 4 vCPUs) on .NET 10. The server was pinned to 2 vCPUs and the load client to the other 2. Values are medians of 5 rounds, which agreed within about 2%. In the table, p99 is the response time that 99% of requests stay under, and RSS (resident set size) is the physical memory the process holds.
 
 | Build (server GC) | Scenario | Req/s | p99 | Server CPU per request | RSS at rest | Peak RSS under load | Startup |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -62,7 +62,7 @@ What this means for an app:
 
 - **Memory.** Compared with the plain apps, the Inertia rows use about 13 MB more at rest and 14–19 MB more at peak under load on JIT. On Native AOT they use about 4 MB more at rest and 6–13 MB more at peak. Almost all of the difference at rest comes from ASP.NET Core Data Protection. `AddInertia` registers it for its state cookie. Adding only `AddDataProtection()` to a plain app increased memory use by 12 MB on JIT and 5 MB on Native AOT. Inertia.Net itself uses about 1 MB at rest. An app with cookie sign-in, antiforgery or sessions already loads Data Protection.
 - **CPU.** An Inertia response costs 5–8 µs more server CPU than a hand-written JSON or HTML endpoint on JIT, and 9–14 µs more on Native AOT. On these do-nothing handlers that is 12–31% fewer requests per second. A handler that spends 1 ms on a database query loses under 1.5%.
-- **A real handler.** The todo rows read the signed-in user's 25 todos from SQLite on every request. The database work, not Inertia, sets their cost: 206–446 µs of CPU per request, against Inertia's 34–44 µs in total. On JIT the EF Core build serves 4,411 requests per second; the Native AOT build, which uses `Microsoft.Data.Sqlite` directly, serves 9,387.
+- **A real handler.** The todo rows read the signed-in user's 25 todos from SQLite on every request. The database work, not Inertia, sets their cost: 206–446 µs of CPU per request, against Inertia's 34–44 µs in total. On JIT the EF Core build serves 4,411 requests per second. The Native AOT build, which uses `Microsoft.Data.Sqlite` directly, serves 9,387.
 - **Latency.** Under 64 concurrent connections, p99 stays below 3 ms in every build without a database.
 - **JIT or Native AOT.** Native AOT uses about half the memory and starts six times faster. JIT serves more requests per second, because dynamic PGO keeps optimizing the hot path after startup.
 - **GC mode.** Workstation GC gave about the same throughput. Its RSS at rest was the same on JIT and up to 2 MB higher on Native AOT, and its peak under load was 2–14 MB higher. That is why the table uses server GC, the ASP.NET Core default.
@@ -73,7 +73,7 @@ Run it yourself on Linux. It needs `taskset`, plus `clang` and `zlib` for the Na
 eng/hosting-probe.sh artifacts/hosting-probe.md --seconds 12 --warmup 8 --repeat 5
 ```
 
-The [`hosting-probe` workflow](https://github.com/adzamkomladev/Inertia.Net/actions/workflows/hosting-probe.yml) runs the same probe on a GitHub runner whenever the probe changes, or on demand. The full table, including workstation GC and RSS after load, is in its job summary and in the [benchmark results](https://github.com/adzamkomladev/Inertia.Net/blob/main/tests/Inertia.Net.Benchmarks/RESULTS.md). Measure on a quiet machine: on a shared one, other processes take CPU from both the server and the client, so requests per second varies from run to run.
+The [`hosting-probe` workflow](https://github.com/adzamkomladev/Inertia.Net/actions/workflows/hosting-probe.yml) runs the same probe on a GitHub runner whenever the probe changes, or on demand. The full table, including workstation GC and RSS after load, is in its job summary and in the [benchmark results](https://github.com/adzamkomladev/Inertia.Net/blob/main/tests/Inertia.Net.Benchmarks/RESULTS.md). Measure on a quiet machine. On a shared machine, other processes take CPU from both the server and the client, so requests per second varies from run to run.
 
 ## Memory and hosting
 
@@ -92,12 +92,12 @@ For capacity planning, the useful number is how much memory the whole process ne
 
 All rows were measured on Linux x64 after the first request. The rows below the first two come from the [hosting probes](#with-and-without-inertia):
 
-- **Todo apps.** These are the probe's todo mode: a signed-in user's 25 todos, read from SQLite on every request, as an Inertia visit. Both rows cover 64 concurrent connections under server and workstation GC on the GitHub runner; the Native AOT build uses `Microsoft.Data.Sqlite` directly, because EF Core's runtime query compilation is not Native AOT compatible.
-- **SSR rows.** These are the Bun or Node process that managed SSR starts, measured with `eng/ssr-memory-probe.sh`. It renders each page once ("at rest"), then sends 3,000 renders from 8 parallel clients ("peak"). The small app is `samples/MinimalApi.React`; the large one is this site's MDX bundle.
+- **Todo apps.** These are the probe's todo mode: a signed-in user's 25 todos, read from SQLite on every request, as an Inertia visit. Both rows cover 64 concurrent connections under server and workstation GC on the GitHub runner. The Native AOT build uses `Microsoft.Data.Sqlite` directly, because EF Core's runtime query compilation is not Native AOT compatible.
+- **SSR rows.** These are the Bun or Node process that managed SSR starts, measured with `eng/ssr-memory-probe.sh`. The script renders each page once ("at rest"), then sends 3,000 renders from 8 parallel clients ("peak"). The small app is `samples/MinimalApi.React`. The large app is this site's MDX bundle.
 
 A few things to plan for:
 
-- **SSR peaks.** Bun starts smaller, but the large bundle peaked higher under Bun than under Node. Bun handed most of it back within seconds (144–222 MB 3 s later); Node kept its peak (229–239 MB). Size the SSR container for the peak. Runtime flags passed through `n.Arguments` barely change it: Bun's `--smol` peaked at 319–322 MB and Node's `--max-old-space-size=128` at 228–230 MB, and both rendered about 2–4× slower. Measure your own bundle with `eng/ssr-memory-probe.sh`.
+- **SSR peaks.** Bun starts smaller, but the large bundle peaked higher under Bun than under Node. Bun handed most of it back within seconds (144–222 MB 3 s later). Node kept its peak (229–239 MB). Size the SSR container for the peak. Runtime flags passed through `n.Arguments` barely change the peak: Bun's `--smol` peaked at 319–322 MB and Node's `--max-old-space-size=128` at 228–230 MB, and both rendered about 2–4× slower. Measure your own bundle with `eng/ssr-memory-probe.sh`.
 - **Bigger apps.** PostgreSQL or MongoDB, image processing and a large cache move every number upward, so measure your own app under realistic concurrency.
 - **Native AOT.** It removes most JIT and reflection overhead, but it does not make EF Core or a database free.
 
@@ -106,7 +106,7 @@ For containers:
 - Set a memory limit for the container instead of relying on the host. .NET uses this limit to size its heap.
 - Keep the default server GC with dynamic adaptation (DATAS). DATAS has been on by default since .NET 9. In the hosting probe, turning it off (`DOTNET_GCDynamicAdaptationMode=0`) raised peak memory from 84 MB to 126 MB on JIT and from 47 MB to 122 MB on Native AOT.
 - Leave headroom for the GC, the OS page cache and request bursts.
-- Expect SSR to add a second process. If the Bun renderer is optional, `SsrMode.Preferred` lets the app fall back to client rendering when it is unavailable.
+- Expect SSR to add a second process. If the Bun renderer is optional, `SsrMode.Preferred` lets the app fall back to client rendering when the renderer is unavailable.
 - Profile with real page sizes. A dashboard with deferred props and a paginated feed behaves very differently from a page that serializes every row.
 
 For in-process render throughput and allocations, use the benchmark project:
@@ -149,7 +149,7 @@ Keep pages well under a megabyte:
 - load on demand with [`Optional`](/docs/props#the-prop-factories)
 - use a [partial reload](/docs/partial-reloads) for refresh buttons and filters
 
-`Ssr.MaxPageBytes` keeps larger pages off the SSR server and `Ssr.MaxResponseBytes` bounds its answer; neither limits the props.
+`Ssr.MaxPageBytes` keeps larger pages off the SSR server, and `Ssr.MaxResponseBytes` limits the size of the SSR server's answer. Neither setting limits the props.
 
 ## Design notes
 
@@ -158,7 +158,7 @@ Keep pages well under a megabyte:
 - **Version check before the handler.** A stale client costs one header comparison and a `409`.
 - **No per-request mutable singletons.** Per-request state lives in an `InertiaFeature` on `HttpContext.Features`, so concurrent requests cannot leak history or flash settings into one another.
 - **Plain DTOs take the fast path.** Inertia.Net checks whether a POCO, list or typed dictionary can hold `InertiaProp` values (`InertiaProp`, `object` or dictionary members/elements). It caches this result per type and checks the contents for props only for those types. Everything else uses one `Serialize` call, through your [generated JSON context](#make-rendering-faster-register-your-json-context-first) when it writes the same output. An object whose `object` members hold only plain values at render time (no `InertiaProp`, dictionary, `JsonElement` or `JsonNode`) is also serialized in one call, unless a partial reload filters inside it.
-- **UTF-8 throughout.** SSR output and the MVC tag helpers write UTF-8 bytes; nothing large is materialized as a .NET string.
+- **UTF-8 throughout.** SSR output and the MVC tag helpers write UTF-8 bytes. Nothing large is turned into a .NET string.
 - **Cached assets.** The Vite manifest is parsed once, the root template is parsed once into pre-encoded UTF-8 segments, and the production tags are pre-rendered per entry set and path base. The version is a precomputed string compared ordinally. A missing manifest, template or SSR bundle is re-checked at most once per second.
 - **Sync loaders stay sync.** `Func<T>` loaders are not wrapped in closures.
 
@@ -166,7 +166,7 @@ Most per-request allocation in a real handler is the props you build, not the re
 
 ## Paired render measurements
 
-Warm, in-process probes on .NET 10 compared 32 alternating rounds in two runs. Times are medians of within-round ratios; B/op values are from run 2.
+Warm, in-process probes on .NET 10 compared 32 alternating rounds in two runs. Times are medians of within-round ratios. B/op (bytes allocated per operation) values are from run 2.
 
 | Workload | Before B/op | After B/op | Run 1 paired time | Run 2 paired time |
 |---|---:|---:|---:|---:|
