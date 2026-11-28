@@ -64,7 +64,7 @@ public sealed class LiveSseTests
 
     private static async Task<Stream> OpenAsync(WebApplication app, string query, string? origin = null)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, "/inertia-live" + query);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/inertia-live" + query);
         request.Headers.Accept.ParseAdd("text/event-stream");
         if (origin is not null) request.Headers.Add("Origin", origin);
         var response = await app.GetTestClient().SendAsync(request, HttpCompletionOption.ResponseHeadersRead, Ct);

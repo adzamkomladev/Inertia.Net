@@ -104,18 +104,17 @@ public sealed class LoaderAnalyzer : DiagnosticAnalyzer
 
     private static IAnonymousFunctionOperation? Loader(IInvocationOperation factory)
     {
-        foreach (var argument in factory.Arguments)
+        return factory.Arguments.Select(argument => Unwrap(argument.Value)).OfType<IAnonymousFunctionOperation>().FirstOrDefault();
+
+        static IOperation Unwrap(IOperation value)
         {
-            var value = argument.Value;
             while (value is IConversionOperation or IDelegateCreationOperation)
             {
                 value = value is IConversionOperation conversion ? conversion.Operand : ((IDelegateCreationOperation)value).Target;
             }
 
-            if (value is IAnonymousFunctionOperation lambda) return lambda;
+            return value;
         }
-
-        return null;
     }
 
     // References to an HttpContext or DbContext declared outside the lambda: captured locals and parameters, fields and properties.
@@ -125,14 +124,15 @@ public sealed class LoaderAnalyzer : DiagnosticAnalyzer
         var span = loader.Syntax.Span;
         foreach (var descendant in loader.Body.Descendants())
         {
-            var (symbol, type) = descendant switch
+            (ISymbol? Symbol, ITypeSymbol? Type) reference = descendant switch
             {
-                ILocalReferenceOperation local => ((ISymbol)local.Local, local.Local.Type),
+                ILocalReferenceOperation local => (local.Local, local.Local.Type),
                 IParameterReferenceOperation parameter => (parameter.Parameter, parameter.Parameter.Type),
                 IFieldReferenceOperation field => (field.Field, field.Field.Type),
                 IPropertyReferenceOperation property => (property.Property, property.Property.Type),
                 _ => (null, null),
             };
+            var (symbol, type) = reference;
             if (symbol is null || type is null) continue;
             if (!(IsOrDerives(type, httpContext) || IsOrDerives(type, dbContext))) continue;
             // A property read off a captured value (http.Request.HttpContext) is reported at the captured value itself.

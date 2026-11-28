@@ -36,9 +36,9 @@ internal sealed partial class ViteDevServer(IOptions<InertiaOptions> options, Vi
         }
 
         var root = environment.ContentRootPath;
-        var manager = File.Exists(Path.Combine(root, "bun.lock")) || File.Exists(Path.Combine(root, "bun.lockb")) ? "bun"
-            : File.Exists(Path.Combine(root, "pnpm-lock.yaml")) ? "pnpm"
-            : File.Exists(Path.Combine(root, "yarn.lock")) ? "yarn" : "npm";
+        var manager = File.Exists(Path.Join(root, "bun.lock")) || File.Exists(Path.Join(root, "bun.lockb")) ? "bun"
+            : File.Exists(Path.Join(root, "pnpm-lock.yaml")) ? "pnpm"
+            : File.Exists(Path.Join(root, "yarn.lock")) ? "yarn" : "npm";
         var start = OperatingSystem.IsWindows()
             ? new ProcessStartInfo("cmd.exe", ["/c", manager, "run", "dev"])
             : new ProcessStartInfo(manager, ["run", "dev"]);
@@ -89,20 +89,27 @@ internal sealed partial class ViteDevServer(IOptions<InertiaOptions> options, Vi
     private void Stop()
     {
         if (Interlocked.Exchange(ref _process, null) is not { } process) return;
+        using (process)
+        {
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                process.WaitForExit(5000);
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogStopFailed(_logger, ex); // it exited on its own
+            }
+        }
+
+        // A killed dev server cannot remove its hot file; a stale one would point the next run at nothing.
         try
         {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            process.WaitForExit(5000);
+            File.Delete(vite.HotFile);
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Already exited.
-        }
-        finally
-        {
-            process.Dispose();
-            // A killed dev server cannot remove its hot file; a stale one would point the next run at nothing.
-            try { File.Delete(vite.HotFile); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            LogHotFileKept(_logger, ex, vite.HotFile);
         }
     }
 
@@ -137,6 +144,12 @@ internal sealed partial class ViteDevServer(IOptions<InertiaOptions> options, Vi
 
     [LoggerMessage(LogLevel.Warning, "The Vite dev server did not write {HotFile} within {Seconds} seconds; pages use the production build until it does.")]
     private static partial void LogNotReady(ILogger logger, double seconds, string hotFile);
+
+    [LoggerMessage(LogLevel.Debug, "The Vite dev server had already exited when the app stopped.")]
+    private static partial void LogStopFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(LogLevel.Warning, "Could not remove {HotFile}; delete it if the next run serves pages from a dev server that is not running.")]
+    private static partial void LogHotFileKept(ILogger logger, Exception exception, string hotFile);
 
     [LoggerMessage(LogLevel.Information, "vite: {Line}")]
     private static partial void LogOutput(ILogger logger, string line);

@@ -47,7 +47,7 @@ public sealed class ValidationNamingTests
         var client = app.CreateClient();
         var body = new { mail = "", displayName = "", items = new[] { new { mail = "" } } };
         // What useHttp sends: X-Requested-With without X-Inertia.
-        var request = new HttpRequestMessage(HttpMethod.Post, "/naming/" + adapter) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/naming/" + adapter) { Content = System.Net.Http.Json.JsonContent.Create(body) };
         request.WithHeader("X-Requested-With", "XMLHttpRequest");
         var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 

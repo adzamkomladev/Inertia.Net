@@ -28,9 +28,8 @@ internal sealed class SseLiveConnections : IInertiaLiveBroadcaster
         ArgumentNullException.ThrowIfNull(message);
         var key = message.Channel.Key;
         string? data = null;
-        foreach (var connection in _connections.Values)
+        foreach (var connection in _connections.Values.Where(c => c.Channels.Contains(key) && c.Id != message.ExceptSocketId))
         {
-            if (!connection.Channels.Contains(key) || connection.Id == message.ExceptSocketId) continue;
             data ??= Event(key, message.Payload);
             // A connection that cannot keep up is closed: its client reconnects and reloads its live props, so nothing is lost.
             if (!connection.Queue.Writer.TryWrite(data)) connection.Queue.Writer.TryComplete();

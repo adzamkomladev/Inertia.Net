@@ -88,9 +88,8 @@ public static class InertiaLiveSseExtensions
         var authorizer = http.RequestServices.GetRequiredService<ILiveChannelAuthorizer>();
         var channels = new HashSet<string>(StringComparer.Ordinal);
         var refused = new List<string>();
-        foreach (var key in requested)
+        foreach (var key in requested.OfType<string>())
         {
-            if (key is null) continue;
             var separator = key.IndexOf(':', StringComparison.Ordinal);
             var name = separator < 0 ? "" : key[(separator + 1)..];
             if (name.Length == 0 || name.Length > options.MaxChannelNameLength || !LiveChannel.TryParseType(key[..separator], out var type))
