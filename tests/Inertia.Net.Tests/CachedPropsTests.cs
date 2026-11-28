@@ -1050,7 +1050,14 @@ public sealed class CachedPropsTests
             Values.Remove(key);
         }
 
-        public ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public async ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken)
+        {
+            await Pause();
+            foreach (var (key, options) in Sets)
+            {
+                if (options.Tags.Contains(tag)) Values.Remove(key);
+            }
+        }
 
         private async ValueTask Pause()
         {

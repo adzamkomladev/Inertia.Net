@@ -316,7 +316,9 @@ public abstract class ProtocolConformanceTests<THost>
         var response = inertia
             ? await client.InertiaAsync(new HttpMethod(method), url)
             : await client.SendAsync(new HttpRequestMessage(new HttpMethod(method), url), TestContext.Current.CancellationToken);
-        Assert.Equal("X-Inertia", response.Header("Vary"));
+        Assert.Contains(InertiaHeaders.Inertia, response.Headers.Vary);
+        if (url == "/fragment-redirect" && inertia)
+            Assert.Contains(InertiaHeaders.Purpose, response.Headers.Vary);
     }
 
     /// <summary>

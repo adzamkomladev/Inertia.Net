@@ -325,8 +325,8 @@ public sealed class DevToolsParityTests
     }
 
     [Theory]
-    [InlineData(49, "ok", true)]
-    [InlineData(48, "ok", false)]
+    [InlineData(49L, "ok", true)]
+    [InlineData(48L, "ok", false)]
     [InlineData(null, "éé", false)]
     [InlineData(null, "ééé", true)]
     public async Task Parsed_uploads_obey_the_recording_budget(long? length, string value, bool omitted)
@@ -414,6 +414,7 @@ public sealed class DevToolsParityTests
     public async Task Broadcasting_during_a_render_does_not_mutate_the_active_capture()
     {
         var harness = Recording();
+        _ = harness.Services.GetRequiredService<DevToolsRecorder>();
         var http = harness.Context().AsInertia();
         var capture = Capture();
         http.Features.Set(capture);
