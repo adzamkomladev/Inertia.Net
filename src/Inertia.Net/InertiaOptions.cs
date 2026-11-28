@@ -147,6 +147,14 @@ public sealed class ViteOptions
     /// <summary>Maps the rendered component to a Vite manifest key for module preloading on the first HTML visit. Return null to skip a page.</summary>
     public Func<string, string?>? PageModule { get; set; }
 
+    /// <summary>
+    /// In Development, starts the Vite dev server with the app: runs the package's <c>dev</c> script (<c>npm run dev</c>, or bun, pnpm or
+    /// yarn when their lock file is in the content root) in the content root, waits up to 30 seconds for the hot file, logs its output and
+    /// stops it with the app, so <c>dotnet watch</c> alone serves a hot-reloading page. Nothing starts when the dev server already runs
+    /// (a live hot file), when <see cref="DevServerUrl"/> is set, or outside Development. Default false.
+    /// </summary>
+    public bool StartDevServer { get; set; }
+
     /// <summary>How many chunks <see cref="VitePrefetch.Waterfall"/> downloads at a time. Default 3.</summary>
     public int PrefetchConcurrency { get; set; } = 3;
 }

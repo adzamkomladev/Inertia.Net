@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Buffers;
 using System.Collections;
 using System.Globalization;
@@ -900,7 +901,28 @@ internal sealed partial class PropsWriter
         }
     }
 
-    private async ValueTask<(bool Resolved, object? Value)> ResolveAsync(InertiaProp prop, bool cached = false)
+    // Timed only while DevTools records the request or a tracer listens, so an ordinary render keeps the untimed path.
+    private ValueTask<(bool Resolved, object? Value)> ResolveAsync(InertiaProp prop, bool cached = false) =>
+        _capture is null && !InertiaDiagnostics.ActivitySource.HasListeners() ? ResolveUntimedAsync(prop, cached) : ResolveTimedAsync(prop, cached);
+
+    private async ValueTask<(bool Resolved, object? Value)> ResolveTimedAsync(InertiaProp prop, bool cached)
+    {
+        // A parallel loader ran in the planner, which timed it (and traced it) itself; the walk only waited for it.
+        var planned = _planner?.IsPlanned(prop) == true;
+        using var activity = planned ? null : InertiaDiagnostics.ActivitySource.StartActivity("inertia.prop");
+        activity?.SetTag("inertia.prop", new string(Path));
+        var started = Stopwatch.GetTimestamp();
+        try
+        {
+            return await ResolveUntimedAsync(prop, cached);
+        }
+        finally
+        {
+            _capture?.RecordDuration(new string(Path), planned ? _planner!.Elapsed(prop) : Stopwatch.GetElapsedTime(started));
+        }
+    }
+
+    private async ValueTask<(bool Resolved, object? Value)> ResolveUntimedAsync(InertiaProp prop, bool cached)
     {
         _cancellationToken.ThrowIfCancellationRequested();
         try

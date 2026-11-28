@@ -9,7 +9,7 @@ Later visits fetch a page object as JSON: the component name, its props, the URL
 the screen without a full reload. You keep ASP.NET Core routing, authentication and validation. You do not need a separate API
 or a client-side router for these pages.
 
-Inertia.Net **1.9.9** is a server adapter for the **Inertia.js v3** protocol. It targets .NET 10 and .NET 11 and supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT (ahead-of-time compilation). FastEndpoints apps support Native AOT when you add the FastEndpoints source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.11** is a server adapter for the **Inertia.js v3** protocol. It targets .NET 10 and .NET 11 and supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT (ahead-of-time compilation). FastEndpoints apps support Native AOT when you add the FastEndpoints source generator. MVC itself does not support Native AOT.
 
 <a id="implementation-tasks"></a>
 
@@ -45,7 +45,7 @@ Inertia.Net **1.9.9** is a server adapter for the **Inertia.js v3** protocol. It
 Install a .NET 10 SDK and Node.js 22.12+ first. In the folder where you want your app, run:
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.9
+dotnet new install Inertia.Net.Templates@1.9.11
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -259,7 +259,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Install the template once.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.9
+dotnet new install Inertia.Net.Templates@1.9.11
 ```
 
 Run the command for your frontend, then change into the new app directory with `cd MyApp`.
@@ -281,7 +281,7 @@ Add these options to `dotnet new inertia` when you need them:
 - `--auth` adds cookie sign-in: a login page with Precognition and a demo user, a protected dashboard, logout, a shared `auth.user`
   and a sign-in rate limit.
 
-In one terminal, from `MyApp`, install the dependencies and start Vite. Use the commands in the row for your package manager:
+From `MyApp`, install the dependencies once. Use the commands in the row for your package manager:
 
 | Package manager | Install dependencies | Start Vite | Build assets |
 |---|---|---|---|
@@ -290,11 +290,15 @@ In one terminal, from `MyApp`, install the dependencies and start Vite. Use the 
 | pnpm | `pnpm install` | `pnpm run dev` | `pnpm run build` |
 | Yarn | `yarn install` | `yarn run dev` | `yarn run build` |
 
-Start ASP.NET Core in another terminal, also from `MyApp`:
+Then start the app, also from `MyApp`:
 
 ```sh
 dotnet watch
 ```
+
+In Development the starter also starts Vite for you (`o.Vite.StartDevServer = true` in `Program.cs`): it runs the package's `dev`
+script with the package manager whose lock file is in the project, and stops it when the app stops. If you prefer Vite in a terminal
+of its own, start it there first (the app then leaves it alone), or remove that line.
 
 Open [http://localhost:5180](http://localhost:5180). This is your app. Open your pages through the ASP.NET Core address. Vite supplies the frontend assets and hot reload.
 
@@ -306,6 +310,20 @@ Two servers are running, and only one of them is the app:
 | `http://localhost:5173` | The **Vite dev server**. It serves JavaScript, CSS and hot-reload updates to the page above, and has no pages or routes of its own. | No. Opening it shows a blank page or a 404. |
 
 Vite prints `localhost:5173` in large letters when it starts. That is expected. Ignore it and use the ASP.NET Core URL that `dotnet watch` prints.
+
+**Add a page.** The same template package has an item template that writes a page record and the matching page file. Run it in the
+project directory, after the project has been restored once (it reads the root namespace from the project):
+
+```sh
+dotnet new inertia-page --component Users/Index                      # React: ClientApp/pages/Users/Index.tsx
+dotnet new inertia-page --component Reports --framework vue          # or svelte
+```
+
+`--component Users/Index` writes `UsersIndexPage.cs` (a `UsersIndexPage(string Message)` record with `Component => "Users/Index"`) and
+`ClientApp/pages/Users/Index.tsx`, typed with `InertiaPages['Users/Index']`. Register the record in your JSON context: add
+`[JsonSerializable(typeof(UsersIndexPage))]` to `AppJsonContext` in `Program.cs` (the command reminds you). Then render it with
+`Render(new UsersIndexPage("Hello"))`. The page type appears in `ClientApp/types/inertia.d.ts` the next time the app starts in
+Development (or after `npm run types`).
 
 For a production build, run the build command from the row for your package manager, then `dotnet publish -c Release`. Deploy the built frontend assets with the published app. SSR (server-side rendering) is optional and requires a Node server at runtime. Ordinary client rendering does not require a Node server at runtime.
 
@@ -340,6 +358,8 @@ Read the docs at [inertia-dotnet.temtem.dev](https://inertia-dotnet.temtem.dev).
 | Native AOT | yes | no (MVC itself is not AOT) | yes (with the FastEndpoints source generator) |
 | Error pages (routing, authorization, exceptions) | `AddInertiaErrorPages()` | same | same |
 | Live props transport: SignalR | `Inertia.Net.Live.SignalR` | same | same |
+| Live props transport: Server-Sent Events | `Inertia.Net.Live.Sse` | same | same |
+| `useHttp` validation errors (`422`) | `.WithInertiaValidation()` | `ModelState` filter (global) | `c.ConfigureInertia()` |
 | Page records (`IInertiaPage`) | `Render(page)` | same | `Send.InertiaAsync(page)` |
 | Typed routes (`routes.ts`) | yes | yes | yes |
 | Cookie auth redirects, rate-limit rejection | `UseInertiaRedirects()`, `InertiaRateLimiting.OnRejected()` | same | same |
@@ -363,13 +383,13 @@ Read the docs at [inertia-dotnet.temtem.dev](https://inertia-dotnet.temtem.dev).
 - [x] Once props with keys, expiry and `fresh` (`onceProps`, `X-Inertia-Except-Once-Props`)
 - [x] Infinite scroll (`scrollProps`, merge intent header; `Page<T>` and `CursorPage<T>` from `Pagination`)
 - [x] Rescued props (`rescuedProps`)
-- [x] Live props (`liveProps`, `X-Socket-Id`, broadcast envelope, `IInertiaLive`), delivered over SignalR by `Inertia.Net.Live.SignalR`
-  or by your own broadcaster: see [Live props](#live-props)
+- [x] Live props (`liveProps`, `X-Socket-Id`, broadcast envelope, `IInertiaLive`), delivered over SignalR by `Inertia.Net.Live.SignalR`,
+  over Server-Sent Events by `Inertia.Net.Live.Sse`, or by your own broadcaster: see [Live props](#live-props)
 - [x] Shared props and `sharedProps`
 - [x] Server head tags (`WithHead`, the `head` prop for the client's `serverHead: true`)
-- [x] Validation errors, error bags, `WithAllErrors`
+- [x] Validation errors, error bags, `WithAllErrors`, `useHttp` `422` errors
 - [x] Precognition (live validation)
-- [x] Flash data (`flash`)
+- [x] Flash data (`flash`), kept for the visit when a prefetch comes first
 - [x] `encryptHistory`, `clearHistory`, `preserveFragment`, `preserveBigIntegers`
 - [x] Server-side rendering (production Node servers, optionally started and supervised by the app, Vite dev server, per-response modes, circuit breakers, render slots, metrics, health check)
 - [x] Vite manifest and dev-server tags, CDN asset base URL, chunk prefetching, CSP nonces
@@ -387,24 +407,26 @@ Inertia.Net is not compatible with the Inertia v2 protocol. MVC TempData storage
 | `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` to errors filter, Razor root view and tag helpers |
 | `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor, Precognition |
 | `Inertia.Net.Live.SignalR` | you deliver [live props](#live-props) over SignalR: hub, channel authorization, broadcaster |
+| `Inertia.Net.Live.Sse` | you deliver [live props](#server-sent-events) over Server-Sent Events from one app instance, with no client library |
 | `Inertia.Net.EntityFrameworkCore` | you page EF Core queries with numbered or cursor pagination |
 | `Inertia.Net.MongoDB` | you page MongoDB finds (`ToPageAsync`, `ToCursorPageAsync`) |
 | `Inertia.Net.Redis` | you share cached props and SSR renders across app instances (`AddInertiaRedisCache`) |
 | `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
-| `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
+| `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte), `dotnet new inertia-page` adds a page |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.9
-dotnet add package Inertia.Net.Mvc --version 1.9.9 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.9 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.9 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.9 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.9 # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.9 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.9 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.11
+dotnet add package Inertia.Net.Mvc --version 1.9.11 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.11 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.11 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.11 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.11 # live props over SignalR
+dotnet add package Inertia.Net.Live.Sse --version 1.9.11 # live props over Server-Sent Events (one app instance)
+dotnet add package Inertia.Net.Redis --version 1.9.11 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.11 # MongoDB pagination
 ```
 
-Inertia.Net requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`). The frontend needs JavaScript build tools with npm, Bun, pnpm or Yarn. Use version `1.9.9` for all Inertia.Net packages. Inertia.Net 1.9.9 uses the Inertia.js v3 protocol. The package version and the protocol version are separate version numbers.
+Inertia.Net requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`). The frontend needs JavaScript build tools with npm, Bun, pnpm or Yarn. Use version `1.9.11` for all Inertia.Net packages. Inertia.Net 1.9.11 uses the Inertia.js v3 protocol. The package version and the protocol version are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -846,6 +868,13 @@ Start Vite with `npm run dev`, `bun run dev`, `pnpm run dev` or `yarn run dev` i
 dotnet watch         # the app, ASPNETCORE_ENVIRONMENT=Development
 ```
 
+**One command.** Set `o.Vite.StartDevServer = true` and `dotnet watch` alone is enough: in Development the app runs the package's
+`dev` script (`npm run dev`, or `bun`, `pnpm` or `yarn` when their lock file is in the content root) in the content root, waits up to
+30 seconds for the hot file, logs Vite's output under `Inertia.Net.Vite`, and stops Vite (and removes a hot file it left) when the app
+stops. Nothing starts outside Development, when `Vite.DevServerUrl` is set, or when a dev server already answers at the hot file's URL.
+With [.NET Aspire](https://aspire.dev), run Vite as its own resource in the AppHost instead (for example with the JavaScript hosting
+integration's `AddViteApp`) and leave this option off.
+
 Open the ASP.NET Core URL printed by `dotnet watch` (for example `http://localhost:5180`), **not** the Vite URL (`http://localhost:5173`). Vite only serves assets and hot-reload updates to the page that ASP.NET Core renders, so the Vite address shows a blank page. The first visit to `/` should display "Hello from .NET". If you started with `dotnet new web`, make sure the launch profile sets `ASPNETCORE_ENVIRONMENT=Development` so that the adapter reads the Vite hot file.
 
 For production, run your package manager's `build` script (see [Start a new app](#start-a-new-app)), then `dotnet publish -c Release`. Deploy `wwwroot/build` and `app.html` with the published app. You need Node.js to build the assets. At runtime you need Node.js only if you enable SSR. Samples for each framework are in [samples/](samples/).
@@ -978,7 +1007,7 @@ Prop(ct => repo.GetValueTaskAsync(ct))             // Func<CancellationToken, Va
 
 The cancellation token is `HttpContext.RequestAborted`. The overloads bind so that an `async` lambda always selects the overload that awaits it. An `async` lambda never becomes "a prop whose value is a Task".
 
-Fluent methods change the prop instance they are called on and return that same instance. Create a separate prop for each use. Do not share prop instances across requests. `.Fresh(false)` clears freshness and keeps the once behavior. `.WithGroup(name)` delegates to `.Defer(name)`. Repeated `.MatchOn(...)` calls accumulate keys. Root append and root prepend are mutually exclusive. The fluent methods are: `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)`, `.Cache(key, duration, staleFor?, tags?)`, `.Live(event)`, `.Live(channel, events)`, `.Throttle(window)`.
+Fluent methods change the prop instance they are called on and return that same instance. Create a separate prop for each use. Do not share prop instances across requests. `.Fresh(false)` clears freshness and keeps the once behavior. `.WithGroup(name)` delegates to `.Defer(name)`. Repeated `.MatchOn(...)` calls accumulate keys. Root append and root prepend are mutually exclusive. The fluent methods are: `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Timeout(timeout)`, `.Cache(key, duration)`, `.Cache(key, duration, staleFor?, tags?)`, `.Live(event)`, `.Live(channel, events)`, `.Throttle(window)`.
 
 **Loaders run sequentially** by default, in prop order, and only when their prop is included in the response. That makes a scoped EF Core `DbContext` safe to use in several loaders. Mark independent async loaders with [`.Parallel()`](#parallel-props) to start them together. A loader that returns another prop (for example `Prop(() => Defer(...))`) is unwrapped once.
 
@@ -1004,7 +1033,7 @@ return Render("Dashboard", new InertiaProps
 - Pages without parallel props skip the work of finding them. A component remembers whether its renders have parallel props. If it was first rendered without them and later gets some, that one render resolves them in turn, and every later render starts them early.
 - If a loader fails, the others are cancelled and awaited, and the render fails with the first failure in prop order. Props marked with `Rescue()` fail alone, as usual.
 
-**DbContext and HttpContext:** a parallel loader must not use the request's `DbContext` or other scoped services that are not thread-safe. A parallel loader must not touch `HttpContext`. EF Core throws "A second operation was started on this context instance…". Give each loader its own context through `IDbContextFactory<T>` or its own scope:
+**DbContext and HttpContext:** a parallel loader must not use the request's `DbContext` or other scoped services that are not thread-safe. A parallel loader must not touch `HttpContext`. EF Core throws "A second operation was started on this context instance…". The build warns about it: [INERTIA003](#compile-time-component-checks) reports a `Parallel()` loader that captures an `HttpContext` or a `DbContext` from outside the lambda. Give each loader its own context through `IDbContextFactory<T>` or its own scope:
 
 ```csharp
 ["orders"] = Prop(async ct =>
@@ -1029,6 +1058,21 @@ return Render("Dashboard", new InertiaProps
 - A [stale-while-revalidate](#cached-props) refresh runs after the response, in a new scope. That scope is disposed when the refresh ends.
 - If the service is not registered, the render fails with the prop's path and the service type.
 
+### Loader timeouts
+
+`.Timeout(TimeSpan)` bounds a loader. When the time is up, the loader's cancellation token is cancelled and the render stops waiting
+for it, so a loader that ignores the token does not hold the request either:
+
+```csharp
+["recommendations"] = Defer(ct => recommender.ForAsync(userId, ct)).Timeout(TimeSpan.FromSeconds(2)).Rescue(),
+["stats"] = Prop(ct => stats.ComputeAsync(ct)).Parallel().Timeout(TimeSpan.FromSeconds(5)),
+```
+
+- With `Rescue()` the prop is left out and listed in `rescuedProps`, like any rescued failure.
+- Without it the render fails with a `TimeoutException`, as for any loader exception.
+- It works on sequential and `Parallel()` loaders, on cache misses and on stale-while-revalidate refreshes.
+- A synchronous loader cannot be interrupted: it finishes before the timeout is checked.
+
 ### Cached props
 
 `.Cache(key, duration)` keeps a prop's value as JSON in the cache. The default cache is the app's `IMemoryCache`. While the entry lives,
@@ -1047,7 +1091,8 @@ return Render("Dashboard", new InertiaProps
   the value depends on in the key. Keys live in their own space in the cache, so they cannot collide with the app's own entries.
 - **Only loading changes.** Optional, deferred, merged, once and scroll props keep their behavior. Their metadata is written from the
   cache too. A parallel cached prop does not start its loader on a hit. A rescued failure is not cached.
-- **Plain values only.** The value must not contain `InertiaProp` values. A loader that returns a prop cannot be cached.
+- **Plain values only.** The value must not contain `InertiaProp` values. A loader that returns a prop cannot be cached;
+  [INERTIA004](#compile-time-component-checks) reports `Prop(() => Defer(...)).Cache(...)` at build time. Cache the inner prop instead.
 - **Per instance.** With the default store each app instance has its own memory cache. Concurrent misses share one fill per key and
   app instance. If that fill fails or is cancelled, a waiting request retries with its own loader. Entries carry a `Size` (their byte
   length), so an `IMemoryCache` with a `SizeLimit` works.
@@ -1084,7 +1129,8 @@ meantime get the stale value too. After `duration + staleFor`, the loader runs d
 
 - When the response completes, the refresh is queued on a bounded background worker, so an HTTP/1.1 connection can take its next request
   immediately. Loaders using `staleFor` must use singleton dependencies or create an independent scope inside the loader (for example
-  with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`). Do not capture request-scoped services or `HttpContext`.
+  with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`). Do not capture request-scoped services or `HttpContext`;
+  [INERTIA003](#compile-time-component-checks) reports a `staleFor` loader that captures an `HttpContext` or a `DbContext`.
 - Four refreshes run at a time. Each refresh is cancelled after 30 seconds, and a loader that ignores the cancellation token is
   abandoned. The worker accepts 64 pending refreshes and stops with the host. When the queue is full, the worker drops the refresh,
   releases its claim and logs a warning (at most every 30 seconds, with a count). The stale value keeps its existing expiration.
@@ -1669,6 +1715,29 @@ Public channels are open. Private, presence and encrypted-private channels need 
 
 See the [package README](src/Inertia.Net.Live.SignalR/README.md) for the options, scale-out and security notes.
 
+### Server-Sent Events
+
+The `Inertia.Net.Live.Sse` package delivers live props over one `text/event-stream` endpoint and the browser's `EventSource`, so the
+client bundle needs no `@microsoft/signalr`. Use it for apps that run as **one instance**: events reach only the clients connected to
+the instance that publishes them, and there is no backplane. For several instances behind a load balancer, use SignalR with a backplane.
+
+```csharp
+builder.Services.AddInertiaLive().AddSse(o =>
+    o.Authorize((context, channel, ct) => ValueTask.FromResult(channel.Name == $"users.{context.UserIdentifier}")));
+app.MapInertiaLiveSse();   // /inertia-live; chain .RequireAuthorization() to require a signed-in user
+```
+
+```ts
+import { sse } from './lib/inertia-sse'   // dotnet new inertia apps include it; elsewhere copy the file
+createInertiaApp({ live: sse() })
+```
+
+The same `ILiveChannelAuthorizer` serves both transports: its `HubCallerContext` wraps the stream request (`User`, `UserIdentifier`,
+`ConnectionId`). The channels are part of the stream URL, so the stream reopens when a page joins or leaves a channel. A stream from
+another origin gets a 403, a stream ends when its sign-in cookie expires (the client reconnects and is authorized again), and a client
+too slow to keep up is disconnected and reloads its live props when it reconnects. See the
+[package README](src/Inertia.Net.Live.Sse/README.md) for the options and the wire format.
+
 ### Reloading scroll and merge props
 
 A `Scroll(...)` or `Merge(...)` prop cannot be live, because a live reload would merge the reloaded page into the list. Reload
@@ -1699,7 +1768,7 @@ The helper works as follows:
 
 ### Other transports
 
-The page metadata and the broadcast payload do not depend on the transport, so you can use a transport other than SignalR:
+The page metadata and the broadcast payload do not depend on the transport, so you can use a transport other than SignalR or SSE:
 
 - **Pusher-protocol servers** (Reverb, Soketi, Ably, Pusher) work with the client's built-in `pusher()` or `echo()` transport.
   Implement `IInertiaLiveBroadcaster` to send `LiveMessage.Payload` with your server's publish API.
@@ -1805,6 +1874,24 @@ app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));   // t
 
 An existing `c.Endpoints.Configurator` runs first, followed by the Inertia setup and its optional callback. The Inertia pre-processor runs after an endpoint's own pre-processors. If one of those has already answered, for example with a 403, that answer wins.
 
+### `useHttp` requests
+
+The client's `useHttp` sends JSON with `X-Requested-With: XMLHttpRequest` and no `X-Inertia`, and fills `form.errors` only from a
+`422` whose body has an `errors` object. So for such a request, `WithInertiaValidation()` (and `WithInertiaPrecognition()`),
+`AddInertiaMvc()` and `ConfigureInertia()` answer a validation failure with `422` and the same body Precognition uses:
+
+```json
+{ "message": "The Email field is required. (and 1 more error)", "errors": { "email": ["The Email field is required."], "name": ["..."] } }
+```
+
+The keys are the client keys an Inertia form gets (`address.street`, `items.0.name`). Requests without `X-Requested-With` keep
+the `400` validation problem.
+
+```tsx
+const check = useHttp({ name: '', email: '' })
+await check.post('/contacts/check')   // check.errors.email after a 422
+```
+
 ### Precognition (live validation)
 
 Precognition validates a form as the user types, without running the handler. Use it for live validation. The server validates a request that has the `Precognition: true` header and answers with:
@@ -1887,7 +1974,7 @@ To remove flash messages before you render or redirect, call `http.Inertia().For
 
 Inertia forms keep their input on the client after `Back().WithErrors(...)`, so there is no `WithInput()` helper. For a full-page POST that needs old input, explicitly flash only sanitized fields: `Back().WithFlash("old", new InertiaProps { ["email"] = email })`. Then read `usePage().flash.old`. Never flash passwords, tokens or other secrets.
 
-**Where state is kept.** The state is the flash data, the errors, `clearHistory` and `preserveFragment` that are set during a request. When that request ends in a redirect, or in a `Location()` or fragment `409`, Inertia.Net saves the state in an `IInertiaStateStore` and loads it at the start of the next request. If the next request redirects again, the state is carried on. This means that `Back()` to a URL that itself redirects still shows the flash. Otherwise, the response of the next request consumes the state. The state is also kept when the response is the version-mismatch `409`.
+**Where state is kept.** The state is the flash data, the errors, `clearHistory` and `preserveFragment` that are set during a request. When that request ends in a redirect, or in a `Location()` or fragment `409`, Inertia.Net saves the state in an `IInertiaStateStore` and loads it at the start of the next request. If the next request redirects again, the state is carried on. This means that `Back()` to a URL that itself redirects still shows the flash. Otherwise, the response of the next request consumes the state. The state is also kept when the response is the version-mismatch `409`, and by a prefetch (`Purpose: prefetch`): a prefetched page renders without flash and with empty errors, and the visit that follows gets them.
 
 - **Default: an encrypted cookie** (`.Inertia.State`). The cookie is protected with ASP.NET Core Data Protection, and is HttpOnly and SameSite=Lax. It works without sessions and under Native AOT. Cookies that were tampered with or cannot be decrypted are ignored and deleted. Inertia.Net logs a warning when the cookie is larger than about 4 KB, because browsers drop larger cookies.
 - **Session store (opt in):** call `o.State.UseSession()`, with `services.AddSession()` and `app.UseSession()` before `app.UseInertia()`.
@@ -2468,7 +2555,7 @@ builder.Services.AddOpenTelemetry()
 | `inertia.props.rescued` | counter | |
 | `inertia.cache.refresh.dropped` | counter | `inertia.cache.kind` (`prop`, `ssr`) |
 
-Tag values are bounded: they contain no URLs, component names or user data. The `inertia.render` activity carries `inertia.component`. The `inertia.ssr` activity carries `inertia.ssr.endpoint`, `inertia.ssr.outcome` and `inertia.ssr.reason`. Nothing is recorded unless a listener is attached.
+Tag values are bounded: they contain no URLs, component names or user data. The `inertia.render` activity carries `inertia.component`. Each loader that runs gets a child `inertia.prop` activity tagged `inertia.prop` with the prop's path, so a trace shows which loader is slow; `Parallel()` loaders overlap under the render. The `inertia.ssr` activity carries `inertia.ssr.endpoint`, `inertia.ssr.outcome` and `inertia.ssr.reason`. Nothing is recorded unless a listener is attached.
 
 ### 6. Response cache
 
@@ -2751,7 +2838,7 @@ props, metrics, DevTools and antiforgery. Named mounts add an `inertia.mount` ta
 
 ## Native AOT
 
-Inertia.Net supports publishing with Native AOT. `Inertia.Net`, `Inertia.Net.FastEndpoints` and `Inertia.Net.Live.SignalR` are annotated `IsAotCompatible`. CI publishes a real app with Native AOT (`tests/Inertia.Net.AotSmoke`), with zero trim and AOT warnings allowed. The library never uses reflection on your props: it writes values with `JsonTypeInfo` from your `JsonSerializerContext`.
+Inertia.Net supports publishing with Native AOT. `Inertia.Net`, `Inertia.Net.FastEndpoints`, `Inertia.Net.Live.SignalR` and `Inertia.Net.Live.Sse` are annotated `IsAotCompatible`. CI publishes a real app with Native AOT (`tests/Inertia.Net.AotSmoke`), with zero trim and AOT warnings allowed. The library never uses reflection on your props: it writes values with `JsonTypeInfo` from your `JsonSerializerContext`.
 
 **1. Register an app `JsonSerializerContext` for every prop type**, and chain it into the HTTP JSON options:
 
@@ -2974,11 +3061,20 @@ git diff --exit-code ClientApp/types
 
 ### Compile-time component checks
 
-Inertia.Net ships an analyzer that checks component names when you compile. It has two rules:
+Inertia.Net ships analyzers that check component names and loaders when you compile. They have four rules:
 
 - INERTIA001 reports two page records that claim one component.
 - INERTIA002 reports a component name that has no page file in the pages directory. It checks the names in `Render("...")`,
   `MapInertia` and page records. This rule needs `<InertiaPagesDirectory>ClientApp/pages</InertiaPagesDirectory>` in the project file.
+- INERTIA003 reports a [`Parallel()`](#parallel-props) or [`staleFor`](#cached-props) loader that captures an `HttpContext` or a
+  `DbContext` declared outside the lambda (a handler parameter, a field, a controller's `HttpContext`). Such a loader runs beside other
+  loaders, or after the response, where the request's instances are not safe to use. Use `IDbContextFactory<T>`, `Prop<TService, T>`
+  or a scope of its own.
+- INERTIA004 reports `Cache(...)` on a loader whose value is an `InertiaProp`, such as `Prop(() => Defer(...)).Cache(...)`, which
+  fails at run time. Cache the inner prop instead.
+
+INERTIA003 and INERTIA004 check the prop built in the same expression (`Prop(...).Defer().Parallel()`); a prop passed around in a
+variable first is not followed.
 
 ## DevTools
 
@@ -3002,7 +3098,8 @@ tab, at most `MaxEntriesPerTab` and `MaxEntries`, for `MaxAge`. An entry holds:
 - timings
 - headers
 - bodies
-- the page object and its props metadata
+- the page object and its props metadata, including `durationMs`: how long each prop's loader (or its cache lookup) took. A
+  `Parallel()` loader is timed from when it got a slot, not from when the walk reached it.
 
 The first page carries the discovery tag that the extension reads. Nothing leaves the app. The recorder warns when it is enabled
 without a mapped reader endpoint.
@@ -3298,6 +3395,7 @@ configuration too, because build-time generation cannot run an arbitrary runtime
 | `AssetBaseUrl` | `null` | Replaces `{PathBase}/{BuildDirectory}` as the URL prefix of built assets (CDN). |
 | `Prefetch` | `None` | `Waterfall` or `Aggressive`: prefetch the code-split chunks after load. |
 | `PrefetchConcurrency` | `3` | Number of chunks that `Waterfall` downloads at a time. |
+| `StartDevServer` | `false` | In Development, run the package's `dev` script with the app and stop it with the app. See [Development workflow](#development-workflow). |
 
 ### `o.Ssr`: `SsrOptions`
 

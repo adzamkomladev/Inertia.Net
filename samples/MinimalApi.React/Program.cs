@@ -54,8 +54,18 @@ builder.Services.AddInertia(o =>
 });
 
 // Live props over SignalR: the hub is mapped below; the client enables it with createInertiaApp({ live: signalr() }).
-builder.Services.AddInertiaLive().AddSignalR(o =>
-    o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)));
+// LIVE_TRANSPORT=sse uses Server-Sent Events instead (build the client with VITE_LIVE_TRANSPORT=sse for its sse() transport).
+var sse = Environment.GetEnvironmentVariable("LIVE_TRANSPORT") == "sse";
+if (sse)
+{
+    builder.Services.AddInertiaLive().AddSse(o =>
+        o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)));
+}
+else
+{
+    builder.Services.AddInertiaLive().AddSignalR(o =>
+        o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)));
+}
 
 // Keep development diagnostics unless the browser tests explicitly enable error pages.
 builder.Services.AddInertiaErrorPages(o =>
@@ -94,7 +104,8 @@ app.UseRateLimiter(); // after UseInertia(), which saves the flash data of a rej
 app.UseInertiaAntiforgery(); // after UseAuthentication() in an app with sign-in
 
 app.MapInertiaDevTools();
-app.MapInertiaLiveHub(); // /inertia-live
+if (sse) app.MapInertiaLiveSse(); // /inertia-live
+else app.MapInertiaLiveHub(); // /inertia-live
 app.MapInertia("/", "Home").WithName("home");
 LoginDemo.MapRoutes(app);
 
@@ -138,6 +149,9 @@ app.MapPost("/contacts", (HttpContext http, [FromBody] ContactForm form) =>
     http.Inertia().Flash("success", "Contact created");
     return Results.Redirect("/");
 }).WithInertiaValidation().WithName("contacts.store");
+
+// The same validation for useHttp (an XHR without X-Inertia): failures are a 422 with { message, errors } that fills form.errors.
+app.MapPost("/contacts/check", ([FromBody] ContactForm form) => Results.NoContent()).WithInertiaValidation().WithName("contacts.check");
 
 app.MapPost("/newsletter", (HttpContext http, [FromBody] NewsletterForm form) =>
 {

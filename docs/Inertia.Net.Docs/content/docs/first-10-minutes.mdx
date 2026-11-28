@@ -17,27 +17,23 @@ Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.
 Run these commands in the folder where you want to create `MyApp`.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.8
+dotnet new install Inertia.Net.Templates@1.9.11
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
-npm run dev
+dotnet watch
 ```
 
 For Vue or Svelte, use `--framework vue` or `--framework svelte` in the `dotnet new inertia` command. For .NET 11, install the .NET 11 SDK and add `--tfm net11.0`.
 
-Leave Vite running. In a second terminal, open the same `MyApp` folder and start the server.
-
-```sh
-dotnet watch
-```
+`dotnet watch` starts the app, and the app starts Vite for you (`o.Vite.StartDevServer = true` in `Program.cs`).
 
 Open [http://localhost:5180/todos](http://localhost:5180/todos) in your browser. That is the address `dotnet watch` prints. Vite also prints an address on port 5173. Vite uses that address to serve JavaScript, CSS and live updates to the page.
 
 ## 2. Change a C# validation rule
 
 1. With the title empty, click **Add**. The page shows an error below the input.
-2. In `Program.cs`, find `NewTodo` and change `StringLength(100)` to `StringLength(10)`. Save the file, then restart the server to load the new rule. To restart, press **Ctrl+C** in the server terminal and run `dotnet watch` again. Leave Vite running.
+2. In `Program.cs`, find `NewTodo` and change `StringLength(100)` to `StringLength(10)`. Save the file, then restart the server to load the new rule. To restart, press **Ctrl+C** and run `dotnet watch` again. Vite stops and starts with the app.
 3. Enter `Buy groceries` and click **Add**. The new error shows the 10-character limit. Then try `Buy milk`. The todo appears in the list.
 
 ## 3. Follow the form from the browser to C#

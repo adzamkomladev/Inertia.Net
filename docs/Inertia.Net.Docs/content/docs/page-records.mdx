@@ -92,12 +92,16 @@ The route pattern and its name stay on the endpoint (`MapGet(...).WithName(...)`
 
 ## Compile-time component checks
 
-The `Inertia.Net` package includes an analyzer with these rules:
+The `Inertia.Net` package includes analyzers with these rules:
 
 | Rule | Reports |
 |---|---|
 | `INERTIA001` | Two page records that claim one component. |
 | `INERTIA002` | A component name, in `Render("...")`, `MapInertia` or a page record, that has no page file under `$(InertiaPagesDirectory)`. |
+| `INERTIA003` | A [`Parallel()`](/docs/props#parallel-props) or [`staleFor`](/docs/props#cached-props) loader that captures an `HttpContext` or a `DbContext` declared outside the lambda (a handler parameter, a field, a controller's `HttpContext`). Use `IDbContextFactory<T>`, `Prop<TService, T>` or a scope of its own. |
+| `INERTIA004` | `Cache(...)` on a loader whose value is an `InertiaProp`, such as `Prop(() => Defer(...)).Cache(...)`, which fails at run time. Cache the inner prop instead. |
+
+`INERTIA003` and `INERTIA004` check the prop built in the same expression (`Prop(...).Defer().Parallel()`). A prop stored in a variable first is not followed.
 
 `INERTIA002` runs when the project file sets the pages directory:
 

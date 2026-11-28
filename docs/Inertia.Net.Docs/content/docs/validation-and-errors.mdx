@@ -109,6 +109,21 @@ app.UseFastEndpoints(c => c.ConfigureInertia(ep => ep.AllowAnonymous()));
 
 `c.ConfigureInertia()` works together with an existing `c.Endpoints.Configurator`. The optional callback of `c.ConfigureInertia()` runs after Inertia setup. The Inertia pre-processor runs after an endpoint's own pre-processors. If one of those already answered, for example with a 403, its answer wins.
 
+## `useHttp` requests
+
+The client's `useHttp` sends JSON with `X-Requested-With: XMLHttpRequest` and no `X-Inertia`. It fills `form.errors` only from a `422` whose body has an `errors` object. For such a request, all three adapters answer a validation failure with `422` and the body Precognition uses: `WithInertiaValidation()` (and `WithInertiaPrecognition()`) on Minimal APIs, `AddInertiaMvc()` on MVC, and `ConfigureInertia()` on FastEndpoints.
+
+```json
+{ "message": "The Email field is required. (and 1 more error)", "errors": { "email": ["The Email field is required."], "name": ["..."] } }
+```
+
+The keys are the client keys an Inertia form gets (`address.street`, `items.0.name`). Requests without `X-Requested-With` keep the `400` validation problem.
+
+```tsx
+const check = useHttp({ name: '', email: '' })
+await check.post('/contacts/check')   // check.errors.email after a 422
+```
+
 ## Precognition (live validation)
 
 [Precognition](/docs/precognition) validates a request without running the handler. Minimal APIs use `.WithInertiaPrecognition()` instead of `.WithInertiaValidation()`. FastEndpoints enables Precognition with `ConfigureInertia()`. MVC does not support Precognition.

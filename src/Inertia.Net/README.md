@@ -40,7 +40,7 @@ app.Run();
 
 `o.State.RememberPreviousUrl = true` lets `Back()` use the last successful page URL when `Referer` is missing; read it with `context.Inertia().PreviousUrl`.
 
-What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll, live) with opt-in parallel loaders and cached props, partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR (several servers, a supervised Node process pool, circuit breakers, render slots, per-response modes, metrics and a health check), validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`), CSRF protection (`UseInertiaAntiforgery()`), an encrypted-cookie state store, an SSR response cache, Vite chunk prefetching and CSP nonces, `MapInertia` page endpoints, TypeScript declarations from your C# page types, and the Inertia DevTools recorder (`AddInertiaDevTools()`).
+What is in the package: prop factories (lazy, optional, deferred, always, merge, once, scroll, live) with opt-in parallel loaders and cached props, partial reloads, shared data, flash, history encryption, asset versioning, Vite manifest and dev-server tags, SSR (several servers, a supervised Node process pool, circuit breakers, render slots, per-response modes, metrics and a health check), validation and Precognition for Minimal APIs (`WithInertiaValidation()`, `WithInertiaPrecognition()`, with a `422` for `useHttp` requests), loader timeouts (`.Timeout(TimeSpan)`), CSRF protection (`UseInertiaAntiforgery()`), an encrypted-cookie state store, an SSR response cache, Vite chunk prefetching and CSP nonces, `MapInertia` page endpoints, TypeScript declarations from your C# page types, the Inertia DevTools recorder (`AddInertiaDevTools()`, with a duration per prop), an opt-in Vite dev server started with the app in Development (`o.Vite.StartDevServer`), and analyzers for page components and loader pitfalls (INERTIA001 to INERTIA004).
 
 `AddInertiaErrorPages()` and `UseInertiaErrorPages()` render production error pages with shared props for Inertia requests and HTML navigations; see [Error pages](https://github.com/adzamkomladev/Inertia.Net#error-pages).
 
@@ -66,8 +66,8 @@ channel and reloads the prop, or applies the broadcast values, when the event ar
 always and shared props; merge and scroll props cannot be live. `.Throttle(window)` spaces out reloads.
 
 `services.AddInertiaLive()` registers `IInertiaLive`, which publishes an event with or without values (`exceptSocketId` leaves the
-caller's own connection out, from `HttpContext.InertiaRequest().SocketId`). A transport delivers it: implement `IInertiaLiveBroadcaster` for your
-broadcaster. Needs the Inertia client 3.11.0 or later. See [Live props](https://github.com/adzamkomladev/Inertia.Net#live-props).
+caller's own connection out, from `HttpContext.InertiaRequest().SocketId`). A transport delivers it: `Inertia.Net.Live.SignalR`, `Inertia.Net.Live.Sse` (one
+app instance), or your own `IInertiaLiveBroadcaster`. Needs the Inertia client 3.11.0 or later. See [Live props](https://github.com/adzamkomladev/Inertia.Net#live-props).
 
 ## Performance
 

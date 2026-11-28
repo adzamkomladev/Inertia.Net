@@ -130,6 +130,71 @@ public sealed class AnalyzerTests
             diagnostics.Select(d => d.GetMessage(System.Globalization.CultureInfo.InvariantCulture).Split(' ')[1]).Order(StringComparer.Ordinal));
     }
 
+    [Fact]
+    public async Task Loader_analyzer_reports_request_state_captured_by_parallel_and_stale_loaders()
+    {
+        var source = """
+            using System;
+            using System.Threading.Tasks;
+            using Microsoft.AspNetCore.Http;
+            namespace Microsoft.EntityFrameworkCore { public class DbContext { public Task<int> CountAsync() => Task.FromResult(1); } }
+            namespace App
+            {
+                public sealed class AppDb : Microsoft.EntityFrameworkCore.DbContext;
+                public sealed class Factory { public AppDb Create() => new(); }
+                public static class Endpoints
+                {
+                    public static InertiaProps Props(HttpContext http, AppDb db, Factory factory) => new()
+                    {
+                        ["parallelDb"] = Prop(ct => db.CountAsync()).Parallel(),
+                        ["parallelHttp"] = Prop(async ct => { await Task.Yield(); return http.Request.Path.Value; }).Defer().Parallel(),
+                        ["stale"] = Prop(() => db.CountAsync()).Cache("k", TimeSpan.FromMinutes(1), staleFor: TimeSpan.FromHours(1)),
+                        // Fine: the request's services in an ordinary loader, a scope of its own, the service parameter, no staleFor.
+                        ["sequential"] = Prop(ct => db.CountAsync()),
+                        ["own"] = Prop(async ct => await factory.Create().CountAsync()).Parallel(),
+                        ["service"] = Prop<AppDb, int>((own, ct) => own.CountAsync()).Parallel(),
+                        ["cached"] = Prop(() => db.CountAsync()).Cache("c", TimeSpan.FromMinutes(1)),
+                        ["nullStale"] = Prop(() => db.CountAsync()).Cache("n", TimeSpan.FromMinutes(1), staleFor: null),
+                    };
+                }
+            }
+            """;
+        var diagnostics = (await AnalyzeLoadersAsync(source)).Where(d => d.Id == "INERTIA003").ToArray();
+        Assert.Equal(3, diagnostics.Length);
+        var messages = diagnostics.Select(d => d.GetMessage(System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+        Assert.Equal(2, messages.Count(m => m.Contains("Parallel()", StringComparison.Ordinal)));
+        Assert.Single(messages, m => m.Contains("staleFor", StringComparison.Ordinal) && m.Contains("'db'", StringComparison.Ordinal));
+        Assert.Single(messages, m => m.Contains("'http'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Loader_analyzer_reports_a_cached_loader_that_returns_a_prop()
+    {
+        var source = """
+            using System;
+            using System.Threading.Tasks;
+            namespace App;
+            public static class Endpoints
+            {
+                public static InertiaProps Props() => new()
+                {
+                    ["bad"] = Prop(() => Defer(() => 1)).Cache("bad", TimeSpan.FromMinutes(1)),
+                    ["badAsync"] = Prop(() => Task.FromResult(Optional(() => 1))).Cache("bad2", TimeSpan.FromMinutes(1)),
+                    ["good"] = Defer(() => 1).Cache("good", TimeSpan.FromMinutes(1)),
+                };
+            }
+            """;
+        var diagnostics = await AnalyzeLoadersAsync(source);
+        Assert.Equal(2, diagnostics.Count(d => d.Id == "INERTIA004"));
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeLoadersAsync(string source)
+    {
+        var compilation = Compile(source);
+        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        return await compilation.WithAnalyzers([new LoaderAnalyzer()]).GetAnalyzerDiagnosticsAsync(TestContext.Current.CancellationToken);
+    }
+
     private sealed class Page(string path) : AdditionalText
     {
         public override string Path { get; } = path;

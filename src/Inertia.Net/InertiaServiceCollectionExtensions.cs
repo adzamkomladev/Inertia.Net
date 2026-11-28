@@ -78,6 +78,7 @@ public static class InertiaServiceCollectionExtensions
         services.TryAddSingleton<SsrNodeProcess>();
         services.AddHostedService(sp => sp.GetRequiredService<SsrNodeProcess>()); // no-op unless o.Ssr.UseNodeProcess()
         services.AddHostedService<InertiaTypeScriptWriter>(); // no-op unless o.TypeScript.OutputPath is set, in Development
+        services.AddHostedService<ViteDevServer>(); // no-op unless o.Vite.StartDevServer is set, in Development
         if (InertiaTypeScriptWriter.IsGenerateOnly)
         {
             // Registered after the web host's server, so it wins: the app builds its endpoints but never listens.
@@ -122,6 +123,8 @@ public static class InertiaServiceCollectionExtensions
             : ActivatorUtilities.CreateInstance<CookieInertiaStateStore>(sp, MountOptions(sp, name)));
         // Not AddHostedService: it skips a second hosted service of the same type, and each mount needs its own.
         services.AddSingleton<IHostedService>(sp => sp.GetRequiredKeyedService<SsrNodeProcess>(name));
+        services.AddSingleton<IHostedService>(sp => new ViteDevServer(MountOptions(sp, name), sp.GetRequiredKeyedService<ViteAssets>(name),
+            sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()));
         services.AddSingleton<IHostedService>(sp => ActivatorUtilities.CreateInstance<InertiaTypeScriptWriter>(sp,
             MountOptions(sp, name), sp.GetRequiredKeyedService<InertiaPageWriter>(name)));
     }

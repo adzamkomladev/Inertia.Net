@@ -28,7 +28,9 @@ public static class InertiaValidationEndpointExtensions
 {
     /// <summary>
     /// For Inertia requests other than GET, turns validation failures into a redirect back with the errors (in the bag named by
-    /// <c>X-Inertia-Error-Bag</c>, else <c>default</c>) instead of a 400 problem details response. Covers:
+    /// <c>X-Inertia-Error-Bag</c>, else <c>default</c>) instead of a 400 problem details response. A request that is not an Inertia
+    /// visit but carries <c>X-Requested-With: XMLHttpRequest</c> (the client's <c>useHttp</c>) gets a <c>422</c> with
+    /// <c>{ "message", "errors": { field: [messages] } }</c> instead, which <c>useHttp</c> puts in <c>form.errors</c>. Covers:
     /// <list type="bullet">
     /// <item>.NET 10 <c>services.AddValidation()</c>: its built-in endpoint filter always runs outermost and writes the 400 itself, so
     /// this disables it on the endpoint and runs the same source-generated validation in its place (other requests still get the 400);</item>
@@ -102,16 +104,28 @@ internal static partial class InertiaValidationFilter
 
             if (validatable is not null && await ValidateAsync(invocation, validatable.Value) is { } errors)
             {
-                return IsInertiaMutation(httpContext) ? Back(httpContext, ToClientKeys(errors, naming, schema)) : TypedResults.ValidationProblem(errors);
+                return Respond(httpContext, errors, naming, schema) ?? TypedResults.ValidationProblem(errors);
             }
 
             var result = await next(invocation);
-            return IsInertiaMutation(httpContext) && GetValidationErrors(result) is { } returned ? Back(httpContext, ToClientKeys(new Dictionary<string, string[]>(returned), naming, schema)) : result;
+            return GetValidationErrors(result) is { } returned
+                && Respond(httpContext, new Dictionary<string, string[]>(returned), naming, schema) is { } response ? response : result;
         };
     }
 
+    /// <summary>The redirect back of an Inertia form, the 422 of a <c>useHttp</c> request, or null for any other request.</summary>
+    internal static IResult? Respond(HttpContext httpContext, Dictionary<string, string[]> errors, JsonNamingPolicy? naming, JsonTypeInfo? schema) =>
+        IsInertiaMutation(httpContext) ? Back(httpContext, ToClientKeys(errors, naming, schema))
+        : IsHttpRequest(httpContext) ? InertiaPrecognition.Unprocessable(ToClientKeys(errors, naming, schema))
+        : null;
+
     internal static bool IsInertiaMutation(HttpContext httpContext) =>
         !HttpMethods.IsGet(httpContext.Request.Method) && !string.IsNullOrEmpty(httpContext.Request.Headers[InertiaHeaders.Inertia]);
+
+    // useHttp sends X-Requested-With without X-Inertia, and reads field errors only from a 422 with an "errors" object.
+    internal static bool IsHttpRequest(HttpContext httpContext) =>
+        string.IsNullOrEmpty(httpContext.Request.Headers[InertiaHeaders.Inertia])
+        && string.Equals(httpContext.Request.Headers.XRequestedWith, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
 
     // Microsoft.Extensions.Validation reports CLR member paths ("Address.Street"); the client knows the JSON names, so each
     // segment uses the page JSON contract, including aliases when generated member metadata is available.

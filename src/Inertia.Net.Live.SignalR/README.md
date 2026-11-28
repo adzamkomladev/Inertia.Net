@@ -136,7 +136,9 @@ does not support strongly typed hubs (`Hub<T>`) under Native AOT.
 
 ## Other transports
 
-The page metadata and the payload do not depend on SignalR. For a Pusher-protocol server (Reverb, Soketi, Ably, Pusher), use the
+The page metadata and the payload do not depend on SignalR. For an app that runs as one instance,
+[Inertia.Net.Live.Sse](https://www.nuget.org/packages/Inertia.Net.Live.Sse) delivers them over Server-Sent Events with no client
+library, and takes the same `ILiveChannelAuthorizer`. For a Pusher-protocol server (Reverb, Soketi, Ably, Pusher), use the
 client's built-in `pusher()` or `echo()` transport and implement `IInertiaLiveBroadcaster` with your server's publish API instead of
 this package.
 

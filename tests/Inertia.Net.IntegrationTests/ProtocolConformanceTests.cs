@@ -610,6 +610,25 @@ public abstract class ProtocolConformanceTests<THost>
     }
 
     [Fact]
+    public async Task A_prefetch_between_the_redirect_and_the_visit_leaves_flash_and_errors_for_the_visit()
+    {
+        await using var app = await StartAsync();
+        var client = app.CreateClient();
+        await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
+
+        var prefetched = await (await client.InertiaGetAsync("/page", r => r.WithHeader(InertiaHeaders.Purpose, "prefetch"))).PageAsync();
+        JsonAssert.Missing(prefetched, "flash");
+        JsonAssert.Equal("{}", prefetched["props"]!["errors"]);
+
+        var page = await (await client.InertiaGetAsync("/page")).PageAsync();
+        JsonAssert.Equal("""{"success":"Saved Ann"}""", page["flash"]);
+
+        await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "" }, r => r.Headers.Referrer = new Uri($"{Base}/page"));
+        JsonAssert.Equal("{}", (await (await client.InertiaGetAsync("/page", r => r.WithHeader(InertiaHeaders.Purpose, "prefetch"))).PageAsync())["props"]!["errors"]);
+        Assert.Single((await (await client.InertiaGetAsync("/page")).PageAsync())["props"]!["errors"]!.AsObject());
+    }
+
+    [Fact]
     public async Task Flash_from_a_classic_form_post_reaches_the_html_page()
     {
         await using var app = await StartAsync();

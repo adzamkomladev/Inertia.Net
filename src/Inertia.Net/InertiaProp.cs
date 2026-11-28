@@ -35,6 +35,7 @@ public abstract class InertiaProp
     internal bool IsParallel;
     internal PropCaching? Caching; // one reference, set only by Cache(): 8 bytes per prop rather than 16
     internal LiveSpec? LiveSpec; // one reference, set only by Live(), like Caching
+    internal long TimeoutTicks; // set only by Timeout(); 0 for none
 
     // Set once any prop is marked Parallel(): until then no render pays for the planning walk.
     internal static volatile bool ParallelUsed;
@@ -49,7 +50,26 @@ public abstract class InertiaProp
     internal virtual bool UsesServices => false;
 
     /// <summary>Returns the constant value or runs the loader; <paramref name="services"/> is the scope a scoped loader resolves from.</summary>
-    internal abstract ValueTask<object?> ResolveAsync(IServiceProvider? services, CancellationToken cancellationToken);
+    internal ValueTask<object?> ResolveAsync(IServiceProvider? services, CancellationToken cancellationToken) =>
+        TimeoutTicks == 0 ? ResolveCoreAsync(services, cancellationToken) : ResolveWithTimeoutAsync(services, cancellationToken);
+
+    private protected abstract ValueTask<object?> ResolveCoreAsync(IServiceProvider? services, CancellationToken cancellationToken);
+
+    private async ValueTask<object?> ResolveWithTimeoutAsync(IServiceProvider? services, CancellationToken cancellationToken)
+    {
+        var timeout = TimeSpan.FromTicks(TimeoutTicks);
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout);
+        try
+        {
+            // WaitAsync: a loader that ignores its token is abandoned at the timeout rather than holding the request.
+            return await ResolveCoreAsync(services, timeoutSource.Token).AsTask().WaitAsync(timeoutSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
+        {
+            throw new TimeoutException($"The prop loader did not finish within {timeout}.", ex);
+        }
+    }
 
     /// <summary>Resolves the prop once: the client keeps it and skips it on later visits.</summary>
     /// <param name="key">Custom once key (defaults to the prop path).</param>
@@ -123,6 +143,19 @@ public abstract class InertiaProp
     public InertiaProp Rescue(bool rescue = true)
     {
         ShouldRescue = rescue;
+        return this;
+    }
+
+    /// <summary>
+    /// Cancels the loader's token after <paramref name="timeout"/> and stops waiting for it. With <see cref="Rescue"/> the prop is then
+    /// listed in <c>rescuedProps</c>; without it the render fails with a <see cref="TimeoutException"/>, as for any loader exception.
+    /// A synchronous loader cannot be interrupted: it finishes before the timeout is checked.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="timeout"/> is not positive.</exception>
+    public InertiaProp Timeout(TimeSpan timeout)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(timeout, TimeSpan.Zero);
+        TimeoutTicks = timeout.Ticks;
         return this;
     }
 
@@ -354,7 +387,7 @@ internal sealed class InertiaProp<T> : InertiaProp
 
     internal override bool UsesServices => _loader is Func<IServiceProvider?, CancellationToken, ValueTask<T>>;
 
-    internal override async ValueTask<object?> ResolveAsync(IServiceProvider? services, CancellationToken cancellationToken) => _loader switch
+    private protected override async ValueTask<object?> ResolveCoreAsync(IServiceProvider? services, CancellationToken cancellationToken) => _loader switch
     {
         null => _value,
         Func<T> syncLoader => syncLoader(),

@@ -50,7 +50,7 @@ Prop(ct => repo.GetValueTaskAsync(ct))             // Func<CancellationToken, Va
 
 The cancellation token a loader receives is `HttpContext.RequestAborted`. An `async` lambda always binds to the awaiting overload, never to “a prop whose value is a Task”.
 
-Fluent methods mutate and return the same instance: `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Parallel()`, `.Cache(key, duration)` and `.Cache(key, duration, staleFor?, tags?)`.
+Fluent methods mutate and return the same instance: `.Once(key?, until?)`, `.As(key)`, `.Until(ttl)`, `.Fresh()`, `.Append(path?, matchOn?)`, `.Prepend(path?, matchOn?)`, `.DeepMerge()`, `.MatchOn(params keys)`, `.Defer(group)`, `.WithGroup(group)`, `.Rescue()`, `.Timeout(timeout)`, `.Parallel()`, `.Cache(key, duration)` and `.Cache(key, duration, staleFor?, tags?)`.
 
 `Fresh()` makes a prop a once prop, and `WithGroup()` makes it deferred. Repeated `MatchOn()` calls add keys. Root `Append()` and `Prepend()` are mutually exclusive, and combining them throws. Fluent methods mutate the prop, so create prop instances per request. Do not share prop instances across requests.
 
@@ -99,7 +99,7 @@ return Render("Dashboard", new InertiaProps
 - If a loader fails, Inertia.Net cancels and awaits the others. The render then fails with the first failure in prop order. A `Rescue()`d prop fails alone.
 
 <Callout type="warning" title="DbContext and HttpContext">
-A parallel loader must not use the request's `DbContext` or other non-thread-safe scoped services, and must not touch `HttpContext`. Give each loader its own context through `IDbContextFactory<T>` or its own scope.
+A parallel loader must not use the request's `DbContext` or other non-thread-safe scoped services, and must not touch `HttpContext`. Give each loader its own context through `IDbContextFactory<T>` or its own scope. The build warns about it: [INERTIA003](/docs/page-records#compile-time-component-checks) reports a `Parallel()` loader that captures an `HttpContext` or a `DbContext` from outside the lambda.
 </Callout>
 
 ```csharp
@@ -192,6 +192,8 @@ return Render("Dashboard", new InertiaProps
 Every request that uses a key gets the same value. Put the user, tenant or anything else the value depends on in the key. Keys live in their own cache space and cannot collide with the app's own entries.
 </Callout>
 
+The cached value must be plain data. `Cache(...)` on a loader that returns an `InertiaProp`, such as `Prop(() => Defer(...)).Cache(...)`, is reported at build time by [INERTIA004](/docs/page-records#compile-time-component-checks). Cache the inner prop instead.
+
 Caching only changes how a prop loads. Optional, deferred, merged, once and scroll props keep their behavior, and their metadata is written from the cache too. A parallel cached prop does not start its loader on a cache hit. A rescued failure is not cached.
 
 **Removing and replacing values.** Inject `IInertiaCache` where the data changes:
@@ -213,7 +215,7 @@ The default store keeps cached props in the app's `IMemoryCache`, with no size l
 
 **Stale-while-revalidate.** `staleFor` keeps serving a value after its duration. The first request that reads a stale value gets the stale value at once, and the loader runs after the response has been sent. After `duration + staleFor`, the loader runs during the request again.
 
-- When the response completes, Inertia.Net queues the refreshes on a bounded background worker. The response does not wait for the loader. Loaders that use `staleFor` must use singleton dependencies, or create an independent scope inside the loader with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`. Do not capture request-scoped services or `HttpContext`.
+- When the response completes, Inertia.Net queues the refreshes on a bounded background worker. The response does not wait for the loader. Loaders that use `staleFor` must use singleton dependencies, or create an independent scope inside the loader with `IServiceScopeFactory.CreateAsyncScope()` or `IDbContextFactory<T>`. Do not capture request-scoped services or `HttpContext`. [INERTIA003](/docs/page-records#compile-time-component-checks) reports a `staleFor` loader that captures an `HttpContext` or a `DbContext`.
 - The worker accepts 64 pending refreshes and runs up to 4 at a time. It cancels each refresh after 30 seconds, and cancels all of them on host shutdown. When the queue is full, Inertia.Net drops the refresh and logs a warning. The stale value keeps its existing expiration. Monitor `inertia.cache.refresh.dropped`, tagged with `inertia.cache.kind=prop|ssr`.
 - One refresh runs per key and app instance at a time. A refresh that finds the value fresh again skips its loader.
 - An `IInertiaCache` removal (`RemovePropAsync`, `RemoveByTagAsync`, `ClearPropsAsync`) can happen while a fill or refresh is running. If the loader started before the removal of its key or of one of its tags, on the same app instance, the fill or refresh does not store its value. The request still gets the value. Removing another key or tag does not affect the fill or refresh.
@@ -270,3 +272,17 @@ builder.Services.AddInertia(o => o.PreserveBigIntegers = true);
 ```
 
 If the loader throws, Inertia.Net logs the exception and leaves the prop out of `props`. The prop's path goes to `"rescuedProps": ["recommendations"]`. Without `.Rescue()`, the exception propagates normally. Cancellation of the request is never rescued.
+
+## Timeout
+
+`.Timeout(TimeSpan)` bounds a loader. When the time is up, the loader's cancellation token is cancelled and the render stops waiting for it, so a loader that ignores the token does not hold the request either:
+
+```csharp
+["recommendations"] = Defer(ct => recommender.ForAsync(userId, ct)).Timeout(TimeSpan.FromSeconds(2)).Rescue(),
+["stats"] = Prop(ct => stats.ComputeAsync(ct)).Parallel().Timeout(TimeSpan.FromSeconds(5)),
+```
+
+- With `Rescue()` the prop is left out and listed in `rescuedProps`, like any rescued failure.
+- Without it the render fails with a `TimeoutException`, as for any loader exception.
+- It works on sequential and `Parallel()` loaders, on cache misses and on stale-while-revalidate refreshes.
+- A synchronous loader cannot be interrupted: it finishes before the timeout is checked.

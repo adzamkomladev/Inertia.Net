@@ -57,6 +57,8 @@ public sealed class ViteAssets
 
     internal string? DevServerOrigin => DevOrigin();
 
+    internal string HotFile => Path.Combine(_contentRoot, _options.HotFilePath ?? Path.Combine(_options.PublicDirectory, "hot"));
+
     /// <summary>Renders the tags for the entry points, e.g. <c>"src/app.tsx"</c> (the manifest key, relative to the Vite root).</summary>
     /// <exception cref="InvalidOperationException">An entry is not in the manifest, or there is no manifest and no dev server.</exception>
     public string RenderTags(HttpContext context, params string[] entries) => Encoding.UTF8.GetString(RenderTagsUtf8(context, entries));
@@ -353,9 +355,7 @@ public sealed class ViteAssets
             return ValidateOrigin(url);
         }
 
-        return _development
-            ? _hotFiles.Get(Path.Combine(_contentRoot, _options.HotFilePath ?? Path.Combine(_options.PublicDirectory, "hot")))
-            : null;
+        return _development ? _hotFiles.Get(HotFile) : null;
     }
 
     private static string? ReadHotFile(string path)

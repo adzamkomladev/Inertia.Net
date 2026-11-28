@@ -46,7 +46,7 @@ Each request through `UseInertia()` gets an `X-Inertia-Devtools-Id` and an entry
 - timings
 - headers
 - bodies
-- the page object and its props metadata
+- the page object and its props metadata, including `durationMs`: how long each prop's loader (or its cache lookup) took. A `Parallel()` loader is timed from when it got a slot.
 
 The first page carries the discovery tag that the extension reads. In props, bodies and headers, DevTools replaces a value with `[REDACTED]` when its name contains `password`, `secret`, `token`, `authorization`, `cookie` or `api_key`. Add names with `RedactedKeys`. Nothing leaves the app.
 

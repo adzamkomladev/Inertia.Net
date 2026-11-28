@@ -92,7 +92,7 @@ the nested path. If no flash values remain, the page has no `flash` field. The r
 
 ## Where state is kept
 
-Some state must survive a redirect: flash data, errors, `clearHistory` and `preserveFragment`. When a request sets any of these and ends in a redirect, Inertia.Net saves the state in an `IInertiaStateStore`. The same applies when the request ends in a `Location()` / fragment `409`. Inertia.Net loads the state at the start of the next request. If the next request redirects again, the state is carried on, so `Back()` to a URL that itself redirects still shows the flash. Otherwise the response of the next request consumes the state. The state is also kept when the response is the version-mismatch `409`.
+Some state must survive a redirect: flash data, errors, `clearHistory` and `preserveFragment`. When a request sets any of these and ends in a redirect, Inertia.Net saves the state in an `IInertiaStateStore`. The same applies when the request ends in a `Location()` / fragment `409`. Inertia.Net loads the state at the start of the next request. If the next request redirects again, the state is carried on, so `Back()` to a URL that itself redirects still shows the flash. Otherwise the response of the next request consumes the state. The state is also kept when the response is the version-mismatch `409`, and by a prefetch (`Purpose: prefetch`). A prefetched page renders without flash and with empty errors, and the visit that follows gets them.
 
 ### Encrypted cookie (default)
 

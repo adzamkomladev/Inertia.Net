@@ -1,4 +1,4 @@
-import { Link, useForm } from '@inertiajs/react'
+import { Link, useForm, useHttp } from '@inertiajs/react'
 import type { FormEvent } from 'react'
 import Layout from '../../Layout'
 import { routes } from '../../types/routes'
@@ -6,6 +6,8 @@ import { routes } from '../../types/routes'
 export default function Create() {
   const contact = useForm({ name: '', email: '' })
   const newsletter = useForm({ email: '' })
+  // useHttp: a plain JSON request (no page visit); validation errors come back as a 422 and land in check.errors.
+  const check = useHttp({ name: '', email: '' })
 
   const submitContact = (e: FormEvent) => {
     e.preventDefault()
@@ -14,6 +16,10 @@ export default function Create() {
   const submitNewsletter = (e: FormEvent) => {
     e.preventDefault()
     newsletter.post('/newsletter', { errorBag: 'newsletter' })
+  }
+  const submitCheck = (e: FormEvent) => {
+    e.preventDefault()
+    void check.post('/contacts/check')
   }
 
   return (
@@ -32,6 +38,15 @@ export default function Create() {
         <input data-testid="newsletter-email" placeholder="Email" value={newsletter.data.email} onChange={(e) => newsletter.setData('email', e.target.value)} />
         <div data-testid="error-newsletter-email">{newsletter.errors.email}</div>
         <button data-testid="newsletter-submit" type="submit" disabled={newsletter.processing}>Subscribe</button>
+      </form>
+      <h2>Check a contact</h2>
+      <form onSubmit={submitCheck}>
+        <input data-testid="http-name" placeholder="Name" value={check.data.name} onChange={(e) => check.setData('name', e.target.value)} />
+        <div data-testid="http-error-name">{check.errors.name}</div>
+        <input data-testid="http-email" placeholder="Email" value={check.data.email} onChange={(e) => check.setData('email', e.target.value)} />
+        <div data-testid="http-error-email">{check.errors.email}</div>
+        <button data-testid="http-submit" type="submit" disabled={check.processing}>Check</button>
+        {check.wasSuccessful && <p data-testid="http-ok">Looks good</p>}
       </form>
     </Layout>
   )

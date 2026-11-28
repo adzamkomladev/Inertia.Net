@@ -1,0 +1,19 @@
+#nullable enable
+Inertia.Net.InertiaLiveSseExtensions
+Inertia.Net.Live.Sse.InertiaLiveSseOptions
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.AllowedOrigins.get -> System.Collections.Generic.IList<string!>!
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.Authorize(System.Func<Microsoft.AspNetCore.SignalR.HubCallerContext!, Inertia.Net.LiveChannel, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<bool>>! authorize) -> Inertia.Net.Live.Sse.InertiaLiveSseOptions!
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.Authorize<TAuthorizer>() -> Inertia.Net.Live.Sse.InertiaLiveSseOptions!
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.AuthorizePublicChannels.get -> bool
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.AuthorizePublicChannels.set -> void
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.HeartbeatInterval.get -> System.TimeSpan
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.HeartbeatInterval.set -> void
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.InertiaLiveSseOptions() -> void
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.MaxChannelNameLength.get -> int
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.MaxChannelNameLength.set -> void
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.MaxQueuedEvents.get -> int
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.MaxQueuedEvents.set -> void
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.MaxSubscriptionsPerConnection.get -> int
+Inertia.Net.Live.Sse.InertiaLiveSseOptions.MaxSubscriptionsPerConnection.set -> void
+static Inertia.Net.InertiaLiveSseExtensions.AddSse(this Inertia.Net.IInertiaLiveBuilder! builder, System.Action<Inertia.Net.Live.Sse.InertiaLiveSseOptions!>? configure = null) -> Inertia.Net.IInertiaLiveBuilder!
+static Inertia.Net.InertiaLiveSseExtensions.MapInertiaLiveSse(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! pattern = "/inertia-live") -> Microsoft.AspNetCore.Builder.IEndpointConventionBuilder!

@@ -7,6 +7,25 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.11] - 2026-11-28
+
+### Added
+
+- `Inertia.Net.Live.Sse`: live props over Server-Sent Events, with the same channel rules and `ILiveChannelAuthorizer` as SignalR and the client transport `ClientApp/lib/inertia-sse.ts`. For apps that run as one instance; there is no backplane.
+- `.Timeout(TimeSpan)` bounds a prop loader, sequential or `Parallel()`. With `Rescue()` the prop is left out and listed in `rescuedProps`; without it the render fails with a `TimeoutException`.
+- `o.Vite.StartDevServer` runs the package's `dev` script with the app in Development and stops it with the app. New apps from `dotnet new inertia` turn it on, so `dotnet watch` alone starts both.
+- `dotnet new inertia-page --component Users/Index` writes a page record and its React, Vue or Svelte page file.
+- Analyzers INERTIA003 (a `Parallel()` or `staleFor` loader that captures an `HttpContext` or a `DbContext`) and INERTIA004 (`Cache(...)` on a loader that returns an `InertiaProp`).
+- DevTools records `durationMs` for each prop, and each loader gets an `inertia.prop` activity while a listener is attached.
+
+### Changed
+
+- A validation failure of a `useHttp` request (`X-Requested-With: XMLHttpRequest` without `X-Inertia`) now gets `422` `{ message, errors }` with client keys on Minimal APIs, MVC and FastEndpoints, instead of the `400` validation problem (or, for plain MVC controllers, the action running with an invalid `ModelState`). Requests without `X-Requested-With` are unchanged.
+
+### Fixed
+
+- A prefetch between a redirect and the visit no longer consumes the flash data and validation errors meant for the visit.
+
 ## [1.9.10] - 2026-11-28
 
 ### Added

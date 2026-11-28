@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Inertia.Net.Live.Sse</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <Description>Server-Sent Events transport for Inertia.Net live props: one endpoint, no client library, single app instance (Native AOT compatible).</Description>
+    <PackageTags>$(PackageTags) sse server-sent-events realtime live-props</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <InternalsVisibleTo Include="Inertia.Net.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ILiveChannelAuthorizer and the origin check are shared with the SignalR transport; SignalR's server is in the shared framework. -->
+    <ProjectReference Include="..\Inertia.Net.Live.SignalR\Inertia.Net.Live.SignalR.csproj" />
+  </ItemGroup>
+</Project>

@@ -449,7 +449,7 @@ builder.Services.AddOpenTelemetry()
 | `inertia.ssr.process.restarts` | counter | `cause` |
 | `inertia.props.rescued` | counter | |
 
-Tag values are bounded: they contain no URLs, component names or user data. The `inertia.render` activity carries `inertia.component`. The `inertia.ssr` activity carries `inertia.ssr.endpoint`, `inertia.ssr.outcome` and `inertia.ssr.reason`. Nothing is recorded unless a listener is attached.
+Tag values are bounded: they contain no URLs, component names or user data. The `inertia.render` activity carries `inertia.component`. Each loader that runs gets a child `inertia.prop` activity tagged `inertia.prop` with the prop's path, so a trace shows which loader is slow. `Parallel()` loaders overlap under the render. The `inertia.ssr` activity carries `inertia.ssr.endpoint`, `inertia.ssr.outcome` and `inertia.ssr.reason`. Nothing is recorded unless a listener is attached.
 
 ## 9. Response cache
 

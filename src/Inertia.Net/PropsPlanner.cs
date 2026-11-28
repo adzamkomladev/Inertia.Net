@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -78,6 +79,9 @@ internal sealed partial class PropsPlanner : IDisposable
 
     /// <summary>Whether <paramref name="prop"/> has a started task the walk has not taken yet.</summary>
     public bool IsPlanned(InertiaProp prop) => Started(prop) is not null;
+
+    /// <summary>How long the planned loader of <paramref name="prop"/> ran, once its task has completed.</summary>
+    public TimeSpan Elapsed(InertiaProp prop) => Find(prop)?.Elapsed ?? TimeSpan.Zero;
 
     /// <summary>The started loader of <paramref name="prop"/>, handed out once.</summary>
     public bool TryTake(InertiaProp prop, out Task<object?> task)
@@ -162,8 +166,10 @@ internal sealed partial class PropsPlanner : IDisposable
     private async Task<object?> RunAsync(Planned planned)
     {
         var cancellationToken = _cancellation.Token;
+        var started = Stopwatch.GetTimestamp();
         if (planned.Lookup is { } lookup && await lookup is { } hit)
         {
+            planned.Elapsed = Stopwatch.GetElapsedTime(started);
             return hit;
         }
 
@@ -173,6 +179,10 @@ internal sealed partial class PropsPlanner : IDisposable
             await gate.WaitAsync(cancellationToken);
         }
 
+        // Timed from the slot, not from the wait for one; the activity is null (no allocation) without a listener.
+        started = Stopwatch.GetTimestamp();
+        using var activity = InertiaDiagnostics.ActivitySource.StartActivity("inertia.prop");
+        activity?.SetTag("inertia.prop", planned.Path);
         try
         {
             // A parallel loader runs beside the others, so a scoped one gets its own scope (its own DbContext).
@@ -192,6 +202,7 @@ internal sealed partial class PropsPlanner : IDisposable
         }
         finally
         {
+            planned.Elapsed = Stopwatch.GetElapsedTime(started);
             gate?.Release();
         }
     }
@@ -219,6 +230,8 @@ internal sealed partial class PropsPlanner : IDisposable
         public Task<CachedProp?>? Lookup { get; init; }
 
         public ExceptionDispatchInfo? Failure { get; set; }
+
+        public TimeSpan Elapsed { get; set; }
 
         public bool Duplicate { get; set; }
 

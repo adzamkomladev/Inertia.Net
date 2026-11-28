@@ -36,6 +36,52 @@ public sealed class DevToolsRecorderTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Each_loader_records_its_duration(bool parallel)
+    {
+        var harness = Recording();
+        var recorder = harness.Services.GetRequiredService<DevToolsRecorder>();
+        var context = harness.Context().AsInertia();
+        var capture = recorder.Begin(context)!;
+        var slow = Inertia.Prop(async ct => { await Task.Delay(40, ct); return 1; });
+        if (parallel) slow.Parallel();
+        await Harness.ExecuteAsync(context, Inertia.Render("Page", new InertiaProps { ["slow"] = slow, ["plain"] = 2 }));
+        await recorder.CompleteAsync(context, capture, false);
+        var entry = await ReadEntryAsync(harness, capture.Id);
+        Assert.InRange((double)entry["props"]!["slow"]!["durationMs"]!, 30, 10_000);
+        Assert.Null(entry["props"]!["plain"]!["durationMs"]); // a value has no loader
+    }
+
+    [Fact]
+    public async Task Each_loader_gets_a_child_activity_only_while_a_listener_is_attached()
+    {
+        var stopped = new List<System.Diagnostics.Activity>();
+        // The listener sees every test's activities; this test keeps those under a root of its own.
+        using var root = new System.Diagnostics.Activity("test").Start();
+        using (var listener = new System.Diagnostics.ActivityListener
+        {
+            ShouldListenTo = source => source.Name == InertiaDiagnostics.ActivitySourceName,
+            Sample = (ref System.Diagnostics.ActivityCreationOptions<System.Diagnostics.ActivityContext> _) => System.Diagnostics.ActivitySamplingResult.AllData,
+            ActivityStopped = activity => { if (activity.TraceId == root.TraceId) lock (stopped) stopped.Add(activity); },
+        })
+        {
+            System.Diagnostics.ActivitySource.AddActivityListener(listener);
+            await new Harness().PageAsync(new InertiaProps
+            {
+                ["a"] = Inertia.Prop(async ct => { await Task.Yield(); return 1; }),
+                ["b"] = Inertia.Prop(async ct => { await Task.Yield(); return 2; }).Parallel(),
+            });
+        }
+
+        System.Diagnostics.Activity[] props;
+        lock (stopped) props = [.. stopped.Where(a => a.OperationName == "inertia.prop" && (string?)a.GetTagItem("inertia.prop") is "a" or "b")];
+        Assert.Equal(["a", "b"], props.Select(a => (string?)a.GetTagItem("inertia.prop")).Order());
+        var render = Assert.Single(stopped, a => a.OperationName == "inertia.render");
+        Assert.All(props, a => Assert.Equal(render.SpanId, a.ParentSpanId));
+    }
+
+    [Theory]
     [InlineData("Production", true, false, true)]
     [InlineData("Staging", true, false, true)]
     [InlineData("Development", true, false, false)]

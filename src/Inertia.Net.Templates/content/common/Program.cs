@@ -64,6 +64,7 @@ builder.Services.AddInertia(o =>
         : null));
 #endif
     o.Vite.Prefetch = VitePrefetch.Waterfall; // fetch the other pages' chunks once a page has loaded
+    o.Vite.StartDevServer = true; // Development only: dotnet watch also runs the package's dev script (Vite) and stops it with the app
     // Development only: rendering a component without a page file fails fast, and ClientApp/types/inertia.d.ts (from these
     // C# types) and ClientApp/types/routes.ts (from the named endpoints below) are rewritten when the app starts.
     o.Pages.Directory = "ClientApp/pages";
