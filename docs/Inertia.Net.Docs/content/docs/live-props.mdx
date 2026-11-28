@@ -339,7 +339,7 @@ createInertiaApp({ live: signalr() })
 | `Public` | Anyone who reaches the hub. Set `o.AuthorizePublicChannels = true` to ask the authorizer too. |
 | `Private`, `Presence`, `EncryptedPrivate` | Only connections the authorizer allows. With no authorizer, nobody joins. |
 
-For rules that need services, implement `ILiveChannelAuthorizer` and register it with `o.Authorize<OrderChannelAuthorizer>()`. The authorizer is created for each subscription, with constructor injection. SignalR has no presence member lists or end-to-end encryption, so presence and encrypted-private channels are authorized like private ones.
+For rules that need services, implement `ILiveChannelAuthorizer` and register it with `o.Authorize<OrderChannelAuthorizer>()`. The authorizer is created for each subscription, with constructor injection. A transport's own `o.Authorize(...)` rule decides first. An `ILiveChannelAuthorizer` you register yourself is the shared fallback for a transport without its own rule. With neither, only public channels are allowed. SignalR has no presence member lists or end-to-end encryption, so presence and encrypted-private channels are authorized like private ones.
 
 The hub answers requests from other origins with 403. Add trusted origins to `o.AllowedOrigins`. The origin check takes the place of antiforgery tokens on the hub. Connections close when their authentication expires.
 
@@ -380,7 +380,7 @@ createInertiaApp({ live: sse() })
 The channel rules and the `ILiveChannelAuthorizer` are the same as for SignalR. One authorizer class serves both transports, and its `HubCallerContext` wraps the stream request. The channels are part of the stream URL, so the stream reopens when a page joins or leaves a channel. These cases are handled for you:
 
 - A stream from another origin gets a 403.
-- A stream ends when its sign-in expires. The client reconnects, and its channels are authorized again.
+- A stream ends when its sign-in expires, and no event is sent after that time, even one already queued. The client reconnects, and its channels are authorized again.
 - A client too slow to keep up is disconnected. It reloads its live props when it reconnects.
 
 <Callout type="info" title="One instance, or any number with a backplane">

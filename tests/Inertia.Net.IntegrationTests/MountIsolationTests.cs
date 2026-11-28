@@ -246,8 +246,12 @@ public sealed class MountIsolationTests
 
     private sealed class TimeoutProbe(TimeSpan timeout) : HttpMessageHandler
     {
+        // The caller owns and disposes the returned response.
+        protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            new(HttpStatusCode.OK) { ReasonPhrase = timeout.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = timeout.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+            Task.FromResult(Send(request, cancellationToken));
     }
 
     [Fact]
