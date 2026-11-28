@@ -94,30 +94,48 @@ public sealed class RedisBackplaneTests
         }
     }
 
-    [Fact]
-    public async Task Killing_the_subscription_connection_fires_a_gap_and_the_next_event_arrives()
+    [Theory]
+    [InlineData("resp2")]
+    [InlineData("resp3")] // pub/sub then rides on the interactive connection, so its restore must count as a gap too
+    public async Task Killing_the_pub_sub_connection_fires_a_gap_and_the_next_event_arrives(string protocol)
     {
         var transport = new RecordingTransport();
-        // Kill only this host's subscription by client name: tests running alongside keep theirs.
+        // Kill only this host's connections by client name: tests running alongside keep theirs.
         var name = "gap-" + Guid.NewGuid().ToString("N");
-        var host = await HostAsync(transport, o => o.Configuration = Url + ",name=" + name);
+        var host = await HostAsync(transport, o => o.Configuration = Url + ",name=" + name + ",protocol=" + protocol);
         try
         {
             await using var admin = await ConnectionMultiplexer.ConnectAsync(Url! + ",allowAdmin=true");
             var server = admin.GetServer(admin.GetEndPoints()[0]);
-            var clients = (string)(await server.ExecuteAsync("CLIENT", "LIST", "TYPE", "pubsub"))!;
-            var ids = clients.Split('\n').Where(line => line.Contains(" name=" + name + " ", StringComparison.Ordinal))
+            var clients = (string)(await server.ExecuteAsync("CLIENT", "LIST"))!;
+            var mine = clients.Split('\n').Where(line => line.Contains(" name=" + name + " ", StringComparison.Ordinal)).ToList();
+            // Under RESP3 the subscription is on the interactive connection: kill that one; under RESP2, the pub/sub one.
+            var targets = mine.Where(line => protocol == "resp3" ? line.Contains(" resp=3", StringComparison.Ordinal) : line.Contains(" sub=", StringComparison.Ordinal) && !line.Contains(" sub=0 ", StringComparison.Ordinal))
                 .Select(line => line.Split(' ')[0]["id=".Length..]).ToList();
-            Assert.NotEmpty(ids);
-            foreach (var id in ids) await server.ExecuteAsync("CLIENT", "KILL", "ID", id);
+            Assert.NotEmpty(targets);
+            foreach (var id in targets) await server.ExecuteAsync("CLIENT", "KILL", "ID", id);
 
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(Ct);
             timeout.CancelAfter(TimeSpan.FromSeconds(20));
             await transport.Resyncs.Reader.ReadAsync(timeout.Token);
 
             var publisher = await HostAsync(null);
-            await publisher.GetRequiredService<IInertiaLive>().PublishAsync(StatsChanged, cancellationToken: Ct);
-            Assert.Equal("StatsChanged", (await transport.NextAsync()).Event);
+            // The subscription may still be restoring right after the gap: publish until it delivers.
+            for (var i = 0; ; i++)
+            {
+                await publisher.GetRequiredService<IInertiaLive>().PublishAsync(StatsChanged, cancellationToken: Ct);
+                using var wait = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+                wait.CancelAfter(TimeSpan.FromSeconds(1));
+                try
+                {
+                    Assert.Equal("StatsChanged", (await transport.Delivered.Reader.ReadAsync(wait.Token)).Event);
+                    break;
+                }
+                catch (OperationCanceledException) when (i < 10 && !Ct.IsCancellationRequested)
+                {
+                }
+            }
+
             await StopAsync(publisher);
         }
         finally
@@ -210,5 +228,72 @@ public sealed class RedisBackplaneTests
             await StopAsync(host);
             await StopAsync(publisher);
         }
+    }
+
+    private static readonly string? ClusterUrl = Environment.GetEnvironmentVariable("REDIS_CLUSTER_URL");
+
+    [Fact]
+    public async Task Sharded_pub_sub_keeps_delivering_after_its_slot_moves_to_another_cluster_node()
+    {
+        Assert.SkipWhen(ClusterUrl is null, "REDIS_CLUSTER_URL is not set (a Redis Cluster, e.g. 127.0.0.1:7101,127.0.0.1:7102,127.0.0.1:7103)");
+        var transport = new RecordingTransport();
+        var host = await HostAsync(transport, o => (o.Configuration, o.UseShardedPubSub, o.ShardCount) = (ClusterUrl, true, 1));
+        var publisher = await HostAsync(null, o => (o.Configuration, o.UseShardedPubSub, o.ShardCount) = (ClusterUrl, true, 1));
+        try
+        {
+            var live = publisher.GetRequiredService<IInertiaLive>();
+            await live.PublishAsync(StatsChanged, new Dictionary<string, int> { ["i"] = 0 }, cancellationToken: Ct);
+            Assert.Equal(0, Index(await transport.NextAsync()));
+
+            // Move the shard channel's slot to another node, as resharding does.
+            await using var admin = await ConnectionMultiplexer.ConnectAsync(ClusterUrl! + ",allowAdmin=true");
+            var channel = host.GetRequiredService<RedisLiveBackplane>().ChannelFor(StatsChanged.Channel).ToString();
+            var slot = admin.HashSlot(channel);
+            var cluster = admin.GetServer(admin.GetEndPoints()[0]).ClusterConfiguration!;
+            var source = cluster.GetBySlot(slot)!;
+            var target = cluster.Nodes.First(n => !n.IsReplica && n.NodeId != source.NodeId);
+            await admin.GetServer(target.EndPoint!).ExecuteAsync("CLUSTER", "SETSLOT", slot, "IMPORTING", source.NodeId);
+            await admin.GetServer(source.EndPoint!).ExecuteAsync("CLUSTER", "SETSLOT", slot, "MIGRATING", target.NodeId);
+            foreach (var node in cluster.Nodes.Where(n => !n.IsReplica))
+            {
+                await admin.GetServer(node.EndPoint!).ExecuteAsync("CLUSTER", "SETSLOT", slot, "NODE", target.NodeId);
+            }
+
+            // Delivery resumes on the new owner, possibly after a gap: publish until an event arrives.
+            for (var i = 1; ; i++)
+            {
+                try
+                {
+                    await live.PublishAsync(StatsChanged, new Dictionary<string, int> { ["i"] = i }, cancellationToken: Ct);
+                    using var wait = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+                    wait.CancelAfter(TimeSpan.FromSeconds(1));
+                    Assert.True(Index(await transport.Delivered.Reader.ReadAsync(wait.Token)) >= 1);
+                    break;
+                }
+                catch (Exception exception) when (i < 30 && exception is OperationCanceledException or RedisException && !Ct.IsCancellationRequested)
+                {
+                }
+            }
+
+            // A subscriber that starts after the move reaches the new owner too.
+            var late = new RecordingTransport();
+            var lateHost = await HostAsync(late, o => (o.Configuration, o.UseShardedPubSub, o.ShardCount) = (ClusterUrl, true, 1));
+            try
+            {
+                await live.PublishAsync(StatsChanged, new Dictionary<string, int> { ["i"] = 1000 }, cancellationToken: Ct);
+                Assert.Equal(1000, Index(await late.NextAsync()));
+            }
+            finally
+            {
+                await StopAsync(lateHost);
+            }
+        }
+        finally
+        {
+            await StopAsync(host);
+            await StopAsync(publisher);
+        }
+
+        static int Index(LiveMessage message) => message.Payload.GetProperty("__inertia").GetProperty("props").GetProperty("i").GetInt32();
     }
 }
