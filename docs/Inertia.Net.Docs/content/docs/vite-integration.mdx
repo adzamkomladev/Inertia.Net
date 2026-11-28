@@ -17,6 +17,19 @@ In production, Inertia.Net reads `wwwroot/build/.vite/manifest.json`. For older 
 
 URLs are `{PathBase}/{BuildDirectory}/{file}` so apps under a path base work, or `{AssetBaseUrl}/{file}`. If an entry is missing from the manifest, Inertia.Net throws an exception that lists the available entries. If the manifest is missing, the exception lists the paths Inertia.Net looked in.
 
+## Preload the current page
+
+For a Vite app that lazy-loads its pages, map the final Inertia component name to the manifest key for that page:
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Vite.PageModule = component => $"ClientApp/pages/{component}.tsx";
+});
+```
+
+Use the actual manifest paths and the correct extension for your frontend, such as `.vue` or `.svelte`. Return `null` for pages you want to skip. The HTML root template and Razor root view emit a module preload for the current page when its separate JavaScript chunk is reachable from the entry. The hint uses the same asset URL and nonce as other Vite tags. The dev server, eager bundles, and JSON visits need no hint. After-load prefetch continues to handle other page chunks.
+
 ## Development
 
 While the dev server runs, the tags are `@vite/client` and the entry from the dev server origin, plus the React Refresh preamble for `@viteReactRefresh`. The dev server counts as running when:

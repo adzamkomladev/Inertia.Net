@@ -7,6 +7,16 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.10] - 2026-11-28
+
+### Added
+
+- Preload the current lazy page module in first-visit HTML with `Vite.PageModule`.
+- Check published Vite entry files and their dependencies with `AddInertiaVite` readiness checks.
+- Generate destination components for named GET routes to support instant visits.
+- Page projected MongoDB finds with `ToProjectedPageAsync`.
+- Test live form validation with Precognition request and response helpers.
+
 ## [1.9.9] - 2026-11-28
 
 ### Fixed

@@ -144,6 +144,9 @@ public sealed class ViteOptions
     /// </summary>
     public VitePrefetch Prefetch { get; set; }
 
+    /// <summary>Maps the rendered component to a Vite manifest key for module preloading on the first HTML visit. Return null to skip a page.</summary>
+    public Func<string, string?>? PageModule { get; set; }
+
     /// <summary>How many chunks <see cref="VitePrefetch.Waterfall"/> downloads at a time. Default 3.</summary>
     public int PrefetchConcurrency { get; set; } = 3;
 }

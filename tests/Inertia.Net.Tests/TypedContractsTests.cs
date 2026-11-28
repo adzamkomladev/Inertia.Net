@@ -105,6 +105,25 @@ public sealed class TypedContractsTests
     }
 
     [Fact]
+    public void Routes_emit_explicit_components_only_for_unambiguous_get_destinations()
+    {
+        var manual = Endpoint("/orders/{id:int}", "orders.show", "GET");
+        var mutation = Endpoint("/orders/{id:int}", "orders.show", "POST");
+        RouteEndpoint WithComponent(RouteEndpoint route, string component, bool automatic = false) =>
+            new(route.RequestDelegate!, route.RoutePattern, route.Order,
+                new EndpointMetadataCollection([.. route.Metadata, new InertiaRouteComponent(component, automatic)]), route.DisplayName);
+
+        var page = WithComponent(manual, "Orders/Show");
+        var post = WithComponent(mutation, "Orders/Success");
+        var output = new RoutesGenerator().Generate([post, page]);
+        Assert.Contains("method: 'get', component: 'Orders/Show'", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("method: 'post', component:", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("component: 'Orders/", new RoutesGenerator().Generate([page, manual]), StringComparison.Ordinal);
+        Assert.DoesNotContain("component: 'Orders/", new RoutesGenerator(automaticComponents: false)
+            .Generate([WithComponent(manual, "Orders/Show", automatic: true)]), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Routes_cover_every_parameter_kind()
     {
         var generator = new RoutesGenerator();

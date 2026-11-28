@@ -11,12 +11,14 @@
     <!-- <InertiaGenerateTypesOnBuild>true</InertiaGenerateTypesOnBuild> -->
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Inertia.Net" Version="1.9.9" />
+    <PackageReference Include="Inertia.Net" Version="1.9.10" />
   </ItemGroup>
   <!-- The client is built with npm (npm run build writes wwwroot/build); dotnet build never needs Node. -->
   <ItemGroup>
     <Content Remove="node_modules\**;ClientApp\**;package*.json;tsconfig*.json" />
     <None Remove="node_modules\**;ClientApp\**;app.html" />
+    <Content Include="wwwroot\build\.vite\manifest.json" Condition="Exists('wwwroot\build\.vite\manifest.json')"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -1,1 +1,2 @@
 #nullable enable
+static Inertia.Net.InertiaFindFluentExtensions.ToProjectedPageAsync<TDocument, TProjection>(this MongoDB.Driver.IFindFluent<TDocument, TProjection>! find, Inertia.Net.PageRequest! request, bool countTotal = true, string? pageName = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Inertia.Net.Page<TProjection>!>!

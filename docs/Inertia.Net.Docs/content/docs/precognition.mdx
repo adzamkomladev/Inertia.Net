@@ -228,21 +228,16 @@ async Task<HttpResponseMessage> ValidateAsync(string email)
     {
         Content = JsonContent.Create(new { email, password = "password123" }),
     };
-    request.WithXsrfToken(page);
-    request.Headers.Add(InertiaPrecognition.Header, "true");
-    request.Headers.Add(InertiaPrecognition.ValidateOnlyHeader, "email");
+    request.WithXsrfToken(page).WithPrecognition("email");
     return await client.SendAsync(request);
 }
 using var valid = await ValidateAsync("ann@example.com");
-Assert.Equal(HttpStatusCode.NoContent, valid.StatusCode);
-Assert.Equal("true", valid.Headers.GetValues(InertiaPrecognition.SuccessHeader).Single());
+valid.AssertSuccessfulPrecognition();
 using var invalid = await ValidateAsync("invalid");
-Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
-using var body = JsonDocument.Parse(await invalid.Content.ReadAsStringAsync());
-Assert.True(body.RootElement.GetProperty("errors").TryGetProperty("email", out _));
+await invalid.AssertPrecognitionErrorAsync("email");
 ```
 
-Import `System.Net`, `System.Net.Http.Json`, `System.Text.Json`, `Inertia.Net` and `Inertia.Net.Testing`. [Testing](/docs/testing#testing-a-form-with-antiforgery) shows the client and token setup.
+Import `System.Net.Http.Json` and `Inertia.Net.Testing`. [Testing](/docs/testing#testing-a-form-with-antiforgery) shows the client and token setup.
 
 ## Protocol reference
 

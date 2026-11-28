@@ -125,6 +125,23 @@ public sealed class PaginationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Numbered_pages_keep_the_source_filter_and_count_when_projecting_a_dto()
+    {
+        var page = await Find(r => r.Active).SortBy(r => r.Number)
+            .Project(r => new Summary(r.Name)).ToProjectedPageAsync(new PageRequest(2, 5), ct: Ct);
+        Assert.Equal(13L, page.Total);
+        Assert.Equal(["n11", "n13", "n15", "n17", "n19"], page.Data.Select(r => r.Name));
+        Assert.True(page.HasMore);
+
+        var empty = await Find(r => r.Active).SortBy(r => r.Number)
+            .Project(r => new Summary(r.Name)).ToProjectedPageAsync(new PageRequest(4, 5), countTotal: false, ct: Ct);
+        Assert.Empty(empty.Data);
+        Assert.Null(empty.Total);
+    }
+
+    private sealed record Summary(string Name);
+
+    [Fact]
     public async Task Offset_needs_a_sort_and_cursors_refuse_one()
     {
         Assert.Throws<InvalidOperationException>(() => { _ = All().ToPageAsync(new PageRequest(), ct: Ct); });

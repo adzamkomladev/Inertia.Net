@@ -7,3 +7,7 @@ Inertia.Net.Testing.InertiaTestingOptions.PageDirectories.get -> System.Collecti
 Inertia.Net.Testing.InertiaTestingOptions.PageExtensions.get -> System.Collections.Generic.IList<string!>!
 Inertia.Net.Testing.AssertableInertia.AssertableInertia(Inertia.Net.Testing.InertiaPage! page, Inertia.Net.Testing.InertiaTestingOptions? options) -> void
 Inertia.Net.Testing.AssertableInertia.Component(string! expected, bool? shouldExist) -> Inertia.Net.Testing.AssertableInertia!
+Inertia.Net.Testing.InertiaPrecognitionExtensions
+static Inertia.Net.Testing.InertiaPrecognitionExtensions.AssertPrecognitionErrorAsync(this System.Net.Http.HttpResponseMessage! response, string! field, string? message = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage!>!
+static Inertia.Net.Testing.InertiaPrecognitionExtensions.AssertSuccessfulPrecognition(this System.Net.Http.HttpResponseMessage! response) -> System.Net.Http.HttpResponseMessage!
+static Inertia.Net.Testing.InertiaPrecognitionExtensions.WithPrecognition(this System.Net.Http.HttpRequestMessage! request, params string![]! fields) -> System.Net.Http.HttpRequestMessage!

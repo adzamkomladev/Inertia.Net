@@ -5,7 +5,7 @@
 export const routeConfig = { base: '' }
 
 export type Method = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'query'
-export type RouteDefinition<M extends Method = Method> = { url: string; method: M }
+export type RouteDefinition<M extends Method = Method> = { url: string; method: M; component?: string }
 type QueryScalar = string | number | boolean
 export type RouteOptions = { query?: Record<string, QueryScalar | QueryScalar[] | null | undefined> }
 type Part = string | [name: string, optional: boolean, fallback: string | null, catchAll: boolean]
@@ -57,11 +57,11 @@ function build(segments: Part[][], names: string[], args: unknown, options?: Rou
 
 const r0_url = (options?: RouteOptions): string => build([], [], undefined, options)
 const r0 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r0_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r0_url(options), method: 'get', component: 'Home' }),
   {
     url: r0_url,
     definition: { methods: ['get'] as const, url: '/' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r0_url(options), method: 'get' }),
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r0_url(options), method: 'get', component: 'Home' }),
   },
 )
 

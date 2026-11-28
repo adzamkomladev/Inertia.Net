@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Http;
 
 namespace Inertia.Net;
 
@@ -21,6 +22,17 @@ public static class InertiaEndpointRouteBuilderExtensions
         ArgumentNullException.ThrowIfNull(pattern);
         ArgumentNullException.ThrowIfNull(component);
         return endpoints.MapMethods(pattern, ["GET", "HEAD"], httpContext => Inertia.Render(component, props).ExecuteAsync(httpContext))
-            .WithDisplayName($"Inertia page {component}");
+            .WithDisplayName($"Inertia page {component}")
+            .WithMetadata(new InertiaRouteComponent(component, Automatic: true));
+    }
+
+    /// <summary>Declares the final component of a named GET route for generated TypeScript instant visits.</summary>
+    public static TBuilder WithInertiaComponent<TBuilder>(this TBuilder builder, string component) where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(component);
+        return builder.WithMetadata(new InertiaRouteComponent(component, Automatic: false));
     }
 }
+
+internal sealed record InertiaRouteComponent(string Name, bool Automatic);

@@ -11,6 +11,12 @@ public static class InertiaFindFluentExtensions
     /// <summary>Creates a numbered page from a sorted find, optionally counting the matching documents.</summary>
     /// <remarks>Sort the find (<c>SortBy</c>) by a stable, fully unique order before calling this method. The find's skip and limit are replaced.</remarks>
     public static Task<Page<T>> ToPageAsync<T>(this IFindFluent<T, T> find, PageRequest request, bool countTotal = true, string? pageName = null, CancellationToken ct = default)
+        => ToProjectedPageAsync(find, request, countTotal, pageName, ct);
+
+    /// <summary>Creates a numbered page of projected results from a sorted find.</summary>
+    /// <remarks>Apply a stable, fully unique sort before paging. The find's skip and limit are replaced.</remarks>
+    public static Task<Page<TProjection>> ToProjectedPageAsync<TDocument, TProjection>(this IFindFluent<TDocument, TProjection> find, PageRequest request,
+        bool countTotal = true, string? pageName = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(find);
         ArgumentNullException.ThrowIfNull(request);
@@ -18,7 +24,7 @@ public static class InertiaFindFluentExtensions
         if (find.Options.Sort is null)
             throw new InvalidOperationException("Sort the find before paging it");
         return Pagination.PaginateAsync(request,
-            async (skip, take, token) => (IReadOnlyList<T>)await find.Skip(skip).Limit(take).ToListAsync(token).ConfigureAwait(false),
+            async (skip, take, token) => (IReadOnlyList<TProjection>)await find.Skip(skip).Limit(take).ToListAsync(token).ConfigureAwait(false),
             countTotal ? token => CountAsync(find, token) : null, pageName, ct);
     }
 
@@ -45,7 +51,7 @@ public static class InertiaFindFluentExtensions
     }
 
     // CountDocuments honors the find's skip and limit, which the page query has just set: count the filter alone.
-    private static Task<long> CountAsync<T>(IFindFluent<T, T> find, CancellationToken ct)
+    private static Task<long> CountAsync<TDocument, TProjection>(IFindFluent<TDocument, TProjection> find, CancellationToken ct)
     {
         find.Options.Skip = null;
         find.Options.Limit = null;

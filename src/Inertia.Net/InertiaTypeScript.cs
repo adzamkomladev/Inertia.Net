@@ -214,8 +214,11 @@ internal sealed partial class InertiaTypeScriptWriter(
 
     private bool WriteRoutes(string? routes) => routes is not { Length: > 0 } || WriteFile(routes, warnings =>
     {
+        var automaticComponents = options.Value.ComponentTransformer is null
+            && !(services?.GetService<InertiaMounts>()?.Names.Any(name => name.Length > 0
+                && services.GetRequiredService<IOptionsMonitor<InertiaOptions>>().Get(name).ComponentTransformer is not null) ?? false);
         var generator = new RoutesGenerator(new TypeScriptGenerator(pageWriter.SerializerOptions, options.Value, RoutesGenerator.ReservedNames),
-            services?.GetServices<IRouteBodySource>() ?? [], options.Value.TypeScript.LiveEventList);
+            services?.GetServices<IRouteBodySource>() ?? [], options.Value.TypeScript.LiveEventList, automaticComponents);
         var content = generator.Generate(services?.GetService<EndpointDataSource>()?.Endpoints ?? []);
         warnings.AddRange(generator.Warnings);
         if (generator.Unnamed > 0)

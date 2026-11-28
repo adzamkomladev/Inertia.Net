@@ -114,3 +114,19 @@ git diff --exit-code ClientApp/types
 ```
 
 Component names are checked at compile time too. See [Page records](/docs/page-records#compile-time-component-checks).
+
+## Instant visits
+
+Named `MapInertia` routes expose their component to the generated GET function. For a regular handler with one known destination, declare its final client component explicitly:
+
+```csharp
+app.MapGet("/orders/{id:int}", (int id) => Render("Orders/Show", new { id }))
+    .WithName("orders.show")
+    .WithInertiaComponent("Orders/Show");
+```
+
+```tsx
+<Link href={routes.orders.show(42)} instant>Order 42</Link>
+```
+
+The client shows the destination while the GET is pending. Let the page render a loading state until its page-specific data arrives. Use an ordinary link for conditional destinations. If a component transformer is configured, use explicit metadata only when you can declare the final name for that route.

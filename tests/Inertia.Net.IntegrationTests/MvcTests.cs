@@ -86,7 +86,8 @@ public sealed class MvcRazorTests
 {
     private const string Manifest = """
         {
-          "src/app.ts": { "file": "assets/app-1.js", "src": "src/app.ts", "isEntry": true, "css": ["assets/app-1.css"] },
+          "src/app.ts": { "file": "assets/app-1.js", "src": "src/app.ts", "isEntry": true, "css": ["assets/app-1.css"], "dynamicImports": ["src/Razor.ts"] },
+          "src/Razor.ts": { "file": "assets/razor.js", "isDynamicEntry": true },
           "src/other.ts": { "file": "assets/other-2.js", "src": "src/other.ts", "isEntry": true }
         }
         """;
@@ -132,6 +133,18 @@ public sealed class MvcRazorTests
 
         var response = await app.CreateClient().GetAsync("/mvc/razor", TestContext.Current.CancellationToken);
         Assert.Equal("hello", (string?)(await response.PageAsync())["props"]!["message"]);
+    }
+
+    [Fact]
+    public async Task Razor_preloads_the_current_page_with_its_nonce()
+    {
+        await using var app = await StartAsync(o =>
+        {
+            o.Vite.PageModule = component => $"src/{component}.ts";
+            o.CspNonce = _ => "cmF6b3I=";
+        });
+        var html = await HtmlAsync(app.CreateClient());
+        Assert.Contains("""<link rel="modulepreload" nonce="cmF6b3I=" href="/build/assets/razor.js">""", html, StringComparison.Ordinal);
     }
 
     [Fact]

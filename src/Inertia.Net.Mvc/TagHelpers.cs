@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Inertia.Net.Mvc.TagHelpers;
 
@@ -72,7 +73,11 @@ public sealed class ViteTagHelper(ViteAssets vite) : TagHelper
     {
         output.TagName = null;
         var (entries, key) = SplitEntries(Entry);
-        output.Content.SetHtmlContent(new Utf8HtmlContent(vite.RenderTagsUtf8(ViewContext.HttpContext, entries, key)));
+        var http = ViewContext.HttpContext;
+        var assets = InertiaMountServices.Mount(http) is { } mount
+            ? http.RequestServices.GetRequiredKeyedService<ViteAssets>(mount) : vite;
+        output.Content.SetHtmlContent(new Utf8HtmlContent(
+            assets.RenderTagsUtf8(http, entries, key, RazorInertiaRootView.TryGetContext(http)?.Component)));
     }
 
     private const int MaxCachedEntryLists = 256;

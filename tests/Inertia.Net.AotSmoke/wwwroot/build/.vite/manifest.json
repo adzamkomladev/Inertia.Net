@@ -5,7 +5,12 @@
     "src": "src/app.tsx",
     "isEntry": true,
     "imports": ["_vendor-8d1e0b7a.js"],
+    "dynamicImports": ["src/pages/Home.tsx"],
     "css": ["assets/app-1c9b6e2d.css"]
+  },
+  "src/pages/Home.tsx": {
+    "file": "assets/Home-829a.js",
+    "isDynamicEntry": true
   },
   "_vendor-8d1e0b7a.js": {
     "file": "assets/vendor-8d1e0b7a.js",

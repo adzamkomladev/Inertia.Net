@@ -71,7 +71,7 @@ public sealed class ViteAssets
     }
 
     /// <summary>The tags for <paramref name="entries"/>, given their cache key: the entries joined by <c>'\n'</c>.</summary>
-    internal byte[] RenderTagsUtf8(HttpContext context, string[] entries, string key)
+    internal byte[] RenderTagsUtf8(HttpContext context, string[] entries, string key, string? component = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(entries);
@@ -87,14 +87,15 @@ public sealed class ViteAssets
         }
 
         var manifest = LoadManifest();
+        var pageModule = component is null ? null : _options.PageModule?.Invoke(component);
         var pathBase = context.Request.PathBase.ToUriComponent();
-        if (!manifest.Rendered.TryGetValue((key, pathBase), out var tags))
+        if (!manifest.Rendered.TryGetValue((key, pathBase, pageModule), out var tags))
         {
             var prefix = _options.AssetBaseUrl?.TrimEnd('/') ?? $"{pathBase}/{_options.BuildDirectory.Trim('/')}";
-            tags = TagSet.Create(RenderProduction(manifest, entries, prefix, _options), NonceMarker);
+            tags = TagSet.Create(RenderProduction(manifest, entries, prefix, _options, pageModule), NonceMarker);
             if (manifest.Rendered.Count < MaxCachedTagSets)
             {
-                manifest.Rendered[(key, pathBase)] = tags;
+                manifest.Rendered[(key, pathBase, pageModule)] = tags;
             }
         }
 
@@ -122,7 +123,7 @@ public sealed class ViteAssets
     }
 
     // The tags, with a NonceMarker wherever a nonce attribute goes.
-    private static string RenderProduction(ManifestState manifest, string[] entries, string prefix, ViteOptions options)
+    private static string RenderProduction(ManifestState manifest, string[] entries, string prefix, ViteOptions options, string? pageModule)
     {
         var html = new StringBuilder();
         var emitted = new HashSet<string>(StringComparer.Ordinal);
@@ -182,6 +183,13 @@ public sealed class ViteAssets
             }
         }
 
+        if (pageModule is not null && manifest.Chunks.TryGetValue(pageModule, out var page)
+            && page.IsDynamicEntry && IsJavaScript(page.File) && !emitted.Contains(page.File)
+            && ReachesPage(manifest, loaded, pageModule) && emitted.Add(page.File))
+        {
+            html.Append("<link rel=\"modulepreload\"").Append(marker).Append(" href=\"").Append(Url(page.File)).Append("\">\n");
+        }
+
         if (options.Prefetch != VitePrefetch.None && PrefetchFiles(manifest, loaded, emitted) is { Count: > 0 } files)
         {
             var concurrency = options.Prefetch == VitePrefetch.Aggressive ? files.Count : options.PrefetchConcurrency;
@@ -190,6 +198,23 @@ public sealed class ViteAssets
 
         return html.ToString();
     }
+
+    private static bool ReachesPage(ManifestState manifest, List<ViteManifestChunk> loaded, string target)
+    {
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Queue<string>(loaded.SelectMany(chunk => chunk.DynamicImports ?? []));
+        while (pending.TryDequeue(out var key))
+        {
+            if (key == target) return true;
+            if (!visited.Add(key) || !manifest.Chunks.TryGetValue(key, out var chunk)) continue;
+            foreach (var next in (chunk.Imports ?? []).Concat(chunk.DynamicImports ?? [])) pending.Enqueue(next);
+        }
+
+        return false;
+    }
+
+    private static bool IsJavaScript(string file) =>
+        file.EndsWith(".js", StringComparison.Ordinal) || file.EndsWith(".mjs", StringComparison.Ordinal);
 
     // The chunks the loaded ones can import later (dynamic imports, then their static and dynamic imports and CSS), minus what the
     // tags already load, in breadth-first order so the nearest pages come first.
@@ -268,6 +293,46 @@ public sealed class ViteAssets
         return Convert.ToHexStringLower(hash[..16]);
     }
 
+    internal void CheckPublishedFiles(string[] entries)
+    {
+        var manifest = LoadManifest();
+        var buildRoot = Path.GetFullPath(Path.Combine(_contentRoot, _options.PublicDirectory, _options.BuildDirectory));
+        foreach (var entry in entries)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var pending = new Queue<string>();
+            pending.Enqueue(entry);
+            while (pending.TryDequeue(out var key))
+            {
+                if (!visited.Add(key)) continue;
+                if (!manifest.Chunks.TryGetValue(key, out var chunk))
+                {
+                    throw new InvalidOperationException($"Vite entry '{entry}' references missing manifest key '{key}' in '{manifest.Path}'.");
+                }
+
+                CheckFile(chunk.File);
+                foreach (var file in (chunk.Css ?? []).Concat(chunk.Assets ?? [])) CheckFile(file);
+                foreach (var import in (chunk.Imports ?? []).Concat(chunk.DynamicImports ?? [])) pending.Enqueue(import);
+            }
+
+            void CheckFile(string file)
+            {
+                if (string.IsNullOrEmpty(file) || Path.IsPathRooted(file))
+                {
+                    throw new InvalidOperationException($"Vite entry '{entry}' references invalid asset '{file}' in '{manifest.Path}'.");
+                }
+
+                var path = Path.GetFullPath(file, buildRoot);
+                var relative = Path.GetRelativePath(buildRoot, path);
+                if (relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                    || Path.IsPathRooted(relative) || !File.Exists(path))
+                {
+                    throw new InvalidOperationException($"Vite entry '{entry}' references missing asset '{file}' under '{buildRoot}'.");
+                }
+            }
+        }
+    }
+
     private ManifestState LoadManifest()
     {
         foreach (var path in _manifestCandidates)
@@ -320,7 +385,7 @@ public sealed class ViteAssets
         public required Dictionary<string, ViteManifestChunk> Chunks { get; init; }
 
         /// <summary>Pre-rendered production tags per (entries, path base).</summary>
-        public ConcurrentDictionary<(string Entries, string PathBase), TagSet> Rendered { get; } = new();
+        public ConcurrentDictionary<(string Entries, string PathBase, string? PageModule), TagSet> Rendered { get; } = new();
 
         public static ManifestState Load(string path)
         {

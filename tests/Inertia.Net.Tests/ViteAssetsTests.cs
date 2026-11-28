@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Inertia.Net.Tests;
@@ -69,6 +70,63 @@ public sealed class ViteAssetsTests : IDisposable
                 """<link rel="modulepreload" href="/build/assets/ui-3.js">""",
             ],
             Lines(tags));
+    }
+
+    [Fact]
+    public void Current_page_module_preloads_once_and_other_dynamic_entries_still_prefetch()
+    {
+        Manifest("""
+            {
+              "app": {"file":"app.js","dynamicImports":["pages/Home","pages/Other"]},
+              "pages/Home": {"file":"home.js","isDynamicEntry":true},
+              "pages/Other": {"file":"other.js","isDynamicEntry":true},
+              "admin": {"file":"admin.js"}
+            }
+            """);
+        var assets = Create(o =>
+        {
+            o.PageModule = component => "pages/" + component;
+            o.Prefetch = VitePrefetch.Waterfall;
+        });
+        string Tags(string entry, string page) => System.Text.Encoding.UTF8.GetString(assets.RenderTagsUtf8(Ctx("/site"), [entry], entry, page));
+
+        var tags = Lines(Tags("app", "Home"));
+        Assert.Equal("""<link rel="modulepreload" href="/site/build/home.js">""", Assert.Single(tags, line => line.Contains("home.js", StringComparison.Ordinal)));
+        Assert.Contains("\"/site/build/other.js\"", string.Join('\n', tags), StringComparison.Ordinal);
+        Assert.Contains("rel=\"modulepreload\" href=\"/site/build/other.js\"", Tags("app", "Other"), StringComparison.Ordinal);
+        Assert.DoesNotContain("modulepreload", Tags("app", "Missing"), StringComparison.Ordinal);
+        Assert.DoesNotContain("home.js", Tags("admin", "Home"), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("app.js")]
+    [InlineData("page.js")]
+    [InlineData("style.css")]
+    [InlineData("asset.svg")]
+    public async Task Published_readiness_follows_both_import_kinds_and_reports_missing_files(string? missing)
+    {
+        Manifest("""
+            {
+              "app": {"file":"app.js","dynamicImports":["page"]},
+              "page": {"file":"page.js","imports":["app"],"css":["style.css"],"assets":["asset.svg"]}
+            }
+            """, "client-manifest.json");
+        foreach (var file in new[] { "app.js", "page.js", "style.css", "asset.svg" })
+        {
+            if (file != missing) _root.Write("wwwroot/build/" + file, "");
+        }
+
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+        services.AddKeyedSingleton("docs", Create(o => o.ManifestPath = "client-manifest.json"));
+        services.AddLogging();
+        services.AddHealthChecks().AddInertiaVite(["app"], mount: "docs");
+        using var provider = services.BuildServiceProvider();
+        var health = provider.GetRequiredService<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckService>();
+        var entry = (await health.CheckHealthAsync(TestContext.Current.CancellationToken)).Entries["inertia-vite-docs"];
+        Assert.Equal(missing is null ? Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Healthy
+            : Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, entry.Status);
+        if (missing is not null) Assert.Contains(missing, entry.Description, StringComparison.Ordinal);
     }
 
     [Fact]

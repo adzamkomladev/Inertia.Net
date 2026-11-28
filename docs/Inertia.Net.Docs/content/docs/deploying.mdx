@@ -98,3 +98,30 @@ The SSR health check is covered in [Server-side rendering](/docs/server-side-ren
 ## Hosts and SSR failures
 
 Keep `AllowedHosts` configured. `Ssr.ConnectTimeout` limits the time to establish a connection. The default is five seconds. In `SsrMode.Required`, the exception message is generic. Diagnostic properties may contain private renderer details and should stay in trusted logs.
+
+## Check published frontend assets
+
+Add a readiness check for the Vite entry keys used by your root view. Register it for production after building the frontend.
+
+```csharp
+builder.Services.AddHealthChecks()
+    .AddInertiaVite(["ClientApp/app.tsx"], tags: ["ready"]);
+
+// After building the app:
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+});
+```
+
+The first probe checks the local build directory for the entry and the files reachable through both static and dynamic imports. An unhealthy result identifies a missing manifest key or file. The result is kept for the lifetime of the host, so publish assets before starting it and restart after replacing them. Use `mount: "admin"` to check a named mount. For CDN deployments, run the check on the staged local files before uploading them.
+
+The starter template includes the hidden manifest in publish output. If an existing project omits it, add this to its project file and build the frontend before publishing:
+
+```xml
+<ItemGroup>
+  <Content Include="wwwroot/build/.vite/manifest.json"
+           Condition="Exists('wwwroot/build/.vite/manifest.json')"
+           CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
+```
