@@ -139,6 +139,10 @@ public sealed class EndpointAndRedirectTests
         var client = app.CreateClient();
         var prefetch = await client.InertiaGetAsync("/go?to=" + Uri.EscapeDataString(target), r => r.WithHeader(InertiaHeaders.Purpose, "prefetch"));
         Assert.Equal(HttpStatusCode.Found, prefetch.StatusCode);
+        Assert.Contains(InertiaHeaders.Purpose, prefetch.Headers.Vary);
+        var visit = await client.InertiaGetAsync("/go?to=" + Uri.EscapeDataString(target));
+        Assert.Equal(HttpStatusCode.Conflict, visit.StatusCode);
+        Assert.Contains(InertiaHeaders.Purpose, visit.Headers.Vary);
         var plain = await client.GetAsync("/go?to=" + Uri.EscapeDataString(target), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Found, plain.StatusCode);
 

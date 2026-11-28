@@ -453,6 +453,25 @@ public sealed class SsrCacheTests
     }
 
     [Fact]
+    public async Task A_queued_render_refresh_respects_clear()
+    {
+        var time = new FakeTimeProvider();
+        var (harness, handler) = Create(c =>
+        {
+            c.Duration = TimeSpan.FromMinutes(1);
+            c.StaleFor = TimeSpan.FromMinutes(5);
+        }, time);
+
+        await RenderAsync(harness);
+        time.Advance(TimeSpan.FromMinutes(2));
+        await RenderAsync(harness, out var refresh);
+        await harness.Services.GetRequiredService<IInertiaCache>().ClearSsrAsync(TestContext.Current.CancellationToken);
+        await harness.CompleteRefreshAsync(refresh);
+        Assert.Equal(1, handler.Calls);
+        Assert.Contains("render 2", await RenderAsync(harness), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_refresh_skips_the_render_when_a_fresh_one_was_stored_since()
     {
         var time = new FakeTimeProvider();

@@ -22,6 +22,20 @@ internal sealed partial class InertiaRefreshQueue(InertiaMetrics metrics, TimePr
         AllowSynchronousContinuations = false,
     });
     private int _pending;
+    private int _reservedSsr;
+
+    // The queue receives SSR work after response completion. Bound the copies retained before that callback as well.
+    public bool TryReserveSsr()
+    {
+        if (Interlocked.Increment(ref _reservedSsr) <= Capacity) return true;
+        ReleaseSsr();
+        metrics.RecordDroppedRefresh("ssr");
+        LogDrop("ssr");
+        return false;
+    }
+
+    public void ReleaseSsr() => Interlocked.Decrement(ref _reservedSsr);
+
     private long _nextDropLog;
     private int _suppressedDrops;
 

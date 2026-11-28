@@ -8,6 +8,21 @@ namespace Inertia.Net.Tests;
 public sealed class RefreshQueueTests
 {
     [Fact]
+    public void Ssr_reservations_are_bounded_before_enqueue()
+    {
+        var worker = new Harness().Services.GetRequiredService<InertiaRefreshQueue>();
+        for (var i = 0; i < InertiaRefreshQueue.Capacity; i++)
+            Assert.True(worker.TryReserveSsr());
+
+        Assert.False(worker.TryReserveSsr());
+        Assert.Equal(0, worker.PendingCount);
+        worker.ReleaseSsr();
+        Assert.True(worker.TryReserveSsr());
+        for (var i = 0; i < InertiaRefreshQueue.Capacity; i++)
+            worker.ReleaseSsr();
+    }
+
+    [Fact]
     public async Task A_full_queue_drops_work_and_shutdown_releases_running_and_queued_claims()
     {
         var drops = new ConcurrentQueue<(long Count, string? Kind)>();

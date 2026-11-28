@@ -69,6 +69,7 @@ public static class InertiaServiceCollectionExtensions
             {
                 AllowAutoRedirect = false,
                 UseProxy = false,
+                UseCookies = false,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(2),
                 ConnectTimeout = builder.Services.GetRequiredService<IOptions<InertiaOptions>>().Value.Ssr.ConnectTimeout,
             }));

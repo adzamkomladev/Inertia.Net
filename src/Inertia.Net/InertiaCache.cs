@@ -172,10 +172,10 @@ internal class PropCaching
 internal sealed record SsrCaching(TimeSpan Duration, TimeSpan? StaleFor);
 
 /// <summary>A cached prop as the walk writes it: its HTML-safe JSON, whether that is an array, a scroll prop's paging metadata.</summary>
-internal readonly record struct CachedProp(ReadOnlyMemory<byte> Json, bool IsArray, ScrollMetadata? Scroll, bool IsStale);
+internal readonly record struct CachedProp(ReadOnlyMemory<byte> Json, bool IsArray, ScrollMetadata? Scroll, bool IsStale, long Stamp = 0);
 
 /// <summary>A cached SSR render.</summary>
-internal readonly record struct CachedRender(ReadOnlyMemory<byte> Head, ReadOnlyMemory<byte> Body, bool IsStale);
+internal readonly record struct CachedRender(ReadOnlyMemory<byte> Head, ReadOnlyMemory<byte> Body, bool IsStale, long Stamp = 0);
 
 /// <summary>
 /// The rendering side of the caches: keys, the store calls (a failing store is logged and counts as a miss) and the refreshes in flight,
@@ -189,7 +189,7 @@ internal sealed partial class InertiaCaching
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<InertiaCacheKey, long> _refreshing = new(); // the claim id of each key's refresh
-    private readonly ConcurrentDictionary<TaskCompletionSource, byte> _storing = new(); // stores that passed the stamp check
+    private readonly ConcurrentDictionary<TaskCompletionSource, (InertiaCacheKey Key, string[] Tags)> _storing = new(); // stores that passed the stamp check
     private long _refreshClaims;
     private readonly ConcurrentDictionary<InertiaCacheKey, (TaskCompletionSource<byte[]?> Completion, string[] Tags)> _filling = new();
     private int _refreshCount;
@@ -266,14 +266,17 @@ internal sealed partial class InertiaCaching
 
     public async ValueTask<CachedProp?> GetPropAsync(PropCaching caching, CancellationToken cancellationToken)
     {
-        var value = await GetAsync(caching.StoreKey, cancellationToken);
-        return value is not null && CacheEntry.TryReadProp(value, Now(), out var prop) ? prop : null;
+        var key = caching.StoreKey;
+        var stamp = InvalidationStamp(key, caching.Tags);
+        var value = await GetAsync(key, cancellationToken);
+        return value is not null && CacheEntry.TryReadProp(value, Now(), out var prop) ? prop with { Stamp = stamp } : null;
     }
 
     public async ValueTask<CachedRender?> GetRenderAsync(InertiaCacheKey key, CancellationToken cancellationToken)
     {
+        var stamp = InvalidationStamp(key, SsrTags);
         var value = await GetAsync(key, cancellationToken);
-        return value is not null && CacheEntry.TryReadRender(value, Now(), out var render) ? render : null;
+        return value is not null && CacheEntry.TryReadRender(value, Now(), out var render) ? render with { Stamp = stamp } : null;
     }
 
     /// <summary>Claims a missing entry, or returns the current fill whose successful bytes are shared even if storage fails.</summary>
@@ -341,7 +344,7 @@ internal sealed partial class InertiaCaching
     {
         Interlocked.Increment(ref _invalidations[Slot(key)]);
         _filling.TryRemove(key, out _);
-        return StoresUnderWayAsync();
+        return StoresUnderWayAsync(key, null);
     }
 
     /// <summary>As <see cref="BeginMutationAsync(InertiaCacheKey)"/>, for every entry that is loaded with <paramref name="tag"/>.</summary>
@@ -353,15 +356,16 @@ internal sealed partial class InertiaCaching
             if (Array.IndexOf(fill.Value.Tags, tag) >= 0) _filling.TryRemove(fill);
         }
 
-        return StoresUnderWayAsync();
+        return StoresUnderWayAsync(default, tag);
     }
 
-    // Every store, not only the mutated entry's: they are short, and waiting for one too many is harmless.
-    private async ValueTask StoresUnderWayAsync()
+    private async ValueTask StoresUnderWayAsync(InertiaCacheKey key, string? tag)
     {
         if (!_storing.IsEmpty)
         {
-            await Task.WhenAll(_storing.Keys.Select(store => store.Task));
+            await Task.WhenAll(_storing
+                .Where(store => tag is null ? store.Value.Key == key : Array.IndexOf(store.Value.Tags, tag) >= 0)
+                .Select(store => store.Key.Task));
         }
     }
 
@@ -375,7 +379,7 @@ internal sealed partial class InertiaCaching
     {
         // Registered before the stamp check: a mutation that increments the stamp afterwards waits for this store (see BeginMutationAsync).
         var storing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _storing.TryAdd(storing, 0);
+        _storing.TryAdd(storing, (key, tags));
         try
         {
             if ((stamp is { } before && before != InvalidationStamp(key, tags)) || cancellationToken.IsCancellationRequested) return Current();

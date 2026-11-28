@@ -29,7 +29,7 @@ public sealed class InertiaRedisCacheOptions
 /// Errors are not swallowed: while a page renders, Inertia.Net logs a failing store and renders without the cache, and
 /// <see cref="IInertiaCache"/> reports a failed removal to its caller.
 /// </summary>
-internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
+internal sealed class RedisInertiaCacheStore : IInertiaCacheStore, IDisposable
 {
     private const int RemoveBatch = 256;
 
@@ -83,15 +83,22 @@ internal sealed class RedisInertiaCacheStore : IInertiaCacheStore
         """);
 
     private readonly IConnectionMultiplexer _connection;
+    private readonly bool _ownsConnection;
     private readonly InertiaRedisCacheOptions _options;
 
     public RedisInertiaCacheStore(IOptions<InertiaRedisCacheOptions> options, IServiceProvider services)
     {
         _options = options.Value;
+        _ownsConnection = _options.Configuration is not null;
         _connection = _options.Configuration is { } configuration
             ? ConnectionMultiplexer.Connect(configuration)
             : (IConnectionMultiplexer?)services.GetService(typeof(IConnectionMultiplexer))
               ?? throw new InvalidOperationException("Set InertiaRedisCacheOptions.Configuration or register an IConnectionMultiplexer.");
+    }
+
+    public void Dispose()
+    {
+        if (_ownsConnection) _connection.Dispose();
     }
 
     private IDatabase Database => _connection.GetDatabase(_options.Database);

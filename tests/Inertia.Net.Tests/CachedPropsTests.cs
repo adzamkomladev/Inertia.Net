@@ -600,6 +600,31 @@ public sealed class CachedPropsTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_queued_prop_refresh_respects_invalidation(bool byTag)
+    {
+        var time = new FakeTimeProvider();
+        var harness = new Harness(timeProvider: time);
+        InertiaProps Page() => new()
+        {
+            ["feed"] = Prop(() => ++_loads).Cache("feed", TimeSpan.FromMinutes(1), staleFor: TimeSpan.FromMinutes(5), tags: ["feed-tag"]),
+        };
+
+        await RenderAsync(harness, Page());
+        time.Advance(TimeSpan.FromMinutes(2));
+        var (_, refresh) = await RenderAsync(harness, Page());
+        var cache = harness.Services.GetRequiredService<IInertiaCache>();
+        if (byTag) await cache.RemoveByTagAsync("feed-tag", TestContext.Current.CancellationToken);
+        else await cache.RemovePropAsync("feed", TestContext.Current.CancellationToken);
+
+        await harness.CompleteRefreshAsync(refresh);
+        Assert.Equal(1, _loads);
+        await RenderAsync(harness, Page());
+        Assert.Equal(2, _loads);
+    }
+
     [Fact]
     public async Task A_refresh_skips_its_loader_when_a_fresh_value_was_stored_since()
     {
@@ -682,14 +707,29 @@ public sealed class CachedPropsTests
         // The fill's store has written its bytes but not returned when the key is removed and a new value is set.
         var filling = harness.PageAsync(Page());
         await written.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        var mutations = Task.Run(async () =>
+        Task mutations;
+        try
         {
-            await cache.RemovePropAsync("orders", TestContext.Current.CancellationToken);
+            await cache.RemovePropAsync("unrelated", TestContext.Current.CancellationToken).AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            await cache.ClearSsrAsync(TestContext.Current.CancellationToken).AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            var removal = cache.RemovePropAsync("orders", TestContext.Current.CancellationToken).AsTask();
+            Assert.False(removal.IsCompleted);
+            mutations = ReplaceAfterRemovalAsync(removal);
+        }
+        finally
+        {
+            release.SetResult();
+        }
+
+        async Task ReplaceAfterRemovalAsync(Task removal)
+        {
+            await removal;
             await cache.SetPropAsync("orders", "seeded", TimeSpan.FromMinutes(5), cancellationToken: TestContext.Current.CancellationToken);
-        }, TestContext.Current.CancellationToken);
-        await Task.WhenAny(mutations, Task.Delay(100, TestContext.Current.CancellationToken));
-        Assert.False(mutations.IsCompleted); // the removal lands after the store under way, not before it
-        release.SetResult();
+        }
+
         await mutations.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Equal("load 1", (string?)(await filling)["props"]!["orders"]);
 

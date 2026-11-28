@@ -674,7 +674,7 @@ internal sealed partial class PropsWriter
 
         if (hit.Value.IsStale && !_owner.Caching.IsRefreshing(caching.StoreKey))
         {
-            ((_uncommon ??= new()).Refreshes ??= new PropRefreshes(_owner)).Add(prop, new string(Path));
+            ((_uncommon ??= new()).Refreshes ??= new PropRefreshes(_owner)).Add(prop, new string(Path), hit.Value.Stamp);
         }
 
         WriteCached(key, prop, hit.Value, parentWasResolved);
@@ -807,7 +807,7 @@ internal sealed partial class PropsWriter
 
             if (hit.Value.IsStale && !_owner.Caching.IsRefreshing(caching.StoreKey))
             {
-                ((_uncommon ??= new()).Refreshes ??= new PropRefreshes(_owner)).Add(lazy.Source, new string(Path));
+                ((_uncommon ??= new()).Refreshes ??= new PropRefreshes(_owner)).Add(lazy.Source, new string(Path), hit.Value.Stamp);
             }
 
             using var document = JsonDocument.Parse(hit.Value.Json);
@@ -1288,20 +1288,20 @@ internal sealed partial class PropsWriter
 /// </summary>
 internal sealed class PropRefreshes(InertiaPageWriter owner)
 {
-    private readonly List<(InertiaProp Prop, string Path, long Claim)> _props = [];
+    private readonly List<(InertiaProp Prop, string Path, long Stamp, long Claim)> _props = [];
 
     /// <summary>Creates the scope of a scoped loader (<c>Prop&lt;TService, T&gt;</c>), disposed when it finishes.</summary>
     public IServiceScopeFactory? Scopes { get; set; }
 
-    public void Add(InertiaProp prop, string path) => _props.Add((prop, path, 0));
+    public void Add(InertiaProp prop, string path, long stamp) => _props.Add((prop, path, stamp, 0));
 
     /// <summary>Keeps the props whose refresh this response claims (a key read twice, or refreshing elsewhere, is dropped); false for none.</summary>
     public bool Claim()
     {
         for (var i = _props.Count - 1; i >= 0; i--)
         {
-            var (prop, path, _) = _props[i];
-            if (owner.Caching.TryBeginRefresh(prop.Caching!.StoreKey, out var claim)) _props[i] = (prop, path, claim);
+            var (prop, path, stamp, _) = _props[i];
+            if (owner.Caching.TryBeginRefresh(prop.Caching!.StoreKey, out var claim)) _props[i] = (prop, path, stamp, claim);
             else _props.RemoveAt(i);
         }
 
@@ -1312,24 +1312,23 @@ internal sealed class PropRefreshes(InertiaPageWriter owner)
 
     private void Release()
     {
-        foreach (var (prop, _, claim) in _props) owner.Caching.EndRefresh(prop.Caching!.StoreKey, claim);
+        foreach (var (prop, _, _, claim) in _props) owner.Caching.EndRefresh(prop.Caching!.StoreKey, claim);
     }
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
-        foreach (var (prop, path, _) in _props)
+        foreach (var (prop, path, stamp, _) in _props)
         {
             var caching = prop.Caching!;
             try
             {
                 // The response read the value stale, but another refresh (this instance's, between that read and this response's
                 // claim, or another instance's in a shared store) may have stored a fresh one since: then there is nothing to do.
-                if (await owner.Caching.GetPropAsync(caching, cancellationToken) is { IsStale: false })
+                if (await owner.Caching.GetPropAsync(caching, cancellationToken) is not { IsStale: true, Stamp: var current } || current != stamp)
                 {
                     continue;
                 }
 
-                var stamp = owner.Caching.InvalidationStamp(caching.StoreKey, caching.Tags);
                 object? value;
                 if (prop.UsesServices)
                 {

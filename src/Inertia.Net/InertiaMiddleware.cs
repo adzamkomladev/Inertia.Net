@@ -191,24 +191,21 @@ internal sealed class InertiaMiddleware
                 response.StatusCode = StatusCodes.Status303SeeOther;
             }
 
-            if (IsRedirect(response.StatusCode)
-                && headers.Location.ToString() is { Length: > 0 } location
-                && !string.Equals(httpContext.Request.Headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase))
+            if (IsRedirect(response.StatusCode) && headers.Location.ToString() is { Length: > 0 } location)
             {
-                // Another origin: XHR cannot follow it, so the client visits it in full (which keeps any fragment, too).
-                if (_pageWriter.Options.ConvertExternalRedirects && IsOtherOrigin(httpContext.Request, location))
+                var redirectHeader = _pageWriter.Options.ConvertExternalRedirects && IsOtherOrigin(httpContext.Request, location)
+                    ? InertiaHeaders.Location
+                    : location.Contains('#', StringComparison.Ordinal) ? InertiaHeaders.Redirect : null;
+                if (redirectHeader is not null)
                 {
-                    response.StatusCode = StatusCodes.Status409Conflict;
-                    headers.Location = default;
-                    headers[InertiaHeaders.Location] = location;
-                    SuppressRedirectBody(httpContext);
-                }
-                else if (location.Contains('#', StringComparison.Ordinal))
-                {
-                    response.StatusCode = StatusCodes.Status409Conflict;
-                    headers.Location = default;
-                    headers[InertiaHeaders.Redirect] = location;
-                    SuppressRedirectBody(httpContext);
+                    InertiaHeaders.AppendVary(headers, InertiaHeaders.Purpose);
+                    if (!string.Equals(httpContext.Request.Headers[InertiaHeaders.Purpose], "prefetch", StringComparison.OrdinalIgnoreCase))
+                    {
+                        response.StatusCode = StatusCodes.Status409Conflict;
+                        headers.Location = default;
+                        headers[redirectHeader] = location;
+                        SuppressRedirectBody(httpContext);
+                    }
                 }
             }
         }

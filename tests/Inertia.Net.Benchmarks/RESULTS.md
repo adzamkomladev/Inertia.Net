@@ -3,7 +3,9 @@
 ## 1.9.5: partial reload selector width — 2026-11-20
 
 `PartialSelectorBenchmarks`: 96 scalar props, one selected (`p0`, or `group.b` for `Nested`), the rest of `X-Inertia-Partial-Data`
-naming absent optional props. `ParseOnly` is `new InertiaRequest(headers)`. .NET 10, Release, BenchmarkDotNet `--job short --inProcess`
+naming existing optional props. The original fixture changed loader count and response size across rows, so the render timings
+do not isolate selector costs. The corrected fixture keeps Flat and Nested output constant and retains a separate GrowingOutput
+case. The table below records the original run. `ParseOnly` is `new InertiaRequest(headers)`. .NET 10, Release, BenchmarkDotNet `--job short --inProcess`
 on a shared Linux host, 2026-11-20.
 
 | Selectors | Flat mean | Nested mean | Render allocated | Parse allocated |

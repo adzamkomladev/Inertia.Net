@@ -193,7 +193,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         {
             if (hit.IsStale)
             {
-                ScheduleRefresh(http, key, context.PageJson, duration, staleFor);
+                ScheduleRefresh(http, key, context.PageJson, duration, staleFor, hit.Stamp);
             }
 
             _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache", _mount);
@@ -214,7 +214,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             if (!_caching.TryBeginFill(key, InertiaCaching.SsrTags, out var completion))
             {
                 var shared = await completion.Task.WaitAsync(deadline.Token);
-                if (shared is not null && CacheEntry.TryReadRender(shared, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds(), out var filled)) return Cached(filled);
+                if (shared is not null && CacheEntry.TryReadRender(shared, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds(), out var filled)) return Cached(filled, scheduleRefresh: false);
                 if (await _caching.GetRenderAsync(key, deadline.Token) is { } stored) return Cached(stored);
 
                 // The fill stored nothing (it failed or was cancelled): render at once rather than queue behind the other waiters.
@@ -236,9 +236,9 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
             return Fail(mode, SsrFailure.Timeout, "timeout", "The SSR cache fill exceeded Ssr.Timeout.", null, null);
         }
 
-        SsrRender Cached(CachedRender hit)
+        SsrRender Cached(CachedRender hit, bool scheduleRefresh = true)
         {
-            if (hit.IsStale) ScheduleRefresh(http, key, context.PageJson, duration, staleFor);
+            if (scheduleRefresh && hit.IsStale) ScheduleRefresh(http, key, context.PageJson, duration, staleFor, hit.Stamp);
             _metrics.RecordOutcome("rendered", hit.IsStale ? "stale" : "cache", _mount);
             return new SsrRender(hit.Head, hit.Body);
         }
@@ -311,18 +311,35 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
 
     // The first request to read a stale render renders the page again once its response has been sent; the others serve it meanwhile.
     // The page JSON is copied: the response's buffer goes back to the pool when the response ends.
-    private void ScheduleRefresh(HttpContext http, InertiaCacheKey key, ReadOnlyMemory<byte> pageJson, TimeSpan duration, TimeSpan staleFor)
+    private void ScheduleRefresh(HttpContext http, InertiaCacheKey key, ReadOnlyMemory<byte> pageJson, TimeSpan duration, TimeSpan staleFor, long stamp)
     {
-        if (_caching.TryBeginRefresh(key, out var claim))
+        if (!_caching.TryBeginRefresh(key, out var claim)) return;
+        if (!_refreshes.TryReserveSsr())
         {
-            OnCompleted(http, key, claim, pageJson.ToArray(), duration, staleFor);
+            _caching.EndRefresh(key, claim);
+            return;
+        }
+
+        try
+        {
+            OnCompleted(http, key, claim, pageJson.ToArray(), duration, staleFor, stamp);
+        }
+        catch
+        {
+            _refreshes.ReleaseSsr();
+            _caching.EndRefresh(key, claim);
+            throw;
         }
     }
 
     // Its own method: the closure would otherwise be allocated on every stale hit, refresh or not.
-    private void OnCompleted(HttpContext http, InertiaCacheKey key, long claim, byte[] pageJson, TimeSpan duration, TimeSpan staleFor)
+    private void OnCompleted(HttpContext http, InertiaCacheKey key, long claim, byte[] pageJson, TimeSpan duration, TimeSpan staleFor, long stamp)
     {
-        var work = new RefreshWork(ct => RefreshAsync(key, pageJson, duration, staleFor, ct), () => _caching.EndRefresh(key, claim), "ssr");
+        var work = new RefreshWork(ct => RefreshAsync(key, pageJson, duration, staleFor, stamp, ct), () =>
+        {
+            _caching.EndRefresh(key, claim);
+            _refreshes.ReleaseSsr();
+        }, "ssr");
         http.Response.OnCompleted(() =>
         {
             _refreshes.Enqueue(work);
@@ -330,18 +347,17 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         });
     }
 
-    private async Task RefreshAsync(InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor, CancellationToken cancellationToken)
+    private async Task RefreshAsync(InertiaCacheKey key, byte[] pageJson, TimeSpan duration, TimeSpan staleFor, long stamp, CancellationToken cancellationToken)
     {
         try
         {
             // As for props: a render stored fresh since this response read it stale needs no second render.
-            if (await _caching.GetRenderAsync(key, cancellationToken) is { IsStale: false })
+            if (await _caching.GetRenderAsync(key, cancellationToken) is not { IsStale: true, Stamp: var current } || current != stamp)
             {
                 return;
             }
 
             // Preferred: a failed refresh is logged like any fallback, and the stale render stays until it expires.
-            var stamp = _caching.InvalidationStamp(key, InertiaCaching.SsrTags);
             if (await RenderOnServersAsync(SsrMode.Preferred, pageJson, _endpoints, _managed, cancellationToken) is { } render)
             {
                 (await StoreAsync(key, duration, staleFor, render, cancellationToken, stamp: stamp)).Dispose();
@@ -670,7 +686,8 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
                 }
             }
 
-            if (!System.Text.Unicode.Utf8.IsValid(output.AsSpan(head)) || !System.Text.Unicode.Utf8.IsValid(output.AsSpan(body)))
+            if (reader.TokenType != JsonTokenType.EndObject || reader.Read()
+                || !System.Text.Unicode.Utf8.IsValid(output.AsSpan(head)) || !System.Text.Unicode.Utf8.IsValid(output.AsSpan(body)))
             {
                 return null;
             }

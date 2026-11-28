@@ -165,6 +165,17 @@ public sealed class SsrGatewayTests
         Assert.DoesNotContain("data-page", html, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("\r\n")]
+    [InlineData("{}")]
+    [InlineData("garbage")]
+    public void Render_parser_requires_end_of_input(string suffix)
+    {
+        using var render = SsrGateway.ParseRender(System.Text.Encoding.UTF8.GetBytes("{\"body\":\"ok\"}" + suffix));
+        Assert.Equal(string.IsNullOrWhiteSpace(suffix), render is not null);
+    }
+
     [Fact]
     public void Ssr_options_have_one_authoritative_timeout_and_validate_limits()
     {
