@@ -15,6 +15,27 @@ public sealed class LiveBackplaneTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    [Fact]
+    public void An_overflowed_inbox_delivers_an_ordered_gap_even_when_the_last_publish_was_dropped()
+    {
+        var inbox = new LiveBackplaneInbox<string>(2);
+        inbox.Enqueue("one");
+        inbox.Enqueue("two");
+        inbox.Enqueue("dropped");
+        inbox.Enqueue("also dropped");
+        Assert.True(inbox.Reader.TryRead(out var first));
+        Assert.Equal("one", first);
+        Assert.True(inbox.Reader.TryRead(out var second));
+        Assert.Equal("two", second);
+        Assert.True(inbox.Reader.TryRead(out var gap));
+        Assert.Null(gap);
+        Assert.False(inbox.Reader.TryRead(out _));
+
+        inbox.Enqueue("after");
+        Assert.True(inbox.Reader.TryRead(out var last));
+        Assert.Equal("after", last);
+    }
+
     private sealed class RecordingTransport : IInertiaLiveLocalTransport
     {
         public List<LiveMessage> Delivered { get; } = [];

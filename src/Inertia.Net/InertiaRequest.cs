@@ -54,7 +54,7 @@ public static class InertiaHeaders
     // The request headers that select a rendered page's status, props or metadata. A shared cache must key a page on all of them:
     // a full and a partial visit to the same URL (or a current and a stale asset version) get different responses.
     private static readonly string[] PageVaryHeaders =
-        [Inertia, Version, PartialComponent, PartialData, PartialExcept, Reset, ExceptOnceProps, ErrorBag, InfiniteScrollMergeIntent];
+        [Inertia, Version, PartialComponent, PartialData, PartialExcept, Reset, ExceptOnceProps, ErrorBag, InfiniteScrollMergeIntent, Purpose];
 
     internal static readonly string PageVary = string.Join(", ", PageVaryHeaders);
 
@@ -70,7 +70,7 @@ public static class InertiaHeaders
 
     /// <summary>
     /// Adds every request header that selects a page's content (<c>X-Inertia</c>, the version, partial reload, reset, once,
-    /// error bag and merge intent headers) to <c>Vary</c>, skipping those already listed (case-insensitive) and all of them after <c>*</c>.
+    /// error bag, merge intent and prefetch headers) to <c>Vary</c>, skipping those already listed (case-insensitive) and all of them after <c>*</c>.
     /// </summary>
     internal static void AppendPageVary(IHeaderDictionary headers)
     {

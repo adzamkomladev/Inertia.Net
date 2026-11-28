@@ -734,21 +734,18 @@ internal sealed partial class DevToolsRecorder
         if (capture.ResponseTooLarge || response.ContentLength > capture.MaxPageBytes) return Body.Omitted("too-large");
         if (capture.ResponseBytes.IsEmpty) return Body.Empty;
         var type = response.ContentType ?? "";
+        if (type.Contains("html", StringComparison.OrdinalIgnoreCase) || type.Contains("xml", StringComparison.OrdinalIgnoreCase))
+            return Body.Omitted("unserializable");
         if (type.Length > 0 && !type.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
-            && !type.Contains("json", StringComparison.OrdinalIgnoreCase)
-            && !type.Contains("xml", StringComparison.OrdinalIgnoreCase))
+            && !type.Contains("json", StringComparison.OrdinalIgnoreCase))
             return Body.Omitted("binary");
         string text;
         try { text = StrictUtf8.GetString(capture.ResponseBytes.Span); }
         catch (DecoderFallbackException) { return Body.Omitted("unserializable"); }
-        if (type.Contains("json", StringComparison.OrdinalIgnoreCase))
-        {
-            try { return Body.Json(JsonNode.Parse(text)); }
-            // Malformed structured data cannot be safely redacted by field name.
-            catch (JsonException) { return Body.Omitted("unserializable"); }
-        }
-        // Echoed structured input must not bypass field redaction by using a text content type.
-        if (text.AsSpan().TrimStart().StartsWith("{") || text.AsSpan().TrimStart().StartsWith("["))
+        // A handler can echo structured input as plain text. Only JSON can be redacted by field name.
+        var content = text.AsSpan().TrimStart().TrimStart('\uFEFF').TrimStart();
+        if (content.StartsWith("<")) return Body.Omitted("unserializable");
+        if (type.Contains("json", StringComparison.OrdinalIgnoreCase) || content.StartsWith("{") || content.StartsWith("["))
         {
             try { return Body.Json(JsonNode.Parse(text)); }
             catch (JsonException) { return Body.Omitted("unserializable"); }
@@ -924,18 +921,18 @@ internal sealed partial class DevToolsRecorder
         while (text.IndexOf('<', start) is var open && open >= 0)
         {
             var close = text.IndexOf('>', open + 1);
-            if (close < 0 || text.AsSpan(start, open - start).Contains('?')) return Redacted;
+            if (close < 0 || text.AsSpan(start, open - start).ContainsAny('?', '#')) return Redacted;
             result.Append(text.AsSpan(start, open + 1 - start)).Append(RedactUrl(text[(open + 1)..close]));
             start = close;
         }
 
-        return text.AsSpan(start).Contains('?') ? Redacted : result.Append(text.AsSpan(start)).ToString();
+        return text.AsSpan(start).ContainsAny('?', '#') ? Redacted : result.Append(text.AsSpan(start)).ToString();
     }
 
     private string RedactRefresh(string text)
     {
         var separator = text.IndexOf(';', StringComparison.Ordinal);
-        if (separator < 0) return text.Contains('?', StringComparison.Ordinal) ? Redacted : text;
+        if (separator < 0) return text.AsSpan().ContainsAny('?', '#') ? Redacted : text;
         var equals = text.IndexOf('=', separator + 1);
         if (equals < 0 || !text.AsSpan(separator + 1, equals - separator - 1).Trim().Equals("url", StringComparison.OrdinalIgnoreCase)) return Redacted;
         var target = text[(equals + 1)..].Trim();
@@ -950,8 +947,15 @@ internal sealed partial class DevToolsRecorder
 
     private string RedactUrl(string url)
     {
-        var queryStart = url.IndexOf('?', StringComparison.Ordinal);
         var fragmentStart = url.IndexOf('#', StringComparison.Ordinal);
+        // A redirect fragment can carry credentials, including a hash router's own query.
+        if (fragmentStart >= 0 && url.AsSpan(fragmentStart + 1).IndexOfAny("=?&%") >= 0)
+        {
+            url = url[..fragmentStart];
+            fragmentStart = -1;
+        }
+
+        var queryStart = url.IndexOf('?', StringComparison.Ordinal);
         if (queryStart < 0 || (fragmentStart >= 0 && fragmentStart < queryStart)) return url;
         var queryEnd = fragmentStart < 0 ? url.Length : fragmentStart;
         var query = QueryHelpers.ParseQuery(url[queryStart..queryEnd]);

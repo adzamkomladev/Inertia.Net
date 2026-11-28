@@ -1,6 +1,5 @@
 import { expect, test, type Request } from '@playwright/test'
 
-test.skip((process.env.SAMPLE ?? 'react') !== 'react', 'The React sample hosts the pagination pages')
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__e2e/reset')

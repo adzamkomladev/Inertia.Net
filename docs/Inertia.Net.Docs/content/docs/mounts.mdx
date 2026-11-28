@@ -17,9 +17,9 @@ default mount is the one `AddInertia(...)` and `UseInertia()` configure, so exis
 |---|---|
 | Shared props (`o.Share`) and every other `InertiaOptions` setting | `IInertiaCache` and the cache store (choose distinct `InertiaProp.Cache(key)` keys) |
 | Asset version: the 409 check only compares against the mount's own version | `IInertiaLive` and the SignalR hub |
-| State cookie: `.Inertia.State.{name}` and `.Inertia.Previous.{name}` by default | Metrics (named mounts add an `inertia.mount` tag) and DevTools |
+| State cookie: `.Inertia.State.{name}` and `.Inertia.Previous.{name}` by default, encrypted for that mount only | Metrics (named mounts add an `inertia.mount` tag) and DevTools |
 | Root view: the mount's `RootView` file, or a keyed `IInertiaRootView` | Antiforgery and data protection |
-| Vite manifest, SSR servers, managed Node processes, TypeScript output | The SSR `HttpClient` (its `ConnectTimeout` comes from the default mount) |
+| Vite manifest, SSR servers, managed Node processes, TypeScript output, SSR `ConnectTimeout` | The SSR `HttpClient` and its handlers |
 | Error pages registered with `AddInertiaErrorPages(name, ...)` | |
 
 ## Register and map a mount

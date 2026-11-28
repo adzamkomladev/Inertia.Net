@@ -322,7 +322,7 @@ Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.
 Run these commands in the folder where you want to create `MyApp`.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.10.0
+dotnet new install Inertia.Net.Templates@1.10.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -469,19 +469,19 @@ Every package is on [NuGet](https://www.nuget.org/profiles/adzamkomladev); the n
 | [`Inertia.Net.Templates`](https://www.nuget.org/packages/Inertia.Net.Templates) | you want to start from a complete app. Install it with `dotnet new install Inertia.Net.Templates`. It also adds pages with `dotnet new inertia-page` |
 
 ```sh
-dotnet add package Inertia.Net --version 1.10.0
-dotnet add package Inertia.Net.Mvc --version 1.10.0            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.10.0  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.10.0        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.10.0   # live props over SignalR
-dotnet add package Inertia.Net.Live.Sse --version 1.10.0        # live props over Server-Sent Events
-dotnet add package Inertia.Net.Redis --version 1.10.0          # Redis cache store and live backplane
-dotnet add package Inertia.Net.Postgres --version 1.10.0       # PostgreSQL live backplane
-dotnet add package Inertia.Net.MongoDB --version 1.10.0        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.10.1
+dotnet add package Inertia.Net.Mvc --version 1.10.1            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.10.1  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.1 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.10.1        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.10.1   # live props over SignalR
+dotnet add package Inertia.Net.Live.Sse --version 1.10.1        # live props over Server-Sent Events
+dotnet add package Inertia.Net.Redis --version 1.10.1          # Redis cache store and live backplane
+dotnet add package Inertia.Net.Postgres --version 1.10.1       # PostgreSQL live backplane
+dotnet add package Inertia.Net.MongoDB --version 1.10.1        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.10.0 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.10.1 implements Inertia.js v3.
 
 ## Requirements
 
@@ -504,7 +504,7 @@ Every package ships `net10.0` and `net11.0` assemblies. NuGet picks the one that
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.10.0
+dotnet new install Inertia.Net.Templates@1.10.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```
@@ -1053,11 +1053,11 @@ Use this guide to add Inertia to an existing ASP.NET Core app. To create a new a
 Run these commands from the folder of your existing server project. Every app needs the core package:
 
 ```sh
-dotnet add package Inertia.Net --version 1.10.0
+dotnet add package Inertia.Net --version 1.10.1
 ```
 
 For MVC, also install `Inertia.Net.Mvc`. For FastEndpoints, install `Inertia.Net.FastEndpoints`.
-Use version `1.10.0` for each. You also need Node.js and Vite to build the client. See
+Use version `1.10.1` for each. You also need Node.js and Vite to build the client. See
 [installation](/docs/installation) for all packages, or [client setup](/docs/client-setup) for the frontend files.
 
 The **root template** is your HTML shell. A **page component** is the React, Vue or Svelte file that renders a screen.
@@ -2771,7 +2771,7 @@ Call `UseRateLimiter()` after `UseInertia()`, so the flash message of a rejected
 `dotnet new inertia --auth` creates an app with both:
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.10.0
+dotnet new install Inertia.Net.Templates::1.10.1
 dotnet new inertia -n MyApp --auth                # add --framework vue or svelte for another client
 ```
 
@@ -3471,7 +3471,7 @@ A page can use the same prop modifiers as other values. For example, `Scroll(ct 
 If your app uses EF Core, install the optional package alongside your database provider:
 
 ```sh
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.1
 ```
 
 The following example uses an existing `AppDb` as `db`, with a `Posts` set. `request` is a `PageRequest`, `cursorRequest` is a `CursorRequest`, and `ct` is the request cancellation token:
@@ -3503,7 +3503,7 @@ The EF Core package is not marked Native AOT compatible. EF Core has its own com
 `Inertia.Net.MongoDB` builds the same `Page<T>` and `CursorPage<T>` values from a `collection.Find(filter)`:
 
 ```sh
-dotnet add package Inertia.Net.MongoDB --version 1.10.0
+dotnet add package Inertia.Net.MongoDB --version 1.10.1
 ```
 
 ```csharp
@@ -6010,7 +6010,7 @@ URL: https://inertia-dotnet.temtem.dev/docs/redis
 `Inertia.Net.Redis` keeps [cached props](/docs/props#cached-props) (`.Cache(...)`) and SSR renders in Redis. Every app instance shares them, and a call to `IInertiaCache.RemoveByTagAsync` on one instance clears them for all instances. Inertia.Net reads a page's cached props from Redis together, not one round trip after another. The loaders of those props still run in turn unless you mark them `Parallel()`.
 
 ```sh
-dotnet add package Inertia.Net.Redis --version 1.10.0
+dotnet add package Inertia.Net.Redis --version 1.10.1
 ```
 
 ```csharp
@@ -7160,7 +7160,8 @@ Inertia DevTools lets you see what your browser sent and what ASP.NET Core retur
 
 DevTools lets you inspect a visit without changing its response. Its read API, the endpoints that return the recorded entries,
 leaves pending errors and flash messages alone. Apps hosted under a path such as `/admin` report that path to the extension.
-Request URLs are absolute. Sensitive query values are redacted in the recorded copy, not in your real request.
+Request URLs are absolute. Recorded URLs redact sensitive query values and omit parameterized or percent-encoded fragments.
+Plain anchors such as `#overview` are kept.
 
 Entries live in memory and disappear on restart. Source-call locations are not collected, so some “open in editor” links
 are unavailable. Keep the read API private, because recorded entries can include user data.
@@ -7180,8 +7181,8 @@ app.MapInertiaDevTools();                // GET /_inertia/devtools/entries/{id} 
 ```
 
 The list endpoint returns metadata summaries. Fetch `/entries/{id}` for props, HTTP bodies and route details.
-Ordinary textual and JSON responses are captured up to `MaxResponseBytes`. Binary, explicitly streamed and oversized
-responses are omitted. Parsed multipart forms include file names, sizes and MIME types, never file contents.
+The recorder captures plain text and JSON responses up to `MaxResponseBytes`. It omits ordinary HTML and XML bodies,
+binary data, explicitly streamed responses and oversized bodies. Inertia page entries keep their redacted page data. Parsed multipart forms include file names, sizes and MIME types, never file contents.
 Unparsed uploads are not read only for recording. Render source locations are included when debug symbols are available.
 Published or Native AOT applications may not retain them. Malformed structured bodies and invalid UTF-8 are omitted, because
 a raw-text fallback could expose an unredacted secret.
@@ -7459,7 +7460,7 @@ Each feature in this table shows one idea from Inertia.Net. The right column nam
 Install the templates once, then create the app. The `--auth` option adds cookie sign-in, so you do not write that yourself. For the other clients, use `--framework vue` or `--framework svelte`. Then pick the matching tab in the examples below.
 
 ```sh
-dotnet new install Inertia.Net.Templates::1.10.0
+dotnet new install Inertia.Net.Templates::1.10.1
 dotnet new inertia -n ForgetMeNot --framework react --auth
 cd ForgetMeNot
 bun install
@@ -7785,7 +7786,7 @@ Lists and items must survive a restart, so the app needs a database. This tutori
 
 ```sh
 dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version "10.*"
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.1
 ```
 
 <Callout type="tip" title="On .NET 11?">
@@ -9676,7 +9677,7 @@ Now look at the line that connects the worker to the page. In `ListsPage`, you w
 Install the SignalR transport. It carries the "something changed" message to the browser:
 
 ```sh
-dotnet add package Inertia.Net.Live.SignalR --version 1.10.0
+dotnet add package Inertia.Net.Live.SignalR --version 1.10.1
 bun add @microsoft/signalr
 ```
 
@@ -9742,7 +9743,7 @@ dotnet new xunit -n ForgetMeNot.Tests
 cd ForgetMeNot.Tests
 dotnet add reference ../ForgetMeNot/ForgetMeNot.csproj
 dotnet add package Microsoft.AspNetCore.Mvc.Testing --version "10.*"
-dotnet add package Inertia.Net.Testing --version 1.10.0
+dotnet add package Inertia.Net.Testing --version 1.10.1
 ```
 
 The test project starts your real app in memory. For that to work, add one line at the very end of the app's `Program.cs`:

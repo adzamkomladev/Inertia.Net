@@ -57,7 +57,8 @@ internal sealed class SseLiveConnections : IInertiaLiveLocalTransport
         var key = message.Channel.Key;
         if (!_channels.TryGetValue(key, out var members)) return default;
         string? data = null;
-        foreach (var connection in members.Values)
+        // Enumerating the dictionary itself avoids the snapshot .Values takes on every publish.
+        foreach (var (_, connection) in members)
         {
             if (connection.Id == message.ExceptSocketId) continue;
             data ??= Event(key, message.Payload);

@@ -15,9 +15,10 @@ Only the latest minor release receives security fixes.
 
 ## Scope
 
-This policy covers the packages published from `src/` (`Inertia.Net` and its `.Mvc`, `.FastEndpoints`, `.Live.SignalR`, `.Redis`,
-`.EntityFrameworkCore`, `.MongoDB`, `.Testing` and `.Templates` packages) and the apps that `dotnet new inertia` creates.
+This policy covers the packages published from `src/` (`Inertia.Net` and its `.Mvc`, `.FastEndpoints`, `.Live.SignalR`, `.Live.Sse`,
+`.Redis`, `.Postgres`, `.EntityFrameworkCore`, `.MongoDB`, `.Testing` and `.Templates` packages) and the apps that `dotnet new inertia` creates.
 
 This policy does not cover the samples, the docs site, or the Inertia client packages (`@inertiajs/*`). Report vulnerabilities in
 those client packages to [inertiajs/inertia](https://github.com/inertiajs/inertia/security).
 The app trusts its own SSR bundle and cache store (Redis) by design. It writes their output into pages without escaping it.
+The app also trusts senders and readers on its configured Redis or PostgreSQL live backplane.

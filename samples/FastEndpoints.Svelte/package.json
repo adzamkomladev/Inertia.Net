@@ -4,11 +4,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "ssr": "node ssr/ssr.js"
   },
   "dependencies": {
     "@inertiajs/svelte": "^3.11.0",
     "@inertiajs/vite": "^3.11.0",
+    "@microsoft/signalr": "^10.0.11",
     "svelte": "^5.57.3"
   },
   "devDependencies": {

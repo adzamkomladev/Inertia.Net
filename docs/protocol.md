@@ -56,7 +56,7 @@ All list headers are comma-separated. Parse them as: split on `,`, trim, drop em
 
 ## 3. Responses and middleware flow
 
-- `Vary: X-Inertia` goes on **every** response that passes through the middleware. A rendered page and the version-mismatch `409` also vary on `X-Inertia-Version`, `X-Inertia-Partial-Component`, `X-Inertia-Partial-Data`, `X-Inertia-Partial-Except`, `X-Inertia-Reset`, `X-Inertia-Except-Once-Props`, `X-Inertia-Error-Bag` and `X-Inertia-Infinite-Scroll-Merge-Intent`, the headers that select their status, props or metadata, so a shared cache cannot serve a full visit's page to a partial reload (or the reverse). Existing `Vary` values are kept (case-insensitive), and `Vary: *` is left alone. Personalization (cookies, authorization) is the application's to express with `Cache-Control`.
+- `Vary: X-Inertia` goes on **every** response that passes through the middleware. A rendered page and the version-mismatch `409` also vary on `X-Inertia-Version`, `X-Inertia-Partial-Component`, `X-Inertia-Partial-Data`, `X-Inertia-Partial-Except`, `X-Inertia-Reset`, `X-Inertia-Except-Once-Props`, `X-Inertia-Error-Bag`, `X-Inertia-Infinite-Scroll-Merge-Intent` and `Purpose`, the headers that select their status, props or metadata, so a shared cache cannot serve a full visit's page to a partial reload (or the reverse). Existing `Vary` values are kept (case-insensitive), and `Vary: *` is left alone. Personalization (cookies, authorization) is the application's to express with `Cache-Control`.
 - A JSON page response normally has status 200, `Content-Type: application/json`, and `X-Inertia: true`. Error pages are ordinary pages with a non-200 status; `AddInertiaErrorPages()` can render them for routing failures and unhandled exceptions.
 - An HTML page response is the root template with the page embedded (§5).
 
@@ -67,7 +67,7 @@ The middleware runs in this order:
 4. If the status is 200 and the body is empty, redirect back (same-host Referer, falling back to the validated previous-URL cookie when `State.RememberPreviousUrl` is on, then the app root `PathBase/`).
 5. If the status is 302 and the method is PUT, PATCH, DELETE or QUERY, change it to 303.
 6. If the response is a redirect to another origin (an absolute or protocol-relative http(s) URL whose scheme, host or port differs from the request's), and the request is not a prefetch, replace it with `409` and `X-Inertia-Location: <Location>` (empty body), unless `ConvertExternalRedirects` is off (deliberate deviation 12).
-7. Otherwise, if the response is a redirect, its `Location` contains `#`, and the request is not a prefetch, replace it with `409` and `X-Inertia-Redirect: <Location>` (empty body). Both the prefetch and navigation variants of redirects eligible for conversion vary on `Purpose`.
+7. Otherwise, if the response is a redirect, its `Location` contains `#`, and the request is not a prefetch, replace it with `409` and `X-Inertia-Redirect: <Location>` (empty body). Both the prefetch and navigation variants of redirects eligible for conversion, and Inertia redirects that produce flash or other state, vary on `Purpose`.
 
 "Redirect" means status 301, 302, 303, 307 or 308 (Symfony's `isRedirect()`, without 201). When the response is a redirect, or a `409` carrying `X-Inertia-Location`/`X-Inertia-Redirect`, the flash/errors/history flags (set during this request **or** restored and not rendered yet) are saved to the state store; any other response consumes the loaded state (§7).
 
@@ -279,7 +279,7 @@ All three (and validation errors) are stored in the state store when a response 
 | preserveFragment | the same mechanism | `preserveFragment: true` on the next rendered page |
 | encryptHistory | global option, or per request | not persisted |
 
-The state is kept (not consumed) when the response is a version-mismatch 409. A prefetch (`Purpose: prefetch`) neither loads nor consumes it: the prefetched page renders without flash and with empty errors, so the visit that follows still gets them.
+The state is kept (not consumed) when the response is a version-mismatch 409. A prefetch (`Purpose: prefetch`) neither loads nor consumes it, even when the prefetch handler redirects with new state: the prefetched page renders without flash and with empty errors, so the visit that follows still gets them.
 
 `ForgetFlashed(keys)` removes current or restored flash values before rendering or redirecting. An exact key wins over a dot path.
 Nested removal copies the value rather than mutating the caller's object. Removing the last key omits `flash`; remaining values

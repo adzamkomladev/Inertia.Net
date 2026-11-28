@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
 
-test.skip((process.env.SAMPLE ?? 'react') !== 'react', 'The React sample hosts the login validation demo')
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__e2e/reset')

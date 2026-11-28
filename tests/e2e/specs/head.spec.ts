@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-// React sample only: /users sets its title and description on the server with Render(...).WithHead(...) (serverHead: true).
-test.skip(process.env.SAMPLE !== 'react', 'the React sample sets a server head')
+// /users sets its title and description on the server with Render(...).WithHead(...) (serverHead: true).
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__e2e/reset')

@@ -24,19 +24,19 @@ Every package is on [NuGet](https://www.nuget.org/profiles/adzamkomladev); the n
 | [`Inertia.Net.Templates`](https://www.nuget.org/packages/Inertia.Net.Templates) | you want to start from a complete app. Install it with `dotnet new install Inertia.Net.Templates`. It also adds pages with `dotnet new inertia-page` |
 
 ```sh
-dotnet add package Inertia.Net --version 1.10.0
-dotnet add package Inertia.Net.Mvc --version 1.10.0            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.10.0  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.10.0        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.10.0   # live props over SignalR
-dotnet add package Inertia.Net.Live.Sse --version 1.10.0        # live props over Server-Sent Events
-dotnet add package Inertia.Net.Redis --version 1.10.0          # Redis cache store and live backplane
-dotnet add package Inertia.Net.Postgres --version 1.10.0       # PostgreSQL live backplane
-dotnet add package Inertia.Net.MongoDB --version 1.10.0        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.10.1
+dotnet add package Inertia.Net.Mvc --version 1.10.1            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.10.1  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.1 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.10.1        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.10.1   # live props over SignalR
+dotnet add package Inertia.Net.Live.Sse --version 1.10.1        # live props over Server-Sent Events
+dotnet add package Inertia.Net.Redis --version 1.10.1          # Redis cache store and live backplane
+dotnet add package Inertia.Net.Postgres --version 1.10.1       # PostgreSQL live backplane
+dotnet add package Inertia.Net.MongoDB --version 1.10.1        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.10.0 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.10.1 implements Inertia.js v3.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ Every package ships `net10.0` and `net11.0` assemblies. NuGet picks the one that
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.10.0
+dotnet new install Inertia.Net.Templates@1.10.1
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```

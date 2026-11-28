@@ -1,5 +1,20 @@
 # Inertia.Net benchmark results
 
+## 1.10.1: mixed page sizes and SSE fan-out — 2026-11-28
+
+In-process allocation probes on .NET 10.0.14 ran against 1.10.0 and 1.10.1. The page probe reused the same
+component and props, rendered a full page containing 2 MiB of text, and then requested a 108-byte partial
+response. The SSE probe sent one small event to every subscriber in a channel and drained and checked the
+queues after each publish. The allocation count covers the render or delivery call and excludes transport I/O.
+
+| Operation | 1.10.0 | 1.10.1 |
+| --- | ---: | ---: |
+| First partial render after a 2 MiB full page | 2,359,560 B | 104 B |
+| SSE publish to 1,000 subscribers | 8,784 B | 768 B |
+| SSE publish to 10,000 subscribers | 80,784 B | 704 B |
+
+These measurements establish allocation changes. They do not measure request latency or resident memory.
+
 ## 1.9.5: partial reload selector width — 2026-11-20
 
 `PartialSelectorBenchmarks`: 96 scalar props, one selected (`p0`, or `group.b` for `Nested`), the rest of `X-Inertia-Partial-Data`

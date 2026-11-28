@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 
 test('a generated route can open its destination before the server responds', async ({ page }) => {
-  test.skip((process.env.SAMPLE ?? 'react') !== 'react', 'The React sample uses an instant home link.')
 
   const response = await page.goto('/contacts/create')
   expect(await response?.text()).toMatch(/<link rel="modulepreload"[^>]+href="\/build\/assets\/Create-[^"]+\.js">/)

@@ -616,7 +616,12 @@ public abstract class ProtocolConformanceTests<THost>
         var client = app.CreateClient();
         await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "Ann" });
 
-        var prefetched = await (await client.InertiaGetAsync("/page", r => r.WithHeader(InertiaHeaders.Purpose, "prefetch"))).PageAsync();
+        using var prefetch = await client.InertiaGetAsync("/page", r => r.WithHeader(InertiaHeaders.Purpose, "prefetch"));
+        Assert.Contains(InertiaHeaders.Purpose, prefetch.Headers.Vary);
+        var prefetched = await prefetch.PageAsync();
+        using var speculativeRedirect = await client.InertiaGetAsync("/clear-history", r => r.WithHeader(InertiaHeaders.Purpose, "prefetch"));
+        Assert.Equal(HttpStatusCode.Found, speculativeRedirect.StatusCode);
+        Assert.Contains(InertiaHeaders.Purpose, speculativeRedirect.Headers.Vary);
         JsonAssert.Missing(prefetched, "flash");
         JsonAssert.Equal("{}", prefetched["props"]!["errors"]);
 
@@ -626,6 +631,9 @@ public abstract class ProtocolConformanceTests<THost>
         await client.InertiaAsync(HttpMethod.Post, "/form", new { name = "" }, r => r.Headers.Referrer = new Uri($"{Base}/page"));
         JsonAssert.Equal("{}", (await (await client.InertiaGetAsync("/page", r => r.WithHeader(InertiaHeaders.Purpose, "prefetch"))).PageAsync())["props"]!["errors"]);
         Assert.Single((await (await client.InertiaGetAsync("/page")).PageAsync())["props"]!["errors"]!.AsObject());
+
+        using var realRedirect = await client.InertiaGetAsync("/clear-history");
+        Assert.Contains(InertiaHeaders.Purpose, realRedirect.Headers.Vary);
     }
 
     [Fact]

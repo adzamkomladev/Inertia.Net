@@ -327,6 +327,31 @@ public class PageWriterTests
         Assert.Equal("</script><!--", (string?)page["props"]!["text"]);
     }
 
+    [Fact]
+    public async Task Raw_converter_output_is_safe_for_HTML_and_round_trips_as_JSON()
+    {
+        var harness = new Harness();
+        var props = new InertiaProps { ["raw"] = new RawJsonValue() };
+        var html = await Harness.ExecuteAsync(harness.Context(), Inertia.Render("Page", props));
+        var json = Harness.ExtractPageJson(html);
+        Assert.DoesNotContain('<', json);
+        Assert.Equal(1, CountOf(html, "</script>"));
+        Assert.Equal("<label>", (string?)JsonNode.Parse(json)!["props"]!["raw"]!["<tag>"]);
+        Assert.Equal("<label>", (string?)(await harness.PageAsync(props))["props"]!["raw"]!["<tag>"]);
+    }
+
+    [System.Text.Json.Serialization.JsonConverter(typeof(RawJsonConverter))]
+    private sealed record RawJsonValue;
+
+    private sealed class RawJsonConverter : System.Text.Json.Serialization.JsonConverter<RawJsonValue>
+    {
+        public override RawJsonValue Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            throw new NotSupportedException();
+
+        public override void Write(Utf8JsonWriter writer, RawJsonValue value, JsonSerializerOptions options) =>
+            writer.WriteRawValue("""{"<tag>":"<label>"}""");
+    }
+
     public sealed class BreakoutDto
     {
         [System.Text.Json.Serialization.JsonPropertyName("</script><!--")]
@@ -350,6 +375,29 @@ public class PageWriterTests
         Assert.True(writer.InitialCapacity("Big") > grown / 2);
         await harness.PageAsync(null, component: "Small");
         Assert.Equal(4096, writer.InitialCapacity("Small"));
+    }
+
+    [Fact]
+    public async Task Full_and_partial_renders_keep_independent_buffer_sizes()
+    {
+        const string component = "Mixed";
+        var harness = new Harness();
+        var writer = harness.Services.GetRequiredService<InertiaPageWriter>();
+        var props = new InertiaProps { ["large"] = new string('x', 2 * 1024 * 1024), ["small"] = 7 };
+
+        await harness.PageAsync(props, c => c.AsInertia(), component);
+        var fullCapacity = writer.InitialCapacity(component);
+        Assert.True(fullCapacity > 2 * 1024 * 1024);
+        Assert.Equal(4096, writer.InitialCapacity(component, partial: true));
+
+        var partial = await harness.PageAsync(props, c => c.AsPartial(only: "small", component: component), component);
+        Assert.Equal(7, (int)partial["props"]!["small"]!);
+        JsonAssert.Missing(partial["props"]!, "large");
+        Assert.Equal(4096, writer.InitialCapacity(component, partial: true));
+        Assert.Equal(fullCapacity, writer.InitialCapacity(component));
+
+        await harness.PageAsync(props, c => c.AsPartial(only: "large", component: component), component);
+        Assert.True(writer.InitialCapacity(component, partial: true) > 2 * 1024 * 1024);
     }
 
     [Fact]

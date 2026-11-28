@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -242,6 +243,34 @@ public static class LiveWire
     }
 }
 
+// The last slot is reserved for a gap. If a burst ends on a dropped message the reader
+// still gets its gap, after every previously accepted message and before any later one.
+internal sealed class LiveBackplaneInbox<T>(int capacity) where T : class
+{
+    private readonly Channel<T?> _channel = Channel.CreateBounded<T?>(new BoundedChannelOptions(capacity + 1) { SingleReader = true });
+    private readonly Lock _gate = new();
+    private bool _lastWasGap;
+
+    public ChannelReader<T?> Reader => _channel.Reader;
+
+    public void Enqueue(T? message)
+    {
+        lock (_gate)
+        {
+            if (message is not null && Reader.Count < capacity)
+            {
+                _channel.Writer.TryWrite(message);
+                _lastWasGap = false;
+            }
+            else if (!_lastWasGap || Reader.Count == 0)
+            {
+                _channel.Writer.TryWrite(null);
+                _lastWasGap = true;
+            }
+        }
+    }
+}
+
 /// <summary>
 /// The broadcaster <c>AddInertiaLive()</c> registers. Without a backplane it delivers each publish to this instance's transports. With
 /// one it only publishes, and its subscription hands every message, this instance's own included, to the transports in the store's
@@ -255,6 +284,7 @@ internal sealed partial class LiveBackplaneRelay : IInertiaLiveBroadcaster, IAsy
     private readonly ILogger _logger;
     private readonly string _tag;
     private IAsyncDisposable? _subscription;
+    private CancellationTokenSource? _deliveryStopping;
 
     public LiveBackplaneRelay(IEnumerable<IInertiaLiveLocalTransport> locals, IServiceProvider services, InertiaMetrics metrics, ILoggerFactory loggers)
     {
@@ -321,16 +351,29 @@ internal sealed partial class LiveBackplaneRelay : IInertiaLiveBroadcaster, IAsy
     {
         // A process without a transport (a worker) only publishes.
         if (_backplane is null || _locals.Length == 0 || _subscription is not null) return;
-        _subscription = await _backplane.SubscribeAsync(ReceiveAsync, Missed, cancellationToken);
+        var stopping = new CancellationTokenSource();
+        try
+        {
+            _subscription = await _backplane.SubscribeAsync(data => ReceiveAsync(data, stopping.Token), Missed, cancellationToken);
+            _deliveryStopping = stopping;
+        }
+        catch
+        {
+            stopping.Dispose();
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
         var subscription = Interlocked.Exchange(ref _subscription, null);
-        if (subscription is not null) await subscription.DisposeAsync();
+        if (subscription is null) return;
+        using var stopping = Interlocked.Exchange(ref _deliveryStopping, null);
+        if (stopping is not null) await stopping.CancelAsync();
+        await subscription.DisposeAsync();
     }
 
-    internal async ValueTask ReceiveAsync(ReadOnlyMemory<byte> data)
+    private async ValueTask ReceiveAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
         if (!LiveWire.TryRead(data.Span, out var message, out _, out var reference, out var error))
         {
@@ -350,7 +393,7 @@ internal sealed partial class LiveBackplaneRelay : IInertiaLiveBroadcaster, IAsy
         {
             try
             {
-                await local.DeliverAsync(message);
+                await local.DeliverAsync(message, cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

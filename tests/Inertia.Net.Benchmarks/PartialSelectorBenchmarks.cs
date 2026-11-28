@@ -12,7 +12,9 @@ namespace Inertia.Net.Benchmarks;
 [MemoryDiagnoser]
 public class PartialSelectorBenchmarks
 {
-    [Params(1, 3, 8, 32)] public int Selectors { get; set; }
+    private const int MaxSelectors = 128;
+
+    [Params(1, 3, 8, 32, MaxSelectors)] public int Selectors { get; set; }
 
     private DefaultHttpContext _flat = null!;
     private DefaultHttpContext _nested = null!;
@@ -36,7 +38,7 @@ public class PartialSelectorBenchmarks
         }
 
         var loaderCalls = 0;
-        for (var i = 1; i < 32; i++)
+        for (var i = 1; i < MaxSelectors; i++)
         {
             _props["optional" + i] = Optional(() =>
             {

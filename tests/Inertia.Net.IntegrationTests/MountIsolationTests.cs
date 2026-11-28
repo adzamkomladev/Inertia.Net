@@ -108,6 +108,11 @@ public sealed class MountIsolationTests
         Assert.False(host.Headers.Contains("Set-Cookie")); // the host neither reads nor clears the mount's cookie
         Assert.False((await host.PageAsync()).ContainsKey("flash"));
 
+        var relabelled = ".Inertia.State" + cookie[cookie.IndexOf('=', StringComparison.Ordinal)..];
+        var foreign = await Get(client, "/", "host-1", relabelled);
+        JsonAssert.Missing(await foreign.PageAsync(), "flash");
+        Assert.Contains("expires=", foreign.Header("Set-Cookie"), StringComparison.OrdinalIgnoreCase);
+
         var sp = await (await Get(client, "/dashboard/", "sp-1", cookie)).PageAsync();
         Assert.Equal("from sp", sp["flash"]?["message"]?.GetValue<string>());
     }
@@ -210,11 +215,43 @@ public sealed class MountIsolationTests
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.RequestUri!.Host == "sp-renderer")
+            {
+                Assert.True(request.Options.TryGetValue(SsrHttpTransport.MountKey, out var mount));
+                Assert.Equal("sp", mount);
+            }
             Interlocked.Increment(ref _calls);
             await Gate.Task.WaitAsync(cancellationToken);
             var json = $$"""{"head":[],"body":"<div id=\"app\">render:{{request.RequestUri!.Host}}</div>"}""";
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
         }
+    }
+
+    [Fact]
+    public async Task Named_mounts_use_their_own_SSR_connection_timeout()
+    {
+        var services = new ServiceCollection();
+        services.AddInertia(o => o.Ssr.ConnectTimeout = TimeSpan.FromSeconds(2));
+        services.AddInertia("sp", o => o.Ssr.ConnectTimeout = TimeSpan.FromSeconds(7));
+        using var provider = services.BuildServiceProvider();
+        using var transport = new HttpMessageInvoker(SsrHttpTransport.Create(provider, timeout => new TimeoutProbe(timeout)));
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost");
+        using var first = await transport.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal("2", first.ReasonPhrase);
+        using var mounted = new HttpRequestMessage(HttpMethod.Get, "http://localhost");
+        mounted.Options.Set(SsrHttpTransport.MountKey, "sp");
+        using var second = await transport.SendAsync(mounted, TestContext.Current.CancellationToken);
+        Assert.Equal("7", second.ReasonPhrase);
+    }
+
+    private sealed class TimeoutProbe(TimeSpan timeout) : HttpMessageHandler
+    {
+        // The caller owns and disposes the returned response.
+        protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            new(HttpStatusCode.OK) { ReasonPhrase = timeout.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(Send(request, cancellationToken));
     }
 
     [Fact]

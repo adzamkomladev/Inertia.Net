@@ -565,6 +565,7 @@ internal sealed partial class SsrGateway : IInertiaSsrRenderer, IDisposable
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint.RenderUrl) { Content = new ReadOnlyMemoryContent(pageJson) };
+            if (_mount is not null) request.Options.Set(SsrHttpTransport.MountKey, _mount);
             request.Content.Headers.ContentType = JsonContentType;
             HttpResponseMessage response;
             try

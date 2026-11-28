@@ -1,10 +1,10 @@
 import { expect, test, type Request } from '@playwright/test'
 
-// Live props across two instances of the React sample on one backplane (LIVE_BACKPLANE=redis|postgres starts the second one at
+// Live props across two instances of a sample on one backplane (LIVE_BACKPLANE=redis|postgres starts the second one at
 // E2E_SECOND_URL): a publish on B reaches a page served by A, and a backplane gap ends in a reconnect and a reload.
 
 const second = process.env.E2E_SECOND_URL
-test.skip(!second || (process.env.SAMPLE ?? 'react') !== 'react', 'Needs LIVE_BACKPLANE and the React sample')
+test.skip(!second, 'Needs LIVE_BACKPLANE')
 
 test.beforeEach(async ({ page, request }) => {
   await request.post('/__e2e/reset')

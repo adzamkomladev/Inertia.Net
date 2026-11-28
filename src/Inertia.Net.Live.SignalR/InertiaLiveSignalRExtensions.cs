@@ -14,6 +14,19 @@ namespace Inertia.Net;
 /// <summary>Registers and maps the SignalR live-props transport.</summary>
 public static class InertiaLiveSignalRExtensions
 {
+    internal const string HubPolicy = "Inertia.Net.Live.SignalR.ChannelAuthorizer";
+
+    // Records when the unkeyed service was supplied by this adapter. Apps may also register
+    // that interface themselves, either before or after AddSignalR.
+    private sealed class DefaultRegistration
+    {
+        public ILiveChannelAuthorizer? Policy { get; set; }
+    }
+
+    internal static readonly ServiceDescriptor DefaultAuthorizer = ServiceDescriptor.Scoped<ILiveChannelAuthorizer>(static sp =>
+        sp.GetRequiredService<DefaultRegistration>().Policy = sp.GetRequiredService<IOptions<InertiaLiveSignalROptions>>()
+            .Value.AuthorizerFactory?.Invoke(sp) ?? DenyingLiveChannelAuthorizer.Instance);
+
     /// <summary>
     /// Delivers live props over SignalR: registers the hub's services (<c>services.AddSignalR()</c>, additive with the app's own hubs), the
     /// JSON metadata the hub needs under Native AOT, this instance's local transport and the channel authorizer. Map the hub with
@@ -55,8 +68,20 @@ public static class InertiaLiveSignalRExtensions
         services.TryAddSingleton<SignalRLiveConnections>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IInertiaLiveLocalTransport, SignalRLiveTransport>());
         services.TryAddSingleton<LiveOrigin>();
-        services.TryAddScoped<ILiveChannelAuthorizer>(static sp =>
-            sp.GetRequiredService<IOptions<InertiaLiveSignalROptions>>().Value.AuthorizerFactory?.Invoke(sp) ?? DenyingLiveChannelAuthorizer.Instance);
+        services.TryAddScoped<DefaultRegistration>();
+        services.TryAdd(DefaultAuthorizer);
+        services.TryAddKeyedScoped<ILiveChannelAuthorizer>(HubPolicy, static (sp, _) =>
+        {
+            var registered = sp.GetRequiredService<ILiveChannelAuthorizer>();
+            if (!ReferenceEquals(registered, sp.GetRequiredService<DefaultRegistration>().Policy) &&
+                sp.GetRequiredService<IOptions<InertiaLiveSignalROptions>>().Value.AuthorizerFactory is { } configure)
+            {
+                return configure(sp);
+            }
+
+            // The unkeyed registration owns this instance, including disposal at the end of the invocation.
+            return new DelegateLiveChannelAuthorizer(registered.AuthorizeAsync);
+        });
         return builder;
     }
 

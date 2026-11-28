@@ -133,46 +133,18 @@ internal sealed partial class RedisLiveBackplane : IInertiaLiveBackplane, IDispo
         ArgumentNullException.ThrowIfNull(missed);
         var connection = Connection;
         var subscriber = connection.GetSubscriber();
-        var queues = new List<ChannelMessageQueue>();
-
-        // The connection carrying pub/sub came back: messages published meanwhile are lost. That is the subscription connection, or
-        // under RESP3 the interactive one, which then carries pub/sub too.
-        void Restored(object? sender, ConnectionFailedEventArgs e)
-        {
-            if (e.ConnectionType == ConnectionType.Subscription
-                || (e.ConnectionType == ConnectionType.Interactive && IsResp3(connection, e.EndPoint)))
-            {
-                missed();
-            }
-        }
-
-        // Registered first, so a restore while the shards are being subscribed is not missed.
-        connection.ConnectionRestored += Restored;
-        var subscription = new Subscription(connection, queues, Restored);
+        var subscription = new Subscription(connection, deliver, missed, _logger);
         try
         {
             foreach (var channel in AllChannels)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var queue = await subscriber.SubscribeAsync(channel);
-                queues.Add(queue);
-                // One message at a time per channel, in publish order.
-                queue.OnMessage(async message =>
-                {
-                    try
-                    {
-                        await deliver((byte[])message.Message!);
-                    }
-                    catch (Exception exception) when (exception is not OperationCanceledException)
-                    {
-                        LogDeliverFailed(_logger, exception);
-                    }
-                });
+                subscription.Add(await subscriber.SubscribeAsync(channel));
             }
         }
         catch
         {
-            await subscription.DisposeAsync(); // unwind the shards already subscribed
+            await subscription.DisposeAsync();
             throw;
         }
 
@@ -200,17 +172,147 @@ internal sealed partial class RedisLiveBackplane : IInertiaLiveBackplane, IDispo
         }
     }
 
-    private sealed class Subscription(IConnectionMultiplexer connection, List<ChannelMessageQueue> queues, EventHandler<ConnectionFailedEventArgs> restored)
-        : IAsyncDisposable
+    private sealed class Subscription : IAsyncDisposable
     {
-        public async ValueTask DisposeAsync()
+        private readonly IConnectionMultiplexer _connection;
+        private readonly Func<ReadOnlyMemory<byte>, ValueTask> _deliver;
+        private readonly Action _missed;
+        private readonly ILogger _logger;
+        private readonly Lock _gate = new();
+        private sealed class Shard(ChannelMessageQueue queue)
         {
-            connection.ConnectionRestored -= restored;
-            foreach (var queue in queues)
+            public ChannelMessageQueue Queue { get; } = queue;
+            public Task Pump { get; set; } = Task.CompletedTask;
+            public int? Discard { get; set; } = 0;
+        }
+
+        private readonly List<Shard> _shards = [];
+        private readonly LiveBackplaneInbox<byte[]> _inbox = new(256);
+        private readonly CancellationTokenSource _stopping = new();
+        private CancellationTokenSource _generation = new();
+        private readonly Task _dispatch;
+
+        public Subscription(IConnectionMultiplexer connection, Func<ReadOnlyMemory<byte>, ValueTask> deliver, Action missed, ILogger logger)
+        {
+            _connection = connection;
+            _deliver = deliver;
+            _missed = missed;
+            _logger = logger;
+            _connection.ConnectionRestored += Restored;
+            _dispatch = DispatchAsync();
+        }
+
+        public void Add(ChannelMessageQueue queue)
+        {
+            var shard = new Shard(queue);
+            lock (_gate)
             {
+                _shards.Add(shard);
+                shard.Pump = Task.Run(() => PumpAsync(shard));
+            }
+        }
+
+        private async Task PumpAsync(Shard shard)
+        {
+            while (!_stopping.IsCancellationRequested)
+            {
+                CancellationTokenSource generation;
+                ValueTask<ChannelMessage> next;
+                lock (_gate)
+                {
+                    if (_stopping.IsCancellationRequested) return;
+                    if (shard.Discard is null)
+                    {
+                        // Fallback for a driver queue without count support. Yield the lock between items.
+                        if (shard.Queue.TryRead(out _)) continue;
+                        shard.Discard = 0;
+                        _inbox.Enqueue(null);
+                    }
+
+                    generation = _generation;
+                    next = shard.Queue.ReadAsync(generation.Token);
+                }
+
                 try
                 {
-                    await queue.UnsubscribeAsync();
+                    var message = await next;
+                    lock (_gate)
+                    {
+                        if (generation != _generation) continue;
+                        if (shard.Discard > 0) shard.Discard--;
+                        else _inbox.Enqueue((byte[])message.Message!);
+                    }
+                }
+                catch (OperationCanceledException) when (generation.IsCancellationRequested)
+                {
+                    // A restore retired this read. Start again after the queued gap.
+                    await Task.Yield();
+                }
+                catch (System.Threading.Channels.ChannelClosedException)
+                {
+                    return;
+                }
+            }
+        }
+
+        private void Restored(object? sender, ConnectionFailedEventArgs e)
+        {
+            if (e.ConnectionType != ConnectionType.Subscription &&
+                !(e.ConnectionType == ConnectionType.Interactive && IsResp3(_connection, e.EndPoint))) return;
+
+            lock (_gate)
+            {
+                if (_stopping.IsCancellationRequested) return;
+                // A slow transport may still be delivering an older event. Put the gap behind committed
+                // deliveries, retire outstanding reads, and discard this generation's driver backlog.
+                var previous = _generation;
+                _generation = new CancellationTokenSource();
+                previous.Cancel();
+                foreach (var shard in _shards)
+                {
+                    // The pump discards exactly the backlog present now. New publications cannot prolong this cutoff.
+                    shard.Discard = shard.Queue.TryGetCount(out var count) ? count : null;
+                }
+
+                previous.Dispose();
+                _inbox.Enqueue(null);
+            }
+        }
+
+        private async Task DispatchAsync()
+        {
+            try
+            {
+                await foreach (var message in _inbox.Reader.ReadAllAsync(_stopping.Token))
+                {
+                    try
+                    {
+                        if (message is null) _missed();
+                        else await _deliver(message);
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException || !_stopping.IsCancellationRequested)
+                    {
+                        LogDeliverFailed(_logger, exception);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+            {
+                // The subscription ended.
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _connection.ConnectionRestored -= Restored;
+            await _stopping.CancelAsync();
+            lock (_gate) _generation.Cancel();
+            foreach (var shard in _shards)
+            {
+                await shard.Pump;
+                try
+                {
+                    await shard.Queue.UnsubscribeAsync();
                 }
                 catch (ObjectDisposedException)
                 {
@@ -221,6 +323,10 @@ internal sealed partial class RedisLiveBackplane : IInertiaLiveBackplane, IDispo
                     // Unsubscribing from a server that is gone has nothing left to do.
                 }
             }
+
+            await _dispatch;
+            _generation.Dispose();
+            _stopping.Dispose();
         }
     }
 

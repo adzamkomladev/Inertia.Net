@@ -26,16 +26,18 @@ function hotFile(): Plugin {
   }
 }
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, isSsrBuild }) => ({
   // Dev: assets come from the Vite origin; build: from the app's /build/ path.
   base: command === 'build' ? '/build/' : '/',
   publicDir: false,
-  plugins: [vue(), inertia(), hotFile()],
+  plugins: [vue(), inertia({ ssr: { entry: 'ClientApp/ssr.ts', host: '127.0.0.1', port: Number(process.env.INERTIA_SSR_PORT ?? 13714), sourcemap: false } }), hotFile()],
   server: { port: 5174, strictPort: true },
-  build: {
-    outDir: 'wwwroot/build',
-    emptyOutDir: true,
-    manifest: true,
-    rolldownOptions: { input: 'ClientApp/app.ts' },
-  },
+  build: isSsrBuild
+    ? { outDir: 'ssr', emptyOutDir: true }
+    : {
+        outDir: 'wwwroot/build',
+        emptyOutDir: true,
+        manifest: true,
+        rolldownOptions: { input: 'ClientApp/app.ts' },
+      },
 }))

@@ -1,8 +1,7 @@
 import { expect, test, type Page, type Request } from '@playwright/test'
 
-// Live props over SignalR, or Server-Sent Events with LIVE_TRANSPORT=sse: the React sample's /live page (contract in samples/README.md).
+// Live props over SignalR, or Server-Sent Events with LIVE_TRANSPORT=sse: each sample's /live page (contract in samples/README.md).
 
-test.skip((process.env.SAMPLE ?? 'react') !== 'react', 'The React sample hosts the live page')
 
 test.beforeEach(async ({ page, request }) => {
   await request.post('/__e2e/reset')
@@ -92,9 +91,26 @@ test('a shared live prop follows its private channel', async ({ page, request })
 test('leaving the page leaves its channel, and coming back fetches a fresh value', async ({ page, request }) => {
   const { hub, reloads } = await openLive(page)
 
+  const sse = process.env.LIVE_TRANSPORT === 'sse'
+  if (sse) {
+    // Publish after the old stream closes and before its replacement can subscribe.
+    await page.route('**/inertia-live?*', async (route) => {
+      await page.request.post('/__e2e/live/inbox')
+      await route.continue()
+    }, { times: 1 })
+  }
+  const catchUp = sse ? page.waitForResponse((response) =>
+    response.request().headers()['x-inertia-partial-data'] === 'inbox') : undefined
+
   await page.getByTestId('nav-users').click()
   await expect(page.getByTestId('user-row')).toHaveCount(3)
   await expect.poll(() => hub.left).toBe(2) // counter and posts: the shared inbox stays subscribed
+
+  if (catchUp) {
+    const response = await catchUp
+    expect((await response.json()).props.inbox.unread).toBe(1)
+    reloads.length = 0
+  }
 
   await request.post('/__e2e/live/increment')
   await page.waitForTimeout(300)

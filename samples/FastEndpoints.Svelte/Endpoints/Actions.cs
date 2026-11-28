@@ -63,3 +63,32 @@ public sealed class SubscribeEndpoint : Endpoint<NewsletterRequest, InertiaBackR
     public override Task<InertiaBackResult> ExecuteAsync(NewsletterRequest req, CancellationToken ct) =>
         Task.FromResult(Back("/contacts/create").WithFlash("success", "Subscribed"));
 }
+
+// The same validation for useHttp (an XHR without X-Inertia): failures are a 422 with { message, errors } that fills form.errors.
+public sealed class CheckContactEndpoint : Endpoint<ContactRequest>
+{
+    public override void Configure()
+    {
+        Post("/contacts/check");
+        Description(b => b.WithName("contacts.check"));
+    }
+
+    public override Task HandleAsync(ContactRequest req, CancellationToken ct) => Send.NoContentAsync();
+}
+
+public sealed class CreateLivePostEndpoint(IInertiaLive live) : EndpointWithoutRequest<InertiaBackResult>
+{
+    public override void Configure()
+    {
+        Post("/live/posts");
+        Description(b => b.WithName("live.posts.store"));
+    }
+
+    public override async Task<InertiaBackResult> ExecuteAsync(CancellationToken ct)
+    {
+        AppState.AddLivePost();
+        // The sender has the new post from this visit's response: leave its connection out.
+        await live.PublishAsync(SampleEvents.PostCreated, exceptSocketId: HttpContext.InertiaRequest().SocketId);
+        return Back("/live");
+    }
+}

@@ -7,6 +7,31 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-11-28
+
+### Security
+
+- Apply the configured private-channel policy independently for SignalR and SSE. End authenticated SSE delivery at ticket expiry.
+- Enforce HTML-safe page data even when an application JSON converter writes raw JSON.
+- Omit ordinary markup bodies and credential-bearing URL fragments from DevTools recordings.
+
+### Fixed
+
+- Keep pending flash and errors through speculative redirects, and distinguish prefetch page responses in caches.
+- Honor the SSR connection timeout configured for each mount.
+- Recover from a PostgreSQL live-backplane queue overflow even when the publisher goes quiet.
+- Reconcile retained live props after the SSE client opens a replacement stream.
+
+### Performance
+
+- Learn separate buffer sizes for full and partial responses of the same page.
+- Avoid taking a snapshot of every subscriber in the SSE publish loop.
+
+### Migration
+
+- The cookie state store now binds encrypted state to its mount. Old and new instances cannot read each other's pending redirect state during a rolling deployment. This affects flash, validation errors and history flags. Session-backed state has no format change.
+- SignalR now uses its explicit `Authorize(...)` rule before the application-wide fallback. If an application relied on a shared authorizer to override the SignalR rule, remove the explicit rule or put the intended policy in it.
+
 ## [1.10.0] - 2026-11-28
 
 ### Added

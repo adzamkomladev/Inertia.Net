@@ -3,24 +3,40 @@
   import Layout from '../../Layout.svelte'
 
   interface Props {
-    users: { id: number; name: string }[]
+    users: {
+      data: { id: number; name: string }[]
+      currentPage: number
+      lastPage: number | null
+      pageName: string
+    }
     stats?: { total: number }
     plans: { items: { name: string; price: number }[]; resolvedCount: number }
   }
 
   let { users, stats, plans }: Props = $props()
+  const pages = $derived(Array.from({ length: users.lastPage ?? 1 }, (_, index) => index + 1))
 </script>
 
 <Layout>
   <h1>Users</h1>
   <ul>
-    {#each users as user (user.id)}
+    {#each users.data as user (user.id)}
       <li data-testid="user-row">
         {user.name}
         <button data-testid="delete-user-{user.id}" onclick={() => router.delete(`/users/${user.id}`)}>Delete</button>
       </li>
     {/each}
   </ul>
+  <nav data-testid="pager" aria-label="User pages">
+    {#each pages as number (number)}
+      <button
+        data-testid="page-{number}"
+        aria-current={number === users.currentPage ? 'page' : undefined}
+        disabled={number === users.currentPage}
+        onclick={() => router.get('/users', { [users.pageName]: number }, { only: ['users'], preserveState: true })}
+      >{number}</button>
+    {/each}
+  </nav>
   <button data-testid="users-refresh" onclick={() => router.visit('/users')}>Refresh</button>
   <Deferred data="stats">
     {#snippet fallback()}
