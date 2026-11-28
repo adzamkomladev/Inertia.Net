@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Inertia.Net.Testing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -41,6 +42,29 @@ public sealed class PrecognitionTests
 
     private static async Task<JsonObject> ErrorsAsync(HttpResponseMessage response) =>
         JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["errors"]!.AsObject();
+
+    [Fact]
+    public async Task Test_helpers_validate_a_real_form_without_running_its_handler()
+    {
+        await using var app = await StartAsync();
+        using var client = app.CreateClient();
+        var ct = TestContext.Current.CancellationToken;
+        using var validRequest = new HttpRequestMessage(HttpMethod.Post, "/precog") { Content = JsonContent.Create(new { name = "Ann", email = "a@b.c" }) };
+        using var valid = await client.SendAsync(validRequest.WithPrecognition("email"), ct);
+        valid.AssertSuccessfulPrecognition();
+
+        using var invalidRequest = new HttpRequestMessage(HttpMethod.Post, "/precog") { Content = JsonContent.Create(new { name = "", email = "" }) };
+        using var invalid = await client.SendAsync(invalidRequest.WithPrecognition("email"), ct);
+        await invalid.AssertPrecognitionErrorAsync("email", cancellationToken: ct);
+        await Assert.ThrowsAsync<InertiaAssertionException>(() => invalid.AssertPrecognitionErrorAsync("name", cancellationToken: ct));
+        Assert.Empty(app.App.Services.GetRequiredService<Calls>().Names);
+
+        using var ordinary = new HttpResponseMessage(HttpStatusCode.NoContent);
+        Assert.Throws<InertiaAssertionException>(() => ordinary.AssertSuccessfulPrecognition());
+        using var throttled = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        throttled.Headers.Add("Precognition", "true");
+        Assert.Throws<InertiaAssertionException>(() => throttled.AssertSuccessfulPrecognition());
+    }
 
     [Fact]
     public async Task Failure_is_a_422_with_message_and_errors_and_the_handler_does_not_run()

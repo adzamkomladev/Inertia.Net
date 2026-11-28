@@ -5,7 +5,7 @@
 export const routeConfig = { base: '' }
 
 export type Method = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'query'
-export type RouteDefinition<M extends Method = Method> = { url: string; method: M }
+export type RouteDefinition<M extends Method = Method> = { url: string; method: M; component?: string }
 type QueryScalar = string | number | boolean
 export type RouteOptions = { query?: Record<string, QueryScalar | QueryScalar[] | null | undefined> }
 type Part = string | [name: string, optional: boolean, fallback: string | null, catchAll: boolean]

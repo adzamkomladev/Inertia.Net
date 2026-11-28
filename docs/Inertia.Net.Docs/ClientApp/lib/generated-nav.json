@@ -872,6 +872,11 @@
           "id": "caching-and-scroll-props",
           "text": "Caching and scroll props",
           "depth": 2
+        },
+        {
+          "id": "project-mongodb-lists-into-a-dto",
+          "text": "Project MongoDB lists into a DTO",
+          "depth": 3
         }
       ]
     },
@@ -1072,6 +1077,11 @@
           "id": "generating-at-build-time",
           "text": "Generating at build time",
           "depth": 2
+        },
+        {
+          "id": "instant-visits",
+          "text": "Instant visits",
+          "depth": 2
         }
       ]
     },
@@ -1161,6 +1171,11 @@
         {
           "id": "production",
           "text": "Production",
+          "depth": 2
+        },
+        {
+          "id": "preload-the-current-page",
+          "text": "Preload the current page",
           "depth": 2
         },
         {
@@ -1301,6 +1316,11 @@
         {
           "id": "hosts-and-ssr-failures",
           "text": "Hosts and SSR failures",
+          "depth": 2
+        },
+        {
+          "id": "check-published-frontend-assets",
+          "text": "Check published frontend assets",
           "depth": 2
         }
       ]

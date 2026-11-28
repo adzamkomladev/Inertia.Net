@@ -1519,6 +1519,8 @@ The EF Core package is not marked Native AOT compatible. EF Core has its own com
 
 ### With MongoDB
 
+For a numbered page of DTOs, call `find.Project(...).ToProjectedPageAsync(request, ct: ct)` on the sorted query. Only the projected fields are fetched.
+
 The `Inertia.Net.MongoDB` package pages a `collection.Find(filter)` in the same way that the EF Core package pages a query:
 
 ```csharp
@@ -2918,7 +2920,17 @@ o.TypeScript.Page<UsersPage>();                      // or AddGeneratedPages(): 
 `AddGeneratedPages()` is written by a source generator, so it needs no reflection and works under Native AOT. `PagesFrom(assembly)`
 does the same with reflection, for page records in another assembly.
 
+### Testing live form validation
+
+Use the existing antiforgery setup, then mark the request with `WithPrecognition("items.0.email")`. Omit field names to validate the whole form. Use `response.AssertSuccessfulPrecognition()` for a 204 with the Precognition headers, or `await response.AssertPrecognitionErrorAsync("items.0.email")` for a validation error. Assert separately that the submit handler made no changes.
+
+### First visits and frontend readiness
+
+Set `o.Vite.PageModule = component => $"ClientApp/pages/{component}.tsx"` to preload the current page’s lazy JavaScript on the first HTML visit. Use manifest keys for your project and return `null` for pages to skip. Register `builder.Services.AddHealthChecks().AddInertiaVite(["ClientApp/app.tsx"])` on a production readiness probe to check published frontend files, including dynamic imports. The check runs once per host and supports named mounts. [Vite guide](https://inertia-dotnet.temtem.dev/docs/vite-integration) · [Deployment guide](https://inertia-dotnet.temtem.dev/docs/deploying)
+
 ### Typed routes
+
+Use `<Link href={routes.orders.show(42)} instant>` when the named GET route includes its destination component. Named `MapInertia` endpoints supply it automatically when no component transformer is configured. Use `.WithInertiaComponent("Orders/Show")` on a regular endpoint with a fixed destination. The page needs a loading state while the GET is pending.
 
 Set `RoutesOutputPath` to generate a typed function in `routes.ts` for every named endpoint. An endpoint is named with `WithName`, a
 controller route name, or a FastEndpoints `Description(x => x.WithName(...))`:

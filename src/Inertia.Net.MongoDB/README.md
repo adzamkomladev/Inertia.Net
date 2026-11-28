@@ -16,3 +16,14 @@ values as `Inertia.Net.EntityFrameworkCore`, built from `IFindFluent<T, T>`.
   tie-breaker). Keys may be `ObjectId` (held in the cursor as its 24-character string), `int`, `long`, `string`, `Guid`,
   `DateTime`, `DateTimeOffset`, `decimal`, `double` or `bool`. A tampered or unparseable cursor starts at the first page.
 - Not Native AOT compatible (the MongoDB driver is not).
+
+### Project MongoDB lists into a DTO
+
+Use `ToProjectedPageAsync` after `Project` when the view needs only a few fields. The sort and count still apply to the source query, and the page holds the projected type.
+
+```csharp
+var page = await articles.Find(a => a.Published)
+    .SortBy(a => a.Id)
+    .Project(a => new ArticleSummary(a.Id, a.Title))
+    .ToProjectedPageAsync(request, ct: ct);
+```

@@ -49,6 +49,7 @@ has '<link rel="stylesheet" href="/build/assets/app-1c9b6e2d.css">'
 has '<link rel="stylesheet" href="/build/assets/vendor-55aa01ff.css">'
 has '<script type="module" src="/build/assets/app-4f2a91c3.js"></script>'
 has '<link rel="modulepreload" href="/build/assets/vendor-8d1e0b7a.js">'
+has '<link rel="modulepreload" href="/build/assets/Home-829a.js">'
 has '<title>Smoke &amp; Mirrors</title>'
 has '"deferredProps":{"default":["stats"]}'
 VERSION=$(sed -n 's/.*"version":"\([0-9a-f]*\)".*/\1/p' "$T/b")

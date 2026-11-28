@@ -21,7 +21,7 @@ internal interface IRouteBodySource
 /// Writes <c>routes.ts</c> (<see cref="InertiaTypeScriptOptions.RoutesOutputPath"/>): one function per named endpoint, in the shape the
 /// Inertia client accepts wherever it takes a URL (<c>{ url, method }</c>), with <c>.url()</c>, <c>.definition</c> and a variant per HTTP method.
 /// </summary>
-internal sealed class RoutesGenerator(TypeScriptGenerator? types = null, IEnumerable<IRouteBodySource>? bodySources = null, IEnumerable<LiveEvent>? liveEvents = null)
+internal sealed class RoutesGenerator(TypeScriptGenerator? types = null, IEnumerable<IRouteBodySource>? bodySources = null, IEnumerable<LiveEvent>? liveEvents = null, bool automaticComponents = true)
 {
     /// <summary>Sources a host package registers when it loads (FastEndpoints has no service registration of its own).</summary>
     internal static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, IRouteBodySource> Registered = new();
@@ -75,6 +75,9 @@ internal sealed class RoutesGenerator(TypeScriptGenerator? types = null, IEnumer
                 continue;
             }
 
+            var metadata = endpoint.Metadata.GetMetadata<InertiaRouteComponent>();
+            var component = methods.Contains("get") && metadata is not null && (!metadata.Automatic || automaticComponents)
+                ? metadata.Name : null;
             var pattern = Template(endpoint.RoutePattern);
             if (routes.TryGetValue(name, out var existing))
             {
@@ -84,12 +87,21 @@ internal sealed class RoutesGenerator(TypeScriptGenerator? types = null, IEnumer
                     continue;
                 }
 
+                if (methods.Contains("get"))
+                {
+                    existing.Component = !existing.Methods.Contains("get") || existing.Component == component ? component : null;
+                }
+
                 existing.Methods.AddRange(methods.Where(m => !existing.Methods.Contains(m)));
                 continue;
             }
 
             // Only these methods carry a body the client sends as form data; GET/DELETE request DTOs are bound from the route and query.
-            routes[name] = new Route(name, pattern, methods) { Body = methods.Any(m => m is "post" or "put" or "patch") ? BodyType(endpoint) : null };
+            routes[name] = new Route(name, pattern, methods)
+            {
+                Component = component,
+                Body = methods.Any(m => m is "post" or "put" or "patch") ? BodyType(endpoint) : null,
+            };
         }
 
         var text = new StringBuilder();
@@ -214,17 +226,18 @@ internal sealed class RoutesGenerator(TypeScriptGenerator? types = null, IEnumer
         }
 
         var names = "[" + string.Join(", ", parameters.Select(p => Quote(p.Name))) + "]";
+        var component = route.Component is null ? "" : ", component: " + Quote(route.Component);
         var call = parameters.Count == 0 ? "options" : "args, options";
         text.Append("const ").Append(id).Append("_url = (").Append(signature).Append("): string => build(")
             .Append(route.Pattern.Segments).Append(", ").Append(names).Append(", ").Append(args).Append(", options)\n");
         text.Append("const ").Append(id).Append(" = Object.assign(\n  (").Append(signature).Append("): RouteDefinition<")
             .Append(Quote(methods[0])).Append("> => ({ url: ").Append(id).Append("_url(").Append(call).Append("), method: ")
-            .Append(Quote(methods[0])).Append(" }),\n  {\n    url: ").Append(id).Append("_url,\n    definition: { methods: [")
+            .Append(Quote(methods[0])).Append(methods[0] == "get" ? component : "").Append(" }),\n  {\n    url: ").Append(id).Append("_url,\n    definition: { methods: [")
             .Append(string.Join(", ", methods.Select(Quote))).Append("] as const, url: ").Append(Quote(route.Pattern.Template)).Append(" },\n");
         foreach (var method in methods)
         {
             text.Append("    ").Append(method).Append(": (").Append(signature).Append("): RouteDefinition<").Append(Quote(method))
-                .Append("> => ({ url: ").Append(id).Append("_url(").Append(call).Append("), method: ").Append(Quote(method)).Append(" }),\n");
+                .Append("> => ({ url: ").Append(id).Append("_url(").Append(call).Append("), method: ").Append(Quote(method)).Append(method == "get" ? component : "").Append(" }),\n");
         }
 
         text.Append("  },\n)\n\n");
@@ -323,6 +336,8 @@ internal sealed class RoutesGenerator(TypeScriptGenerator? types = null, IEnumer
         public string? Identifier { get; set; }
 
         public Type? Body { get; init; }
+
+        public string? Component { get; set; }
     }
 
     private sealed class Node
@@ -340,7 +355,7 @@ internal sealed class RoutesGenerator(TypeScriptGenerator? types = null, IEnumer
         export const routeConfig = { base: '' }
 
         export type Method = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'query'
-        export type RouteDefinition<M extends Method = Method> = { url: string; method: M }
+        export type RouteDefinition<M extends Method = Method> = { url: string; method: M; component?: string }
         type QueryScalar = string | number | boolean
         export type RouteOptions = { query?: Record<string, QueryScalar | QueryScalar[] | null | undefined> }
         type Part = string | [name: string, optional: boolean, fallback: string | null, catchAll: boolean]

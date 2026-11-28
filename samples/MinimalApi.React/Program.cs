@@ -35,6 +35,7 @@ builder.Services.AddInertia(o =>
     o.Share("appName", "Inertia.Net Sample");
     o.Head.TitleTemplate = "{0} - Inertia.Net Sample"; // Render(...).WithHead(h => h.Title("Users"))
     o.VersionResolver = _ => AppState.Version; // null: fall back to the hash of the Vite manifest
+    o.Vite.PageModule = component => $"ClientApp/pages/{component}.tsx";
     o.Vite.Prefetch = VitePrefetch.Waterfall; // fetch the other pages' chunks after load, three at a time
     // Development only: Render("Users/Indx") fails fast, and the TypeScript declarations are rewritten at startup.
     o.Pages.Directory = "ClientApp/pages";

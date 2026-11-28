@@ -89,3 +89,7 @@ cookie and the sign-in cookie between requests.
 Nested scopes fail on properties you did not assert unless you call `Etc()`. Call `Interacted()` to enforce the same at the root.
 
 Documentation: <https://github.com/adzamkomladev/Inertia.Net#testing>
+
+### Test live form validation
+
+Use the existing antiforgery setup, then mark the request with `WithPrecognition("items.0.email")`. Omit field names to validate the whole form. Use `response.AssertSuccessfulPrecognition()` for a 204 with the Precognition headers, or `await response.AssertPrecognitionErrorAsync("items.0.email")` for a validation error. Assert separately that the submit handler made no changes.

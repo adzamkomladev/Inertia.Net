@@ -3483,6 +3483,17 @@ See [Native AOT](/docs/native-aot).
 
 A cached page still writes its scroll metadata. Use cache keys that include the page or cursor and all user or tenant dependencies. `Scroll(...)` can be deferred or cached. Do not reuse its mutable prop instance across requests. You cannot combine root `Append()` and `Prepend()` on the same prop. See [Props](/docs/props#cached-props) and [Infinite scroll](/docs/infinite-scroll).
 
+### Project MongoDB lists into a DTO
+
+Use `ToProjectedPageAsync` after `Project` when the view needs only a few fields. The sort and count still apply to the source query, and the page holds the projected type.
+
+```csharp
+var page = await articles.Find(a => a.Published)
+    .SortBy(a => a.Id)
+    .Project(a => new ArticleSummary(a.Id, a.Title))
+    .ToProjectedPageAsync(request, ct: ct);
+```
+
 ---
 
 # Live props
@@ -4166,21 +4177,16 @@ async Task<HttpResponseMessage> ValidateAsync(string email)
     {
         Content = JsonContent.Create(new { email, password = "password123" }),
     };
-    request.WithXsrfToken(page);
-    request.Headers.Add(InertiaPrecognition.Header, "true");
-    request.Headers.Add(InertiaPrecognition.ValidateOnlyHeader, "email");
+    request.WithXsrfToken(page).WithPrecognition("email");
     return await client.SendAsync(request);
 }
 using var valid = await ValidateAsync("ann@example.com");
-Assert.Equal(HttpStatusCode.NoContent, valid.StatusCode);
-Assert.Equal("true", valid.Headers.GetValues(InertiaPrecognition.SuccessHeader).Single());
+valid.AssertSuccessfulPrecognition();
 using var invalid = await ValidateAsync("invalid");
-Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
-using var body = JsonDocument.Parse(await invalid.Content.ReadAsStringAsync());
-Assert.True(body.RootElement.GetProperty("errors").TryGetProperty("email", out _));
+await invalid.AssertPrecognitionErrorAsync("email");
 ```
 
-Import `System.Net`, `System.Net.Http.Json`, `System.Text.Json`, `Inertia.Net` and `Inertia.Net.Testing`. [Testing](/docs/testing#testing-a-form-with-antiforgery) shows the client and token setup.
+Import `System.Net.Http.Json` and `Inertia.Net.Testing`. [Testing](/docs/testing#testing-a-form-with-antiforgery) shows the client and token setup.
 
 ## Protocol reference
 
@@ -4556,6 +4562,22 @@ git diff --exit-code ClientApp/types
 ```
 
 Component names are checked at compile time too. See [Page records](/docs/page-records#compile-time-component-checks).
+
+## Instant visits
+
+Named `MapInertia` routes expose their component to the generated GET function. For a regular handler with one known destination, declare its final client component explicitly:
+
+```csharp
+app.MapGet("/orders/{id:int}", (int id) => Render("Orders/Show", new { id }))
+    .WithName("orders.show")
+    .WithInertiaComponent("Orders/Show");
+```
+
+```tsx
+<Link href={routes.orders.show(42)} instant>Order 42</Link>
+```
+
+The client shows the destination while the GET is pending. Let the page render a loading state until its page-specific data arrives. Use an ordinary link for conditional destinations. If a component transformer is configured, use explicit metadata only when you can declare the final name for that route.
 
 ---
 
@@ -5061,6 +5083,19 @@ In production, Inertia.Net reads `wwwroot/build/.vite/manifest.json`. For older 
 
 URLs are `{PathBase}/{BuildDirectory}/{file}` so apps under a path base work, or `{AssetBaseUrl}/{file}`. If an entry is missing from the manifest, Inertia.Net throws an exception that lists the available entries. If the manifest is missing, the exception lists the paths Inertia.Net looked in.
 
+## Preload the current page
+
+For a Vite app that lazy-loads its pages, map the final Inertia component name to the manifest key for that page:
+
+```csharp
+builder.Services.AddInertia(o =>
+{
+    o.Vite.PageModule = component => $"ClientApp/pages/{component}.tsx";
+});
+```
+
+Use the actual manifest paths and the correct extension for your frontend, such as `.vue` or `.svelte`. Return `null` for pages you want to skip. The HTML root template and Razor root view emit a module preload for the current page when its separate JavaScript chunk is reachable from the entry. The hint uses the same asset URL and nonce as other Vite tags. The dev server, eager bundles, and JSON visits need no hint. After-load prefetch continues to handle other page chunks.
+
 ## Development
 
 While the dev server runs, the tags are `@vite/client` and the entry from the dev server origin, plus the React Refresh preamble for `@viteReactRefresh`. The dev server counts as running when:
@@ -5359,6 +5394,23 @@ The SSR health check is covered in [Server-side rendering](/docs/server-side-ren
 ## Hosts and SSR failures
 
 Keep `AllowedHosts` configured. `Ssr.ConnectTimeout` limits the time to establish a connection. The default is five seconds. In `SsrMode.Required`, the exception message is generic. Diagnostic properties may contain private renderer details and should stay in trusted logs.
+
+## Check published frontend assets
+
+Add a readiness check for the Vite entry keys used by your root view. Register it for production after building the frontend.
+
+```csharp
+builder.Services.AddHealthChecks()
+    .AddInertiaVite(["ClientApp/app.tsx"], tags: ["ready"]);
+
+// After building the app:
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+});
+```
+
+The first probe checks the local build directory for the entry and the files reachable through both static and dynamic imports. An unhealthy result identifies a missing manifest key or file. The result is kept for the lifetime of the host, so publish assets before starting it and restart after replacing them. Use `mount: "admin"` to check a named mount. For CDN deployments, run the check on the staged local files before uploading them.
 
 ---
 

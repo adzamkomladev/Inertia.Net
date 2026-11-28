@@ -48,8 +48,10 @@ internal sealed class RazorInertiaRootView(IActionResultExecutor<ViewResult> exe
 
     /// <summary>The context of the page being rendered; the tag helpers only work inside the root view.</summary>
     internal static InertiaRootViewContext GetContext(HttpContext http) =>
-        http.Items[ContextKey] as InertiaRootViewContext
+        TryGetContext(http)
         ?? throw new InvalidOperationException("The Inertia tag helpers can only be used in the Inertia root view (see InertiaMvcOptions.UseRazorRootView).");
+
+    internal static InertiaRootViewContext? TryGetContext(HttpContext http) => http.Items[ContextKey] as InertiaRootViewContext;
 
     /// <summary>SSRs the page at most once per request, so <c>&lt;inertia-head /&gt;</c> and <c>&lt;inertia /&gt;</c> share one call.</summary>
     internal static Task<SsrRender?> GetSsrAsync(HttpContext http)

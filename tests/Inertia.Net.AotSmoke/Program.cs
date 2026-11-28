@@ -25,6 +25,7 @@ builder.Services.AddInertia(o =>
     o.Share("appName", "AotSmoke");
     o.Share("auth", ctx => new AuthInfo(ctx.Request.Headers["X-User"].ToString() is { Length: > 0 } user ? user : null));
     o.CspNonce = ctx => ctx.Request.Headers["X-Nonce"].ToString();
+    o.Vite.PageModule = component => $"src/pages/{component}.tsx";
     o.Vite.Prefetch = VitePrefetch.Waterfall;
     o.TypeScript.AddGeneratedPages(); // source-generated Page<TPage>() calls: no assembly scan under Native AOT
 });

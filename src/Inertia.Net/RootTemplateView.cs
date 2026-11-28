@@ -95,7 +95,7 @@ internal sealed class RootTemplateView : IInertiaRootView
             {
                 if (segment.Kind == RootTemplate.Kind.Vite)
                 {
-                    vite![v++] = _vite.RenderTagsUtf8(http, segment.Args!, segment.Key!);
+                    vite![v++] = _vite.RenderTagsUtf8(http, segment.Args!, segment.Key!, context.Component);
                 }
             }
 
