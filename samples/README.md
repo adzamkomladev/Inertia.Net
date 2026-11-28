@@ -28,36 +28,36 @@ for reproducible sample and Playwright installs; that verification command is no
 The layout (used by every page) shows:
 - shared prop `appName` in `data-testid="app-name"`;
 - nav links with `data-testid` `nav-home` (`/`), `nav-users` (`/users`), `nav-contacts` (`/contacts/create`), `nav-feed` (`/feed`),
-  and in the React sample `nav-live` (`/live`);
+  `nav-live` (`/live`) and `nav-login` (`/login`);
 - a flash area `data-testid="flash"` that shows `page.flash.success` when present (empty otherwise).
 
 | Route | Component | Contract |
 |---|---|---|
 | `GET /` | `Home` | `data-testid="home-title"`. |
-| `GET /users` | `Users/Index` | `users`: array of `{id, name}` (React uses the `Page<User>` shape with items under `data`); each row `data-testid="user-row"` with a button `data-testid="delete-user-{id}"` that calls `router.delete('/users/{id}')`. `stats`: `Defer` (default group), the server sleeps about 300 ms; rendered with `<Deferred data="stats">`: `data-testid="stats-loading"` first, then `data-testid="stats"` containing `stats.total` (the number of users). `plans`: `Once` prop `{items: [...], resolvedCount}`; `data-testid="plans"` with `resolvedCount` in `data-testid="plans-count"`. The server increments a counter each time the loader really runs and sends it as `resolvedCount`, so the E2E can tell the prop was not re-resolved when the page is visited again. A button `data-testid="users-refresh"` calls `router.visit('/users')` (the client only sends `X-Inertia-Except-Once-Props` for once props held by the page it is currently on, so the test needs a Users to Users visit). |
+| `GET /users` | `Users/Index` | `users`: a `Page<User>` of `{id, name}` with the items under `data`; each row `data-testid="user-row"` with a button `data-testid="delete-user-{id}"` that calls `router.delete('/users/{id}')`. `stats`: `Defer` (default group), the server sleeps about 300 ms; rendered with `<Deferred data="stats">`: `data-testid="stats-loading"` first, then `data-testid="stats"` containing `stats.total` (the number of users). `plans`: `Once` prop `{items: [...], resolvedCount}`; `data-testid="plans"` with `resolvedCount` in `data-testid="plans-count"`. The server increments a counter each time the loader really runs and sends it as `resolvedCount`, so the E2E can tell the prop was not re-resolved when the page is visited again. A button `data-testid="users-refresh"` calls `router.visit('/users')` (the client only sends `X-Inertia-Except-Once-Props` for once props held by the page it is currently on, so the test needs a Users to Users visit). |
 | `DELETE /users/{id}` | n/a | Removes the user from an in-memory list and returns `Back()` with flash `success` = `User deleted`. Must reach the client as a **303**. |
-| `GET /contacts/create` | `Contacts/Create` | Form 1 (`useForm`): inputs `data-testid="name"`, `data-testid="email"`, button `data-testid="submit"`, error slots `data-testid="error-name"`, `data-testid="error-email"` (empty element when no error). `POST /contacts` validates a record with `[Required] Name` and `[Required][EmailAddress] Email` using the framework's validation plus the adapter's validation glue; on failure it redirects back with errors, on success it redirects to `/` with flash `success` = `Contact created`. Form 2, error bag `newsletter`: input `data-testid="newsletter-email"`, button `data-testid="newsletter-submit"`, error slot `data-testid="error-newsletter-email"` showing `errors.newsletter.email`; `POST /newsletter` (`[Required][EmailAddress] Email`, sent with `X-Inertia-Error-Bag: newsletter`), success redirects to `/contacts/create` with flash `success` = `Subscribed`. React only, form 3 (`useHttp`): inputs `data-testid="http-name"`, `data-testid="http-email"`, button `data-testid="http-submit"`, error slots `data-testid="http-error-name"`, `data-testid="http-error-email"`; `POST /contacts/check` validates the same record and answers `422` `{ message, errors }` or `204`, after which `data-testid="http-ok"` shows (`specs/http.spec.ts`). |
+| `GET /contacts/create` | `Contacts/Create` | Form 1 (`useForm`): inputs `data-testid="name"`, `data-testid="email"`, button `data-testid="submit"`, error slots `data-testid="error-name"`, `data-testid="error-email"` (empty element when no error). `POST /contacts` validates a record with `[Required] Name` and `[Required][EmailAddress] Email` using the framework's validation plus the adapter's validation glue; on failure it redirects back with errors, on success it redirects to `/` with flash `success` = `Contact created`. Form 2, error bag `newsletter`: input `data-testid="newsletter-email"`, button `data-testid="newsletter-submit"`, error slot `data-testid="error-newsletter-email"` showing `errors.newsletter.email`; `POST /newsletter` (`[Required][EmailAddress] Email`, sent with `X-Inertia-Error-Bag: newsletter`), success redirects to `/contacts/create` with flash `success` = `Subscribed`. Form 3 (`useHttp`): inputs `data-testid="http-name"`, `data-testid="http-email"`, button `data-testid="http-submit"`, error slots `data-testid="http-error-name"`, `data-testid="http-error-email"`; `POST /contacts/check` validates the same record and answers `422` `{ message, errors }` or `204`, after which `data-testid="http-ok"` shows (`specs/http.spec.ts`). |
 | `GET /nope` (unmatched route) | `Error` | HTTP 404 on both first visits and Inertia navigation; `data-testid="error-status"` contains `404`, shared layout remains available, and `Return home` navigates to `/`. |
 | `GET /feed` | `Feed/Index` | `posts`: a `Scroll` prop (wrapper key `data`), 10 items per page, 5 pages, page number in query `page`. Rendered with `<InfiniteScroll data="posts">`; every item `data-testid="post"`. Items must be tall enough (about 160 px) that 10 of them overflow a normal viewport. |
 
 All samples enable `o.State.RememberPreviousUrl = true`. The shared `specs/back.spec.ts` test applies a `no-referrer` policy and verifies that invalid contact submissions return to the form with its input and errors intact.
 
-## Pagination (React sample only)
+## Pagination
 
 | Route | Component | Contract |
 |---|---|---|
 | `GET /feed/cursor` | `Feed/Cursor` | 50 posts ordered by descending `id`, 10 per cursor page. `<InfiniteScroll data="posts">` renders `data-testid="post"`. EF Core queries a seeded in-memory SQLite database with keyset predicates; the paginator supplies opaque cursors. |
 | `GET /users?page=` | `Users/Index` | Classic `Page<User>`, five users per page. `data-testid="pager"` contains `page-{n}` buttons that call `router.get` with `only: ['users']` and `preserveState`. |
 
-`specs/pagination.spec.ts` runs with `SAMPLE=react`. It seeds twelve users using the E2E-only
+`specs/pagination.spec.ts` seeds twelve users using the E2E-only
 `POST /__e2e/pagination/seed-users` hook after resetting; other specs keep the three standard users.
 
-## Live props (React sample only)
+## Live props
 
-The React sample also delivers [live props](../README.md#live-props) over SignalR (`Inertia.Net.Live.SignalR`): the hub is mapped at
+Every sample also delivers [live props](../README.md#live-props) over SignalR (`Inertia.Net.Live.SignalR`): the hub is mapped at
 `/inertia-live`, the client uses the transport file `ClientApp/lib/inertia-signalr.ts` (`createInertiaApp({ live: signalr() })`), and the
 channel authorizer allows the demo user's private channel `users.1` (the sample has no sign-in). `specs/live.spec.ts` runs with
-`SAMPLE=react` only. With `LIVE_TRANSPORT=sse` (server) and `VITE_LIVE_TRANSPORT=sse` (client build) the sample uses Server-Sent
+every sample. With `LIVE_TRANSPORT=sse` (server) and `VITE_LIVE_TRANSPORT=sse` (client build) the sample uses Server-Sent
 Events instead (`Inertia.Net.Live.Sse`, `MapInertiaLiveSse()`, `ClientApp/lib/inertia-sse.ts`); CI runs `specs/live.spec.ts` against
 both transports.
 
@@ -86,18 +86,19 @@ curl -X POST http://localhost:5100/__e2e/live/increment-with-value   # with E2E=
 
 `POST /__e2e/live/backplane-gap` (with `E2E=1`) cuts the backplane's subscription connection (Redis `CLIENT KILL TYPE pubsub`,
 PostgreSQL `pg_terminate_backend` on the `LISTEN` connection), so every client reconnects and reloads. `specs/live-scale.spec.ts`
-runs both instances in CI for SSE with Redis, SSE with PostgreSQL and SignalR with PostgreSQL.
+runs both instances in CI for every sample, for SSE with Redis, SSE with PostgreSQL and SignalR with PostgreSQL.
 
 When the page sets `window.__e2e = true` before the app starts (the spec does, with `addInitScript`), the app exposes its hub
 connection as `window.__inertiaLive`, so the spec can stop it and check that missed events are caught up on reconnect.
 
-## Login validation (React sample only)
+## Login validation
 
 `GET /login` shows a dummy email/password form using Precognition on blur. Its POST endpoint has two bounded per-client
 rate-limit buckets: 30 sliding-window validations per minute and five fixed-window submissions per minute. Both reject with
 429; only validation responses carry `Precognition: true`. Accepted submissions update a demo counter without signing in.
 `specs/precognition.spec.ts` covers field errors, validation beyond the strict submission limit and both rejection paths.
-The E2E reset hook resets this counter and the rate-limit partitions too.
+The E2E reset hook resets this counter and the rate-limit partitions too. The MVC sample maps `/login` as a Minimal API endpoint beside its controllers, because
+`WithInertiaPrecognition()` builds on Minimal API validation.
 
 ## CSRF
 
@@ -108,10 +109,10 @@ after `app.UseInertia()`. Page loads set the `XSRF-TOKEN` cookie, which the Iner
 ## Test hooks (only mapped when the environment variable `E2E=1`)
 
 - `POST /__e2e/bump-version`: changes the asset version (the sample's `VersionResolver` reads a mutable singleton; it is `null`, meaning the hash of the Vite manifest, until bumped).
-- `POST /__e2e/reset`: restores the three seed users (ids 1 to 3), resets the once-prop counter and clears the version override (and, in
-  the React sample, the live counter and unread count). The spec calls it before every test.
+- `POST /__e2e/reset`: restores the three seed users (ids 1 to 3), resets the once-prop counter and clears the version override (and the
+  live counter, unread count, live posts and login demo state). The spec calls it before every test.
 - `GET /__e2e/boom`: throws an exception; the `Error` page renders with HTTP 500 and `data-testid="error-status"` containing `500`.
-- React sample: the live publish hooks in [Live props](#live-props-react-sample-only).
+- The live publish hooks in [Live props](#live-props).
 
 Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
 
@@ -127,11 +128,12 @@ Seed users: `1 Ada Lovelace`, `2 Grace Hopper`, `3 Alan Turing`.
 - Response compression (`AddResponseCompression()`) and `Cache-Control: public, max-age=31536000, immutable` for `/build/assets`.
 - Development only: the pages check (`o.Pages.Directory = "ClientApp/pages"`) and the Inertia DevTools recorder
   (`AddInertiaDevTools()`, `MapInertiaDevTools()`); install the browser extension to see the visits.
-- React sample: `o.Vite.Prefetch = VitePrefetch.Waterfall`, `MapInertia("/", "Home")`, and TypeScript declarations in
+- `o.Vite.Prefetch = VitePrefetch.Waterfall`, `MapInertia("/", "Home")` (the MVC sample maps this one page outside its controllers,
+  so `routes.home()` carries the component for the instant link), and TypeScript declarations in
   `ClientApp/types/inertia.d.ts` (shared props and flash data), rewritten when the app starts in Development and committed so the
   build type-checks without running the app.
 
-## SSR (React sample only)
+## SSR
 
 Enabled with the environment variable `INERTIA_SSR=1`:
 - the `build` script (run with any package manager above) also builds the SSR bundle (`ssr/ssr.js`);

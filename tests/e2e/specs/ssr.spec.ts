@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-// React sample only, with the SSR bundle built (the sample starts the SSR server): INERTIA_SSR=1 SAMPLE=react.
-test.skip(process.env.SAMPLE !== 'react' || process.env.INERTIA_SSR !== '1', 'SSR runs for the React sample with INERTIA_SSR=1')
+// With the SSR bundle built (the sample starts the SSR server): INERTIA_SSR=1 SAMPLE=react|vue|svelte.
+test.skip(process.env.INERTIA_SSR !== '1', 'SSR runs with INERTIA_SSR=1')
 
 test('the first visit is server-rendered and hydrates', async ({ request, page }) => {
   const html = await (await request.get('/users')).text()

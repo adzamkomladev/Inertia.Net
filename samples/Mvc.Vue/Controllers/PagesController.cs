@@ -1,24 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Mvc.Vue.Controllers;
 
 // Plain MVC controllers (no [ApiController]): they return the core IResult factories (Render, Back), which MVC executes.
 public sealed class PagesController : Controller
 {
-    [HttpGet("/", Name = "home")]
-    public IResult Home() => Render("Home");
-
     [HttpGet("/users", Name = "users.index")]
     public IResult Users() => Render("Users/Index", new InertiaProps
     {
-        ["users"] = AppState.Users.ToList(),
+        ["users"] = Pagination.Paginate(AppState.Users, PageRequest.From(Request.Query, defaultPerPage: 5, maxPerPage: 5)),
         ["stats"] = Defer(async ct =>
         {
             await Task.Delay(300, ct);
             return new Stats(AppState.Users.Count);
         }),
         ["plans"] = Once(() => new Plans([new("Free", 0), new("Pro", 9)], AppState.NextPlansCount())),
-    });
+    }).WithHead(h => h.Title("Users").Meta("description", "Paginated users with deferred stats"));
 
     [HttpDelete("/users/{id:int}", Name = "users.destroy")]
     public IResult DeleteUser(int id)
@@ -39,6 +37,10 @@ public sealed class PagesController : Controller
         return Redirect("/");
     }
 
+    // The same validation for useHttp (an XHR without X-Inertia): the filter answers a 422 with { message, errors } that fills form.errors.
+    [HttpPost("/contacts/check", Name = "contacts.check")]
+    public IActionResult CheckContact([FromBody] ContactForm form) => NoContent();
+
     [HttpPost("/newsletter", Name = "newsletter.store")]
     public IActionResult Subscribe([FromBody] NewsletterForm form)
     {
@@ -52,4 +54,12 @@ public sealed class PagesController : Controller
         ["posts"] = Scroll(Pagination.Paginate(AppState.Posts,
             PageRequest.From(Request.Query, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize))),
     });
+
+    [HttpGet("/feed/cursor", Name = "feed.cursor")]
+    public async Task<IResult> FeedCursor([FromServices] FeedDbContext feed, CancellationToken ct)
+    {
+        var request = CursorRequest.From(HttpContext, defaultPerPage: AppState.PageSize, maxPerPage: AppState.PageSize);
+        var posts = await feed.Posts.AsNoTracking().ToCursorPageAsync(post => post.Id, request, descending: true, ct: ct);
+        return Render("Feed/Cursor", new InertiaProps { ["posts"] = Scroll(posts) });
+    }
 }

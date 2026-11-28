@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test'
 
-// useHttp validation: the React sample's third form on /contacts/create posts JSON without X-Inertia, and the server's
+// useHttp validation: the third form on /contacts/create posts JSON without X-Inertia, and the server's
 // WithInertiaValidation() answers with a 422 whose errors useHttp puts in form.errors.
 
-test.skip((process.env.SAMPLE ?? 'react') !== 'react', 'The React sample hosts the useHttp form')
 
 test('useHttp shows field errors from a 422 and clears them once the input is valid', async ({ page }) => {
   await page.goto('/contacts/create')

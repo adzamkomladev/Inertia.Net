@@ -119,22 +119,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sample: [react, vue, svelte, react-sse, react-sse-redis, react-sse-postgres, react-signalr-postgres]
+        sample: [react, vue, svelte, react-sse, react-sse-redis, react-sse-postgres, react-signalr-postgres, vue-sse, vue-sse-redis, vue-sse-postgres, vue-signalr-postgres, svelte-sse, svelte-sse-redis, svelte-sse-postgres, svelte-signalr-postgres]
         include:
+          # Every sample runs the whole suite, and also builds the SSR bundle (the sample starts the SSR server itself) for the SSR spec.
           - sample: react
             dir: MinimalApi.React
-            ssr: "1" # also builds the SSR bundle (the sample starts the SSR server itself) and runs the SSR spec
+            ssr: "1"
           - sample: vue
             dir: Mvc.Vue
+            ssr: "1"
           - sample: svelte
             dir: FastEndpoints.Svelte
-          # The live spec again, with live props over Server-Sent Events (Inertia.Net.Live.Sse) instead of SignalR.
+            ssr: "1"
+          # Per sample: the live spec over Server-Sent Events (Inertia.Net.Live.Sse) instead of SignalR, and two instances on one
+          # backplane (live-scale.spec.ts) per transport and store.
           - sample: react-sse
             app: react
             dir: MinimalApi.React
             live: sse
             specs: specs/live.spec.ts
-          # Two instances of the React sample on one backplane (live-scale.spec.ts), per transport and store.
           - sample: react-sse-redis
             app: react
             dir: MinimalApi.React
@@ -150,6 +153,50 @@ jobs:
           - sample: react-signalr-postgres
             app: react
             dir: MinimalApi.React
+            backplane: postgres
+            specs: specs/live-scale.spec.ts
+          - sample: vue-sse
+            app: vue
+            dir: Mvc.Vue
+            live: sse
+            specs: specs/live.spec.ts
+          - sample: vue-sse-redis
+            app: vue
+            dir: Mvc.Vue
+            live: sse
+            backplane: redis
+            specs: specs/live-scale.spec.ts
+          - sample: vue-sse-postgres
+            app: vue
+            dir: Mvc.Vue
+            live: sse
+            backplane: postgres
+            specs: specs/live-scale.spec.ts
+          - sample: vue-signalr-postgres
+            app: vue
+            dir: Mvc.Vue
+            backplane: postgres
+            specs: specs/live-scale.spec.ts
+          - sample: svelte-sse
+            app: svelte
+            dir: FastEndpoints.Svelte
+            live: sse
+            specs: specs/live.spec.ts
+          - sample: svelte-sse-redis
+            app: svelte
+            dir: FastEndpoints.Svelte
+            live: sse
+            backplane: redis
+            specs: specs/live-scale.spec.ts
+          - sample: svelte-sse-postgres
+            app: svelte
+            dir: FastEndpoints.Svelte
+            live: sse
+            backplane: postgres
+            specs: specs/live-scale.spec.ts
+          - sample: svelte-signalr-postgres
+            app: svelte
+            dir: FastEndpoints.Svelte
             backplane: postgres
             specs: specs/live-scale.spec.ts
     services:

@@ -1,8 +1,7 @@
 import { expect, test, type Page, type Request } from '@playwright/test'
 
-// Live props over SignalR, or Server-Sent Events with LIVE_TRANSPORT=sse: the React sample's /live page (contract in samples/README.md).
+// Live props over SignalR, or Server-Sent Events with LIVE_TRANSPORT=sse: each sample's /live page (contract in samples/README.md).
 
-test.skip((process.env.SAMPLE ?? 'react') !== 'react', 'The React sample hosts the live page')
 
 test.beforeEach(async ({ page, request }) => {
   await request.post('/__e2e/reset')
