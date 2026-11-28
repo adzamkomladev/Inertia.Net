@@ -1,1 +1,13 @@
 #nullable enable
+Inertia.Net.InertiaRedisBackplaneExtensions
+Inertia.Net.InertiaRedisBackplaneOptions
+Inertia.Net.InertiaRedisBackplaneOptions.Configuration.get -> string?
+Inertia.Net.InertiaRedisBackplaneOptions.Configuration.set -> void
+Inertia.Net.InertiaRedisBackplaneOptions.InertiaRedisBackplaneOptions() -> void
+Inertia.Net.InertiaRedisBackplaneOptions.Prefix.get -> string!
+Inertia.Net.InertiaRedisBackplaneOptions.Prefix.set -> void
+Inertia.Net.InertiaRedisBackplaneOptions.ShardCount.get -> int
+Inertia.Net.InertiaRedisBackplaneOptions.ShardCount.set -> void
+Inertia.Net.InertiaRedisBackplaneOptions.UseShardedPubSub.get -> bool
+Inertia.Net.InertiaRedisBackplaneOptions.UseShardedPubSub.set -> void
+static Inertia.Net.InertiaRedisBackplaneExtensions.AddRedisBackplane(this Inertia.Net.IInertiaLiveBuilder! builder, System.Action<Inertia.Net.InertiaRedisBackplaneOptions!>? configure = null) -> Inertia.Net.IInertiaLiveBuilder!

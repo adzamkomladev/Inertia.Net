@@ -56,15 +56,22 @@ builder.Services.AddInertia(o =>
 // Live props over SignalR: the hub is mapped below; the client enables it with createInertiaApp({ live: signalr() }).
 // LIVE_TRANSPORT=sse uses Server-Sent Events instead (build the client with VITE_LIVE_TRANSPORT=sse for its sse() transport).
 var sse = Environment.GetEnvironmentVariable("LIVE_TRANSPORT") == "sse";
-if (sse)
-{
-    builder.Services.AddInertiaLive().AddSse(o =>
+var live = sse
+    ? builder.Services.AddInertiaLive().AddSse(o =>
+        o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)))
+    : builder.Services.AddInertiaLive().AddSignalR(o =>
         o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)));
+// LIVE_BACKPLANE=redis|postgres runs several instances (or a worker) on one backplane: start the app twice on two ports and a publish
+// on either reaches the pages of both. REDIS_URL / POSTGRES_URL point at the store.
+var backplane = Environment.GetEnvironmentVariable("LIVE_BACKPLANE");
+if (backplane == "redis")
+{
+    live.AddRedisBackplane(o => o.Configuration = Environment.GetEnvironmentVariable("REDIS_URL") ?? "localhost:6379");
 }
-else
+else if (backplane == "postgres")
 {
-    builder.Services.AddInertiaLive().AddSignalR(o =>
-        o.Authorize((_, channel, _) => ValueTask.FromResult(channel == SampleEvents.InboxChanged.Channel)));
+    live.AddPostgresBackplane(o => o.ConnectionString = Environment.GetEnvironmentVariable("POSTGRES_URL")
+        ?? "Host=localhost;Username=postgres;Password=postgres");
 }
 
 // Keep development diagnostics unless the browser tests explicitly enable error pages.
@@ -193,6 +200,25 @@ if (e2e)
     {
         var value = AppState.IncrementCounter();
         await live.PublishAsync(SampleEvents.CounterChanged, new CounterUpdate(new Counter(value)));
+    }).DisableAntiforgery();
+    // Cuts this backplane's subscription connections, as a store restart would: every instance then resyncs its live clients.
+    app.MapPost("/__e2e/live/backplane-gap", async () =>
+    {
+        if (backplane == "redis")
+        {
+            await using var redis = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(
+                (Environment.GetEnvironmentVariable("REDIS_URL") ?? "localhost:6379") + ",allowAdmin=true");
+            await redis.GetServer(redis.GetEndPoints()[0]).ExecuteAsync("CLIENT", "KILL", "TYPE", "pubsub");
+        }
+        else if (backplane == "postgres")
+        {
+            await using var connection = new Npgsql.NpgsqlConnection(Environment.GetEnvironmentVariable("POSTGRES_URL")
+                ?? "Host=localhost;Username=postgres;Password=postgres");
+            await connection.OpenAsync();
+            await using var command = new Npgsql.NpgsqlCommand(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query ILIKE 'LISTEN%' AND pid <> pg_backend_pid()", connection);
+            await command.ExecuteNonQueryAsync();
+        }
     }).DisableAntiforgery();
     app.MapPost("/__e2e/live/posts", async (IInertiaLive live, int? count) =>
     {

@@ -22,6 +22,12 @@ public sealed class InertiaLiveSignalROptions
     /// </summary>
     public IList<string> AllowedOrigins { get; } = [];
 
+    /// <summary>
+    /// Lets <c>InertiaLiveHub</c> use a non-default <c>HubLifetimeManager</c> (SignalR's Redis backplane, Azure SignalR) beside an Inertia
+    /// backplane, logging a warning instead of failing at startup. Events then arrive twice; leave it off unless that is intended.
+    /// </summary>
+    public bool AllowExternalHubLifetimeManager { get; set; }
+
     internal Func<IServiceProvider, ILiveChannelAuthorizer>? AuthorizerFactory { get; private set; }
 
     /// <summary>Uses <typeparamref name="TAuthorizer"/>, created per hub invocation with constructor injection, to authorize channels.</summary>

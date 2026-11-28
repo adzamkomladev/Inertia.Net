@@ -1,38 +1,42 @@
 ---
 title: Installation
-description: Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.
+description: Install Inertia.Net, the optional MVC, FastEndpoints, SSE, SignalR, Redis, PostgreSQL or MongoDB package, and the testing helpers.
 section: Get started
 order: 4
 ---
 
 Inertia.Net is split into small packages. Install the core package and one optional backend integration.
 
+Every package is on [NuGet](https://www.nuget.org/profiles/adzamkomladev); the names below link to their NuGet pages.
+
 | Package | Install when |
 |---|---|
-| `Inertia.Net` | always. The core adapter, Minimal API support, Vite, server-side rendering (SSR), state store and antiforgery |
-| `Inertia.Net.Mvc` | you use MVC controllers: `ModelState` filter, Razor root view and tag helpers |
-| `Inertia.Net.FastEndpoints` | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
-| `Inertia.Net.Live.SignalR` | you deliver [live props](/docs/live-props) over SignalR: hub, channel authorization and broadcaster |
-| `Inertia.Net.Live.Sse` | you deliver [live props](/docs/live-props#server-sent-events) over Server-Sent Events from one app instance |
-| `Inertia.Net.EntityFrameworkCore` | you page EF Core queries with numbered or cursor pagination |
-| `Inertia.Net.Redis` | you share [cached props](/docs/props#cached-props) and SSR renders between app instances through Redis |
-| `Inertia.Net.MongoDB` | you page MongoDB finds with numbered or cursor [pagination](/docs/pagination#with-mongodb) |
-| `Inertia.Net.Testing` | in your test project: fluent assertions over Inertia responses |
-| `Inertia.Net.Templates` | you want to start from a complete app. Install it with `dotnet new install Inertia.Net.Templates`. It also adds pages with `dotnet new inertia-page` |
+| [`Inertia.Net`](https://www.nuget.org/packages/Inertia.Net) | always. The core adapter, Minimal API support, Vite, server-side rendering (SSR), state store and antiforgery |
+| [`Inertia.Net.Mvc`](https://www.nuget.org/packages/Inertia.Net.Mvc) | you use MVC controllers: `ModelState` filter, Razor root view and tag helpers |
+| [`Inertia.Net.FastEndpoints`](https://www.nuget.org/packages/Inertia.Net.FastEndpoints) | you use FastEndpoints: `Send` extensions, validation pre-processor and Precognition |
+| [`Inertia.Net.Live.SignalR`](https://www.nuget.org/packages/Inertia.Net.Live.SignalR) | you deliver [live props](/docs/live-props) over SignalR: hub, channel authorization and local transport |
+| [`Inertia.Net.Live.Sse`](https://www.nuget.org/packages/Inertia.Net.Live.Sse) | you deliver [live props](/docs/live-props#server-sent-events) over Server-Sent Events, with no client library |
+| [`Inertia.Net.Redis`](https://www.nuget.org/packages/Inertia.Net.Redis) | you share [cached props](/docs/props#cached-props) and SSR renders, or carry [live props across instances](/docs/live-props-at-scale), through Redis |
+| [`Inertia.Net.Postgres`](https://www.nuget.org/packages/Inertia.Net.Postgres) | you carry [live props across instances](/docs/live-props-at-scale) and workers over PostgreSQL `LISTEN`/`NOTIFY`, with publish on commit |
+| [`Inertia.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Inertia.Net.EntityFrameworkCore) | you page EF Core queries with numbered or cursor pagination |
+| [`Inertia.Net.MongoDB`](https://www.nuget.org/packages/Inertia.Net.MongoDB) | you page MongoDB finds with numbered or cursor [pagination](/docs/pagination#with-mongodb) |
+| [`Inertia.Net.Testing`](https://www.nuget.org/packages/Inertia.Net.Testing) | in your test project: fluent assertions over Inertia responses, and `FakeBackplane` for multi-instance live tests |
+| [`Inertia.Net.Templates`](https://www.nuget.org/packages/Inertia.Net.Templates) | you want to start from a complete app. Install it with `dotnet new install Inertia.Net.Templates`. It also adds pages with `dotnet new inertia-page` |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.11
-dotnet add package Inertia.Net.Mvc --version 1.9.11            # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.11  # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.11 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.11        # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.11   # live props over SignalR
-dotnet add package Inertia.Net.Live.Sse --version 1.9.11        # live props over Server-Sent Events
-dotnet add package Inertia.Net.Redis --version 1.9.11          # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.11        # MongoDB pagination
+dotnet add package Inertia.Net --version 1.10.0
+dotnet add package Inertia.Net.Mvc --version 1.10.0            # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.10.0  # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.10.0 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.10.0        # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.10.0   # live props over SignalR
+dotnet add package Inertia.Net.Live.Sse --version 1.10.0        # live props over Server-Sent Events
+dotnet add package Inertia.Net.Redis --version 1.10.0          # Redis cache store and live backplane
+dotnet add package Inertia.Net.Postgres --version 1.10.0       # PostgreSQL live backplane
+dotnet add package Inertia.Net.MongoDB --version 1.10.0        # MongoDB pagination
 ```
 
-Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.9.11 implements Inertia.js v3.
+Use the same version for every Inertia.Net package. The package version and the Inertia.js protocol version are separate numbers: Inertia.Net 1.10.0 implements Inertia.js v3.
 
 ## Requirements
 
@@ -55,7 +59,7 @@ Every package ships `net10.0` and `net11.0` assemblies. NuGet picks the one that
 ## Start from the template
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.11
+dotnet new install Inertia.Net.Templates@1.10.0
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 ```

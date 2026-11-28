@@ -9,7 +9,7 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [Introduction](https://inertia-dotnet.temtem.dev/docs/introduction): Inertia.Net is a .NET 10 and .NET 11 server adapter for Inertia.js v3. Build React, Vue and Svelte apps without a separate API.
 - [Why Inertia?](https://inertia-dotnet.temtem.dev/docs/why-inertia): Build a C# backend for React, Vue or Svelte and see what Inertia.Net handles between them.
 - [First 10 minutes](https://inertia-dotnet.temtem.dev/docs/first-10-minutes): Run your first app, change a C# validation rule, and see the result in your browser.
-- [Installation](https://inertia-dotnet.temtem.dev/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints, SignalR, Redis or MongoDB package, and the testing helpers.
+- [Installation](https://inertia-dotnet.temtem.dev/docs/installation): Install Inertia.Net, the optional MVC, FastEndpoints, SSE, SignalR, Redis, PostgreSQL or MongoDB package, and the testing helpers.
 - [Client setup](https://inertia-dotnet.temtem.dev/docs/client-setup): Configure Vite and the React, Vue or Svelte client for an Inertia.Net app.
 - [Quick start](https://inertia-dotnet.temtem.dev/docs/quick-start): Add Inertia.Net to an ASP.NET Core app, create the root template and render your first page.
 - [AI agents](https://inertia-dotnet.temtem.dev/docs/ai-agents): Give coding agents the context and conventions they need to build Inertia.Net pages correctly.
@@ -56,6 +56,8 @@ Full documentation as one file: https://inertia-dotnet.temtem.dev/llms-full.txt.
 - [Multiple apps and libraries](https://inertia-dotnet.temtem.dev/docs/mounts): Mount a second Inertia UI under its own path, with its own shared props, asset version, state cookie, root view, error pages and SSR.
 - [Redis cache](https://inertia-dotnet.temtem.dev/docs/redis): Share cached props and SSR renders between app instances with the Inertia.Net.Redis cache store.
 - [Framework comparison](https://inertia-dotnet.temtem.dev/docs/framework-comparison): Compare complete application stacks: ASP.NET Core with Inertia.Net, Next.js, TanStack Start, Nuxt and Laravel with Inertia. Understand their setup, strengths and measured performance.
+- [Live props at scale](https://inertia-dotnet.temtem.dev/docs/live-props-at-scale): Live props across every app instance and every job, on the Redis or PostgreSQL you already run.
+- [Background jobs](https://inertia-dotnet.temtem.dev/docs/background-jobs): Publish live props from Runwick, Hangfire, Quartz and BackgroundService, in the web process or in a separate worker.
 
 ## Reference
 

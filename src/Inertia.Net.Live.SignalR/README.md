@@ -105,15 +105,22 @@ like private ones and carry the same payloads.
 
 ## Scale-out
 
-Groups are per server unless SignalR shares them. Behind more than one instance, add a backplane or Azure SignalR Service to the
-same SignalR registration and publish as before:
+Groups are per server. Behind more than one instance, or to publish from a worker, add an Inertia backplane on the Redis or
+PostgreSQL you already run:
 
 ```csharp
-builder.Services.AddSignalR().AddStackExchangeRedis(redisConnectionString);   // Microsoft.AspNetCore.SignalR.StackExchangeRedis
-// or: builder.Services.AddSignalR().AddAzureSignalR();                      // Microsoft.Azure.SignalR
+builder.Services.AddInertiaLive().AddSignalR().AddRedisBackplane(o => o.Configuration = "localhost:6379");   // Inertia.Net.Redis
+// or .AddPostgresBackplane(o => o.ConnectionString = connectionString);                                   // Inertia.Net.Postgres
 ```
 
-Without one, use sticky sessions and expect a publish on one instance to reach only the clients connected to it.
+When the backplane loses messages, the hub closes every connection; the clients reconnect and reload their live props.
+Behind a load balancer SignalR still needs sticky sessions (its negotiate request and connection must reach one instance), unless
+clients use WebSockets only with `skipNegotiation: true`.
+
+Do not also register SignalR's own backplane (`AddStackExchangeRedis`) or Azure SignalR for this hub: every event would arrive twice,
+so the transport refuses to start. If you need a custom `HubLifetimeManager` that delivers locally only, set
+`AllowExternalHubLifetimeManager = true`. Without an Inertia backplane, SignalR's own scale-out still works as before.
+See [Live props at scale](https://inertia-dotnet.temtem.dev/docs/live-props-at-scale).
 
 ## Security
 

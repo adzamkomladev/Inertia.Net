@@ -33,6 +33,7 @@ internal sealed class InertiaMetrics
     private readonly Counter<long> _processRestarts;
     private readonly Counter<long> _rescued;
     private readonly Counter<long> _droppedRefreshes;
+    private readonly Counter<long>[] _backplane;
     private Func<IEnumerable<Measurement<int>>>[] _circuitStates = [];
 
     public InertiaMetrics(IMeterFactory meterFactory)
@@ -49,6 +50,14 @@ internal sealed class InertiaMetrics
         _processRestarts = meter.CreateCounter<long>("inertia.ssr.process.restarts", "{restart}", "Managed Node SSR process restarts.");
         _rescued = meter.CreateCounter<long>("inertia.props.rescued", "{prop}", "Props whose loader failed and that were rescued (left out and listed in rescuedProps).");
         _droppedRefreshes = meter.CreateCounter<long>("inertia.cache.refresh.dropped", "{refresh}", "Cache refreshes dropped because the background queue is full or stopping.");
+        _backplane =
+        [
+            meter.CreateCounter<long>("inertia.live.backplane.published", "{message}", "Live messages sent to the backplane."),
+            meter.CreateCounter<long>("inertia.live.backplane.received", "{message}", "Live messages from other processes delivered by this instance."),
+            meter.CreateCounter<long>("inertia.live.backplane.resyncs", "{resync}", "Backplane gaps after which this instance's live clients reconnect."),
+            meter.CreateCounter<long>("inertia.live.backplane.oversize", "{message}", "Live messages sent without values: over the size limit (outcome=reload) or whose stored copy was gone (outcome=missing)."),
+            meter.CreateCounter<long>("inertia.live.backplane.errors", "{error}", "Backplane publish, delivery and resync failures and malformed messages."),
+        ];
         meter.CreateObservableGauge("inertia.ssr.circuit.state", () => _circuitStates.SelectMany(static states => states()), "{state}", "SSR circuit state per server: 0 closed, 1 half-open, 2 open.");
     }
 
@@ -151,6 +160,18 @@ internal sealed class InertiaMetrics
         {
             _droppedRefreshes.Add(1, new KeyValuePair<string, object?>("inertia.cache.kind", kind));
         }
+    }
+
+    internal const int BackplanePublished = 0, BackplaneReceived = 1, BackplaneResyncs = 2, BackplaneOversize = 3, BackplaneErrors = 4;
+
+    /// <summary>Counts one backplane message, tagged <c>inertia.live.backplane</c> and, for oversize and errors, <c>outcome</c> or <c>error.type</c>.</summary>
+    public void RecordBackplane(int instrument, string backplane, string? detail = null)
+    {
+        var counter = _backplane[instrument];
+        if (!counter.Enabled) return;
+        var tags = new TagList { { "inertia.live.backplane", backplane } };
+        if (detail is not null) tags.Add(instrument == BackplaneErrors ? "error.type" : "outcome", detail);
+        counter.Add(1, tags);
     }
 
     internal static string StateName(SsrCircuitState state) => state switch

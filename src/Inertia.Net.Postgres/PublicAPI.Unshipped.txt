@@ -1,0 +1,34 @@
+#nullable enable
+Inertia.Net.InertiaPostgresBackplaneExtensions
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.AutoCreateTable.get -> bool
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.AutoCreateTable.set -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.Channel.get -> string!
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.Channel.set -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.ConnectionString.get -> string?
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.ConnectionString.set -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.DurableLargeMessages.get -> bool
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.DurableLargeMessages.set -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.InertiaPostgresBackplaneOptions() -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.LargeMessageRetention.get -> System.TimeSpan
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.LargeMessageRetention.set -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.LargeMessages.get -> Inertia.Net.Postgres.LargeMessageMode
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.LargeMessages.set -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.ListenConnectionString.get -> string?
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.ListenConnectionString.set -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.ReconnectDelayMax.get -> System.TimeSpan
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.ReconnectDelayMax.set -> void
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.TableName.get -> string!
+Inertia.Net.Postgres.InertiaPostgresBackplaneOptions.TableName.set -> void
+Inertia.Net.Postgres.LargeMessageMode
+Inertia.Net.Postgres.LargeMessageMode.Reload = 1 -> Inertia.Net.Postgres.LargeMessageMode
+Inertia.Net.Postgres.LargeMessageMode.Table = 0 -> Inertia.Net.Postgres.LargeMessageMode
+Inertia.Net.Postgres.PostgresLiveBackplane
+Inertia.Net.Postgres.PostgresLiveBackplane.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Inertia.Net.Postgres.PostgresLiveBackplane.MaxMessageBytes.get -> int?
+Inertia.Net.Postgres.PostgresLiveBackplane.PublishAsync(Inertia.Net.LiveChannel channel, System.ReadOnlyMemory<byte> message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.Postgres.PostgresLiveBackplane.PublishAsync(Inertia.Net.LiveMessage! message, System.Data.Common.DbConnection! connection, System.Data.Common.DbTransaction? transaction = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Inertia.Net.Postgres.PostgresLiveBackplane.SubscribeAsync(System.Func<System.ReadOnlyMemory<byte>, System.Threading.Tasks.ValueTask>! deliver, System.Action! missed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.IAsyncDisposable!>
+const Inertia.Net.Postgres.PostgresLiveBackplane.NotifyLimit = 7900 -> int
+static Inertia.Net.InertiaPostgresBackplaneExtensions.AddPostgresBackplane(this Inertia.Net.IInertiaLiveBuilder! builder, System.Action<Inertia.Net.Postgres.InertiaPostgresBackplaneOptions!>? configure = null) -> Inertia.Net.IInertiaLiveBuilder!
+static Inertia.Net.Postgres.PostgresLiveBackplane.CreateTableSql(string! tableName = "inertia_live_messages", bool durable = false) -> string!

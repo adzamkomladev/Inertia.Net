@@ -1,0 +1,98 @@
+---
+title: Background jobs
+description: Publish live props from Runwick, Hangfire, Quartz and BackgroundService, in the web process or in a separate worker.
+section: Production
+order: 12
+---
+
+A background job publishes a live event the same way a request does: inject `IInertiaLive` and call `PublishAsync`. What you register depends on **where the job runs**.
+
+| The job runs | Register in that process |
+|---|---|
+| Inside the web app (Runwick `AddWorker`, Hangfire or Quartz in the same host, a `BackgroundService`) | Nothing extra: the web app's `AddInertiaLive().AddSse()` (or `.AddSignalR()`) already delivers to its clients |
+| Inside the web app, and you run several web instances | A [backplane](/docs/live-props-at-scale) on every instance, so the other instances' clients get the event too |
+| In a separate worker process or container | `AddInertiaLive()` plus the same backplane as the web app. No transport, no `AddInertia()` |
+
+```csharp
+// Worker Program.cs: publishes only, so no transport and no AddInertia().
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddInertiaLive().AddPostgresBackplane(o => o.ConnectionString = builder.Configuration.GetConnectionString("Db"));
+// or .AddRedisBackplane(o => o.Configuration = builder.Configuration.GetConnectionString("Redis"))
+```
+
+A worker serializes published values with the app's HTTP JSON options (`ConfigureHttpJsonOptions`), since it has no page serializer. Under Native AOT, chain the same `JsonSerializerContext` there as in the web app, or use the `JsonTypeInfo<T>` overload of `PublishAsync`.
+
+## Runwick
+
+```csharp
+public sealed class BuildReportHandler(ReportService reports, IInertiaLive live) : IJobHandler<BuildReport>
+{
+    public async Task HandleAsync(BuildReport job, CancellationToken cancellationToken)
+    {
+        var report = await reports.BuildAsync(job.ReportId, cancellationToken);
+        await live.PublishAsync(ReportEvents.Ready(report.OwnerId), new { report = ReportDto.From(report) }, cancellationToken: cancellationToken);
+    }
+}
+
+// In your Runwick setup:
+runwick.AddHandler<BuildReport, BuildReportHandler>();
+```
+
+Define the `BuildReport` job and configure Runwick's store and workers as its own documentation describes; nothing about them changes for live props.
+
+With Runwick on PostgreSQL you can also [publish on commit](/docs/live-props-at-scale#publish-on-commit) in the same transaction as the job's own writes.
+
+## Hangfire
+
+```csharp
+public sealed class ReportJob(ReportService reports, IInertiaLive live)
+{
+    public async Task RunAsync(Guid reportId, CancellationToken cancellationToken)
+    {
+        var report = await reports.BuildAsync(reportId, cancellationToken);
+        await live.PublishAsync(ReportEvents.Ready(report.OwnerId), cancellationToken: cancellationToken);
+    }
+}
+
+BackgroundJob.Enqueue<ReportJob>(job => job.RunAsync(reportId, CancellationToken.None));
+```
+
+## Quartz
+
+```csharp
+public sealed class StatsJob(StatsService stats, IInertiaLive live) : IJob
+{
+    public async Task Execute(IJobExecutionContext context)
+    {
+        await stats.RefreshAsync(context.CancellationToken);
+        await live.PublishAsync(DashboardEvents.StatsChanged, cancellationToken: context.CancellationToken);
+    }
+}
+```
+
+## BackgroundService
+
+```csharp
+public sealed class QueueDepthMonitor(QueueClient queue, IInertiaLive live) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            var depth = await queue.DepthAsync(stoppingToken);
+            await live.PublishAsync(OpsEvents.QueueDepth, new Dictionary<string, int> { ["queue.depth"] = depth }, cancellationToken: stoppingToken);
+        }
+    }
+}
+```
+
+## Failures and retries
+
+If the backplane store is down, `PublishAsync` throws. The job fails, and Runwick, Hangfire and Quartz retry it. That makes delivery **at least once**: a retried job may publish an event twice. For live props that is harmless. An event without values makes clients reload the prop, and an event with values replaces the prop with the same values; either way the page ends up showing the current data.
+
+Publish **after** the job's data is saved, or in the same transaction with PostgreSQL. A client that reloads on the event must find the new data.
+
+## Try it
+
+The React sample's `/__e2e/live/increment-with-value` endpoint publishes the way a job would. Start the sample twice with `LIVE_BACKPLANE=postgres` (see [samples/README.md](https://github.com/adzamkomladev/Inertia.Net/blob/main/samples/README.md#live-props-on-several-instances)), call the endpoint on one port, and watch `/live` on the other.

@@ -168,13 +168,20 @@ public static class InertiaServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds <see cref="IInertiaLive"/>, which publishes live-prop events. Chain a transport (<c>.AddSignalR()</c> from
-    /// <c>Inertia.Net.Live.SignalR</c>) or register an <see cref="IInertiaLiveBroadcaster"/>. Safe to call more than once.
+    /// Adds <see cref="IInertiaLive"/>, which publishes live-prop events. Chain a transport (<c>.AddSse()</c> from
+    /// <c>Inertia.Net.Live.Sse</c>, <c>.AddSignalR()</c> from <c>Inertia.Net.Live.SignalR</c>), a backplane for several instances or a
+    /// separate worker (<c>.AddRedisBackplane()</c>, <c>.AddPostgresBackplane()</c>), or register an <see cref="IInertiaLiveBroadcaster"/>.
+    /// Works without <c>AddInertia()</c>, for a worker that only publishes. Safe to call more than once.
     /// </summary>
     public static IInertiaLiveBuilder AddInertiaLive(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        services.AddMetrics();
+        services.TryAddSingleton<InertiaMetrics>();
         services.TryAddSingleton<IInertiaLive, InertiaLive>();
+        services.TryAddSingleton<LiveBackplaneRelay>();
+        services.TryAddSingleton<IInertiaLiveBroadcaster>(static sp => sp.GetRequiredService<LiveBackplaneRelay>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, LiveBackplaneSubscription>());
         return new InertiaLiveBuilder(services);
     }
 }

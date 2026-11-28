@@ -16,7 +16,9 @@ public static class InertiaLiveSignalRExtensions
 {
     /// <summary>
     /// Delivers live props over SignalR: registers the hub's services (<c>services.AddSignalR()</c>, additive with the app's own hubs), the
-    /// JSON metadata the hub needs under Native AOT, the broadcaster and the channel authorizer. Map the hub with <see cref="MapInertiaLiveHub"/>.
+    /// JSON metadata the hub needs under Native AOT, this instance's local transport and the channel authorizer. Map the hub with
+    /// <see cref="MapInertiaLiveHub"/>. With several instances or a separate worker, add an Inertia backplane (<c>.AddRedisBackplane()</c>,
+    /// <c>.AddPostgresBackplane()</c>) instead of SignalR's own: registering both fails at startup, as every event would arrive twice.
     /// </summary>
     public static IInertiaLiveBuilder AddSignalR(this IInertiaLiveBuilder builder, Action<InertiaLiveSignalROptions>? configure = null)
     {
@@ -50,7 +52,8 @@ public static class InertiaLiveSignalRExtensions
                 chain.Add(ReflectionResolver());
             }
         });
-        services.TryAddSingleton<IInertiaLiveBroadcaster, SignalRLiveBroadcaster>();
+        services.TryAddSingleton<SignalRLiveConnections>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IInertiaLiveLocalTransport, SignalRLiveTransport>());
         services.TryAddSingleton<LiveOrigin>();
         services.TryAddScoped<ILiveChannelAuthorizer>(static sp =>
             sp.GetRequiredService<IOptions<InertiaLiveSignalROptions>>().Value.AuthorizerFactory?.Invoke(sp) ?? DenyingLiveChannelAuthorizer.Instance);

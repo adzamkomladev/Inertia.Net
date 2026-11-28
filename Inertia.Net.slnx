@@ -4,6 +4,7 @@
     <Project Path="src/Inertia.Net.EntityFrameworkCore/Inertia.Net.EntityFrameworkCore.csproj" />
     <Project Path="src/Inertia.Net.MongoDB/Inertia.Net.MongoDB.csproj" />
     <Project Path="src/Inertia.Net.Redis/Inertia.Net.Redis.csproj" />
+    <Project Path="src/Inertia.Net.Postgres/Inertia.Net.Postgres.csproj" />
     <Project Path="src/Inertia.Net.FastEndpoints/Inertia.Net.FastEndpoints.csproj" />
     <Project Path="src/Inertia.Net.Live.SignalR/Inertia.Net.Live.SignalR.csproj" />
     <Project Path="src/Inertia.Net.Live.Sse/Inertia.Net.Live.Sse.csproj" />
@@ -24,6 +25,7 @@
     <Project Path="tests/Inertia.Net.EntityFrameworkCore.Tests/Inertia.Net.EntityFrameworkCore.Tests.csproj" />
     <Project Path="tests/Inertia.Net.MongoDB.Tests/Inertia.Net.MongoDB.Tests.csproj" />
     <Project Path="tests/Inertia.Net.Redis.Tests/Inertia.Net.Redis.Tests.csproj" />
+    <Project Path="tests/Inertia.Net.Postgres.Tests/Inertia.Net.Postgres.Tests.csproj" />
     <Project Path="tests/Inertia.Net.AotSmoke/Inertia.Net.AotSmoke.csproj" />
     <Project Path="tests/Inertia.Net.Benchmarks/Inertia.Net.Benchmarks.csproj" />
     <Project Path="tests/Inertia.Net.HostingProbe/Inertia.Net.HostingProbe.csproj" />

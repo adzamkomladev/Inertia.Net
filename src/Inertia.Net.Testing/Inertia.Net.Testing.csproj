@@ -5,5 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- FakeBackplane implements IInertiaLiveBackplane. -->
+    <ProjectReference Include="../Inertia.Net/Inertia.Net.csproj" />
   </ItemGroup>
 </Project>

@@ -40,6 +40,45 @@ public interface IInertiaLive
     /// </summary>
     /// <inheritdoc cref="PublishAsync{TProps}(LiveEvent, TProps, JsonTypeInfo{TProps}, string?, CancellationToken)"/>
     ValueTask PublishAsync<TProps>(LiveEvent @event, TProps props, string? exceptSocketId = null, CancellationToken cancellationToken = default);
+
+#pragma warning disable RS0026 // The overloads mirror PublishAsync's, optional exceptSocketId included.
+    /// <summary>
+    /// Builds the message <see cref="PublishAsync(LiveEvent, string?, CancellationToken)"/> would send, without sending it: for a
+    /// transactional publish (<c>PostgresLiveBackplane.PublishAsync(message, connection, transaction)</c>), tests and custom transports.
+    /// </summary>
+    /// <param name="event">The event and its channel.</param>
+    /// <param name="exceptSocketId">A connection to leave out, usually the caller's <see cref="InertiaRequest.SocketId"/>.</param>
+    LiveMessage CreateMessage(LiveEvent @event, string? exceptSocketId = null)
+    {
+        ArgumentNullException.ThrowIfNull(@event);
+        return new LiveMessage(@event, LiveEnvelope.Build(@event, writeProps: null), exceptSocketId);
+    }
+
+    /// <summary>Builds the message <see cref="PublishAsync{TProps}(LiveEvent, TProps, JsonTypeInfo{TProps}, string?, CancellationToken)"/> would send, without sending it.</summary>
+    /// <param name="event">The event and its channel.</param>
+    /// <param name="props">An object or dictionary keyed by prop path.</param>
+    /// <param name="propsTypeInfo">The serialization metadata of <typeparamref name="TProps"/>.</param>
+    /// <param name="exceptSocketId">A connection to leave out.</param>
+    LiveMessage CreateMessage<TProps>(LiveEvent @event, TProps props, JsonTypeInfo<TProps> propsTypeInfo, string? exceptSocketId = null)
+    {
+        ArgumentNullException.ThrowIfNull(@event);
+        ArgumentNullException.ThrowIfNull(propsTypeInfo);
+        LiveEnvelope.ThrowIfInvalidProps(props, propsTypeInfo);
+        var payload = LiveEnvelope.Build(@event, props is null ? null : writer => JsonSerializer.Serialize(writer, props, propsTypeInfo));
+        return new LiveMessage(@event, payload, exceptSocketId);
+    }
+
+    /// <summary>
+    /// Builds the message <see cref="PublishAsync{TProps}(LiveEvent, TProps, string?, CancellationToken)"/> would send, without sending it.
+    /// The default implementation (for custom <see cref="IInertiaLive"/> implementations written before 1.10) throws
+    /// <see cref="NotSupportedException"/>, since only the registered implementation knows the page serializer options.
+    /// </summary>
+    /// <param name="event">The event and its channel.</param>
+    /// <param name="props">An object or dictionary keyed by prop path, serialized with the page serializer options.</param>
+    /// <param name="exceptSocketId">A connection to leave out.</param>
+    LiveMessage CreateMessage<TProps>(LiveEvent @event, TProps props, string? exceptSocketId = null) =>
+        throw new NotSupportedException($"{GetType().Name} does not implement CreateMessage with the page serializer options; pass a JsonTypeInfo<TProps>.");
+#pragma warning restore RS0026
 }
 
 #pragma warning restore CA1716
@@ -96,28 +135,23 @@ internal sealed class InertiaLive(IServiceProvider services) : IInertiaLive
 {
     private IInertiaLiveBroadcaster? _broadcaster;
 
-    public ValueTask PublishAsync(LiveEvent @event, string? exceptSocketId = null, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(@event);
-        var payload = LiveEnvelope.Build(@event, writeProps: null);
-        return Broadcaster.PublishAsync(new LiveMessage(@event, payload, exceptSocketId), cancellationToken);
-    }
+    private IInertiaLive Self => this; // the interface's default CreateMessage implementations
 
-    public ValueTask PublishAsync<TProps>(LiveEvent @event, TProps props, JsonTypeInfo<TProps> propsTypeInfo, string? exceptSocketId = null, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(@event);
-        ArgumentNullException.ThrowIfNull(propsTypeInfo);
-        LiveEnvelope.ThrowIfInvalidProps(props, propsTypeInfo);
-        var payload = LiveEnvelope.Build(@event, props is null ? null : writer => JsonSerializer.Serialize(writer, props, propsTypeInfo));
-        return Broadcaster.PublishAsync(new LiveMessage(@event, payload, exceptSocketId), cancellationToken);
-    }
+    public ValueTask PublishAsync(LiveEvent @event, string? exceptSocketId = null, CancellationToken cancellationToken = default) =>
+        Broadcaster.PublishAsync(Self.CreateMessage(@event, exceptSocketId), cancellationToken);
 
-    public ValueTask PublishAsync<TProps>(LiveEvent @event, TProps props, string? exceptSocketId = null, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<TProps>(LiveEvent @event, TProps props, JsonTypeInfo<TProps> propsTypeInfo, string? exceptSocketId = null, CancellationToken cancellationToken = default) =>
+        Broadcaster.PublishAsync(Self.CreateMessage(@event, props, propsTypeInfo, exceptSocketId), cancellationToken);
+
+    public ValueTask PublishAsync<TProps>(LiveEvent @event, TProps props, string? exceptSocketId = null, CancellationToken cancellationToken = default) =>
+        Broadcaster.PublishAsync(CreateMessage(@event, props, exceptSocketId), cancellationToken);
+
+    public LiveMessage CreateMessage<TProps>(LiveEvent @event, TProps props, string? exceptSocketId = null)
     {
         ArgumentNullException.ThrowIfNull(@event);
         if (props is null)
         {
-            return PublishAsync(@event, exceptSocketId, cancellationToken);
+            return Self.CreateMessage(@event, exceptSocketId);
         }
 
         // The page serializer options, so values match a reload byte for byte (naming policy, big integers, the app's contexts); a
@@ -128,10 +162,10 @@ internal sealed class InertiaLive(IServiceProvider services) : IInertiaLive
         var info = options.GetTypeInfo(type);
         LiveEnvelope.ThrowIfInvalidProps(props, info);
         var payload = LiveEnvelope.Build(@event, writer => JsonSerializer.Serialize(writer, props, info));
-        return Broadcaster.PublishAsync(new LiveMessage(@event, payload, exceptSocketId), cancellationToken);
+        return new LiveMessage(@event, payload, exceptSocketId);
     }
 
     private IInertiaLiveBroadcaster Broadcaster => _broadcaster ??= services.GetService<IInertiaLiveBroadcaster>()
         ?? throw new InvalidOperationException(
-            $"No {nameof(IInertiaLiveBroadcaster)} is registered. Add a transport (for example services.AddInertiaLive().AddSignalR() from Inertia.Net.Live.SignalR) or register your own {nameof(IInertiaLiveBroadcaster)}.");
+            $"No {nameof(IInertiaLiveBroadcaster)} is registered. Add a transport (for example services.AddInertiaLive().AddSse() from Inertia.Net.Live.Sse) or register your own {nameof(IInertiaLiveBroadcaster)}.");
 }

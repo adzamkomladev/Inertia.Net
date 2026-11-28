@@ -2,7 +2,7 @@
   <PropertyGroup>
     <RootNamespace>Inertia.Net.Live.Sse</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>
-    <Description>Server-Sent Events transport for Inertia.Net live props: one endpoint, no client library, single app instance (Native AOT compatible).</Description>
+    <Description>Server-Sent Events transport for Inertia.Net live props: one endpoint, no client library, any number of app instances with a backplane (Native AOT compatible).</Description>
     <PackageTags>$(PackageTags) sse server-sent-events realtime live-props</PackageTags>
   </PropertyGroup>
   <ItemGroup>

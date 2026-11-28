@@ -19,6 +19,8 @@
     <ProjectReference Include="..\..\src\Inertia.Net.FastEndpoints\Inertia.Net.FastEndpoints.csproj" />
     <ProjectReference Include="..\..\src\Inertia.Net.Live.SignalR\Inertia.Net.Live.SignalR.csproj" />
     <ProjectReference Include="..\..\src\Inertia.Net.Redis\Inertia.Net.Redis.csproj" />
+    <ProjectReference Include="..\..\src\Inertia.Net.Live.Sse\Inertia.Net.Live.Sse.csproj" />
+    <ProjectReference Include="..\..\src\Inertia.Net.Postgres\Inertia.Net.Postgres.csproj" />
     <!-- Source-generated endpoint discovery (DiscoveredTypes) and request binding data (ReflectionCache) for Native AOT. -->
     <PackageReference Include="FastEndpoints.Generator" PrivateAssets="all" />
   </ItemGroup>

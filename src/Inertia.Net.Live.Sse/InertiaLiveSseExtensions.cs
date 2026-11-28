@@ -21,9 +21,10 @@ namespace Inertia.Net;
 public static class InertiaLiveSseExtensions
 {
     /// <summary>
-    /// Delivers live props over Server-Sent Events: registers the broadcaster, the open-stream registry and the channel authorizer. Map
-    /// the endpoint with <see cref="MapInertiaLiveSse"/>. Events reach the clients connected to this app instance only: with several
-    /// instances behind a load balancer use the SignalR transport with a backplane instead.
+    /// Delivers live props over Server-Sent Events: registers the open-stream registry as this instance's local transport, and the
+    /// channel authorizer. Map the endpoint with <see cref="MapInertiaLiveSse"/>. Events reach the clients connected to this app
+    /// instance; with several instances or a separate worker, add a backplane (<c>.AddRedisBackplane()</c>,
+    /// <c>.AddPostgresBackplane()</c>) and every instance delivers every event. No sticky sessions are needed.
     /// </summary>
     public static IInertiaLiveBuilder AddSse(this IInertiaLiveBuilder builder, Action<InertiaLiveSseOptions>? configure = null)
     {
@@ -41,10 +42,8 @@ public static class InertiaLiveSseExtensions
             .Validate(o => o.HeartbeatInterval > TimeSpan.Zero, "InertiaLiveSseOptions.HeartbeatInterval must be positive.")
             .ValidateOnStart();
         services.TryAddSingleton<SseLiveConnections>();
-        services.TryAddSingleton<IInertiaLiveBroadcaster>(static sp => sp.GetRequiredService<SseLiveConnections>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IInertiaLiveLocalTransport, SseLiveConnections>(static sp => sp.GetRequiredService<SseLiveConnections>()));
         services.TryAddSingleton<LiveOrigin>();
-        services.TryAddScoped<ILiveChannelAuthorizer>(static sp =>
-            sp.GetRequiredService<IOptions<InertiaLiveSseOptions>>().Value.AuthorizerFactory?.Invoke(sp) ?? DenyingLiveChannelAuthorizer.Instance);
         return builder;
     }
 
@@ -61,11 +60,12 @@ public static class InertiaLiveSseExtensions
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentException.ThrowIfNullOrEmpty(pattern);
         var services = endpoints.ServiceProvider;
-        var options = services.GetRequiredService<IOptions<InertiaLiveSseOptions>>();
+        // Read per connection: a configuration reload applies to new streams; open ones keep the settings they started with.
+        var options = services.GetRequiredService<IOptionsMonitor<InertiaLiveSseOptions>>();
         var origin = services.GetRequiredService<LiveOrigin>();
         var connections = services.GetRequiredService<SseLiveConnections>();
         var stopping = services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping;
-        return endpoints.MapGet(pattern, http => ConnectAsync(http, options.Value, origin, connections, stopping));
+        return endpoints.MapGet(pattern, http => ConnectAsync(http, options.CurrentValue, origin, connections, stopping));
     }
 
     private static async Task ConnectAsync(HttpContext http, InertiaLiveSseOptions options, LiveOrigin origin, SseLiveConnections connections, CancellationToken stopping)
@@ -85,7 +85,11 @@ public static class InertiaLiveSseExtensions
 
         var id = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
         var caller = new SseCallerContext(http, id);
-        var authorizer = http.RequestServices.GetRequiredService<ILiveChannelAuthorizer>();
+        // SSE's own Authorize(...) first, so a SignalR policy registered alongside never decides for SSE; then an app-registered
+        // ILiveChannelAuthorizer (shared by both transports); otherwise only public channels.
+        var authorizer = options.AuthorizerFactory?.Invoke(http.RequestServices)
+            ?? http.RequestServices.GetService<ILiveChannelAuthorizer>()
+            ?? DenyingLiveChannelAuthorizer.Instance;
         var channels = new HashSet<string>(StringComparer.Ordinal);
         var refused = new List<string>();
         foreach (var key in requested.OfType<string>())
@@ -109,7 +113,7 @@ public static class InertiaLiveSseExtensions
             channels.Add(channel.Key);
         }
 
-        var connection = new SseConnection(id, channels, options.MaxQueuedEvents);
+        var connection = new SseConnection(id, channels, options.MaxQueuedEvents) { Abort = http.Abort };
         // Set by UseAuthentication(); without it (or without a sign-in) the stream has no expiry.
         var expires = http.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties?.ExpiresUtc;
         using var aborted = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted, stopping);
@@ -126,6 +130,7 @@ public static class InertiaLiveSseExtensions
         finally
         {
             connections.Remove(connection);
+            connection.Ended();
         }
     }
 

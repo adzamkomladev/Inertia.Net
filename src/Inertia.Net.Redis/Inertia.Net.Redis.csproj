@@ -6,5 +6,6 @@
   <ItemGroup>
     <ProjectReference Include="../Inertia.Net/Inertia.Net.csproj" />
     <PackageReference Include="StackExchange.Redis" />
+    <InternalsVisibleTo Include="Inertia.Net.Redis.Tests" />
   </ItemGroup>
 </Project>
