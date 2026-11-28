@@ -59,12 +59,12 @@ public static class InertiaHeaders
     internal static readonly string PageVary = string.Join(", ", PageVaryHeaders);
 
     /// <summary>Adds <c>X-Inertia</c> to <c>Vary</c> unless it (or <c>*</c>) is already listed.</summary>
-    internal static void AppendVary(IHeaderDictionary headers)
+    internal static void AppendVary(IHeaderDictionary headers, string token = Inertia)
     {
         var vary = CleanVary(headers);
-        if (!Lists(vary, Inertia) && !Lists(vary, "*"))
+        if (!Lists(vary, token) && !Lists(vary, "*"))
         {
-            headers.Vary = StringValues.Concat(vary, Inertia);
+            headers.Vary = StringValues.Concat(vary, token);
         }
     }
 

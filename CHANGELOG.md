@@ -7,6 +7,18 @@ Release versions use `MAJOR.MINOR.PATCH`; observable behavior changes are docume
 
 ## [Unreleased]
 
+## [1.9.9] - 2026-11-28
+
+### Fixed
+
+- DevTools applies the request capture budget to already-bound multipart forms and continues to record file metadata only.
+- The generated starter caps shared demo todos at 100 and shows a validation error when full. Projects generated earlier can apply the same cap to their own demo store.
+- Queued stale refreshes honor intervening prop and SSR cache invalidations. Cache mutations wait only for pending writes matching their key or tag.
+- The Redis adapter disposes multiplexers it creates and leaves the lifetime of injected connections to the application.
+- External and fragment redirects eligible for conversion vary on the prefetch header. The default SSR HTTP handler disables cookies and the render parser requires a complete JSON document.
+- SSR refresh work reserves capacity before copying page data for pending responses.
+- The partial-selector benchmark holds the rendered output constant and measures extra optional loaders separately.
+
 ## [1.9.8] - 2026-11-28
 
 ### Fixed

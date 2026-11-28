@@ -120,9 +120,13 @@ app.MapGet("/todos", (TodoStore todos) => Render(new TodosPage(
     })))).WithName("todos.index");
 
 // Invalid input never reaches the handler: the client gets a redirect back with the errors.
-app.MapPost("/todos", (HttpContext http, TodoStore todos, NewTodo input) =>
+app.MapPost("/todos", IResult (HttpContext http, TodoStore todos, NewTodo input) =>
 {
-    todos.Add(input.Title!);
+    if (!todos.TryAdd(input.Title!))
+    {
+        return Back("/todos").WithErrors(new Dictionary<string, string> { ["title"] = "The demo list is full. Delete a todo before adding another." });
+    }
+
     http.Inertia().Flash("success", "Todo added");
     return Results.Redirect("/todos");
 }).WithInertiaValidation().WithName("todos.store");
@@ -203,9 +207,10 @@ namespace InertiaStarter
         public string? Title { get; set; }
     }
 
-    /// <summary>In-memory todos shared by every request. Swap it for a database.</summary>
+    /// <summary>In-memory demo list shared by every request, with room for 100 todos. Swap it for a database.</summary>
     public sealed class TodoStore
     {
+        private const int Capacity = 100;
         private readonly Lock _lock = new();
         private readonly List<Todo> _todos = [new(1, "Read the Inertia.Net README", false), new(2, "Build something", false)];
         private int _nextId = 3;
@@ -226,11 +231,13 @@ namespace InertiaStarter
             }
         }
 
-        public void Add(string title)
+        public bool TryAdd(string title)
         {
             lock (_lock)
             {
+                if (_todos.Count >= Capacity) return false;
                 _todos.Add(new Todo(_nextId++, title, false));
+                return true;
             }
         }
 

@@ -503,6 +503,7 @@ public sealed class SsrResilienceTests
         var sockets = Assert.IsType<SocketsHttpHandler>(handler);
         Assert.False(sockets.AllowAutoRedirect);
         Assert.False(sockets.UseProxy);
+        Assert.False(sockets.UseCookies);
     }
 
     [Theory]

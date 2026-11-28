@@ -9,7 +9,7 @@ Later visits fetch a page object as JSON: the component name, its props, the URL
 the screen without a full reload. You keep ASP.NET Core routing, authentication and validation. You do not need a separate API
 or a client-side router for these pages.
 
-Inertia.Net **1.9.8** is a server adapter for the **Inertia.js v3** protocol. It targets .NET 10 and .NET 11 and supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT (ahead-of-time compilation). FastEndpoints apps support Native AOT when you add the FastEndpoints source generator. MVC itself does not support Native AOT.
+Inertia.Net **1.9.9** is a server adapter for the **Inertia.js v3** protocol. It targets .NET 10 and .NET 11 and supports Minimal APIs, MVC and FastEndpoints. Minimal API apps support Native AOT (ahead-of-time compilation). FastEndpoints apps support Native AOT when you add the FastEndpoints source generator. MVC itself does not support Native AOT.
 
 <a id="implementation-tasks"></a>
 
@@ -45,7 +45,7 @@ Inertia.Net **1.9.8** is a server adapter for the **Inertia.js v3** protocol. It
 Install a .NET 10 SDK and Node.js 22.12+ first. In the folder where you want your app, run:
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.8
+dotnet new install Inertia.Net.Templates@1.9.9
 dotnet new inertia -n MyApp --framework react
 cd MyApp
 npm install
@@ -259,7 +259,7 @@ You need the .NET 10 or .NET 11 SDK and JavaScript frontend build tools. npm, Bu
 Install the template once.
 
 ```sh
-dotnet new install Inertia.Net.Templates@1.9.8
+dotnet new install Inertia.Net.Templates@1.9.9
 ```
 
 Run the command for your frontend, then change into the new app directory with `cd MyApp`.
@@ -394,17 +394,17 @@ Inertia.Net is not compatible with the Inertia v2 protocol. MVC TempData storage
 | `Inertia.Net.Templates` | `dotnet new install Inertia.Net.Templates`: `dotnet new inertia` starts an app (React, Vue or Svelte) |
 
 ```sh
-dotnet add package Inertia.Net --version 1.9.8
-dotnet add package Inertia.Net.Mvc --version 1.9.8 # MVC only
-dotnet add package Inertia.Net.FastEndpoints --version 1.9.8 # FastEndpoints only
-dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.8 # EF Core pagination
-dotnet add package Inertia.Net.Testing --version 1.9.8 # test projects
-dotnet add package Inertia.Net.Live.SignalR --version 1.9.8 # live props over SignalR
-dotnet add package Inertia.Net.Redis --version 1.9.8 # Redis cache store
-dotnet add package Inertia.Net.MongoDB --version 1.9.8 # MongoDB pagination
+dotnet add package Inertia.Net --version 1.9.9
+dotnet add package Inertia.Net.Mvc --version 1.9.9 # MVC only
+dotnet add package Inertia.Net.FastEndpoints --version 1.9.9 # FastEndpoints only
+dotnet add package Inertia.Net.EntityFrameworkCore --version 1.9.9 # EF Core pagination
+dotnet add package Inertia.Net.Testing --version 1.9.9 # test projects
+dotnet add package Inertia.Net.Live.SignalR --version 1.9.9 # live props over SignalR
+dotnet add package Inertia.Net.Redis --version 1.9.9 # Redis cache store
+dotnet add package Inertia.Net.MongoDB --version 1.9.9 # MongoDB pagination
 ```
 
-Inertia.Net requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`). The frontend needs JavaScript build tools with npm, Bun, pnpm or Yarn. Use version `1.9.8` for all Inertia.Net packages. Inertia.Net 1.9.8 uses the Inertia.js v3 protocol. The package version and the protocol version are separate version numbers.
+Inertia.Net requires .NET 10 or .NET 11 and an ASP.NET Core app (`Microsoft.NET.Sdk.Web`). The frontend needs JavaScript build tools with npm, Bun, pnpm or Yarn. Use version `1.9.9` for all Inertia.Net packages. Inertia.Net 1.9.9 uses the Inertia.js v3 protocol. The package version and the protocol version are separate version numbers.
 
 ### .NET 10 and .NET 11
 
@@ -1069,7 +1069,7 @@ app.MapPost("/orders", async (OrderInput input, IInertiaCache cache, Cancellatio
 serializes the value as a prop of its type would be, and takes the same `staleFor` and `tags`. A scroll value's paging metadata comes
 from `IProvidesScrollMetadata`. With the default store a removal frees the entries at once.
 
-A removal or a `SetPropAsync` call waits for the cache writes that this app instance already has under way. A load or refresh of that
+A removal or a `SetPropAsync` call waits for in-flight writes to the affected key or tag on this app instance. A load or refresh of that
 key (or of a prop with that tag) that started before the removal or the `SetPropAsync` call neither stores nor shares its value
 afterwards. Later requests see the new value, or load again. Loads of other keys and tags are not affected. This guarantee is per app
 instance. With a shared store (Redis, MongoDB), a load on another instance that finishes after the removal can still store a value that

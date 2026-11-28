@@ -324,6 +324,28 @@ public sealed class DevToolsParityTests
         Assert.DoesNotContain("secret", entry.ToJsonString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(49L, "ok", true)]
+    [InlineData(48L, "ok", false)]
+    [InlineData(null, "éé", false)]
+    [InlineData(null, "ééé", true)]
+    public async Task Parsed_uploads_obey_the_recording_budget(long? length, string value, bool omitted)
+    {
+        var harness = Recording(options => options.MaxBodyBytes = length is null ? 10 : 48);
+        var http = harness.Context().AsInertia();
+        http.Request.ContentType = "multipart/form-data; boundary=test";
+        http.Request.ContentLength = length;
+        http.Features.Set<IFormFeature>(new FormFeature(new FormCollection(new Dictionary<string, StringValues>
+        {
+            ["name"] = value,
+        })));
+        var entry = await RecordAsync(harness, http);
+        var body = entry["http"]!["requestBody"]!;
+        Assert.Equal(omitted ? "omitted" : "present", (string?)body["status"]);
+        if (omitted) Assert.Equal("too-large", (string?)body["reason"]);
+        else Assert.Equal(value, (string?)body["value"]!["name"]);
+    }
+
     [Fact]
     public async Task Uploads_are_summarized_without_reading_file_contents()
     {
@@ -392,6 +414,7 @@ public sealed class DevToolsParityTests
     public async Task Broadcasting_during_a_render_does_not_mutate_the_active_capture()
     {
         var harness = Recording();
+        _ = harness.Services.GetRequiredService<DevToolsRecorder>();
         var http = harness.Context().AsInertia();
         var capture = Capture();
         http.Features.Set(capture);

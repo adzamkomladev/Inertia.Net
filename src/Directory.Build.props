@@ -4,7 +4,7 @@
     <IsPackable>true</IsPackable>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <Version>1.9.8</Version>
+    <Version>1.9.9</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Authors>Inertia.Net contributors</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

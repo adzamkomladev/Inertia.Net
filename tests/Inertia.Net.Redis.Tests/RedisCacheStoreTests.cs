@@ -43,6 +43,32 @@ public sealed class RedisCacheStoreTests
     private static InertiaCacheEntryOptions Entry(TimeSpan? ttl = null, params string[] tags) => new(ttl ?? TimeSpan.FromMinutes(1), tags);
 
     [Fact]
+    public async Task Disposing_the_host_closes_the_owned_connection()
+    {
+        var app = App();
+        var store = Store(app);
+        await store.GetAsync(Key("lifecycle"), Ct);
+        await app.DisposeAsync();
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await store.GetAsync(Key("lifecycle"), Ct));
+    }
+
+    [Fact]
+    public async Task Disposing_the_host_preserves_a_borrowed_connection()
+    {
+        Assert.SkipWhen(Url is null, "REDIS_URL is not set");
+        using var redis = await ConnectionMultiplexer.ConnectAsync(Url!);
+        var services = new ServiceCollection();
+        services.AddSingleton<IConnectionMultiplexer>(redis);
+        services.AddInertiaRedisCache();
+        await using (var app = services.BuildServiceProvider())
+        {
+            await Store(app).GetAsync(Key("lifecycle"), Ct);
+        }
+
+        await redis.GetDatabase().PingAsync();
+    }
+
+    [Fact]
     public async Task Values_are_stored_replaced_removed_and_expire()
     {
         await using var app = App();

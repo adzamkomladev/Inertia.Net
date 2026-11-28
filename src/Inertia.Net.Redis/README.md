@@ -1,7 +1,8 @@
 # Inertia.Net.Redis
 
 A Redis store for [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net)'s cache: cached props (`.Cache(...)`) and SSR renders are
-shared by every app instance, and `IInertiaCache.RemoveByTagAsync` removes them everywhere.
+shared by every app instance, and `IInertiaCache.RemoveByTagAsync` removes them everywhere while the tag indexes are intact.
+Use a properly sized Redis instance with the `noeviction` policy when tag invalidation must be reliable. Redis eviction can discard a tag index while its cached value survives until expiration.
 
 ```csharp
 builder.Services.AddInertia();

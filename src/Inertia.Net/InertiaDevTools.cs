@@ -509,28 +509,33 @@ internal sealed partial class DevToolsRecorder
 
     private async Task<Body> ReadRequestBodyAsync(HttpRequest request)
     {
-        if (request.ContentLength == 0 || (request.ContentLength is null && !request.Headers.ContainsKey("Transfer-Encoding")))
+        var multipart = request.HasFormContentType && request.ContentType!.StartsWith("multipart/", StringComparison.OrdinalIgnoreCase);
+        var isInertia = !string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]);
+        var parsedForm = multipart && isInertia && request.ContentLength is null
+            ? request.HttpContext.Features.Get<IFormFeature>()?.Form : null;
+        if (request.ContentLength == 0 || (request.ContentLength is null && parsedForm is null && !request.Headers.ContainsKey("Transfer-Encoding")))
         {
             return Body.Empty;
         }
 
-        if (string.IsNullOrEmpty(request.Headers[InertiaHeaders.Inertia]))
+        if (!isInertia)
         {
             return Body.Omitted("non-inertia-request");
         }
 
-        if (request.HasFormContentType && request.ContentType!.StartsWith("multipart/", StringComparison.OrdinalIgnoreCase))
+        if (multipart)
         {
-            var form = request.HttpContext.Features.Get<IFormFeature>()?.Form;
-            if (form is null)
+            if (request.ContentLength > _options.MaxBodyBytes) return Body.Omitted("too-large");
+            parsedForm ??= request.HttpContext.Features.Get<IFormFeature>()?.Form;
+            if (parsedForm is null)
             {
-                if (request.ContentLength > _options.MaxBodyBytes) return Body.Omitted("too-large");
                 // Never consume or buffer a file upload merely for inspection.
                 return Body.Omitted("streamed");
             }
+            if (!FitsFormSummaryBudget(parsedForm, _options.MaxBodyBytes)) return Body.Omitted("too-large");
             var summary = new JsonObject();
-            foreach (var (key, values) in form) summary[key] = values.ToString();
-            foreach (var files in form.Files.GroupBy(file => file.Name))
+            foreach (var (key, values) in parsedForm) summary[key] = values.ToString();
+            foreach (var files in parsedForm.Files.GroupBy(file => file.Name))
             {
                 var values = files.Select(file => (JsonNode)new JsonObject
                 {
@@ -602,6 +607,33 @@ internal sealed partial class DevToolsRecorder
         {
             request.Body.Position = position;
         }
+    }
+
+    // Count individual strings before joining repeated values or constructing any JSON nodes.
+    private static bool FitsFormSummaryBudget(IFormCollection form, long remaining)
+    {
+        bool Charge(string? text)
+        {
+            // Charge at least one byte for each item, including empty values and metadata.
+            remaining -= 1L + Encoding.UTF8.GetByteCount(text ?? "");
+            return remaining >= 0;
+        }
+
+        foreach (var (key, values) in form)
+        {
+            if (!Charge(key)) return false;
+            foreach (var value in values)
+            {
+                if (!Charge(value)) return false;
+            }
+        }
+
+        foreach (var file in form.Files)
+        {
+            if (!Charge(file.Name) || !Charge(file.FileName) || !Charge(file.ContentType)) return false;
+        }
+
+        return true;
     }
 
     private byte[] Write(HttpContext httpContext, DevToolsCapture capture, Body requestBody, string requestType, string? tab, DateTimeOffset now, bool failed)
